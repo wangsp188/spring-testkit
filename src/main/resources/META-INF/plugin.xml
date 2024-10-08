@@ -1,0 +1,40 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>com.zcc.zcc_plugin</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>Zcc_plugin</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="dex.wang@zcc" url="https://www.yourcompany.com">zcc</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    zcczcczcczcczcczcczcczcczcczcczcczcczcczcczcczcc
+  ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Register LineMarkerProvider -->
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.zcc.plugin.spring_cache.SpringCacheIconProvider"/>
+        <java.programPatcher implementation="com.zcc.plugin.SideServerJavaProgramPatcher" />
+        <!-- Here you can register other extensions, for example, actions -->
+    </extensions>
+
+    <actions>
+        <action id="zcc_log_to_link" class="com.zcc.plugin.links.Log2LinksAction" text="zcc_log_to_link"
+                description="Processes the selected text and copies the results to clipboard">
+            <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>
