@@ -14,6 +14,7 @@ repositories {
 dependencies {
     // FastJSON 依赖
     implementation("com.alibaba:fastjson:1.2.83")
+    implementation(files("libs/zcc_side_server-0.0.1-SNAPSHOT.jar"))
 }
 
 // Configure Gradle IntelliJ Plugin
