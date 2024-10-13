@@ -36,5 +36,9 @@
                 description="Processes the selected text and copies the results to clipboard">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
+        <action id="zcc_popup_log_to_link" class="com.zcc.plugin.links.Log2LinksWebViewAction" text="zcc_popup_log_to_link"
+                description="Processes the selected text and copies the results to clipboard">
+            <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
+        </action>
     </actions>
 </idea-plugin>

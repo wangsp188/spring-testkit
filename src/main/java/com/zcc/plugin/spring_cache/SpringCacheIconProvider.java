@@ -36,15 +36,6 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
                         return "This method is cacheable";
                     }
                 },
-//                (MouseEvent e, PsiElement elt) -> {
-//                    Project project = elt.getProject();
-//                    Messages.showInputDialog(
-//                            project,
-//                            "Enter your input:",
-//                            "Input Dialog",
-//                            Messages.getQuestionIcon()
-//                    );
-//                },
                 new CacheableIconNavigationHandler(method),
                 GutterIconRenderer.Alignment.RIGHT
         );
