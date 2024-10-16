@@ -23,7 +23,7 @@ intellij {
     version.set("2023.2.6")
     type.set("IU") // Target IDE Platform
 
-    plugins.set(listOf("com.intellij.java"))
+    plugins.set(listOf("com.intellij.java","Git4Idea"))
 }
 
 tasks {

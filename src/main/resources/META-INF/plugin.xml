@@ -21,6 +21,7 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
+    <depends>Git4Idea</depends>
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
@@ -39,6 +40,12 @@
         <action id="zcc_popup_log_to_link" class="com.zcc.plugin.links.Log2LinksWebViewAction" text="zcc_popup_log_to_link"
                 description="Processes the selected text and copies the results to clipboard">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
+        </action>
+        <action id="EnumScanAction"
+                class="com.zcc.plugin.codeanaly.EnumScanAction"
+                text="Scan Enum Value Usage"
+                description="Scan Enum Value Usage and Last Committer Email">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

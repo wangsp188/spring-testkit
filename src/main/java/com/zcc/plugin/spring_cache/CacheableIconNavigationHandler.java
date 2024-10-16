@@ -1,17 +1,12 @@
 package com.zcc.plugin.spring_cache;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
-import com.intellij.json.JsonFileType;
 import com.intellij.json.JsonLanguage;
-import com.intellij.openapi.editor.EditorFactory;
-import com.intellij.openapi.editor.EditorSettings;
-import com.intellij.openapi.editor.impl.DocumentImpl;
-import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
-import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
 import com.zcc.plugin.HttpUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -21,6 +16,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 public class CacheableIconNavigationHandler implements GutterIconNavigationHandler<PsiElement> {
     private final PsiMethod method;
@@ -61,7 +58,43 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
 
         JPanel inputPanel = new JPanel(new BorderLayout());
         JLabel inputLabel = new JLabel("Input JSON Array:");
-        LanguageTextField inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE,project,"[]",false);
+        ArrayList initParams = new ArrayList();
+//      遍历方法参数，如果是简单对象，则设置为空字符，如果是array/collection则设置为空集合，否则就是空map
+        PsiMethod method = (PsiMethod) elt;
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        for (PsiParameter parameter : parameters) {
+            PsiType type = parameter.getType();
+            if (type.equalsToText("boolean") || type.equalsToText("java.lang.Boolean")) {
+                initParams.add(false);
+            } else if (type.equalsToText("char") || type.equalsToText("java.lang.Character")) {
+                initParams.add('\0');
+            } else if (type.equalsToText("byte") || type.equalsToText("java.lang.Byte")) {
+                initParams.add((byte) 0);
+            } else if (type.equalsToText("short") || type.equalsToText("java.lang.Short")) {
+                initParams.add((short) 0);
+            } else if (type.equalsToText("int") || type.equalsToText("java.lang.Integer")) {
+                initParams.add(0);
+            } else if (type.equalsToText("long") || type.equalsToText("java.lang.Long")) {
+                initParams.add(0L);
+            } else if (type.equalsToText("float") || type.equalsToText("java.lang.Float")) {
+                initParams.add(0.0f);
+            } else if (type.equalsToText("double") || type.equalsToText("java.lang.Double")) {
+                initParams.add(0.0);
+            } else if (type.equalsToText("java.lang.String")) {
+                initParams.add("");
+            } else if (type.equalsToText("java.util.Collection") || type.equalsToText("java.util.List")|| type.equalsToText("java.util.ArrayList") || type.equalsToText("java.util.HashSet") || type.equalsToText("java.util.Set")) {
+                initParams.add(new ArrayList<>());
+            } else if (type.equalsToText("java.util.Map")) {
+                initParams.add(new HashMap<>());
+            } else if (type instanceof PsiArrayType) {
+                initParams.add(new ArrayList<>()); // 可以使用空集合来表示数组
+            } else {
+                initParams.add(new HashMap<>()); // 为复杂对象类型初始化空映射
+            }
+        }
+
+
+        LanguageTextField inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE,project, JSON.toJSONString(initParams,true),false);
         inputPanel.add(inputLabel, BorderLayout.NORTH);
         inputPanel.add(new JScrollPane(inputEditorTextField), BorderLayout.CENTER);
 
@@ -85,12 +118,46 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
         portPanel.add(portTextField);
 
         // 将submit按钮移到port输入框的右边，在一行
+        JButton testPort = new JButton("Test port");
+        portPanel.add(testPort);
+        testPort.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String port = portTextField.getText();
+                if (port == null || port.isBlank() || !StringUtils.isNumeric(port)) {
+                    outputTextArea.setText("端口号不可为空，且必须为数字");
+                    return;
+                }
+                JSONObject req = new JSONObject();
+                req.put("method", "hello");
+                JSONObject response = null;
+                try {
+                    response = HttpUtil.sendPost("http://localhost:" + (Integer.parseInt(port) + 10086) + "/", req, JSONObject.class);
+                    if (response == null) {
+                        outputTextArea.setText("返回结果为空");
+                    } else if (!response.getBooleanValue("success")) {
+                        outputTextArea.setText("失败：" + response.getString("message"));
+                    }else{
+                        outputTextArea.setText("棒棒");
+                    }
+                } catch (Exception ex) {
+                    outputTextArea.setText("僚机连接失败，请检查端口是否正确或者查看目标应用是否启动！");
+                }
+            }
+        });
+
         JButton submitButton = new JButton("Build key");
         portPanel.add(submitButton);
 
+        JButton getButton = new JButton("Get val");
+        portPanel.add(getButton);
+
+        JButton delButton = new JButton("Del val");
+        portPanel.add(delButton);
+
         frame.add(portPanel, BorderLayout.NORTH);
 
-        submitButton.addActionListener(new ActionListener() {
+        ActionListener actionListener = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
                 String jsonInput = inputEditorTextField.getDocument().getText();
@@ -116,7 +183,7 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
                     return;
                 }
                 try {
-                    JSONObject paramsJson = buildParams(method, jsonArray);
+                    JSONObject paramsJson = buildParams(event,method, jsonArray);
                     System.out.println("zcc_plugin,cache_req," + paramsJson.toJSONString());
                     JSONObject response = HttpUtil.sendPost("http://localhost:" + (Integer.parseInt(port) + 10086) + "/", paramsJson, JSONObject.class);
                     if (response == null) {
@@ -134,7 +201,10 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
                     }
                 }
             }
-        });
+        };
+        submitButton.addActionListener(actionListener);
+        getButton.addActionListener(actionListener);
+        delButton.addActionListener(actionListener);
 
         frame.setVisible(true);
     }
@@ -148,7 +218,7 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
         return sw.toString();
     }
 
-    private JSONObject buildParams(PsiMethod method, JSONArray args) throws Exception {
+    private JSONObject buildParams(ActionEvent event, PsiMethod method, JSONArray args) throws Exception {
         JSONObject params = new JSONObject();
         PsiClass containingClass = method.getContainingClass();
         String typeClass = containingClass.getQualifiedName();
@@ -166,7 +236,16 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
         params.put("argTypes", JSONObject.toJSONString(argTypes));
         params.put("args", args.toJSONString());
         JSONObject req = new JSONObject();
-        req.put("method", "build_cache_key");
+        JButton source = (JButton) event.getSource();
+        if("Build key".equals(source.getText())){
+            req.put("method", "build_cache_key");
+        }else if("Get val".equals(source.getText())){
+            req.put("method", "get_cache");
+        }else if("Del val".equals(source.getText())){
+            req.put("method", "delete_cache");
+        }else{
+            throw new IllegalArgumentException("unknown button");
+        }
         req.put("params", params);
         return req;
     }
@@ -202,4 +281,5 @@ public class CacheableIconNavigationHandler implements GutterIconNavigationHandl
 
         return beanName;
     }
+
 }
