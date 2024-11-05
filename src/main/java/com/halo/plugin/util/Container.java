@@ -1,4 +1,4 @@
-package com.zcc.plugin;
+package com.halo.plugin.util;
 
 public class Container<T> {
 

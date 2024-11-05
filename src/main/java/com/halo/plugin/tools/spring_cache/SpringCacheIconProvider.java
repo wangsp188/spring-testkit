@@ -1,4 +1,4 @@
-package com.zcc.plugin.spring_cache;
+package com.halo.plugin.tools.spring_cache;
 
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;  
@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 
 public class SpringCacheIconProvider implements LineMarkerProvider {
+
     private static final Icon CACHEABLE_ICON = new ImageIcon(SpringCacheIconProvider.class.getResource("/icons/cacheable.png"));
 
     @Nullable  

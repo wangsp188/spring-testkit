@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "zcc_plugin"
+rootProject.name = "zcc_halo"

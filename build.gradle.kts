@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.17.4"
 }
 
-group = "com.zcc"
+group = "com.halo"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -14,7 +14,7 @@ repositories {
 dependencies {
     // FastJSON 依赖
     implementation("com.alibaba:fastjson:1.2.83")
-    implementation(files("libs/zcc_side_server-0.0.1-SNAPSHOT.jar"))
+    implementation(files("libs/halo_side_server-0.0.1-SNAPSHOT.jar"))
 }
 
 // Configure Gradle IntelliJ Plugin
