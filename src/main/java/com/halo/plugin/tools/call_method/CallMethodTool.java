@@ -15,6 +15,7 @@ import com.halo.plugin.tools.BasePluginTool;
 import com.halo.plugin.tools.PluginToolEnum;
 import com.halo.plugin.view.PluginToolWindow;
 import com.intellij.ui.LanguageTextField;
+import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
 import java.awt.*;
@@ -131,7 +132,7 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
     private JPanel createMiddlePanel() {
         JPanel middlePanel = new JPanel(new BorderLayout());
         inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        middlePanel.add(new JScrollPane(inputEditorTextField), BorderLayout.CENTER);
+        middlePanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
 
         return middlePanel;
     }
@@ -139,8 +140,7 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
     private JPanel createBottomPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
         outputTextArea = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        bottomPanel.add(new JScrollPane(outputTextArea), BorderLayout.CENTER);
-
+        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
         return bottomPanel;
     }
 
