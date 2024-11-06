@@ -28,9 +28,12 @@
     <extensions defaultExtensionNs="com.intellij">
         <!-- Register LineMarkerProvider -->
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.halo.plugin.tools.spring_cache.SpringCacheIconProvider"/>
-        <java.programPatcher implementation="com.halo.plugin.SideServerJavaProgramPatcher" />
-        <toolWindow id="zcc halo"  icon="PlatformDebuggerImplIcons.MemoryView.Active" factoryClass="com.halo.plugin.view.PluginToolWindowFactory" anchor="right"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.halo.plugin.tools.flexible_test.FlexibleTestIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.halo.plugin.tools.call_method.CallMethodIconProvider"/>
 
+        <java.programPatcher implementation="com.halo.plugin.SideServerJavaProgramPatcher" />
+        <toolWindow id="zcc halo" icon="/icons/halo.svg"  factoryClass="com.halo.plugin.view.PluginToolWindowFactory" anchor="right"/>
+<!--icon="PlatformDebuggerImplIcons.MemoryView.Active"-->
         <!-- Here you can register other extensions, for example, actions -->
     </extensions>
 

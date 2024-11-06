@@ -2,9 +2,11 @@ package com.halo.plugin.tools.spring_cache;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.intellij.ui.LanguageTextField;
 import com.halo.plugin.tools.ActionTool;
@@ -19,9 +21,9 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public class SpringCacheTool extends BasePluginTool  implements ActionTool {
+    private static final Icon KIcon = IconLoader.getIcon("/icons/K.svg", SpringCacheTool.class);
 
     private JComboBox<MethodAction> actionComboBox;
 
@@ -37,19 +39,15 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
     public SpringCacheTool(PluginToolWindow pluginToolWindow) {
         super(pluginToolWindow);
         initializePanel();
-        // 假设有一个方法来传递选定的方法对象
-        // handleMethodSelection(PsiMethod method);
     }
 
     private void initializePanel() {
-        panel.setLayout(new GridBagLayout());
-
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.weightx = 1.0;
-        gbc.weighty = 0.1; // Top panel takes 10% of the space
+        gbc.weighty = 0.0; // 顶部面板不占用垂直空间
 
         // Top panel for method selection and actions
         JPanel topPanel = createTopPanel();
@@ -70,9 +68,79 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         panel.add(bottomPanel, gbc);
     }
 
+
+//    private JPanel createTopPanel() {
+//        JPanel topPanel = new JPanel(new BorderLayout());
+//        // 创建下拉框并添加到左侧
+//        actionComboBox = new ComboBox<>();
+//        topPanel.add(actionComboBox, BorderLayout.WEST);
+//
+//        // 创建按钮并设置图标和提示文字
+//        JButton getKeyButton = new JButton(new ImageIcon(new ImageIcon(getClass().getResource("/icons/K.png")).getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH)));
+//        getKeyButton.setToolTipText("get keys");
+//        JButton getValButton = new JButton(AllIcons.Actions.Find);
+//        getValButton.setToolTipText("get keys and get values for every key");
+//        JButton delValButton = new JButton(AllIcons.Actions.GC);
+//        delValButton.setToolTipText("get keys and delete these");
+//
+//        // 设置按钮大小
+//        Dimension buttonSize = new Dimension(32, 32);
+//        getKeyButton.setPreferredSize(buttonSize);
+//        getValButton.setPreferredSize(buttonSize);
+//        delValButton.setPreferredSize(buttonSize);
+//
+//        // 创建一个面板来放置按钮
+//        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+//        buttonPanel.add(getKeyButton);
+//        buttonPanel.add(getValButton);
+//        buttonPanel.add(delValButton);
+//
+//        // 将按钮面板添加到右侧
+//        topPanel.add(buttonPanel, BorderLayout.EAST);
+//
+//        // 设置下拉框的首选宽度
+//        actionComboBox.setPreferredSize(new Dimension(200, 32));
+//
+//        // 设置整个面板的高度
+//        topPanel.setPreferredSize(new Dimension(600, 32));
+//
+//        // 添加动作监听器
+//        actionComboBox.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                triggerChangeAction();
+//            }
+//        });
+//
+//        getKeyButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                handleAction("build_cache_key");
+//            }
+//        });
+//
+//        getValButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                handleAction("get_cache");
+//            }
+//        });
+//
+//        delValButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                handleAction("delete_cache");
+//            }
+//        });
+//
+//        return topPanel;
+//    }
+
+
     private JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         actionComboBox = new ComboBox<>();
+        actionComboBox.setPreferredSize(new Dimension(280, 32));
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 
@@ -84,9 +152,18 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
             }
         });
 
-        JButton getKeyButton = new JButton("Get Key");
-        JButton getValButton = new JButton("Get Val");
-        JButton delValButton = new JButton("Del Val");
+
+        JButton getKeyButton = new JButton(KIcon);
+        getKeyButton.setToolTipText("get keys");
+        JButton getValButton = new JButton(AllIcons.Actions.Find);
+        getValButton.setToolTipText("get keys and get values for every key");
+        JButton delValButton = new JButton(AllIcons.Actions.GC);
+        delValButton.setToolTipText("get keys and delete these");
+        //        // 设置按钮大小
+        Dimension buttonSize = new Dimension(32, 32);
+        getKeyButton.setPreferredSize(buttonSize);
+        getValButton.setPreferredSize(buttonSize);
+        delValButton.setPreferredSize(buttonSize);
 
         getKeyButton.addActionListener(new ActionListener() {
             @Override
@@ -164,22 +241,36 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
             outputTextArea.setText("参数量不对,预期是：" + method.getParameterList().getParameters().length + "个，提供了：" + jsonArray.size() + "个");
             return;
         }
-        try {
-            JSONObject paramsJson = buildParams(method, jsonArray, action);
-            JSONObject response = HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/api-endpoint", paramsJson, JSONObject.class); // 替换为实际的端口和URL
-            if (response == null) {
-                outputTextArea.setText("返回结果为空");
-            } else if (!response.getBooleanValue("success")) {
-                outputTextArea.setText("失败：" + response.getString("message"));
-            } else {
-                outputTextArea.setText(JSONObject.toJSONString(response.get("data"), true));
+        JSONObject paramsJson = buildParams(method, jsonArray, action);
+        outputTextArea.setText("......");
+        // 使用 SwingWorker 在后台线程执行耗时操作
+        SwingWorker<JSONObject, Void> worker = new SwingWorker<>() {
+            @Override
+            protected JSONObject doInBackground() throws Exception {
+                return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", paramsJson, JSONObject.class);
             }
-        } catch (Exception ex) {
-            outputTextArea.setText("Error: " + getStackTrace(ex));
-        }
+
+            @Override
+            protected void done() {
+                try {
+                    JSONObject response = get();
+                    if (response == null) {
+                        outputTextArea.setText("返回结果为空");
+                    } else if (!response.getBooleanValue("success")) {
+                        outputTextArea.setText("失败：" + response.getString("message"));
+                    } else {
+                        outputTextArea.setText(JSONObject.toJSONString(response.get("data"), true));
+                    }
+                } catch (Throwable ex) {
+                    outputTextArea.setText("Error: " + getStackTrace(ex.getCause()));
+                }
+            }
+        };
+
+        worker.execute();
     }
 
-    private JSONObject buildParams(PsiMethod method, JSONArray args, String action) throws Exception {
+    private JSONObject buildParams(PsiMethod method, JSONArray args, String action) {
         JSONObject params = new JSONObject();
         PsiClass containingClass = method.getContainingClass();
         String typeClass = containingClass.getQualifiedName();
@@ -202,38 +293,6 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         return req;
     }
 
-    private String getBeanNameFromClass(PsiClass psiClass) {
-        PsiModifierList modifierList = psiClass.getModifierList();
-        String beanName = null;
-
-        if (modifierList != null) {
-            for (PsiAnnotation annotation : modifierList.getAnnotations()) {
-                String qualifiedName = annotation.getQualifiedName();
-                if (qualifiedName != null &&
-                        (qualifiedName.equals("org.springframework.stereotype.Component") ||
-                                qualifiedName.equals("org.springframework.stereotype.Service") ||
-                                qualifiedName.equals("org.springframework.stereotype.Repository") ||
-                                qualifiedName.equals("org.springframework.context.annotation.Configuration") ||
-                                qualifiedName.equals("org.springframework.stereotype.Controller") ||
-                                qualifiedName.equals("org.springframework.web.bind.annotation.RestController"))) {
-
-                    if (annotation.findAttributeValue("value") != null) {
-                        beanName = annotation.findAttributeValue("value").getText().replace("\"", "");
-                    }
-                }
-            }
-        }
-
-        if (beanName == null || beanName.isBlank()) {
-            String className = psiClass.getName();
-            if (className != null && !className.isEmpty()) {
-                beanName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
-            }
-        }
-
-        return beanName;
-    }
-
     @Override
     public void onSwitchAction(PsiElement psiElement) {
         if(!(psiElement instanceof PsiMethod)) {
@@ -251,13 +310,13 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
 
         // 检查下拉框中是否已经包含当前方法的名称
         for (int i = 0; i < actionComboBox.getItemCount(); i++) {
-            if (actionComboBox.getItemAt(i).getName().equals(method.getName())) {
+            if (actionComboBox.getItemAt(i).toString().equals(buildMethodKey(method))) {
                 actionComboBox.setSelectedIndex(i);
                 return;
             }
         }
         // 如果当前下拉框没有此选项，则新增该选项
-        MethodAction item = new MethodAction(method.getName(), method);
+        MethodAction item = new MethodAction(method);
         actionComboBox.addItem(item);
         actionComboBox.setSelectedItem(item);
     }
@@ -272,48 +331,10 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         if(lastMethodAction!=null && methodAction==lastMethodAction){
             return;
         }
-        initParams(methodAction.getMethod());
+        ArrayList initParams = initParams(methodAction.getMethod());
+        inputEditorTextField.setText(JSONObject.toJSONString(initParams, true));
         lastMethodAction = methodAction;
     }
-
-
-    private void initParams(PsiMethod method){
-        ArrayList initParams = new ArrayList();
-        PsiParameter[] parameters = method.getParameterList().getParameters();
-        for (PsiParameter parameter : parameters) {
-            PsiType type = parameter.getType();
-            if (type.equalsToText("boolean") || type.equalsToText("java.lang.Boolean")) {
-                initParams.add(false);
-            } else if (type.equalsToText("char") || type.equalsToText("java.lang.Character")) {
-                initParams.add('\0');
-            } else if (type.equalsToText("byte") || type.equalsToText("java.lang.Byte")) {
-                initParams.add((byte) 0);
-            } else if (type.equalsToText("short") || type.equalsToText("java.lang.Short")) {
-                initParams.add((short) 0);
-            } else if (type.equalsToText("int") || type.equalsToText("java.lang.Integer")) {
-                initParams.add(0);
-            } else if (type.equalsToText("long") || type.equalsToText("java.lang.Long")) {
-                initParams.add(0L);
-            } else if (type.equalsToText("float") || type.equalsToText("java.lang.Float")) {
-                initParams.add(0.0f);
-            } else if (type.equalsToText("double") || type.equalsToText("java.lang.Double")) {
-                initParams.add(0.0);
-            } else if (type.equalsToText("java.lang.String")) {
-                initParams.add("");
-            } else if (type.equalsToText("java.util.Collection") || type.equalsToText("java.util.List")|| type.equalsToText("java.util.ArrayList") || type.equalsToText("java.util.HashSet") || type.equalsToText("java.util.Set")) {
-                initParams.add(new ArrayList<>());
-            } else if (type.equalsToText("java.util.Map")) {
-                initParams.add(new HashMap<>());
-            } else if (type instanceof PsiArrayType) {
-                initParams.add(new ArrayList<>()); // 可以使用空集合来表示数组
-            } else {
-                initParams.add(new HashMap<>()); // 为复杂对象类型初始化空映射
-            }
-        }
-        inputEditorTextField.setText(JSONObject.toJSONString(initParams, true));
-    }
-
-
 
 
 }

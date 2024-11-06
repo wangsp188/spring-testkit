@@ -1,20 +1,28 @@
 package com.halo.plugin.tools.spring_cache;
 
+import com.halo.plugin.tools.PluginToolEnum;
+import com.halo.plugin.view.WindowHelper;
+import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;  
-import com.intellij.openapi.editor.markup.GutterIconRenderer;  
+import com.intellij.openapi.editor.markup.GutterIconRenderer;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiModifierList;
 import com.intellij.util.Function;
+import icons.PlatformDebuggerImplIcons;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseEvent;
 
 public class SpringCacheIconProvider implements LineMarkerProvider {
 
-    private static final Icon CACHEABLE_ICON = new ImageIcon(SpringCacheIconProvider.class.getResource("/icons/cacheable.png"));
+    private static final Icon CACHEABLE_ICON = IconLoader.getIcon("/icons/cacheable.svg",SpringCacheIconProvider.class);
 
     @Nullable  
     @Override  
@@ -37,7 +45,16 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
                         return "This method is cacheable";
                     }
                 },
-                new CacheableIconNavigationHandler(method),
+                new GutterIconNavigationHandler(){
+                    @Override
+                    public void navigate(MouseEvent e, PsiElement elt) {
+                        if (GraphicsEnvironment.isHeadless()) {
+                            throw new HeadlessException("Cannot display UI elements in a headless environment.");
+                        }
+                        Project project = elt.getProject();
+                        WindowHelper.switch2Tool(project, PluginToolEnum.SPRING_CACHE, elt);
+                    }
+                },
                 GutterIconRenderer.Alignment.RIGHT
         );
     }

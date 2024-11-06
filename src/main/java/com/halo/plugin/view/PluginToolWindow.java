@@ -1,34 +1,54 @@
 package com.halo.plugin.view;
 
+import com.intellij.icons.AllIcons;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.PsiElement;
 import com.halo.plugin.tools.*;
 import com.halo.plugin.tools.call_method.CallMethodTool;
 import com.halo.plugin.tools.flexible_test.FlexibleTestTool;
 import com.halo.plugin.tools.spring_cache.SpringCacheTool;
+import com.intellij.ui.components.JBList;
+import com.intellij.ui.components.JBScrollPane;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import com.halo.plugin.util.Container;
 
 public class PluginToolWindow {
+
+    private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", BasePluginTool.class);
+
 
     private Project project;
     private ToolWindow toolWindow;
     private JPanel windowContent;
     private JButton tipsButton;
+    private JButton settingsButton;
     private JComboBox<String> toolBox;
     private JButton refreshButton;
     private JComboBox<String> appBox;
-
+    private JDialog settingsDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
+
+
+    private JTextField flexibleTestPackageNameField;
+    private Container<String> savedFlexibleTestPackageName;
+
 
 
     public PluginToolWindow(Project project, ToolWindow toolWindow) {
@@ -41,9 +61,10 @@ public class PluginToolWindow {
 
         // 第一行
         // tips按钮
-        Icon tipsIcon = new ImageIcon(new ImageIcon(getClass().getResource("/icons/tips.png")).getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH));
-        tipsButton = new JButton(tipsIcon);
+        tipsButton = new JButton(AllIcons.General.Information);
+        tipsButton.setToolTipText("how to use?");
         tipsButton.setPreferredSize(new Dimension(32, 32));
+        tipsButton.setMaximumSize(new Dimension(32, 32));
         tipsButton.setText(null); // 去除文本
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -52,26 +73,49 @@ public class PluginToolWindow {
         gbc.anchor = GridBagConstraints.LINE_START; // 按钮靠左
         windowContent.add(tipsButton, gbc);
 
+        gbc.gridx = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+
+        settingsButton = new JButton(settingsIcon);
+        settingsButton.setPreferredSize(new Dimension(32, 32));
+        settingsButton.setMaximumSize(new Dimension(32, 32));
+        windowContent.add(settingsButton, gbc);
+
+        // 添加按钮点击事件以显示设置窗口
+        settingsButton.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                flexibleTestPackageNameField.setText(savedFlexibleTestPackageName.get());
+                settingsDialog.setVisible(true);
+            }
+        });
+
 
         // 工具拉框A
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(),PluginToolEnum.SPRING_CACHE.getCode()});
-        gbc.gridx = 1;
-        gbc.weightx = 1.0; // 设置组件水平扩展
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(),PluginToolEnum.FLEXIBLE_TEST.getCode()});
+        toolBox.setEnabled(false);
+        toolBox.setPreferredSize(new Dimension(120, 32));
+        toolBox.setMaximumSize(new Dimension(120, 32));
+        gbc.gridx = 2;
+        gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         windowContent.add(toolBox, gbc);
 
 
         // 刷新按钮
-        Icon refreshIcon = new ImageIcon(new ImageIcon(getClass().getResource("/icons/refresh.png")).getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH));
-        refreshButton = new JButton(refreshIcon);
+        refreshButton = new JButton(AllIcons.Actions.Refresh);
+        refreshButton.setToolTipText("refresh runtime spring project");
         refreshButton.setPreferredSize(new Dimension(32, 32));
-        gbc.gridx = 2;
-        gbc.weightx = 0.0; // 不需要水平拉伸按钮
+        refreshButton.setMaximumSize(new Dimension(32, 32));
+        gbc.gridx = 3;
+        gbc.weightx = 0.0;
         windowContent.add(refreshButton, gbc);
 
         // 运行时app下拉框
-        appBox = new ComboBox<>(new String[]{"Web:9002:19088","Api:9090:19176","Op:9060:19146"});
-        gbc.gridx = 3;
+        appBox = new ComboBox<>(new String[]{"Web:9002:19088", "Api:9090:19176", "Op:9060:19146","Test:70:10156"});
+        gbc.gridx = 4;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         windowContent.add(appBox, gbc);
@@ -98,9 +142,11 @@ public class PluginToolWindow {
             panel.setVisible(false); // 初始时不显示
             windowContent.add(panel, gbc);
         }
-
+        onSwitchTool();
         tipsButton.addActionListener(e -> openTipsDoc());
         toolBox.addActionListener(e -> onSwitchTool());
+
+        initSettingsDialog();
     }
 
     private void openTipsDoc() {
@@ -143,7 +189,7 @@ public class PluginToolWindow {
     public void switchTool(PluginToolEnum tool, PsiElement element) {
         toolBox.setSelectedItem(tool.getCode());
         BasePluginTool pluginTool = tools.get(tool);
-        if(pluginTool instanceof ActionTool){
+        if (pluginTool instanceof ActionTool) {
             ((ActionTool) pluginTool).onSwitchAction(element);
         }
         toolWindow.show();
@@ -187,12 +233,12 @@ public class PluginToolWindow {
 
     public VisibleApp getSelectedApp() {
         String selectedItem = (String) appBox.getSelectedItem();
-        if (selectedItem==null) {
+        if (selectedItem == null) {
             return null;
         }
         VisibleApp visibleApp = new VisibleApp();
         String[] split = selectedItem.split(":");
-        if(split.length!=3){
+        if (split.length != 3) {
             Messages.showMessageDialog(project,
                     "app is not valid",
                     "Error",
@@ -203,5 +249,103 @@ public class PluginToolWindow {
         visibleApp.setPort(Integer.parseInt(split[1]));
         visibleApp.setSidePort(Integer.parseInt(split[2]));
         return visibleApp;
+    }
+
+    private void initSettingsDialog() {
+        settingsDialog = new JDialog((Frame) null, "halo settings", true);
+        // 定义主面板
+        JPanel contentPanel = new JPanel(new BorderLayout());
+
+        // 左侧选项列表
+        String[] options = {"basic"};
+        JBList<String> optionList = new JBList<>(options);
+        optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // 默认选中第一个选项
+        optionList.setSelectedIndex(0);
+        // 右侧内容显示区域
+        JPanel rightContent = new JPanel(new CardLayout());
+        rightContent.add(createBasicOptionPanel(), "basic");
+
+        // 监听选项改变，更新右侧内容
+        optionList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                CardLayout cl = (CardLayout) (rightContent.getLayout());
+                cl.show(rightContent, optionList.getSelectedValue());
+            }
+        });
+
+        // SplitPane 分割左右
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JBScrollPane(optionList), rightContent);
+//        splitPane.setDividerLocation(150); // 设置初始分割条位置
+        contentPanel.add(splitPane, BorderLayout.CENTER);
+        // 去掉分隔条
+        splitPane.setDividerSize(0); // 隐藏分隔条
+        splitPane.setOneTouchExpandable(false); // 禁用单触展开
+        splitPane.setDividerLocation(150); // 设置初始分割条位置
+
+        // 设置对话框内容
+        settingsDialog.setContentPane(contentPanel);
+
+        // 设置对话框的大小与显示位置
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        settingsDialog.setSize(screenSize.width / 2, screenSize.height / 2);
+        settingsDialog.setLocationRelativeTo(null); // 居中显示
+    }
+
+    private JPanel createBasicOptionPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+
+        flexibleTestPackageNameField = new JTextField(".flexibletest", 20);
+        savedFlexibleTestPackageName = Container.of(flexibleTestPackageNameField.getText());
+        // 输入框
+        JLabel packageNameLabel = new JLabel("Package Name:");
+        packageNameLabel.setLabelFor(flexibleTestPackageNameField); // 关联标签和输入框
+        packageNameLabel.setToolTipText("Enter the package name here"); // 提示信息
+
+        // 布局输入框和标签
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(packageNameLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0; // 让输入框占据剩余空间
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(flexibleTestPackageNameField, gbc);
+
+        // 保存按钮
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String packageName = flexibleTestPackageNameField.getText();
+                if(StringUtils.isBlank(packageName)) {
+                    savedFlexibleTestPackageName.set(null);
+                    Notification notification = new Notification("Halo", "Info", "packageName is blank , none fun can execute", NotificationType.INFORMATION);
+                    Notifications.Bus.notify(notification, project);
+                    return;
+                }
+                savedFlexibleTestPackageName.set(packageName);
+                Notification notification = new Notification("Halo", "Info", "flexible-test is refresh by"+packageName+", pls restart project", NotificationType.INFORMATION);
+                Notifications.Bus.notify(notification, project);
+            }
+        });
+
+        // 将保存按钮添加到内容面板右下角
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        gbc.weightx = 0.0; // 重置权重
+        gbc.weighty = 1.0; // 让按钮靠下
+        gbc.anchor = GridBagConstraints.SOUTHEAST;
+        gbc.fill = GridBagConstraints.NONE;
+        panel.add(saveButton, gbc);
+
+        return panel;
+    }
+
+    public String getFlexibleTestPackage() {
+        return savedFlexibleTestPackageName ==null?null: savedFlexibleTestPackageName.get();
     }
 }
