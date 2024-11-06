@@ -5,7 +5,6 @@ import com.halo.plugin.view.WindowHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
-import com.intellij.icons.AllIcons;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.IconLoader;
@@ -21,7 +20,7 @@ import java.awt.event.MouseEvent;
 
 public class CallMethodIconProvider implements LineMarkerProvider {
 
-    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/run.svg", CallMethodIconProvider.class);
+    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/debug.svg", CallMethodIconProvider.class);
 
 
     @Nullable

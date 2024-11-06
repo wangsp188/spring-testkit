@@ -5,11 +5,9 @@ import com.halo.plugin.view.WindowHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
-import com.intellij.icons.AllIcons;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.util.Function;
@@ -22,7 +20,7 @@ import java.awt.event.MouseEvent;
 
 public class FlexibleTestIconProvider implements LineMarkerProvider {
 
-    private static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/run.svg", FlexibleTestIconProvider.class);
+    private static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/debug.svg", FlexibleTestIconProvider.class);
 
 
     @Nullable
