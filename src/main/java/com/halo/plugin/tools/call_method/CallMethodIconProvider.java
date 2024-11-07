@@ -20,7 +20,7 @@ import java.awt.event.MouseEvent;
 
 public class CallMethodIconProvider implements LineMarkerProvider {
 
-    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/debug.svg", CallMethodIconProvider.class);
+    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/no-bug.svg", CallMethodIconProvider.class);
 
 
     @Nullable

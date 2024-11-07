@@ -20,7 +20,7 @@ import java.awt.event.MouseEvent;
 
 public class FlexibleTestIconProvider implements LineMarkerProvider {
 
-    private static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/debug.svg", FlexibleTestIconProvider.class);
+    private static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/no-bug.svg", FlexibleTestIconProvider.class);
 
 
     @Nullable

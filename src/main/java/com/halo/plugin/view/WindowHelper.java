@@ -63,7 +63,7 @@ public class WindowHelper {
             return;
         }
         // 尝试通过 ToolWindowManager 获取 ToolWindow 实例
-        ToolWindow ideToolWindow = ToolWindowManager.getInstance(project).getToolWindow("zcc halo");
+        ToolWindow ideToolWindow = ToolWindowManager.getInstance(project).getToolWindow("halo");
         if (ideToolWindow == null) {
             Messages.showMessageDialog(project,
                     "Failed to open the project window",
