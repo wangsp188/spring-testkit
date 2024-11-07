@@ -1,7 +1,7 @@
-package com.halo.plugin.tools.call_method;
+package com.nb.tools.flexible_test;
 
-import com.halo.plugin.tools.PluginToolEnum;
-import com.halo.plugin.view.WindowHelper;
+import com.nb.tools.PluginToolEnum;
+import com.nb.view.WindowHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
@@ -18,9 +18,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 
-public class CallMethodIconProvider implements LineMarkerProvider {
+public class FlexibleTestIconProvider implements LineMarkerProvider {
 
-    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/no-bug.svg", CallMethodIconProvider.class);
+    private static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/no-bug.svg", FlexibleTestIconProvider.class);
 
 
     @Nullable
@@ -31,13 +31,13 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         }
 
         PsiMethod method = (PsiMethod) element;
-        if (!isBeanMethod(method.getModifierList())) {
+        if (!isTest(method.getModifierList())) {
             return null;
         }
         return new LineMarkerInfo<>(
                 method,
                 method.getTextRange(),
-                CALL_METHOD_ICON,
+                FLEXIBLE_TEST_ICON,
                 new Function<PsiElement, String>() {
                     @Override
                     public String fun(PsiElement element) {
@@ -51,83 +51,57 @@ public class CallMethodIconProvider implements LineMarkerProvider {
                             throw new HeadlessException("Cannot display UI elements in a headless environment.");
                         }
                         Project project = elt.getProject();
-                        WindowHelper.switch2Tool(project, PluginToolEnum.CALL_METHOD, elt);
+                        WindowHelper.switch2Tool(project, PluginToolEnum.FLEXIBLE_TEST, elt);
                     }
                 },
                 GutterIconRenderer.Alignment.RIGHT
         );
     }
 
-    private boolean isBeanMethod(@NotNull PsiModifierList modifierList) {
+    private boolean isTest(PsiModifierList modifierList) {
 
-        // 1. 检查方法是否为 public
-        if (!modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
+        // 1. 必须是个public的函数
+        if (modifierList == null || !modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
             return false;
         }
 
-        // 2. 检查方法是否为非静态
+        // 2. 必须是非静态方法
         if (modifierList.hasModifierProperty(PsiModifier.STATIC)) {
             return false;
         }
 
-        // 3. 获取方法和类
+        // 获取方法所在的文件
         PsiElement parent = modifierList.getParent();
         if (!(parent instanceof PsiMethod)) {
             return false;
         }
-        PsiMethod psiMethod = (PsiMethod) parent;
-
-        PsiClass containingClass = psiMethod.getContainingClass();
-        if (containingClass == null) {
-            return false;
-        }
-
-        // 4. 检查类是否含有 Spring 可注册 Bean 的注解
-        if (!isSpringBean(containingClass)) {
-            return false;
-        }
-
-        PsiFile psiFile = psiMethod.getContainingFile();
+        PsiMethod method = (PsiMethod) parent;
+        PsiFile psiFile = method.getContainingFile();
         if (!(psiFile instanceof PsiJavaFile)) {
             return false;
         }
 
-        // 3. 必须不在Java的test模块下
+        // 3. 必须是在Java的test模块下
         VirtualFile virtualFile = psiFile.getVirtualFile();
         if (virtualFile == null) {
             return false;
         }
         // 获取文件的完整路径
         String filePath = virtualFile.getPath();
+        String packageName = ((PsiJavaFile) psiFile).getPackageName();
         // 提取类名和包名部分
         String packageAndClassPath = filePath.substring(0, filePath.lastIndexOf('/'));
         String packagePath = packageAndClassPath.substring(0, packageAndClassPath.length() - ((PsiJavaFile) psiFile).getPackageName().replace(".", "/").length());
         // 检查路径是否以 src/test/java 结尾
-        if (packagePath.endsWith("src/test/java/")) {
+        if (!packagePath.endsWith("src/test/java/")) {
             return false;
         }
 
-        return true;
-    }
-
-    private boolean isSpringBean(@NotNull PsiClass psiClass) {
-        // 列举常见的 Spring 注解
-        String[] springAnnotations = {
-                "org.springframework.stereotype.Component",
-                "org.springframework.stereotype.Service",
-                "org.springframework.stereotype.Repository",
-                "org.springframework.stereotype.Controller",
-                "org.apache.ibatis.annotations.Mapper",
-                "org.springframework.web.bind.annotation.RestController",
-                "org.springframework.context.annotation.Configuration",
-        };
-
-        for (String annotationName : springAnnotations) {
-            if (psiClass.hasAnnotation(annotationName)) {
-                return true;
-            }
+        String flexibleTestPackage = WindowHelper.getFlexibleTestPackage(modifierList.getProject());
+        if (flexibleTestPackage == null) {
+            return false;
         }
-
-        return false;
+        // 4. 必须在指定的包下
+        return packageName.contains(flexibleTestPackage);
     }
 }

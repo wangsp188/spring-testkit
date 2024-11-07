@@ -1,20 +1,19 @@
-package com.halo.plugin.tools.spring_cache;
+package com.nb.tools.flexible_test;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.nb.util.HttpUtil;
+import com.nb.view.VisibleApp;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
+import com.nb.tools.ActionTool;
+import com.nb.tools.BasePluginTool;
+import com.nb.tools.PluginToolEnum;
+import com.nb.view.PluginToolWindow;
 import com.intellij.ui.LanguageTextField;
-import com.halo.plugin.tools.ActionTool;
-import com.halo.plugin.tools.BasePluginTool;
-import com.halo.plugin.tools.PluginToolEnum;
-import com.halo.plugin.util.HttpUtil;
-import com.halo.plugin.view.PluginToolWindow;
-import com.halo.plugin.view.VisibleApp;
 import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
@@ -23,8 +22,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 
-public class SpringCacheTool extends BasePluginTool  implements ActionTool {
-    private static final Icon KIcon = IconLoader.getIcon("/icons/K.svg", SpringCacheTool.class);
+public class FlexibleTestTool extends BasePluginTool  implements ActionTool {
+
 
     private JComboBox<MethodAction> actionComboBox;
 
@@ -34,10 +33,10 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
     private MethodAction lastMethodAction;
 
     {
-        this.tool = PluginToolEnum.SPRING_CACHE;
+        this.tool = PluginToolEnum.FLEXIBLE_TEST;
     }
 
-    public SpringCacheTool(PluginToolWindow pluginToolWindow) {
+    public FlexibleTestTool(PluginToolWindow pluginToolWindow) {
         super(pluginToolWindow);
         initializePanel();
     }
@@ -70,72 +69,6 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
     }
 
 
-//    private JPanel createTopPanel() {
-//        JPanel topPanel = new JPanel(new BorderLayout());
-//        // 创建下拉框并添加到左侧
-//        actionComboBox = new ComboBox<>();
-//        topPanel.add(actionComboBox, BorderLayout.WEST);
-//
-//        // 创建按钮并设置图标和提示文字
-//        JButton getKeyButton = new JButton(new ImageIcon(new ImageIcon(getClass().getResource("/icons/K.png")).getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH)));
-//        getKeyButton.setToolTipText("get keys");
-//        JButton getValButton = new JButton(AllIcons.Actions.Find);
-//        getValButton.setToolTipText("get keys and get values for every key");
-//        JButton delValButton = new JButton(AllIcons.Actions.GC);
-//        delValButton.setToolTipText("get keys and delete these");
-//
-//        // 设置按钮大小
-//        Dimension buttonSize = new Dimension(32, 32);
-//        getKeyButton.setPreferredSize(buttonSize);
-//        getValButton.setPreferredSize(buttonSize);
-//        delValButton.setPreferredSize(buttonSize);
-//
-//        // 创建一个面板来放置按钮
-//        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
-//        buttonPanel.add(getKeyButton);
-//        buttonPanel.add(getValButton);
-//        buttonPanel.add(delValButton);
-//
-//        // 将按钮面板添加到右侧
-//        topPanel.add(buttonPanel, BorderLayout.EAST);
-//
-//        // 设置下拉框的首选宽度
-//        actionComboBox.setPreferredSize(new Dimension(200, 32));
-//
-//        // 设置整个面板的高度
-//        topPanel.setPreferredSize(new Dimension(600, 32));
-//
-//        // 添加动作监听器
-//        actionComboBox.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                triggerChangeAction();
-//            }
-//        });
-//
-//        getKeyButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                handleAction("build_cache_key");
-//            }
-//        });
-//
-//        getValButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                handleAction("get_cache");
-//            }
-//        });
-//
-//        delValButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                handleAction("delete_cache");
-//            }
-//        });
-//
-//        return topPanel;
-//    }
 
 
     private JPanel createTopPanel() {
@@ -154,42 +87,21 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         });
 
 
-        JButton getKeyButton = new JButton(KIcon);
-        getKeyButton.setToolTipText("get keys");
-        JButton getValButton = new JButton(AllIcons.Actions.Find);
-        getValButton.setToolTipText("get keys and get values for every key");
-        JButton delValButton = new JButton(AllIcons.Actions.GC);
-        delValButton.setToolTipText("get keys and delete these");
+        JButton runButton = new JButton(AllIcons.Actions.Execute);
+        runButton.setToolTipText("test function");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
-        getKeyButton.setPreferredSize(buttonSize);
-        getValButton.setPreferredSize(buttonSize);
-        delValButton.setPreferredSize(buttonSize);
+        runButton.setPreferredSize(buttonSize);
 
-        getKeyButton.addActionListener(new ActionListener() {
+        runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                handleAction("build_cache_key");
+                handleAction("flexible_test");
             }
         });
 
-        getValButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleAction("get_cache");
-            }
-        });
 
-        delValButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleAction("delete_cache");
-            }
-        });
-
-        topPanel.add(getKeyButton);
-        topPanel.add(getValButton);
-        topPanel.add(delValButton);
+        topPanel.add(runButton);
 
         return topPanel;
     }
@@ -242,13 +154,13 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
             outputTextArea.setText("参数量不对,预期是：" + method.getParameterList().getParameters().length + "个，提供了：" + jsonArray.size() + "个");
             return;
         }
-        JSONObject paramsJson = buildParams(method, jsonArray, action);
+        JSONObject params = buildParams(method, jsonArray, action);
         outputTextArea.setText("......");
         // 使用 SwingWorker 在后台线程执行耗时操作
         SwingWorker<JSONObject, Void> worker = new SwingWorker<>() {
             @Override
             protected JSONObject doInBackground() throws Exception {
-                return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", paramsJson, JSONObject.class);
+                return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", params, JSONObject.class);
             }
 
             @Override
@@ -274,11 +186,9 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
     private JSONObject buildParams(PsiMethod method, JSONArray args, String action) {
         JSONObject params = new JSONObject();
         PsiClass containingClass = method.getContainingClass();
-        String typeClass = containingClass.getQualifiedName();
-        params.put("typeClass", typeClass);
-
-        String beanName = getBeanNameFromClass(containingClass);
-        params.put("beanName", beanName);
+        // 获取包含这个类的文件
+        PsiFile file = containingClass.getContainingFile();
+        params.put("code", file.getText());
         params.put("methodName", method.getName());
 
         PsiParameter[] parameters = method.getParameterList().getParameters();
@@ -293,6 +203,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         req.put("params", params);
         return req;
     }
+
 
     @Override
     public void onSwitchAction(PsiElement psiElement) {

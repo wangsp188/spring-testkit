@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "halo"
+rootProject.name = "no-bug"

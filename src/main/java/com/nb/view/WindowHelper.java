@@ -1,18 +1,17 @@
-package com.halo.plugin.view;
+package com.nb.view;
 
-import com.halo.plugin.util.Container;
+import com.nb.util.Container;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.psi.PsiElement;
-import com.halo.plugin.tools.PluginToolEnum;
+import com.nb.tools.PluginToolEnum;
 
 import javax.swing.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 public class WindowHelper {
 
@@ -63,7 +62,7 @@ public class WindowHelper {
             return;
         }
         // 尝试通过 ToolWindowManager 获取 ToolWindow 实例
-        ToolWindow ideToolWindow = ToolWindowManager.getInstance(project).getToolWindow("halo");
+        ToolWindow ideToolWindow = ToolWindowManager.getInstance(project).getToolWindow("No-Bug");
         if (ideToolWindow == null) {
             Messages.showMessageDialog(project,
                     "Failed to open the project window",

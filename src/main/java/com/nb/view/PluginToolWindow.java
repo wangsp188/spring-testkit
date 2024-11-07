@@ -1,4 +1,4 @@
-package com.halo.plugin.view;
+package com.nb.view;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.Notification;
@@ -10,10 +10,12 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.PsiElement;
-import com.halo.plugin.tools.*;
-import com.halo.plugin.tools.call_method.CallMethodTool;
-import com.halo.plugin.tools.flexible_test.FlexibleTestTool;
-import com.halo.plugin.tools.spring_cache.SpringCacheTool;
+import com.nb.tools.ActionTool;
+import com.nb.tools.BasePluginTool;
+import com.nb.tools.PluginToolEnum;
+import com.nb.tools.call_method.CallMethodTool;
+import com.nb.tools.flexible_test.FlexibleTestTool;
+import com.nb.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import org.apache.commons.lang3.StringUtils;
@@ -26,7 +28,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-import com.halo.plugin.util.Container;
+import com.nb.util.Container;
 
 public class PluginToolWindow {
 
@@ -252,7 +254,7 @@ public class PluginToolWindow {
     }
 
     private void initSettingsDialog() {
-        settingsDialog = new JDialog((Frame) null, "halo settings", true);
+        settingsDialog = new JDialog((Frame) null, "No-Bug Settings", true);
         // 定义主面板
         JPanel contentPanel = new JPanel(new BorderLayout());
 
@@ -323,12 +325,12 @@ public class PluginToolWindow {
                 String packageName = flexibleTestPackageNameField.getText();
                 if(StringUtils.isBlank(packageName)) {
                     savedFlexibleTestPackageName.set(null);
-                    Notification notification = new Notification("Halo", "Info", "packageName is blank , none fun can execute", NotificationType.INFORMATION);
+                    Notification notification = new Notification("No-Bug", "Info", "packageName is blank , none fun can execute", NotificationType.INFORMATION);
                     Notifications.Bus.notify(notification, project);
                     return;
                 }
                 savedFlexibleTestPackageName.set(packageName);
-                Notification notification = new Notification("Halo", "Info", "flexible-test is refresh by"+packageName+", pls restart project", NotificationType.INFORMATION);
+                Notification notification = new Notification("No-Bug", "Info", "flexible-test is refresh by"+packageName+", pls restart project", NotificationType.INFORMATION);
                 Notifications.Bus.notify(notification, project);
             }
         });

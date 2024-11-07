@@ -1,4 +1,4 @@
-package com.halo.plugin.view;
+package com.nb.view;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;

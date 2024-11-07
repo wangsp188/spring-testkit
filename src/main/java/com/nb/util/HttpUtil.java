@@ -1,4 +1,4 @@
-package com.halo.plugin.util;
+package com.nb.util;
 
 import com.alibaba.fastjson.JSON;
 

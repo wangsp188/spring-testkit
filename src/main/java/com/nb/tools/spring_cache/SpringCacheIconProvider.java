@@ -1,7 +1,7 @@
-package com.halo.plugin.tools.spring_cache;
+package com.nb.tools.spring_cache;
 
-import com.halo.plugin.tools.PluginToolEnum;
-import com.halo.plugin.view.WindowHelper;
+import com.nb.tools.PluginToolEnum;
+import com.nb.view.WindowHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;  
@@ -12,7 +12,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiModifierList;
 import com.intellij.util.Function;
-import icons.PlatformDebuggerImplIcons;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

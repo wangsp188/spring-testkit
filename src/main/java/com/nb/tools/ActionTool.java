@@ -1,4 +1,4 @@
-package com.halo.plugin.tools;
+package com.nb.tools;
 
 import com.intellij.psi.PsiElement;
 

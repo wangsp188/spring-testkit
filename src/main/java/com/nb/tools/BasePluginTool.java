@@ -1,16 +1,13 @@
-package com.halo.plugin.tools;
+package com.nb.tools;
 
-import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
-import com.halo.plugin.view.PluginToolWindow;
-import com.halo.plugin.view.VisibleApp;
+import com.nb.view.PluginToolWindow;
+import com.nb.view.VisibleApp;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;

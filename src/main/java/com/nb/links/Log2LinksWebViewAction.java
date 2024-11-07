@@ -1,4 +1,4 @@
-package com.halo.plugin.links;
+package com.nb.links;
 
 import com.alibaba.fastjson.JSON;
 import com.intellij.notification.Notification;

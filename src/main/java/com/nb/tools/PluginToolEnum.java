@@ -1,4 +1,4 @@
-package com.halo.plugin.tools;
+package com.nb.tools;
 
 public enum PluginToolEnum {
     SPRING_CACHE("spring-cache"), CALL_METHOD("call-method"), FLEXIBLE_TEST("flexible-test");

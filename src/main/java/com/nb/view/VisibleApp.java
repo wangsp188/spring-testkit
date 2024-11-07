@@ -1,4 +1,4 @@
-package com.halo.plugin.view;
+package com.nb.view;
 
 public class VisibleApp {
 

@@ -1,19 +1,18 @@
-package com.halo.plugin.tools.call_method;
+package com.nb.tools.call_method;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.halo.plugin.util.HttpUtil;
-import com.halo.plugin.view.VisibleApp;
+import com.nb.util.HttpUtil;
+import com.nb.view.VisibleApp;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
-import com.halo.plugin.tools.ActionTool;
-import com.halo.plugin.tools.BasePluginTool;
-import com.halo.plugin.tools.PluginToolEnum;
-import com.halo.plugin.view.PluginToolWindow;
+import com.nb.tools.ActionTool;
+import com.nb.tools.BasePluginTool;
+import com.nb.tools.PluginToolEnum;
+import com.nb.view.PluginToolWindow;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 
@@ -24,7 +23,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public class CallMethodTool extends BasePluginTool implements ActionTool {
 
