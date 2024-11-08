@@ -55,7 +55,7 @@ public class LocalStorageHelper {
                     "     *\n" +
                     "     * @param tool   所执行的tool 非空\n" +
                     "     * @param params 入参 非空\n" +
-                    "     * @throws Throwable 抛出异常则阻断tool调用" +
+                    "     * @throws Throwable 抛出异常则阻断tool调用\n" +
                     "     */\n" +
                     "    public void invokeBefore(String tool, Map<String, String> params)  throws Throwable{\n" +
                     "\n" +
