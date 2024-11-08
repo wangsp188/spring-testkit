@@ -20,8 +20,9 @@ import com.nb.tools.flexible_test.FlexibleTestTool;
 import com.nb.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
-import net.sf.cglib.core.Local;
+import com.nb.util.HttpUtil;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -29,8 +30,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.List;
 
 public class PluginToolWindow {
 
@@ -115,12 +116,31 @@ public class PluginToolWindow {
         refreshButton.setToolTipText("refresh runtime spring project");
         refreshButton.setPreferredSize(new Dimension(32, 32));
         refreshButton.setMaximumSize(new Dimension(32, 32));
+        refreshButton.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshVisibleApp();
+                Notification notification = new Notification("No-Bug", "Info", "Runtime App Refresh Success!", NotificationType.INFORMATION);
+                Notifications.Bus.notify(notification, project);
+            }
+        });
         gbc.gridx = 3;
         gbc.weightx = 0.0;
         windowContent.add(refreshButton, gbc);
 
         // 运行时app下拉框
-        appBox = new ComboBox<>(new String[]{"Web:9002:19088", "Api:9090:19176", "Op:9060:19146","Test:70:10156"});
+        appBox = new ComboBox<>(new String[]{});
+        new Thread(() -> {
+            while (true) {
+                try {
+                    refreshVisibleApp();
+                    Thread.sleep(60 * 1000); // 每隔一分钟调用一次
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
         gbc.gridx = 4;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -153,6 +173,35 @@ public class PluginToolWindow {
         toolBox.addActionListener(e -> onSwitchTool());
 
         initSettingsDialog();
+    }
+
+
+    private void refreshVisibleApp(){
+        List<String> items = AppRuntimeHelper.loadProjectRuntimes("unknown");
+        Iterator<String> iterator = items.iterator();
+        HashMap<String, String> map = new HashMap<>();
+        map.put("method", "hello");
+        while (iterator.hasNext()){
+            String item = iterator.next();
+            if (item==null) {
+                iterator.remove();
+                continue;
+            }
+            VisibleApp visibleApp = parseApp(item);
+            try {
+                HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+                iterator.remove();
+                AppRuntimeHelper.removeApp("unknown",visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
+            }
+        }
+
+        // 清理 appBox 的内容，并使用 newStrings 重新赋值
+        appBox.removeAllItems();
+        for (String item : items) {
+            appBox.addItem(item.substring(0,item.lastIndexOf(":")));
+        }
     }
 
     private void openTipsDoc() {
@@ -242,19 +291,26 @@ public class PluginToolWindow {
         if (selectedItem == null) {
             return null;
         }
-        VisibleApp visibleApp = new VisibleApp();
+        return parseApp(selectedItem);
+    }
+
+    private @Nullable VisibleApp parseApp(String selectedItem) {
         String[] split = selectedItem.split(":");
-        if (split.length != 3) {
-            Messages.showMessageDialog(project,
-                    "app is not valid",
-                    "Error",
-                    Messages.getErrorIcon());
-            return null;
+        if (split.length == 2) {
+            VisibleApp visibleApp = new VisibleApp();
+            visibleApp.setAppName(split[0]);
+            visibleApp.setPort(Integer.parseInt(split[1]));
+            visibleApp.setSidePort(Integer.parseInt(split[1])+10000);
+            return visibleApp;
+
+        } else if (split.length == 3) {
+            VisibleApp visibleApp = new VisibleApp();
+            visibleApp.setAppName(split[0]);
+            visibleApp.setPort(Integer.parseInt(split[1]));
+            visibleApp.setSidePort(Integer.parseInt(split[2]));
+            return visibleApp;
         }
-        visibleApp.setAppName(split[0]);
-        visibleApp.setPort(Integer.parseInt(split[1]));
-        visibleApp.setSidePort(Integer.parseInt(split[2]));
-        return visibleApp;
+        throw new IllegalArgumentException("un support app item");
     }
 
     public String getSelectedAppName() {
