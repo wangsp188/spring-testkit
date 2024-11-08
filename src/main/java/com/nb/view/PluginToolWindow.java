@@ -93,6 +93,7 @@ public class PluginToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
+                scriptField.setText(LocalStorageHelper.getScript(project));
                 settingsDialog.setVisible(true);
             }
         });
