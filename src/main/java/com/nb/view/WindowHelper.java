@@ -31,27 +31,6 @@ public class WindowHelper {
         windows.put(project, window);
     }
 
-    public static String getFlexibleTestPackage(Project project) {
-        Container<String> packageNames = new Container<>();
-        getOrInitToolWindow(project, new Consumer<PluginToolWindow>() {
-            @Override
-            public void accept(PluginToolWindow pluginToolWindow) {
-                packageNames.set(pluginToolWindow.getFlexibleTestPackage());
-            }
-        });
-        return packageNames.get();
-    }
-
-    public static String getScript(Project project) {
-        Container<String> script = new Container<>();
-        getOrInitToolWindow(project, new Consumer<PluginToolWindow>() {
-            @Override
-            public void accept(PluginToolWindow pluginToolWindow) {
-                script.set(pluginToolWindow.getScript());
-            }
-        });
-        return script.get();
-    }
 
 
     public static void switch2Tool(Project project, PluginToolEnum tool, PsiElement element) {
@@ -73,7 +52,7 @@ public class WindowHelper {
             return;
         }
         // 尝试通过 ToolWindowManager 获取 ToolWindow 实例
-        ToolWindow ideToolWindow = ToolWindowManager.getInstance(project).getToolWindow("No-Bug");
+        ToolWindow ideToolWindow = ToolWindowManager.getInstance(project).getToolWindow("ZCC No-Bug");
         if (ideToolWindow == null) {
             Messages.showMessageDialog(project,
                     "Failed to open the project window",

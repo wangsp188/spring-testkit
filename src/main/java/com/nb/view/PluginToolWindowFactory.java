@@ -15,7 +15,6 @@ public class PluginToolWindowFactory implements ToolWindowFactory {
             System.err.println("project:" + project.getName() + "已存在window");
             return;
         }
-        toolWindow.setTitle("ZCC No-Bug");
         synchronized (project) {
             PluginToolWindow pluginToolWindow = new PluginToolWindow(project,toolWindow);
             WindowHelper.registerWindow(project, pluginToolWindow);

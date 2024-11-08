@@ -1,6 +1,7 @@
 package com.nb.tools.flexible_test;
 
 import com.nb.tools.PluginToolEnum;
+import com.nb.view.LocalStorageHelper;
 import com.nb.view.WindowHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -97,7 +98,7 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return false;
         }
 
-        String flexibleTestPackage = WindowHelper.getFlexibleTestPackage(modifierList.getProject());
+        String flexibleTestPackage = LocalStorageHelper.getFlexibleTestPackage(modifierList.getProject());
         if (flexibleTestPackage == null) {
             return false;
         }

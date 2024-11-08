@@ -3,19 +3,17 @@ package com.nb.tools.spring_cache;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.icons.AllIcons;
-import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
-import com.intellij.ui.LanguageTextField;
 import com.nb.tools.ActionTool;
 import com.nb.tools.BasePluginTool;
 import com.nb.tools.PluginToolEnum;
 import com.nb.util.HttpUtil;
+import com.nb.view.LocalStorageHelper;
 import com.nb.view.PluginToolWindow;
 import com.nb.view.VisibleApp;
-import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
 import java.awt.*;
@@ -28,9 +26,6 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
 
     private JComboBox<MethodAction> actionComboBox;
 
-    private LanguageTextField inputEditorTextField;
-    private LanguageTextField outputTextArea;
-
     private MethodAction lastMethodAction;
 
     {
@@ -39,34 +34,6 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
 
     public SpringCacheTool(PluginToolWindow pluginToolWindow) {
         super(pluginToolWindow);
-        initializePanel();
-    }
-
-    private void initializePanel() {
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 1.0;
-        gbc.weighty = 0.0; // 顶部面板不占用垂直空间
-
-        // Top panel for method selection and actions
-        JPanel topPanel = createTopPanel();
-        panel.add(topPanel, gbc);
-
-        gbc.gridy = 1;
-        gbc.weighty = 0.3; // Middle panel takes 30% of the space
-
-        // Middle panel for input parameters
-        JPanel middlePanel = createMiddlePanel();
-        panel.add(middlePanel, gbc);
-
-        gbc.gridy = 2;
-        gbc.weighty = 0.6; // Bottom panel takes 60% of the space
-
-        // Bottom panel for output
-        JPanel bottomPanel = createBottomPanel();
-        panel.add(bottomPanel, gbc);
     }
 
 
@@ -138,7 +105,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
 //    }
 
 
-    private JPanel createTopPanel() {
+    protected JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(280, 32));
@@ -194,24 +161,8 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         return topPanel;
     }
 
-    private JPanel createMiddlePanel() {
-        JPanel middlePanel = new JPanel(new BorderLayout());
-        inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        middlePanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
-
-        return middlePanel;
-    }
-
-    private JPanel createBottomPanel() {
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        outputTextArea = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
-
-        return bottomPanel;
-    }
-
     private void handleAction(String action) {
-        VisibleApp app = getVisibleApp();
+        VisibleApp app = getSelectedApp();
         if(app==null){
             Messages.showMessageDialog(getProject(),
                     "Failed to find visible app",
@@ -292,6 +243,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         JSONObject req = new JSONObject();
         req.put("method", "spring_cache");
         req.put("params", params);
+        req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
         return req;
     }
 

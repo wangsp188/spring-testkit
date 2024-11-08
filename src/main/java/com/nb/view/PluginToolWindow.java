@@ -1,7 +1,6 @@
 package com.nb.view;
 
 import com.intellij.icons.AllIcons;
-import com.intellij.json.JsonLanguage;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
@@ -32,7 +31,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-import com.nb.util.Container;
 
 public class PluginToolWindow {
 
@@ -94,7 +92,7 @@ public class PluginToolWindow {
         settingsButton.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                flexibleTestPackageNameField.setText(getFlexibleTestPackage());
+                flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
                 settingsDialog.setVisible(true);
             }
         });
@@ -258,6 +256,14 @@ public class PluginToolWindow {
         return visibleApp;
     }
 
+    public String getSelectedAppName() {
+        VisibleApp app = getSelectedApp();
+        if (app==null) {
+            return null;
+        }
+        return app.getAppName();
+    }
+
     private void initSettingsDialog() {
         settingsDialog = new JDialog((Frame) null, "No-Bug Settings", true);
         // 定义主面板
@@ -305,11 +311,12 @@ public class PluginToolWindow {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        flexibleTestPackageNameField = new JTextField(getFlexibleTestPackage(), 20);
+        flexibleTestPackageNameField = new JTextField(LocalStorageHelper.getFlexibleTestPackage(project), 20);
+
         // 输入框
-        JLabel packageNameLabel = new JLabel("Package Name:");
+        JLabel packageNameLabel = new JLabel("Flexible Test Package:");
         packageNameLabel.setLabelFor(flexibleTestPackageNameField); // 关联标签和输入框
-        packageNameLabel.setToolTipText("Enter the package name here"); // 提示信息
+        packageNameLabel.setToolTipText("Which package do you want to enable flexible test?"); // 提示信息
 
         // 布局输入框和标签
         gbc.gridx = 0;
@@ -318,36 +325,67 @@ public class PluginToolWindow {
         panel.add(packageNameLabel, gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1.0; // 让输入框占据剩余空间
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0; // 让输入框占据剩余空间
         panel.add(flexibleTestPackageNameField, gbc);
 
+        // 新增一行值得占用
+        gbc.gridx = 0;
+        gbc.gridy = 1; // 新的一行
+        gbc.gridwidth = 2; // 占据两列
+        gbc.weighty = 1.0; // 占用剩余空间
+        gbc.fill = GridBagConstraints.BOTH; // 使下一行占用空间
+        panel.add(Box.createVerticalStrut(0), gbc); // 添加空白占位符，以便下一行显示正确
+
+        // 创建按钮面板，使用FlowLayout以右对齐
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
         // 保存按钮
-        JButton saveButton = new JButton("Save");
-        saveButton.addActionListener(new ActionListener() {
+        JButton saveButton = new JButton("Apply");
+        ActionListener saveListener = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String packageName = flexibleTestPackageNameField.getText();
-                if(StringUtils.isBlank(packageName)) {
-                    LocalStorage.setFlexibleTestPackage(project, null);
-                    Notification notification = new Notification("No-Bug", "Info", "packageName is blank , none fun can execute", NotificationType.INFORMATION);
+                if (StringUtils.isBlank(packageName)) {
+                    LocalStorageHelper.setFlexibleTestPackage(project, null);
+                    Notification notification = new Notification("No-Bug", "Info", "Package name is blank, none fun can execute", NotificationType.INFORMATION);
                     Notifications.Bus.notify(notification, project);
                     return;
                 }
-                LocalStorage.setFlexibleTestPackage(project, packageName);
-                Notification notification = new Notification("No-Bug", "Info", "flexible-test is refresh by"+packageName+", pls restart project", NotificationType.INFORMATION);
+                LocalStorageHelper.setFlexibleTestPackage(project, packageName);
+                Notification notification = new Notification("No-Bug", "Info", "Flexible-test is refreshed by " + packageName + ", please restart project", NotificationType.INFORMATION);
                 Notifications.Bus.notify(notification, project);
+            }
+        };
+        saveButton.addActionListener(saveListener);
+
+        // 关闭按钮
+        JButton closeButton = new JButton("OK");
+        closeButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                saveListener.actionPerformed(e);
+                // 关闭当前窗口
+                Window window = SwingUtilities.getWindowAncestor(panel);
+                if (window != null) {
+                    window.dispose();
+                }
             }
         });
 
-        // 将保存按钮添加到内容面板右下角
-        gbc.gridx = 1;
-        gbc.gridy = 1;
+        // 将按钮添加到按钮面板
+        buttonPanel.add(saveButton);
+        buttonPanel.add(closeButton);
+
+        // 将按钮面板添加到主面板的底部
+        gbc.gridx = 0;
+        gbc.gridy = 1; // 新的一行
+        gbc.gridwidth = 2; // 占据两列
         gbc.weightx = 0.0; // 重置权重
-        gbc.weighty = 1.0; // 让按钮靠下
-        gbc.anchor = GridBagConstraints.SOUTHEAST;
-        gbc.fill = GridBagConstraints.NONE;
-        panel.add(saveButton, gbc);
+        gbc.weighty = 0.0; // 重置权重
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
+        gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
+        panel.add(buttonPanel, gbc);
 
         return panel;
     }
@@ -357,55 +395,64 @@ public class PluginToolWindow {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), getScript(), false);
+        scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.getScript(project), false);
 
-        // 布局输入框和标签
+        // 布局输入框
         gbc.gridx = 0;
         gbc.gridy = 0;
-        gbc.gridwidth = 1;
-        gbc.gridheight = 1;
+        gbc.gridwidth = 2; // 占据两列
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.NORTHWEST;
-        panel.add(scriptField, gbc);
+        panel.add(new JBScrollPane(scriptField), gbc);
+
+        // 创建按钮面板，使用FlowLayout以右对齐
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
         // 保存按钮
-        JButton saveButton = new JButton("Save");
-        saveButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String script = scriptField.getText();
-                if (StringUtils.isBlank(script)) {
-                    LocalStorage.setScript(project,null);
-                    Notification notification = new Notification("No-Bug", "Info", "script is blank", NotificationType.INFORMATION);
-                    Notifications.Bus.notify(notification, project);
-                    return;
-                }
-                LocalStorage.setScript(project,script);
-                Notification notification = new Notification("No-Bug", "Info", "script is saved", NotificationType.INFORMATION);
+        JButton saveButton = new JButton("Apply");
+        ActionListener saveListener = e -> {
+            String script = scriptField.getText();
+            if (StringUtils.isBlank(script)) {
+                LocalStorageHelper.setScript(project, null);
+                Notification notification = new Notification("No-Bug", "Info", "Script is blank", NotificationType.INFORMATION);
                 Notifications.Bus.notify(notification, project);
+                return;
+            }
+            LocalStorageHelper.setScript(project, script);
+            Notification notification = new Notification("No-Bug", "Info", "Script is saved", NotificationType.INFORMATION);
+            Notifications.Bus.notify(notification, project);
+        };
+        saveButton.addActionListener(saveListener);
+
+        // 关闭按钮
+        JButton closeButton = new JButton("OK");
+        closeButton.addActionListener(e -> {
+            saveListener.actionPerformed(e);
+            // 关闭当前窗口
+            Window window = SwingUtilities.getWindowAncestor(panel);
+            if (window != null) {
+                window.dispose();
             }
         });
 
-        // 将保存按钮添加到内容面板右下角
+        // 将按钮添加到按钮面板
+        buttonPanel.add(saveButton);
+        buttonPanel.add(closeButton);
+
+        // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 1; // 新的一行
+        gbc.gridwidth = 2; // 占据两列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
-        gbc.anchor = GridBagConstraints.SOUTHEAST;
-        gbc.fill = GridBagConstraints.NONE;
-        panel.add(saveButton, gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
+        gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
+        panel.add(buttonPanel, gbc);
 
         return panel;
     }
-
-    public String getFlexibleTestPackage() {
-        return LocalStorage.getConfig(project).getFlexibleTestPackage();
-    }
-
-    public String getScript() {
-        return LocalStorage.getConfig(project).getScript();
-    }
-
 }
+
+

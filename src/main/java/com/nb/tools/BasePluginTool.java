@@ -1,8 +1,10 @@
 package com.nb.tools;
 
+import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.psi.*;
+import com.intellij.ui.LanguageTextField;
+import com.intellij.ui.components.JBScrollPane;
 import com.nb.view.PluginToolWindow;
 import com.nb.view.VisibleApp;
 
@@ -13,59 +15,20 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class BasePluginTool {
+public abstract class BasePluginTool {
 
 
     protected PluginToolWindow toolWindow;
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
-    protected JComboBox<String> actionBox;
-    protected JButton runButton;
-    protected JTextArea resultArea;
+    protected LanguageTextField inputEditorTextField;
+    protected LanguageTextField outputTextArea;
 
     public BasePluginTool(PluginToolWindow pluginToolWindow) {
         // 初始化panel
         this.toolWindow = pluginToolWindow;
         this.panel = new JPanel(new GridBagLayout());
-    }
-
-    protected void addActionBox() {
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.gridx = 1;
-        gbc.gridy = 0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        actionBox = new ComboBox<>(new String[]{tool + " Action 1", "Action 2", "Action 3"});
-        panel.add(actionBox, gbc);
-    }
-
-    protected void addRunButton() {
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.gridx = 2;
-        gbc.gridy = 0;
-        gbc.fill = GridBagConstraints.NONE;
-
-        runButton = new JButton("Run");
-        panel.add(runButton, gbc);
-    }
-
-    protected void addResultArea() {
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        gbc.gridwidth = GridBagConstraints.REMAINDER;
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.weightx = 1.0;
-        gbc.weighty = 1.0;
-
-        resultArea = new JTextArea();
-        resultArea.setEditable(false);
-        resultArea.setLineWrap(true);
-        JScrollPane scrollPane = new JScrollPane(resultArea);
-        panel.add(scrollPane, gbc);
+        initializePanel();
     }
 
 
@@ -81,8 +44,12 @@ public class BasePluginTool {
         return toolWindow.getProject();
     }
 
-    public VisibleApp getVisibleApp() {
+    public VisibleApp getSelectedApp() {
         return toolWindow.getSelectedApp();
+    }
+
+    public String getSelectedAppName() {
+        return toolWindow.getSelectedAppName();
     }
 
     public static String getStackTrace(Throwable throwable) {
@@ -188,7 +155,52 @@ public class BasePluginTool {
         return initParams;
     }
 
+    protected void initializePanel() {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0.0; // 顶部面板不占用垂直空间
+
+        // Top panel for method selection and actions
+        JPanel topPanel = createTopPanel();
+        panel.add(topPanel, gbc);
+
+        gbc.gridy = 1;
+        gbc.weighty = 0.3; // Middle panel takes 30% of the space
+
+        // Middle panel for input parameters
+        JPanel middlePanel = createMiddlePanel();
+        panel.add(middlePanel, gbc);
+
+        gbc.gridy = 2;
+        gbc.weighty = 0.6; // Bottom panel takes 60% of the space
+
+        // Bottom panel for output
+        JPanel bottomPanel = createBottomPanel();
+        panel.add(bottomPanel, gbc);
+    }
+
+    protected abstract JPanel createTopPanel();
+
+    protected JPanel createMiddlePanel() {
+        JPanel middlePanel = new JPanel(new BorderLayout());
+        inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        middlePanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
+
+        return middlePanel;
+    }
+
+    protected JPanel createBottomPanel() {
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        outputTextArea = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
+        return bottomPanel;
+    }
+
     public static class MethodAction {
+
         private final PsiMethod method;
 
         public MethodAction(PsiMethod method) {
