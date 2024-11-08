@@ -36,9 +36,13 @@ public class LocalStorageHelper {
                     "\n" +
                     "\n" +
                     "/**\n" +
-                    " * 这是可执行函数的脚本类\n" +
+                    " * 拦截tool执行的脚本类\n" +
                     " * 一定要有一个无参构造\n" +
-                    " * 操作执行前后分别会执行invokeBefore和invokeAfter函数\n" +
+                    " * tool执行前后分别会执行invokeBefore和invokeAfter函数\n" +
+                    " * 可执行业务逻辑\n" +
+                    " * 可引用项目中的类及函数\n" +
+                    " * trace写入\n" +
+                    " * 登录态模拟\n" +
                     " * 支持使用@Autowired注入项目中存在的bean\n" +
                     " */\n" +
                     "class MyScript {\n" +
@@ -51,9 +55,9 @@ public class LocalStorageHelper {
                     "\n" +
                     "\n" +
                     "    /**\n" +
-                    "     * 工具执行前\n" +
+                    "     * tool执行前\n" +
                     "     *\n" +
-                    "     * @param tool   所执行的tool 非空\n" +
+                    "     * @param tool   将要执行的tool 非空\n" +
                     "     * @param params 入参 非空\n" +
                     "     * @throws Throwable 抛出异常则阻断tool调用\n" +
                     "     */\n" +
@@ -62,9 +66,9 @@ public class LocalStorageHelper {
                     "    }\n" +
                     "\n" +
                     "    /**\n" +
-                    "     * 工具执行后\n" +
+                    "     * tool执行后\n" +
                     "     *\n" +
-                    "     * @param tool   所执行的tool 非空\n" +
+                    "     * @param tool   将要执行的tool 非空\n" +
                     "     * @param params 入参 非空\n" +
                     "     * @param cost   耗时ms 不包含脚本耗时 可能为空\n" +
                     "     * @param ret    返回内容 可能为空\n" +
