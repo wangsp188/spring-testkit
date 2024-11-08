@@ -224,6 +224,29 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);
+
+        req.put("script", "package com.nb.side_server;\n" +
+                "\n" +
+                "import org.springframework.beans.factory.annotation.Autowired;\n" +
+                "import org.springframework.context.ApplicationContext;\n" +
+                "\n" +
+                "import java.util.Map;\n" +
+                "\n" +
+                "public class T1 {\n" +
+                "    \n" +
+                "    @Autowired\n" +
+                "    private ApplicationContext ctx;\n" +
+                "    \n" +
+                "    public void invokeBefore(String method, Map<String,String> params){\n" +
+                "        System.err.println(\"before\"+ctx);\n" +
+                "    }\n" +
+                "\n" +
+                "\n" +
+                "    public void invokeAfter(String method, Map<String,String> params,Object ret,Throwable e){\n" +
+                "        System.err.println(\"before\"+ctx);\n" +
+                "    }\n" +
+                "    \n" +
+                "}\n");
         return req;
     }
 

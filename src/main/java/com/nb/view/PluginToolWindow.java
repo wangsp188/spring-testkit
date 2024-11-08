@@ -1,6 +1,8 @@
 package com.nb.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.json.JsonLanguage;
+import com.intellij.lang.java.JavaLanguage;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
@@ -10,6 +12,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.PsiElement;
+import com.intellij.ui.LanguageTextField;
 import com.nb.tools.ActionTool;
 import com.nb.tools.BasePluginTool;
 import com.nb.tools.PluginToolEnum;
@@ -18,6 +21,7 @@ import com.nb.tools.flexible_test.FlexibleTestTool;
 import com.nb.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
+import net.sf.cglib.core.Local;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
@@ -49,7 +53,8 @@ public class PluginToolWindow {
 
 
     private JTextField flexibleTestPackageNameField;
-    private Container<String> savedFlexibleTestPackageName;
+
+    private LanguageTextField scriptField;
 
 
 
@@ -89,7 +94,7 @@ public class PluginToolWindow {
         settingsButton.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                flexibleTestPackageNameField.setText(savedFlexibleTestPackageName.get());
+                flexibleTestPackageNameField.setText(getFlexibleTestPackage());
                 settingsDialog.setVisible(true);
             }
         });
@@ -259,7 +264,7 @@ public class PluginToolWindow {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"basic"};
+        String[] options = {"basic","script"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
@@ -267,6 +272,7 @@ public class PluginToolWindow {
         // 右侧内容显示区域
         JPanel rightContent = new JPanel(new CardLayout());
         rightContent.add(createBasicOptionPanel(), "basic");
+        rightContent.add(createScriptOptionPanel(), "script");
 
         // 监听选项改变，更新右侧内容
         optionList.addListSelectionListener(e -> {
@@ -299,8 +305,7 @@ public class PluginToolWindow {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        flexibleTestPackageNameField = new JTextField(".flexibletest", 20);
-        savedFlexibleTestPackageName = Container.of(flexibleTestPackageNameField.getText());
+        flexibleTestPackageNameField = new JTextField(getFlexibleTestPackage(), 20);
         // 输入框
         JLabel packageNameLabel = new JLabel("Package Name:");
         packageNameLabel.setLabelFor(flexibleTestPackageNameField); // 关联标签和输入框
@@ -324,12 +329,12 @@ public class PluginToolWindow {
             public void actionPerformed(ActionEvent e) {
                 String packageName = flexibleTestPackageNameField.getText();
                 if(StringUtils.isBlank(packageName)) {
-                    savedFlexibleTestPackageName.set(null);
+                    LocalStorage.setFlexibleTestPackage(project, null);
                     Notification notification = new Notification("No-Bug", "Info", "packageName is blank , none fun can execute", NotificationType.INFORMATION);
                     Notifications.Bus.notify(notification, project);
                     return;
                 }
-                savedFlexibleTestPackageName.set(packageName);
+                LocalStorage.setFlexibleTestPackage(project, packageName);
                 Notification notification = new Notification("No-Bug", "Info", "flexible-test is refresh by"+packageName+", pls restart project", NotificationType.INFORMATION);
                 Notifications.Bus.notify(notification, project);
             }
@@ -347,7 +352,60 @@ public class PluginToolWindow {
         return panel;
     }
 
-    public String getFlexibleTestPackage() {
-        return savedFlexibleTestPackageName ==null?null: savedFlexibleTestPackageName.get();
+    private JPanel createScriptOptionPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+
+        scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), getScript(), false);
+
+        // 布局输入框和标签
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        panel.add(scriptField, gbc);
+
+        // 保存按钮
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String script = scriptField.getText();
+                if (StringUtils.isBlank(script)) {
+                    LocalStorage.setScript(project,null);
+                    Notification notification = new Notification("No-Bug", "Info", "script is blank", NotificationType.INFORMATION);
+                    Notifications.Bus.notify(notification, project);
+                    return;
+                }
+                LocalStorage.setScript(project,script);
+                Notification notification = new Notification("No-Bug", "Info", "script is saved", NotificationType.INFORMATION);
+                Notifications.Bus.notify(notification, project);
+            }
+        });
+
+        // 将保存按钮添加到内容面板右下角
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.weightx = 0.0; // 重置权重
+        gbc.weighty = 0.0; // 重置权重
+        gbc.anchor = GridBagConstraints.SOUTHEAST;
+        gbc.fill = GridBagConstraints.NONE;
+        panel.add(saveButton, gbc);
+
+        return panel;
     }
+
+    public String getFlexibleTestPackage() {
+        return LocalStorage.getConfig(project).getFlexibleTestPackage();
+    }
+
+    public String getScript() {
+        return LocalStorage.getConfig(project).getScript();
+    }
+
 }

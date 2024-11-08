@@ -42,6 +42,17 @@ public class WindowHelper {
         return packageNames.get();
     }
 
+    public static String getScript(Project project) {
+        Container<String> script = new Container<>();
+        getOrInitToolWindow(project, new Consumer<PluginToolWindow>() {
+            @Override
+            public void accept(PluginToolWindow pluginToolWindow) {
+                script.set(pluginToolWindow.getScript());
+            }
+        });
+        return script.get();
+    }
+
 
     public static void switch2Tool(Project project, PluginToolEnum tool, PsiElement element) {
         getOrInitToolWindow(project, new Consumer<PluginToolWindow>() {

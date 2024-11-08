@@ -288,8 +288,9 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         }
         params.put("argTypes", JSONObject.toJSONString(argTypes));
         params.put("args", args.toJSONString());
+        params.put("action", action);
         JSONObject req = new JSONObject();
-        req.put("method", action);
+        req.put("method", "spring_cache");
         req.put("params", params);
         return req;
     }
