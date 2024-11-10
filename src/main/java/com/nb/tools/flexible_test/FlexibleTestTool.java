@@ -61,7 +61,7 @@ public class FlexibleTestTool extends BasePluginTool  implements ActionTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                handleAction("flexible_test");
+                handleAction(PluginToolEnum.FLEXIBLE_TEST.getCode());
             }
         });
 

@@ -64,7 +64,7 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                handleAction("call_method");
+                handleAction(PluginToolEnum.CALL_METHOD.getCode());
             }
         });
 

@@ -241,7 +241,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         params.put("args", args.toJSONString());
         params.put("action", action);
         JSONObject req = new JSONObject();
-        req.put("method", "spring_cache");
+        req.put("method", PluginToolEnum.SPRING_CACHE.getCode());
         req.put("params", params);
         req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
         return req;

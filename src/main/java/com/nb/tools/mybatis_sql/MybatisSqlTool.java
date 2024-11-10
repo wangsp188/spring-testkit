@@ -81,7 +81,7 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                handleAction("mybatis-sql");
+                handleAction(PluginToolEnum.MYBATIS_SQL.getCode());
             }
         });
 
