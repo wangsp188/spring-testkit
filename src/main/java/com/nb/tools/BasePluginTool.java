@@ -3,6 +3,7 @@ package com.nb.tools;
 import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
+import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.nb.view.PluginToolWindow;
@@ -84,6 +85,30 @@ public abstract class BasePluginTool {
 
         // 构建完整的方法签名
         return className + "#" + methodName + "(" + parameters.toString() + ")";
+    }
+
+    protected static String buildXmlTagKey(XmlTag xmlTag) {
+        if (xmlTag == null) {
+            return null;
+        }
+
+        // 获取标签名
+        String tagName = xmlTag.getContainingFile().getName();
+
+        // 构建标识符，假设我们使用标签名称和某个关键属性进行组合
+        StringBuilder keyBuilder = new StringBuilder(tagName);
+
+        // 假设我们关注某个特定属性，比如 "id"，这个可以根据具体业务规则定制
+        String idAttribute = xmlTag.getAttributeValue("id");
+        if (idAttribute != null) {
+            keyBuilder.append("#").append(idAttribute);
+        }
+
+        // 当然，你可以根据需要加入更多的信息，比如标签的命名空间或其他属性
+        // String namespace = xmlTag.getNamespace();
+        // keyBuilder.append("(namespace: ").append(namespace).append(")");
+
+        return keyBuilder.toString();
     }
 
     protected String getBeanNameFromClass(PsiClass psiClass) {
@@ -217,6 +242,27 @@ public abstract class BasePluginTool {
 
         public PsiMethod getMethod() {
             return method;
+        }
+    }
+
+    public static class XmlTagAction {
+
+        private final XmlTag xmlTag;
+
+        public XmlTagAction(XmlTag xmlTag) {
+            this.xmlTag = xmlTag;
+        }
+
+        @Override
+        public String toString() {
+            if (xmlTag==null) {
+                return "unknown";
+            }
+            return buildXmlTagKey(xmlTag);
+        }
+
+        public XmlTag getXmlTag() {
+            return xmlTag;
         }
     }
 

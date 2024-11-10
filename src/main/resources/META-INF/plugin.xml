@@ -37,6 +37,8 @@
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.nb.tools.spring_cache.SpringCacheIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.nb.tools.flexible_test.FlexibleTestIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.nb.tools.call_method.CallMethodIconProvider"/>
+        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.nb.tools.mybatis_sql.MybatisSqlIconProvider"/>
+
 
         <java.programPatcher implementation="com.nb.SideServerJavaProgramPatcher" />
         <toolWindow id="ZCC No-Bug" icon="/icons/no-bug.svg" factoryClass="com.nb.view.PluginToolWindowFactory" anchor="right"/>
@@ -45,11 +47,11 @@
     </extensions>
 
     <actions>
-        <action id="nb_log_to_link" class="com.nb.links.Log2LinksAction" text="nb_log_to_link"
+        <action id="No-Bug_log_to_link" class="com.nb.links.Log2LinksAction" text="No-Bug_log_to_link"
                 description="Processes the selected text and copies the results to clipboard">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
-        <action id="nb_popup_log_to_link" class="com.nb.links.Log2LinksWebViewAction" text="nb_popup_log_to_link"
+        <action id="No-Bug_popup_log_to_link" class="com.nb.links.Log2LinksWebViewAction" text="No-Bug_popup_log_to_link"
                 description="Processes the selected text and copies the results to clipboard">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>

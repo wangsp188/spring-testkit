@@ -1,7 +1,11 @@
 package com.nb.tools;
 
 public enum PluginToolEnum {
-    SPRING_CACHE("spring-cache"), CALL_METHOD("call-method"), FLEXIBLE_TEST("flexible-test");
+    SPRING_CACHE("spring-cache"),
+    CALL_METHOD("call-method"),
+    FLEXIBLE_TEST("flexible-test"),
+    MYBATIS_SQL("mybatis-sql")
+    ;
 
     private String code;
 

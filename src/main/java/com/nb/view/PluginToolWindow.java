@@ -17,6 +17,7 @@ import com.nb.tools.BasePluginTool;
 import com.nb.tools.PluginToolEnum;
 import com.nb.tools.call_method.CallMethodTool;
 import com.nb.tools.flexible_test.FlexibleTestTool;
+import com.nb.tools.mybatis_sql.MybatisSqlTool;
 import com.nb.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
@@ -101,7 +102,7 @@ public class PluginToolWindow {
 
 
         // 工具拉框A
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(),PluginToolEnum.FLEXIBLE_TEST.getCode()});
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(),PluginToolEnum.FLEXIBLE_TEST.getCode(),PluginToolEnum.MYBATIS_SQL.getCode()});
         toolBox.setEnabled(false);
         toolBox.setPreferredSize(new Dimension(120, 32));
         toolBox.setMaximumSize(new Dimension(120, 32));
@@ -134,7 +135,7 @@ public class PluginToolWindow {
             while (true) {
                 try {
                     refreshVisibleApp();
-                    Thread.sleep(60 * 1000); // 每隔一分钟调用一次
+                    Thread.sleep(3 * 1000); // 每隔一分钟调用一次
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
@@ -153,6 +154,7 @@ public class PluginToolWindow {
         tools.put(PluginToolEnum.CALL_METHOD, new CallMethodTool(this));
         tools.put(PluginToolEnum.FLEXIBLE_TEST, new FlexibleTestTool(this));
         tools.put(PluginToolEnum.SPRING_CACHE, new SpringCacheTool(this));
+        tools.put(PluginToolEnum.MYBATIS_SQL, new MybatisSqlTool(this));
 
         // 添加工具面板（初次加载时隐藏）
         gbc.gridx = 0;
@@ -178,6 +180,9 @@ public class PluginToolWindow {
 
     private void refreshVisibleApp(){
         List<String> items = AppRuntimeHelper.loadProjectRuntimes("unknown");
+        if (items == null) {
+            return;
+        }
         Iterator<String> iterator = items.iterator();
         HashMap<String, String> map = new HashMap<>();
         map.put("method", "hello");
