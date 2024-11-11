@@ -94,10 +94,10 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (prepareRadioButton.isSelected()) {
-                    prepareRadioButton.setText("Final");
-                    prepareRadioButton.setToolTipText("build final sql");
+                    prepareRadioButton.setText("FinalSql");
+                    prepareRadioButton.setToolTipText("build FinalSql");
                 } else {
-                    prepareRadioButton.setText("Prepared");
+                    prepareRadioButton.setText("PreparedSql");
                     prepareRadioButton.setToolTipText("build PreparedSql");
                 }
             }
