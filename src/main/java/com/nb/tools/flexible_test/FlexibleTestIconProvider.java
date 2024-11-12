@@ -1,7 +1,7 @@
 package com.nb.tools.flexible_test;
 
 import com.nb.tools.PluginToolEnum;
-import com.nb.view.LocalStorageHelper;
+import com.nb.util.LocalStorageHelper;
 import com.nb.view.WindowHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -77,6 +77,11 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return false;
         }
         PsiMethod method = (PsiMethod) parent;
+
+        if (method.isConstructor()) {
+            return false;
+        }
+
         PsiFile psiFile = method.getContainingFile();
         if (!(psiFile instanceof PsiJavaFile)) {
             return false;

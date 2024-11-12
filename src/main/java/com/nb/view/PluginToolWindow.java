@@ -5,12 +5,18 @@ import com.intellij.lang.java.JavaLanguage;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.StdFileTypes;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.psi.PsiElement;
+import com.intellij.psi.*;
+import com.intellij.psi.search.FileTypeIndex;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.LanguageTextField;
 import com.nb.tools.ActionTool;
 import com.nb.tools.BasePluginTool;
@@ -21,7 +27,9 @@ import com.nb.tools.mybatis_sql.MybatisSqlTool;
 import com.nb.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
+import com.nb.util.AppRuntimeHelper;
 import com.nb.util.HttpUtil;
+import com.nb.util.LocalStorageHelper;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,6 +45,7 @@ import java.util.List;
 public class PluginToolWindow {
 
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", BasePluginTool.class);
+    public static final String PROJECT_DEFAULT = "project:default";
 
 
     private Project project;
@@ -51,6 +60,7 @@ public class PluginToolWindow {
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
+    private JComboBox<String> scriptAppBox;
 
     private JTextField flexibleTestPackageNameField;
 
@@ -179,7 +189,7 @@ public class PluginToolWindow {
 
 
     private void refreshVisibleApp(){
-        List<String> items = AppRuntimeHelper.loadProjectRuntimes("unknown");
+        List<String> items = AppRuntimeHelper.loadProjectRuntimes(project.getName());
         if (items == null) {
             return;
         }
@@ -192,13 +202,13 @@ public class PluginToolWindow {
                 iterator.remove();
                 continue;
             }
-            VisibleApp visibleApp = parseApp(item);
+            WindowHelper.VisibleApp visibleApp = parseApp(item);
             try {
                 HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
-                AppRuntimeHelper.removeApp("unknown",visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
+                AppRuntimeHelper.removeApp(project.getName(),visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
             }
         }
 
@@ -291,7 +301,7 @@ public class PluginToolWindow {
         return project;
     }
 
-    public VisibleApp getSelectedApp() {
+    public WindowHelper.VisibleApp getSelectedApp() {
         String selectedItem = (String) appBox.getSelectedItem();
         if (selectedItem == null) {
             return null;
@@ -299,17 +309,17 @@ public class PluginToolWindow {
         return parseApp(selectedItem);
     }
 
-    private @Nullable VisibleApp parseApp(String selectedItem) {
+    private @Nullable WindowHelper.VisibleApp parseApp(String selectedItem) {
         String[] split = selectedItem.split(":");
         if (split.length == 2) {
-            VisibleApp visibleApp = new VisibleApp();
+            WindowHelper.VisibleApp visibleApp = new WindowHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[1])+10000);
             return visibleApp;
 
         } else if (split.length == 3) {
-            VisibleApp visibleApp = new VisibleApp();
+            WindowHelper.VisibleApp visibleApp = new WindowHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[2]));
@@ -319,7 +329,7 @@ public class PluginToolWindow {
     }
 
     public String getSelectedAppName() {
-        VisibleApp app = getSelectedApp();
+        WindowHelper.VisibleApp app = getSelectedApp();
         if (app==null) {
             return null;
         }
@@ -452,6 +462,35 @@ public class PluginToolWindow {
         return panel;
     }
 
+    public List<PsiClass> findSpringBootApplicationClasses() {
+        List<PsiClass> springBootApplicationClasses = new ArrayList<>();
+
+        // 使用PsiManager获取项目中的所有文件
+        PsiManager psiManager = PsiManager.getInstance(project);
+        GlobalSearchScope globalSearchScope = GlobalSearchScope.projectScope(project);
+
+        // 获取所有的Java文件
+        FileType javaFileType = StdFileTypes.JAVA;
+        Collection<VirtualFile> javaFiles = FileTypeIndex.getFiles(javaFileType, globalSearchScope);
+
+        for (VirtualFile file : javaFiles) {
+            PsiFile psiFile = psiManager.findFile(file);
+            if (psiFile instanceof PsiJavaFile) {
+                PsiJavaFile javaFile = (PsiJavaFile) psiFile;
+                for (PsiClass psiClass : javaFile.getClasses()) {
+                    // 检查每个类的注解
+                    PsiAnnotation[] annotations = psiClass.getAnnotations();
+                    for (PsiAnnotation annotation : annotations) {
+                        if ("org.springframework.boot.autoconfigure.SpringBootApplication".equals(annotation.getQualifiedName())) {
+                            springBootApplicationClasses.add(psiClass);
+                        }
+                    }
+                }
+            }
+        }
+        return springBootApplicationClasses;
+    }
+
     private JPanel createScriptOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -461,13 +500,79 @@ public class PluginToolWindow {
 
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.gridwidth = 2; // 占据两列
+        gbc.gridy = 1;
+        gbc.gridwidth = 3; // 占据3列
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.NORTHWEST;
         panel.add(new JBScrollPane(scriptField), gbc);
+
+        String[] apps = new String[]{PROJECT_DEFAULT};
+
+        // 添加标签和组合框
+        JLabel comboBoxLabel = new JLabel("Scope:");
+        scriptAppBox = new ComboBox<>(apps);
+
+        DumbService.getInstance(project).smartInvokeLater(() -> {
+            // 事件或代码在索引准备好后运行
+            List<PsiClass> applicationClasses = findSpringBootApplicationClasses();
+            for (PsiClass applicationClass : applicationClasses) {
+                scriptAppBox.addItem(applicationClass.getName());
+            }
+        });
+
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(comboBoxLabel, gbc);
+
+        // 添加组合框到标签右边
+        gbc.gridx = 1;
+        gbc.gridy = 0; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(scriptAppBox, gbc);
+
+        scriptAppBox.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedApp = (String) scriptAppBox.getSelectedItem();
+                if (selectedApp==null) {
+                    scriptField.setText(null);
+                }else if(PROJECT_DEFAULT.equals(selectedApp)) {
+                    scriptField.setText(LocalStorageHelper.getScript(project));
+                }else{
+                    scriptField.setText(LocalStorageHelper.getAppScript(project,selectedApp));
+                }
+            }
+        });
+
+        // 添加新按钮到组合框右边
+        JButton newButton = new JButton(AllIcons.Actions.Rollback);
+        newButton.setToolTipText("use default script");
+        newButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                scriptField.setText(LocalStorageHelper.defScript);
+            }
+        });
+        gbc.gridx = 2;  // 放在同一行的尾部
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        panel.add(newButton, gbc);
+
+
+
 
         // 创建按钮面板，使用FlowLayout以右对齐
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -476,13 +581,25 @@ public class PluginToolWindow {
         JButton saveButton = new JButton("Apply");
         ActionListener saveListener = e -> {
             String script = scriptField.getText();
+            String selectedApp = (String) scriptAppBox.getSelectedItem();
+            if (selectedApp==null) {
+                return;
+            }
             if (StringUtils.isBlank(script)) {
-                LocalStorageHelper.setScript(project, null);
+                if (PROJECT_DEFAULT.equals(selectedApp)) {
+                    LocalStorageHelper.setScript(project, null);
+                }else{
+                    LocalStorageHelper.setAppScript(project, selectedApp,null);
+                }
                 Notification notification = new Notification("No-Bug", "Info", "Script is blank", NotificationType.INFORMATION);
                 Notifications.Bus.notify(notification, project);
                 return;
             }
-            LocalStorageHelper.setScript(project, script);
+            if (PROJECT_DEFAULT.equals(selectedApp)) {
+                LocalStorageHelper.setScript(project, script);
+            }else{
+                LocalStorageHelper.setAppScript(project, selectedApp,script);
+            }
             Notification notification = new Notification("No-Bug", "Info", "Script is saved", NotificationType.INFORMATION);
             Notifications.Bus.notify(notification, project);
         };
@@ -505,8 +622,8 @@ public class PluginToolWindow {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 1; // 新的一行
-        gbc.gridwidth = 2; // 占据两列
+        gbc.gridy = 2; // 新的一行
+        gbc.gridwidth = 3; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
         gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间

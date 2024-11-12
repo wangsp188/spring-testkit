@@ -1,4 +1,4 @@
-package com.nb.view;
+package com.nb.util;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
@@ -26,9 +26,9 @@ public class LocalStorageHelper {
 
     private static final String CONFIG_DIR = ".no-bug/config";
 
-    private static final String defFlexibleTestPackage = ".flexibletest";
+    public static final String defFlexibleTestPackage = "flexibletest";
 
-    private static final String defScript =
+    public static final String defScript =
             "import org.springframework.beans.factory.annotation.Autowired;\n" +
                     "import org.springframework.context.ApplicationContext;\n" +
                     "\n" +
@@ -174,7 +174,7 @@ public class LocalStorageHelper {
             config.setFlexibleTestPackage(defFlexibleTestPackage);
         }
         if (config.getScript() == null) {
-            config.setScript(defScript);
+            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
         }
         return config;
     }

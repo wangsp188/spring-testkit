@@ -5,8 +5,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.ComboBox;
 import com.nb.util.HttpUtil;
-import com.nb.view.LocalStorageHelper;
-import com.nb.view.VisibleApp;
+import com.nb.util.LocalStorageHelper;
+import com.nb.view.WindowHelper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.*;
 import com.nb.tools.ActionTool;
@@ -21,6 +21,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.ArrayList;
+import java.util.function.Supplier;
 
 public class CallMethodTool extends BasePluginTool implements ActionTool {
 
@@ -47,7 +48,6 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
         topPanel.add(actionComboBox);
 
         actionComboBox.addActionListener(new ActionListener() {
-
             @Override
             public void actionPerformed(ActionEvent e) {
                 triggerChangeAction();
@@ -64,7 +64,48 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                handleAction(PluginToolEnum.CALL_METHOD.getCode());
+                WindowHelper.VisibleApp app = getSelectedApp();
+                if (app == null) {
+                    Messages.showMessageDialog(getProject(),
+                            "Failed to find visible app",
+                            "Error",
+                            Messages.getErrorIcon());
+                    return;
+                }
+                triggerTask(runButton, AllIcons.Actions.Execute, outputTextArea, app.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        String jsonInput = inputEditorTextField.getDocument().getText();
+                        if (jsonInput == null || jsonInput.isBlank()) {
+                            outputTextArea.setText("参数框不可为空");
+                            return null;
+                        }
+                        JSONArray jsonArray;
+                        try {
+                            jsonArray = JSONObject.parseArray(jsonInput);
+                        } catch (Exception ex) {
+                            outputTextArea.setText("参数必须是json数组");
+                            return null;
+                        }
+                        inputEditorTextField.setText(JSONObject.toJSONString(jsonArray, true));
+                        MethodAction selectedItem = (MethodAction) actionComboBox.getSelectedItem();
+                        if (selectedItem==null) {
+                            outputTextArea.setText("未选中函数，请先选中");
+                            return null;
+                        }
+                        PsiMethod method = selectedItem.getMethod(); // 需要从实际应用中获取当前的选中的 PsiMethod
+                        if (method.getParameterList().getParameters().length != jsonArray.size()) {
+                            outputTextArea.setText("参数量不对,预期是：" + method.getParameterList().getParameters().length + "个，提供了：" + jsonArray.size() + "个");
+                            return null;
+                        }
+                        JSONObject params = buildParams(method, jsonArray, PluginToolEnum.CALL_METHOD.getCode());
+                        try {
+                            return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", params, JSONObject.class);
+                        } catch (Exception ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    }
+                });
             }
         });
 
@@ -90,68 +131,6 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
         topPanel.add(useProxyRadioButton);
 
         return topPanel;
-    }
-
-
-    private void handleAction(String action) {
-        VisibleApp app = getSelectedApp();
-        if(app==null){
-            Messages.showMessageDialog(getProject(),
-                    "Failed to find visible app",
-                    "Error",
-                    Messages.getErrorIcon());
-            return;
-        }
-        String jsonInput = inputEditorTextField.getDocument().getText();
-        if (jsonInput == null || jsonInput.isBlank()) {
-            outputTextArea.setText("参数框不可为空");
-            return;
-        }
-        JSONArray jsonArray;
-        try {
-            jsonArray = JSONObject.parseArray(jsonInput);
-        } catch (Exception ex) {
-            outputTextArea.setText("参数必须是json数组");
-            return;
-        }
-        inputEditorTextField.setText(JSONObject.toJSONString(jsonArray, true));
-        MethodAction selectedItem = (MethodAction) actionComboBox.getSelectedItem();
-        if (selectedItem==null) {
-            outputTextArea.setText("未选中函数，请先选中");
-            return;
-        }
-        PsiMethod method = selectedItem.getMethod(); // 需要从实际应用中获取当前的选中的 PsiMethod
-        if (method.getParameterList().getParameters().length != jsonArray.size()) {
-            outputTextArea.setText("参数量不对,预期是：" + method.getParameterList().getParameters().length + "个，提供了：" + jsonArray.size() + "个");
-            return;
-        }
-        JSONObject params = buildParams(method, jsonArray, action);
-        outputTextArea.setText("......");
-        // 使用 SwingWorker 在后台线程执行耗时操作
-        SwingWorker<JSONObject, Void> worker = new SwingWorker<>() {
-            @Override
-            protected JSONObject doInBackground() throws Exception {
-                return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", params, JSONObject.class);
-            }
-
-            @Override
-            protected void done() {
-                try {
-                    JSONObject response = get();
-                    if (response == null) {
-                        outputTextArea.setText("返回结果为空");
-                    } else if (!response.getBooleanValue("success")) {
-                        outputTextArea.setText("失败：" + response.getString("message"));
-                    } else {
-                        outputTextArea.setText(JSONObject.toJSONString(response.get("data"), true));
-                    }
-                } catch (Throwable ex) {
-                    outputTextArea.setText("Error: " + getStackTrace(ex.getCause()));
-                }
-            }
-        };
-
-        worker.execute();
     }
 
     private JSONObject buildParams(PsiMethod method, JSONArray args, String action) {
@@ -216,13 +195,8 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
             inputEditorTextField.setText("[]");
             return;
         }
-        if(lastMethodAction!=null && methodAction==lastMethodAction){
-            return;
-        }
-        ArrayList initParams = initParams(methodAction.getMethod());
-        inputEditorTextField.setText(JSONObject.toJSONString(initParams, true));
-
         lastMethodAction = methodAction;
+        initParams(inputEditorTextField,methodAction.getMethod());
     }
 
 }
