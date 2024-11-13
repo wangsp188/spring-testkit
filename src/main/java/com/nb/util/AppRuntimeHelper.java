@@ -15,7 +15,7 @@ import java.util.List;
 
 public class AppRuntimeHelper {
 
-    private static ObjectMapper mapper = new ObjectMapper();
+    private static ObjectMapper MAPPER = new ObjectMapper();
 
 
     private static final String APPS_DIR = ".no-bug/apps";
@@ -26,7 +26,6 @@ public class AppRuntimeHelper {
             return;
         }
         doRemoveApp(project, appName, port, sidePort);
-        doRemoveApp("unknown", appName, port, sidePort);
     }
 
     private static void doRemoveApp(String project, String appName, Integer port, Integer sidePort) {
@@ -52,31 +51,13 @@ public class AppRuntimeHelper {
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
                 String content = new String(Files.readAllBytes(configFile.toPath()));
-                ret = mapper.readValue(content, new TypeReference<List<String>>() {
+                ret = MAPPER.readValue(content, new TypeReference<List<String>>() {
                 });
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
-        if("unknown".equals(project)){
-            return ret;
-        }
-        configFile = getConfigFile("unknown");
-        if (configFile.exists()) {
-            try (FileReader reader = new FileReader(configFile)) {
-                String content = new String(Files.readAllBytes(configFile.toPath()));
-                if (ret == null) {
-                    ret = mapper.readValue(content, new TypeReference<List<String>>() {
-                    });
-                } else {
-                    ret.addAll(mapper.readValue(content, new TypeReference<List<String>>() {
-                    }));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
         return ret;
     }
 
@@ -90,7 +71,7 @@ public class AppRuntimeHelper {
             if (runtimes == null) {
                 runtimes = new ArrayList<>();
             }
-            mapper.writeValue(writer, runtimes);
+            MAPPER.writeValue(writer, runtimes);
         } catch (IOException e) {
             e.printStackTrace();
         }

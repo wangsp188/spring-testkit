@@ -9,6 +9,9 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.xml.XmlTag;
+import com.intellij.sql.dialects.dateTime.SqlDtLanguage;
+import com.intellij.sql.dialects.mysql.MysqlBaseMetaLanguage;
+import com.intellij.sql.psi.SqlLanguage;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.nb.tools.ActionTool;
@@ -44,8 +47,6 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
 
     private JRadioButton prepareRadioButton;
 
-    private XmlTagAction lastXmlTagAction;
-
     {
         this.tool = PluginToolEnum.FLEXIBLE_TEST;
     }
@@ -59,12 +60,7 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);
-        actionComboBox = new ComboBox<>();
-        actionComboBox.setPreferredSize(new Dimension(280, 32));
-        actionComboBox.addItemListener(e -> {
-            Object selectedItem = actionComboBox.getSelectedItem();
-            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
-        });
+        actionComboBox = buildActionComboBox();
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 
@@ -112,6 +108,14 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
         return topPanel;
     }
 
+    @Override
+    protected JPanel createBottomPanel() {
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        outputTextArea = new LanguageTextField(SqlLanguage.INSTANCE, getProject(), "", false);
+        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
+        return bottomPanel;
+    }
+
     private void handleAction(String action) {
         String jsonInput = inputEditorTextField.getDocument().getText();
         if (jsonInput == null || jsonInput.isBlank()) {
@@ -137,7 +141,7 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
             String statementId = selectedItem.getXmlTag().getAttributeValue("id");
 
-            String sql = generateSql(xmlContent, statementId, !prepareRadioButton.isSelected(),jsonObject);
+            String sql = SqlGenerator.generateSql(xmlContent, statementId, !prepareRadioButton.isSelected(),jsonObject);
             outputTextArea.setText(sql);
         } catch (Throwable ex) {
             outputTextArea.setText("Error: " + getStackTrace(ex.getCause()));
@@ -173,102 +177,6 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
         actionComboBox.setSelectedItem(item);
     }
 
-    public static String generateSql(String xmlContent, String statementId, boolean prepared,JSONObject parameters) {
-        Configuration configuration = new Configuration();
-        XPathParser parser = new XPathParser(xmlContent, false, configuration.getVariables(), new XMLMapperEntityResolver());
-        XNode mapperNode = parser.evalNode("/mapper");
-
-        // Parse <sql> tags and store them in a map
-        Map<String, XNode> sqlFragments = new HashMap<>();
-        for (XNode node : mapperNode.getChildren()) {
-            if ("sql".equals(node.getName())) {
-                String id = node.getStringAttribute("id");
-                sqlFragments.put(id, node);
-            }
-        }
-
-        // Find the specified SQL statement
-        XNode statementNode = null;
-        for (XNode node : mapperNode.getChildren()) {
-            if (statementId.equals(node.getStringAttribute("id"))) {
-                statementNode = node;
-                break;
-            }
-        }
-
-        if (statementNode == null) {
-            throw new IllegalArgumentException("Statement not found: " + statementId);
-        }
-
-        // Handle <include> tags
-        statementNode = applyIncludes(statementNode, sqlFragments);
-
-        // Create SQL source and generate SQL
-        String sqlText = statementNode.getStringBody().trim();
-        SqlSource sqlSource = new XMLLanguageDriver().createSqlSource(configuration, sqlText, JSONObject.class);
-        BoundSql boundSql = sqlSource.getBoundSql(parameters);
-
-        String preparedSQL = boundSql.getSql();
-        if(prepared){
-            return preparedSQL;
-        }
-
-        Splitter splitter = Splitter.on("?");
-        Iterable<String> splitIterable = splitter.split(preparedSQL);
-        java.util.List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
-        StringBuilder stringBuilder = new StringBuilder();
-        int i = 0;
-        for (String str : splitIterable) {
-            if (StringUtils.isBlank(str)) {
-                continue;
-            }
-            stringBuilder.append(str);
-            ParameterMapping paramObj = parameterMappings.get(i);
-            String fieldName = paramObj.getProperty();
-            Object value;
-            // 这里 ITEM_PREFIX 见处理<foreach>的 org.apache.ibatis.scripting.xmltags.ForEachSqlNode.ITEM_PREFIX
-            if (fieldName.startsWith(ITEM_PREFIX)) {
-                fieldName = fieldName.substring(7);
-                int indexIndex = fieldName.lastIndexOf('_');
-                int valueIndex = NumberUtils.toInt(fieldName.substring(indexIndex + 1));
-                fieldName = fieldName.substring(0, indexIndex);
-                JSONArray listValue = parameters.getJSONArray(fieldName);
-                value = listValue.get(valueIndex);
-            } else {
-                value = parameters.get(fieldName);
-            }
-            stringBuilder.append(value);
-            i++;
-        }
-        return stringBuilder.toString();
-    }
-
-    /**
-     * Recursively applies includes, replacing <include refid="..."> tags with their corresponding SQL fragments.
-     */
-    private static XNode applyIncludes(XNode node, Map<String, XNode> sqlFragments) {
-        for (XNode child : node.getChildren()) {
-            if ("include".equals(child.getName())) {
-                String refid = child.getStringAttribute("refid");
-                XNode fragment = sqlFragments.get(refid);
-                if (fragment == null) {
-                    throw new IllegalArgumentException("SQL fragment not found: " + refid);
-                }
-
-                // Replace the include node with the fragment nodes
-                for (XNode fragmentChild : fragment.getChildren()) {
-                    node.getChildren().add(fragmentChild);
-                }
-
-                // Remove the processed include node
-                node.getChildren().remove(child);
-            } else {
-                // Recursively process child nodes
-                applyIncludes(child, sqlFragments);
-            }
-        }
-        return node;
-    }
 
     private void triggerChangeAction() {
         // 获取当前选中的值
@@ -277,11 +185,7 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             inputEditorTextField.setText("[]");
             return;
         }
-        if(lastXmlTagAction!=null && xmlTagAction==lastXmlTagAction){
-            return;
-        }
         inputEditorTextField.setText("{}");
-        lastXmlTagAction = xmlTagAction;
     }
 
 

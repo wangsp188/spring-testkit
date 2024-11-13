@@ -6,6 +6,7 @@ import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
@@ -521,6 +522,16 @@ public abstract class BasePluginTool {
                 }
             }
         }.execute();
+    }
+
+    protected ComboBox buildActionComboBox() {
+        ComboBox actionComboBox = new ComboBox<>();
+        actionComboBox.setPreferredSize(new Dimension(200, 32));
+        actionComboBox.addItemListener(e -> {
+            Object selectedItem = actionComboBox.getSelectedItem();
+            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
+        });
+        return actionComboBox;
     }
 
     public static class MethodAction {

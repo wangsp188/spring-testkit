@@ -27,8 +27,6 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
 
     private JComboBox<MethodAction> actionComboBox;
 
-    private MethodAction lastMethodAction;
-
     {
         this.tool = PluginToolEnum.SPRING_CACHE;
     }
@@ -38,84 +36,12 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
     }
 
 
-//    private JPanel createTopPanel() {
-//        JPanel topPanel = new JPanel(new BorderLayout());
-//        // 创建下拉框并添加到左侧
-//        actionComboBox = new ComboBox<>();
-//        topPanel.add(actionComboBox, BorderLayout.WEST);
-//
-//        // 创建按钮并设置图标和提示文字
-//        JButton getKeyButton = new JButton(new ImageIcon(new ImageIcon(getClass().getResource("/icons/K.png")).getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH)));
-//        getKeyButton.setToolTipText("get keys");
-//        JButton getValButton = new JButton(AllIcons.Actions.Find);
-//        getValButton.setToolTipText("get keys and get values for every key");
-//        JButton delValButton = new JButton(AllIcons.Actions.GC);
-//        delValButton.setToolTipText("get keys and delete these");
-//
-//        // 设置按钮大小
-//        Dimension buttonSize = new Dimension(32, 32);
-//        getKeyButton.setPreferredSize(buttonSize);
-//        getValButton.setPreferredSize(buttonSize);
-//        delValButton.setPreferredSize(buttonSize);
-//
-//        // 创建一个面板来放置按钮
-//        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
-//        buttonPanel.add(getKeyButton);
-//        buttonPanel.add(getValButton);
-//        buttonPanel.add(delValButton);
-//
-//        // 将按钮面板添加到右侧
-//        topPanel.add(buttonPanel, BorderLayout.EAST);
-//
-//        // 设置下拉框的首选宽度
-//        actionComboBox.setPreferredSize(new Dimension(200, 32));
-//
-//        // 设置整个面板的高度
-//        topPanel.setPreferredSize(new Dimension(600, 32));
-//
-//        // 添加动作监听器
-//        actionComboBox.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                triggerChangeAction();
-//            }
-//        });
-//
-//        getKeyButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                handleAction("build_cache_key");
-//            }
-//        });
-//
-//        getValButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                handleAction("get_cache");
-//            }
-//        });
-//
-//        delValButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                handleAction("delete_cache");
-//            }
-//        });
-//
-//        return topPanel;
-//    }
-
 
     protected JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);
-        actionComboBox = new ComboBox<>();
-        actionComboBox.setPreferredSize(new Dimension(280, 32));
-        actionComboBox.addItemListener(e -> {
-            Object selectedItem = actionComboBox.getSelectedItem();
-            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
-        });
+        actionComboBox = buildActionComboBox();
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 
@@ -146,7 +72,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
                 WindowHelper.VisibleApp app = getSelectedApp();
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
-                            "Failed to find visible app",
+                            "Failed to find runtime app",
                             "Error",
                             Messages.getErrorIcon());
                     return;
@@ -166,7 +92,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
                 WindowHelper.VisibleApp app = getSelectedApp();
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
-                            "Failed to find visible app",
+                            "Failed to find runtime app",
                             "Error",
                             Messages.getErrorIcon());
                     return;
@@ -186,7 +112,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
                 WindowHelper.VisibleApp app = getSelectedApp();
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
-                            "Failed to find visible app",
+                            "Failed to find runtime app",
                             "Error",
                             Messages.getErrorIcon());
                     return;
@@ -299,7 +225,6 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
             inputEditorTextField.setText("[]");
             return;
         }
-        lastMethodAction = methodAction;
         initParams(inputEditorTextField, methodAction.getMethod());
     }
 

@@ -28,6 +28,10 @@ public class LocalStorageHelper {
 
     public static final String defFlexibleTestPackage = "flexibletest";
 
+    public static final String defProperties = "#Here properties takes precedence over spring.properties\n"
+            + "#You can write some configurations for local startup use, like log level\n"
+            + "logging.level.com.example=WARN";
+
     public static final String defScript =
             "import org.springframework.beans.factory.annotation.Autowired;\n" +
                     "import org.springframework.context.ApplicationContext;\n" +
@@ -101,6 +105,12 @@ public class LocalStorageHelper {
 
 
 
+    public static String getAppProperties(Project project,String app) {
+        return getAppConfig(project,app).getProperties();
+    }
+
+
+
     public static void setFlexibleTestPackage(Project project, String flexibleTestPackage) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
@@ -109,6 +119,27 @@ public class LocalStorageHelper {
         projectConfig.setFlexibleTestPackage(flexibleTestPackage);
         saveProjectConfig(project, projectConfig);
     }
+
+
+    public static void setAppProperties(Project project, String app, String properties) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        if (projectConfig.getAppConfigs() == null) {
+            projectConfig.setAppConfigs(new HashMap<>());
+        }
+
+
+        projectConfig.getAppConfigs().computeIfAbsent(app, new Function<String, Config>() {
+            @Override
+            public Config apply(String s) {
+                return new Config();
+            }
+        }).setProperties(properties);
+        saveProjectConfig(project, projectConfig);
+    }
+
 
 
     public static void setScript(Project project, String script) {
@@ -161,12 +192,14 @@ public class LocalStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
             config.setScript(defScript);
+            config.setProperties(defProperties);
             return config;
         }
         if (app == null || projectConfig.getAppConfigs() == null || !projectConfig.getAppConfigs().containsKey(app)) {
             Config config = new Config();
             config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
             config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
+            config.setProperties(defProperties);
             return config;
         }
         Config config = projectConfig.getAppConfigs().get(app);
@@ -175,6 +208,9 @@ public class LocalStorageHelper {
         }
         if (config.getScript() == null) {
             config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
+        }
+        if (config.getProperties() == null) {
+            config.setProperties(defProperties);
         }
         return config;
     }
@@ -252,6 +288,7 @@ public class LocalStorageHelper {
 
         private String flexibleTestPackage;
         private String script;
+        private String properties;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -267,6 +304,14 @@ public class LocalStorageHelper {
 
         public void setScript(String script) {
             this.script = script;
+        }
+
+        public String getProperties() {
+            return properties;
+        }
+
+        public void setProperties(String properties) {
+            this.properties = properties;
         }
     }
 

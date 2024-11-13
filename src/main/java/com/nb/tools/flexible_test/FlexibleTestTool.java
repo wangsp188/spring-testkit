@@ -27,8 +27,6 @@ public class FlexibleTestTool extends BasePluginTool implements ActionTool {
     private JComboBox<MethodAction> actionComboBox;
 
 
-    private MethodAction lastMethodAction;
-
     {
         this.tool = PluginToolEnum.FLEXIBLE_TEST;
     }
@@ -41,12 +39,7 @@ public class FlexibleTestTool extends BasePluginTool implements ActionTool {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);
-        actionComboBox = new ComboBox<>();
-        actionComboBox.setPreferredSize(new Dimension(280, 32));
-        actionComboBox.addItemListener(e -> {
-            Object selectedItem = actionComboBox.getSelectedItem();
-            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
-        });
+        actionComboBox = buildActionComboBox();
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 
@@ -71,7 +64,7 @@ public class FlexibleTestTool extends BasePluginTool implements ActionTool {
                 WindowHelper.VisibleApp app = getSelectedApp();
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
-                            "Failed to find visible app",
+                            "Failed to find runtime app",
                             "Error",
                             Messages.getErrorIcon());
                     return;
@@ -175,7 +168,6 @@ public class FlexibleTestTool extends BasePluginTool implements ActionTool {
             inputEditorTextField.setText("[]");
             return;
         }
-        lastMethodAction = methodAction;
         initParams(inputEditorTextField, methodAction.getMethod());
 
     }

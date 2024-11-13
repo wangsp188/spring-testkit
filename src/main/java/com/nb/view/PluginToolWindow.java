@@ -2,15 +2,18 @@ package com.nb.view;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
+import com.intellij.lang.properties.PropertiesLanguage;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.StdFileTypes;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
@@ -31,15 +34,14 @@ import com.nb.util.AppRuntimeHelper;
 import com.nb.util.HttpUtil;
 import com.nb.util.LocalStorageHelper;
 import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.URI;
 import java.util.*;
 import java.util.List;
@@ -56,18 +58,13 @@ public class PluginToolWindow {
     private JButton tipsButton;
     private JButton settingsButton;
     private JComboBox<String> toolBox;
-    private JButton refreshButton;
     private JComboBox<String> appBox;
     private JDialog settingsDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
     private JComboBox<String> scriptAppBox;
-
-    private JTextField flexibleTestPackageNameField;
-
-    private LanguageTextField scriptField;
-
+    private JComboBox<String> propertiesAppBox;
 
 
     public PluginToolWindow(Project project, ToolWindow toolWindow) {
@@ -118,7 +115,7 @@ public class PluginToolWindow {
         // 创建一个新的 JPanel 用于存放第一行的组件
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5)); // 使用 FlowLayout 确保组件的水平排列和固定间距
 
-// 添加 tipsButton 到 topPanel
+        // 添加 tipsButton 到 topPanel
         tipsButton = new JButton(AllIcons.General.Information);
         tipsButton.setToolTipText("how to use?");
         tipsButton.setPreferredSize(new Dimension(32, 32));
@@ -126,37 +123,28 @@ public class PluginToolWindow {
         tipsButton.setText(null);
         topPanel.add(tipsButton);
 
-// 添加 settingsButton 到 topPanel
+        // 添加 settingsButton 到 topPanel
         settingsButton = new JButton(settingsIcon);
         settingsButton.setPreferredSize(new Dimension(32, 32));
         settingsButton.setMaximumSize(new Dimension(32, 32));
-        // 添加按钮点击事件以显示设置窗口
-        settingsButton.addActionListener(new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
-                scriptField.setText(LocalStorageHelper.getScript(project));
-                settingsDialog.setVisible(true);
-            }
-        });
-
         topPanel.add(settingsButton);
 
-// 添加 toolBox 到 topPanel
+        // 添加 toolBox 到 topPanel
         toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MYBATIS_SQL.getCode()});
         toolBox.setEnabled(false);
         topPanel.add(toolBox);
 
 
         // 添加 VisibleApp Label
-        JLabel visibleAppLabel = new JLabel("VisibleApp:");
+        JLabel visibleAppLabel = new JLabel("RuntimeApp:");
         topPanel.add(visibleAppLabel);
 
         // 添加 appBox 到 topPanel
         appBox = new ComboBox<>(new String[]{});
+        appBox.setPreferredSize(new Dimension(150, 32));
         appBox.addItemListener(e -> {
             Object selectedItem = appBox.getSelectedItem();
-            appBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
+            appBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
         });
         new Thread(() -> {
             while (true) {
@@ -173,7 +161,7 @@ public class PluginToolWindow {
     }
 
 
-    private void refreshVisibleApp(){
+    private void refreshVisibleApp() {
         List<String> items = AppRuntimeHelper.loadProjectRuntimes(project.getName());
         if (items == null) {
             return;
@@ -181,9 +169,9 @@ public class PluginToolWindow {
         Iterator<String> iterator = items.iterator();
         HashMap<String, String> map = new HashMap<>();
         map.put("method", "hello");
-        while (iterator.hasNext()){
+        while (iterator.hasNext()) {
             String item = iterator.next();
-            if (item==null) {
+            if (item == null) {
                 iterator.remove();
                 continue;
             }
@@ -193,14 +181,14 @@ public class PluginToolWindow {
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
-                AppRuntimeHelper.removeApp(project.getName(),visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
+                AppRuntimeHelper.removeApp(project.getName(), visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
             }
         }
 
         // 清理 appBox 的内容，并使用 newStrings 重新赋值
         appBox.removeAllItems();
         for (String item : items) {
-            appBox.addItem(item.substring(0,item.lastIndexOf(":")));
+            appBox.addItem(item.substring(0, item.lastIndexOf(":")));
         }
     }
 
@@ -300,7 +288,7 @@ public class PluginToolWindow {
             WindowHelper.VisibleApp visibleApp = new WindowHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
-            visibleApp.setSidePort(Integer.parseInt(split[1])+10000);
+            visibleApp.setSidePort(Integer.parseInt(split[1]) + 10000);
             return visibleApp;
 
         } else if (split.length == 3) {
@@ -315,28 +303,34 @@ public class PluginToolWindow {
 
     public String getSelectedAppName() {
         WindowHelper.VisibleApp app = getSelectedApp();
-        if (app==null) {
+        if (app == null) {
             return null;
         }
         return app.getAppName();
     }
 
     private void initSettingsDialog() {
+        JTextField flexibleTestPackageNameField = new JTextField(LocalStorageHelper.getFlexibleTestPackage(project), 20);
+
         settingsDialog = new JDialog((Frame) null, "No-Bug Settings", true);
         // 定义主面板
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"basic","script"};
+        String[] options = {"basic", "script", "properties"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
         optionList.setSelectedIndex(0);
         // 右侧内容显示区域
         JPanel rightContent = new JPanel(new CardLayout());
-        rightContent.add(createBasicOptionPanel(), "basic");
+        rightContent.add(createBasicOptionPanel(flexibleTestPackageNameField), "basic");
         rightContent.add(createScriptOptionPanel(), "script");
-
+        rightContent.add(createPropertiesOptionPanel(), "properties");
+        DumbService.getInstance(project).smartInvokeLater(() -> {
+            // 事件或代码在索引准备好后运行
+            findSpringBootApplicationClasses();
+        });
         // 监听选项改变，更新右侧内容
         optionList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -361,14 +355,25 @@ public class PluginToolWindow {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         settingsDialog.setSize(screenSize.width / 2, screenSize.height / 2);
         settingsDialog.setLocationRelativeTo(null); // 居中显示
+        // 添加按钮点击事件以显示设置窗口
+        settingsButton.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
+                scriptAppBox.setSelectedIndex(0);
+                if (propertiesAppBox.getItemCount() > 0) {
+                    // 选择第一个选项
+                    propertiesAppBox.setSelectedIndex(0);
+                }
+                settingsDialog.setVisible(true);
+            }
+        });
     }
 
-    private JPanel createBasicOptionPanel() {
+    private JPanel createBasicOptionPanel(JTextField flexibleTestPackageNameField) {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
-
-        flexibleTestPackageNameField = new JTextField(LocalStorageHelper.getFlexibleTestPackage(project), 20);
 
         // 输入框
         JLabel packageNameLabel = new JLabel("Flexible Test Package:");
@@ -443,37 +448,53 @@ public class PluginToolWindow {
         gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
         gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
         panel.add(buttonPanel, gbc);
-
         return panel;
     }
 
-    public List<PsiClass> findSpringBootApplicationClasses() {
-        List<PsiClass> springBootApplicationClasses = new ArrayList<>();
 
-        // 使用PsiManager获取项目中的所有文件
-        PsiManager psiManager = PsiManager.getInstance(project);
-        GlobalSearchScope globalSearchScope = GlobalSearchScope.projectScope(project);
+    public void findSpringBootApplicationClasses() {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            List<PsiClass> springBootApplicationClasses = ApplicationManager.getApplication().runReadAction((Computable<List<PsiClass>>) () -> {
+                List<PsiClass> result = new ArrayList<>();
 
-        // 获取所有的Java文件
-        FileType javaFileType = StdFileTypes.JAVA;
-        Collection<VirtualFile> javaFiles = FileTypeIndex.getFiles(javaFileType, globalSearchScope);
+                // 使用PsiManager获取项目中的所有文件
+                PsiManager psiManager = PsiManager.getInstance(project);
+                GlobalSearchScope globalSearchScope = GlobalSearchScope.projectScope(project);
 
-        for (VirtualFile file : javaFiles) {
-            PsiFile psiFile = psiManager.findFile(file);
-            if (psiFile instanceof PsiJavaFile) {
-                PsiJavaFile javaFile = (PsiJavaFile) psiFile;
-                for (PsiClass psiClass : javaFile.getClasses()) {
-                    // 检查每个类的注解
-                    PsiAnnotation[] annotations = psiClass.getAnnotations();
-                    for (PsiAnnotation annotation : annotations) {
-                        if ("org.springframework.boot.autoconfigure.SpringBootApplication".equals(annotation.getQualifiedName())) {
-                            springBootApplicationClasses.add(psiClass);
+                // 获取所有的Java文件
+                FileType javaFileType = StdFileTypes.JAVA;
+                Collection<VirtualFile> javaFiles = FileTypeIndex.getFiles(javaFileType, globalSearchScope);
+
+                for (VirtualFile file : javaFiles) {
+                    PsiFile psiFile = psiManager.findFile(file);
+                    if (psiFile instanceof PsiJavaFile) {
+                        PsiJavaFile javaFile = (PsiJavaFile) psiFile;
+                        for (PsiClass psiClass : javaFile.getClasses()) {
+                            // 检查每个类的注解
+                            PsiAnnotation[] annotations = psiClass.getAnnotations();
+                            for (PsiAnnotation annotation : annotations) {
+                                if ("org.springframework.boot.autoconfigure.SpringBootApplication".equals(annotation.getQualifiedName())) {
+                                    result.add(psiClass);
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-        return springBootApplicationClasses;
+                return result;
+            });
+
+            // 当所有的操作完成后，更新UI或进一步处理结果
+            // 用UI相关的操作需要放在EDT上执行
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    for (PsiClass applicationClass : springBootApplicationClasses) {
+                        scriptAppBox.addItem(applicationClass.getName());
+                        propertiesAppBox.addItem(applicationClass.getName());
+                    }
+                }
+            });
+        });
     }
 
     private JPanel createScriptOptionPanel() {
@@ -481,7 +502,7 @@ public class PluginToolWindow {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.getScript(project), false);
+        LanguageTextField scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.getScript(project), false);
 
         // 布局输入框
         gbc.gridx = 0;
@@ -498,15 +519,6 @@ public class PluginToolWindow {
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("Scope:");
         scriptAppBox = new ComboBox<>(apps);
-
-        DumbService.getInstance(project).smartInvokeLater(() -> {
-            // 事件或代码在索引准备好后运行
-            List<PsiClass> applicationClasses = findSpringBootApplicationClasses();
-            for (PsiClass applicationClass : applicationClasses) {
-                scriptAppBox.addItem(applicationClass.getName());
-            }
-        });
-
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -529,12 +541,12 @@ public class PluginToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String selectedApp = (String) scriptAppBox.getSelectedItem();
-                if (selectedApp==null) {
+                if (selectedApp == null) {
                     scriptField.setText(null);
-                }else if(PROJECT_DEFAULT.equals(selectedApp)) {
+                } else if (PROJECT_DEFAULT.equals(selectedApp)) {
                     scriptField.setText(LocalStorageHelper.getScript(project));
-                }else{
-                    scriptField.setText(LocalStorageHelper.getAppScript(project,selectedApp));
+                } else {
+                    scriptField.setText(LocalStorageHelper.getAppScript(project, selectedApp));
                 }
             }
         });
@@ -557,8 +569,6 @@ public class PluginToolWindow {
         panel.add(newButton, gbc);
 
 
-
-
         // 创建按钮面板，使用FlowLayout以右对齐
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
@@ -567,14 +577,14 @@ public class PluginToolWindow {
         ActionListener saveListener = e -> {
             String script = scriptField.getText();
             String selectedApp = (String) scriptAppBox.getSelectedItem();
-            if (selectedApp==null) {
+            if (selectedApp == null) {
                 return;
             }
             if (StringUtils.isBlank(script)) {
                 if (PROJECT_DEFAULT.equals(selectedApp)) {
                     LocalStorageHelper.setScript(project, null);
-                }else{
-                    LocalStorageHelper.setAppScript(project, selectedApp,null);
+                } else {
+                    LocalStorageHelper.setAppScript(project, selectedApp, null);
                 }
                 Notification notification = new Notification("No-Bug", "Info", "Script is blank", NotificationType.INFORMATION);
                 Notifications.Bus.notify(notification, project);
@@ -582,10 +592,143 @@ public class PluginToolWindow {
             }
             if (PROJECT_DEFAULT.equals(selectedApp)) {
                 LocalStorageHelper.setScript(project, script);
-            }else{
-                LocalStorageHelper.setAppScript(project, selectedApp,script);
+            } else {
+                LocalStorageHelper.setAppScript(project, selectedApp, script);
             }
             Notification notification = new Notification("No-Bug", "Info", "Script is saved", NotificationType.INFORMATION);
+            Notifications.Bus.notify(notification, project);
+        };
+        saveButton.addActionListener(saveListener);
+
+        // 关闭按钮
+        JButton closeButton = new JButton("OK");
+        closeButton.addActionListener(e -> {
+            saveListener.actionPerformed(e);
+            // 关闭当前窗口
+            Window window = SwingUtilities.getWindowAncestor(panel);
+            if (window != null) {
+                window.dispose();
+            }
+        });
+
+        // 将按钮添加到按钮面板
+        buttonPanel.add(saveButton);
+        buttonPanel.add(closeButton);
+
+        // 将按钮面板添加到主面板的底部
+        gbc.gridx = 0;
+        gbc.gridy = 2; // 新的一行
+        gbc.gridwidth = 3; // 占据三列
+        gbc.weightx = 0.0; // 重置权重
+        gbc.weighty = 0.0; // 重置权重
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
+        gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
+        panel.add(buttonPanel, gbc);
+
+        return panel;
+    }
+
+
+    private JPanel createPropertiesOptionPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+
+//        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
+
+        LanguageTextField propertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, getProject(), LocalStorageHelper.getAppProperties(project, ""), false);
+        // 布局输入框
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 3; // 占据3列
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        panel.add(new JBScrollPane(propertiesField), gbc);
+
+        String[] apps = new String[]{};
+
+        // 添加标签和组合框
+        JLabel comboBoxLabel = new JLabel("App:");
+        propertiesAppBox = new ComboBox<>(apps);
+
+
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(comboBoxLabel, gbc);
+
+        // 添加组合框到标签右边
+        gbc.gridx = 1;
+        gbc.gridy = 0; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(propertiesAppBox, gbc);
+
+        propertiesAppBox.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedApp = (String) propertiesAppBox.getSelectedItem();
+                if (selectedApp == null) {
+                    propertiesField.setText(null);
+                } else {
+                    propertiesField.setText(LocalStorageHelper.getAppProperties(project, selectedApp));
+                }
+            }
+        });
+
+        // 添加新按钮到组合框右边
+        JButton newButton = new JButton(AllIcons.Actions.Rollback);
+        newButton.setToolTipText("use default properties");
+        newButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                propertiesField.setText(LocalStorageHelper.defProperties);
+            }
+        });
+        gbc.gridx = 2;  // 放在同一行的尾部
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        panel.add(newButton, gbc);
+
+
+        // 创建按钮面板，使用FlowLayout以右对齐
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        // 保存按钮
+        JButton saveButton = new JButton("Apply");
+        ActionListener saveListener = e -> {
+            String propertiesStr = propertiesField.getText();
+            String selectedApp = (String) propertiesAppBox.getSelectedItem();
+            if (selectedApp == null) {
+                return;
+            }
+            if (StringUtils.isBlank(propertiesStr)) {
+                LocalStorageHelper.setAppProperties(project, selectedApp, null);
+                Notification notification = new Notification("No-Bug", "Info", "Properties is blank", NotificationType.INFORMATION);
+                Notifications.Bus.notify(notification, project);
+                return;
+            }
+            try {
+                Properties properties = new Properties();
+                properties.load(new StringReader(propertiesStr));
+            } catch (Throwable ex) {
+                Notification notification = new Notification("No-Bug", "Error", "Properties parsed error, pls check", NotificationType.ERROR);
+                Notifications.Bus.notify(notification, project);
+                return;
+            }
+            LocalStorageHelper.setAppProperties(project, selectedApp, propertiesStr);
+            Notification notification = new Notification("No-Bug", "Info", "Properties is saved", NotificationType.INFORMATION);
             Notifications.Bus.notify(notification, project);
         };
         saveButton.addActionListener(saveListener);

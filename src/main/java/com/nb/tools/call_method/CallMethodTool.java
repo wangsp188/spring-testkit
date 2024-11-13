@@ -3,7 +3,6 @@ package com.nb.tools.call_method;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.icons.AllIcons;
-import com.intellij.openapi.ui.ComboBox;
 import com.nb.util.HttpUtil;
 import com.nb.util.LocalStorageHelper;
 import com.nb.view.WindowHelper;
@@ -20,7 +19,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.util.ArrayList;
 import java.util.function.Supplier;
 
 public class CallMethodTool extends BasePluginTool implements ActionTool {
@@ -29,8 +27,6 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
     private JComboBox<MethodAction> actionComboBox;
 
     private JRadioButton useProxyRadioButton;
-
-    private MethodAction lastMethodAction;
 
     {
         this.tool = PluginToolEnum.CALL_METHOD;
@@ -45,12 +41,7 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
 
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);
-        actionComboBox = new ComboBox<>();
-        actionComboBox.setPreferredSize(new Dimension(280, 32));
-        actionComboBox.addItemListener(e -> {
-            Object selectedItem = actionComboBox.getSelectedItem();
-            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
-        });
+        actionComboBox = buildActionComboBox();
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 
@@ -74,7 +65,7 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
                 WindowHelper.VisibleApp app = getSelectedApp();
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
-                            "Failed to find visible app",
+                            "Failed to find runtime app",
                             "Error",
                             Messages.getErrorIcon());
                     return;
@@ -202,7 +193,6 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
             inputEditorTextField.setText("[]");
             return;
         }
-        lastMethodAction = methodAction;
         initParams(inputEditorTextField,methodAction.getMethod());
     }
 
