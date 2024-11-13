@@ -95,11 +95,11 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (prepareRadioButton.isSelected()) {
-                    prepareRadioButton.setText("Final");
-                    prepareRadioButton.setToolTipText("build FinalSql");
-                } else {
                     prepareRadioButton.setText("Prepared");
                     prepareRadioButton.setToolTipText("build PreparedSql");
+                } else {
+                    prepareRadioButton.setText("Final");
+                    prepareRadioButton.setToolTipText("build FinalSql");
                 }
             }
         });
@@ -141,10 +141,10 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
             String statementId = selectedItem.getXmlTag().getAttributeValue("id");
 
-            String sql = SqlGenerator.generateSql(xmlContent, statementId, !prepareRadioButton.isSelected(),jsonObject);
+            String sql = SqlGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(),jsonObject);
             outputTextArea.setText(sql);
         } catch (Throwable ex) {
-            outputTextArea.setText("Error: " + getStackTrace(ex.getCause()));
+            outputTextArea.setText("Error: " + getStackTrace(ex));
         }
     }
 

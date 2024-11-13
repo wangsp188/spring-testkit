@@ -516,7 +516,7 @@ public abstract class BasePluginTool {
                         outputTextArea.setText(JSONObject.toJSONString(result.get("data"), true));
                     }
                 } catch (Throwable ex) {
-                    outputTextArea.setText("wait req is error\n" + getStackTrace(ex.getCause()));
+                    outputTextArea.setText("wait req is error\n" + getStackTrace(ex));
                 } finally {
                     triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
                 }

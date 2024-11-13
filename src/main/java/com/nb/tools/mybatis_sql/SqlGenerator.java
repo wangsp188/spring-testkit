@@ -6,6 +6,7 @@ import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.scripting.xmltags.DynamicSqlSource;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
@@ -33,14 +34,16 @@ import java.io.IOException;
 import java.util.logging.Logger;
 
 public class SqlGenerator {
+    private static Configuration configuration = new Configuration();
+    // Initialize an environment (we don't need actual data source for SQL generation)
+    private static Environment environment = new Environment("No-Bug", new JdbcTransactionFactory(), new FakeDataSource());
+    static {
+        configuration.setEnvironment(environment);
+    }
 
     public static String generateSql(String xmlContent, String statementId,boolean prepared, JSONObject parameters) throws Exception {
         xmlContent = cleanXml(xmlContent, statementId);
         // Step 1: Initialize MyBatis Configuration and parse XML content
-        Configuration configuration = new Configuration();
-        // Initialize an environment (we don't need actual data source for SQL generation)
-        Environment environment = new Environment("No-Bug", new JdbcTransactionFactory(), new FakeDataSource());
-        configuration.setEnvironment(environment);
         // 使用正则表达式移除typeHandler属性 (注意：正则可能影响其他配置，请具体分析XML结构）
         // Step 2: Parse the mapper XML and build a MappedStatement
         XMLMapperBuilder mapperBuilder = new XMLMapperBuilder(new StringReader(xmlContent), configuration,"No-Bug", configuration.getSqlFragments());
@@ -48,7 +51,7 @@ public class SqlGenerator {
 
         // Step 3: Get the MappedStatement by statementId
         MappedStatement mappedStatement = configuration.getMappedStatement(statementId);
-        DynamicSqlSource sqlSource = (DynamicSqlSource) mappedStatement.getSqlSource();
+        SqlSource sqlSource = mappedStatement.getSqlSource();
         BoundSql boundSql = sqlSource.getBoundSql(parameters);
 
         // Step 4: Prepare SQL with parameters
@@ -163,6 +166,9 @@ public class SqlGenerator {
         element.removeAttribute("resultMap");
         element.removeAttribute("parameterType");
         element.removeAttribute("type");
+        element.removeAttribute("resultSetType");
+        element.removeAttribute("resultSets");
+
 
         // Recursively clean child nodes for typeHandler attributes
         cleanTypeHandlerAttributes(element);
@@ -236,4 +242,57 @@ public class SqlGenerator {
         }
     }
 
+
+    public static void main(String[] args) throws Exception {
+        generateSql("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-mapper.dtd\">\n" +
+                "<mapper namespace=\"com.zoom.contactcenter.db.mybatis.mapper.AccountBillingMapper\">\n" +
+                "\n" +
+                "    <insert id=\"batchAddAccountBillings\" parameterType=\"com.zoom.contactcenter.db.mybatis.entity.AccountBilling\">\n" +
+                "        INSERT INTO cci_account_billing (id, account_id, parent_account_id, billing_id, plan_count, start_time, expire_time, version)\n" +
+                "        VALUES\n" +
+                "        <foreach collection=\"accountBillingList\" item=\"item\" index=\"index\" separator=\",\">\n" +
+                "            (#{item.id}, #{item.accountId}, #{item.parentAccountId}, #{item.billingId}, #{item.planCount}, #{item.startTime}, #{item.expireTime}, #{item.version})\n" +
+                "        </foreach>\n" +
+                "    </insert>\n" +
+                "\n" +
+                "    <select id=\"getAccountBillingLicenseDetailsByParentAccountId\">\n" +
+                "        select cab.account_id,\n" +
+                "               cab.parent_account_id,\n" +
+                "               cab.billing_id,\n" +
+                "               cb.plan_type,\n" +
+                "               cab.plan_count,\n" +
+                "               COALESCE(cabpc.plan_used_count, 0)                                 as plan_used_count,\n" +
+                "               (COALESCE(cab.plan_count, 0) - COALESCE(cabpc.plan_used_count, 0)) as plan_available_number,\n" +
+                "               cb.name\n" +
+                "        from cci_account_billing cab\n" +
+                "                 join cci_billing cb ON cb.id = cab.billing_id\n" +
+                "                 left join cci_account_billing_plan_count cabpc\n" +
+                "                           ON cabpc.service_code = cb.service_code and cabpc.account_id = cab.account_id\n" +
+                "        where cab.parent_account_id = #{parentAccountId};\n" +
+                "    </select>\n" +
+                "\n" +
+                "    <update id=\"updateParentAccountId\">\n" +
+                "        UPDATE cci_account_billing JOIN cci_account\n" +
+                "        ON cci_account_billing.account_id  = cci_account.id\n" +
+                "            SET cci_account_billing.parent_account_id = cci_account.parent_account_id\n" +
+                "        WHERE cci_account_billing.account_id IN\n" +
+                "        <foreach item=\"accountId\" collection=\"accountIds\" open=\"(\" separator=\",\" close=\")\">\n" +
+                "            #{accountId}\n" +
+                "        </foreach>\n" +
+                "    </update>\n" +
+                "\n" +
+                "    <resultMap id=\"accountBillingLicense\" type=\"com.zoom.contactcenter.db.mybatis.bo.account.AccountBillingPlanBO\">\n" +
+                "        <result column=\"parent_account_id\" property=\"parentAccountId\"/>\n" +
+                "        <result column=\"account_id\" property=\"accountId\"/>\n" +
+                "        <result column=\"billing_id\" property=\"billingId\"/>\n" +
+                "        <result column=\"plan_type\" property=\"planType\"/>\n" +
+                "        <result column=\"plan_count\" property=\"planNumber\"/>\n" +
+                "        <result column=\"plan_used_count\" property=\"planUsedNumber\"/>\n" +
+                "        <result column=\"plan_available_number\" property=\"planAvailableNumber\"/>\n" +
+                "        <result column=\"name\" property=\"name\"/>\n" +
+                "    </resultMap>\n" +
+                "\n" +
+                "</mapper>", "getAccountBillingLicenseDetailsByParentAccountId", true, new JSONObject());
+    }
 }
