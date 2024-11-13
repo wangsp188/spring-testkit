@@ -4,10 +4,13 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.base.Splitter;
 import com.intellij.icons.AllIcons;
+import com.intellij.json.JsonLanguage;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.xml.XmlTag;
+import com.intellij.ui.LanguageTextField;
+import com.intellij.ui.components.JBScrollPane;
 import com.nb.tools.ActionTool;
 import com.nb.tools.BasePluginTool;
 import com.nb.tools.PluginToolEnum;
@@ -54,8 +57,14 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
     @Override
     protected JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JLabel visibleAppLabel = new JLabel("action:");
+        topPanel.add(visibleAppLabel);
         actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(280, 32));
+        actionComboBox.addItemListener(e -> {
+            Object selectedItem = actionComboBox.getSelectedItem();
+            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
+        });
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 
@@ -90,10 +99,10 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (prepareRadioButton.isSelected()) {
-                    prepareRadioButton.setText("FinalSql");
+                    prepareRadioButton.setText("Final");
                     prepareRadioButton.setToolTipText("build FinalSql");
                 } else {
-                    prepareRadioButton.setText("PreparedSql");
+                    prepareRadioButton.setText("Prepared");
                     prepareRadioButton.setToolTipText("build PreparedSql");
                 }
             }
@@ -124,7 +133,6 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             return;
         }
         outputTextArea.setText("......");
-
         try {
             String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
             String statementId = selectedItem.getXmlTag().getAttributeValue("id");

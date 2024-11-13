@@ -42,8 +42,15 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
 
     protected JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        JLabel visibleAppLabel = new JLabel("action:");
+        topPanel.add(visibleAppLabel);
         actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(280, 32));
+        actionComboBox.addItemListener(e -> {
+            Object selectedItem = actionComboBox.getSelectedItem();
+            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
+        });
         // Populate methodComboBox with method names
         topPanel.add(actionComboBox);
 

@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
+import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.nb.util.HttpUtil;
@@ -32,8 +33,8 @@ public abstract class BasePluginTool {
     protected PluginToolWindow toolWindow;
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
-    protected LanguageTextField inputEditorTextField;
-    protected LanguageTextField outputTextArea;
+    protected EditorTextField inputEditorTextField;
+    protected EditorTextField outputTextArea;
 
     public BasePluginTool(PluginToolWindow pluginToolWindow) {
         // 初始化panel
@@ -160,7 +161,7 @@ public abstract class BasePluginTool {
         return beanName;
     }
 
-    protected void initParams(LanguageTextField inputEditorTextField, PsiMethod method) {
+    protected void initParams(EditorTextField inputEditorTextField, PsiMethod method) {
         // 在这里执行耗时操作
         ArrayList<Object> initParams = doInitParams(method);
         inputEditorTextField.setText(JSONObject.toJSONString(initParams, true));
@@ -435,7 +436,7 @@ public abstract class BasePluginTool {
         return bottomPanel;
     }
 
-    public void triggerTask(JButton triggerBtn, Icon executeIcon, LanguageTextField outputTextArea, int sidePort, Supplier<JSONObject> submit) {
+    protected void triggerTask(JButton triggerBtn, Icon executeIcon, EditorTextField outputTextArea, int sidePort, Supplier<JSONObject> submit) {
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
             if (lastReqId == null) {
                 triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);

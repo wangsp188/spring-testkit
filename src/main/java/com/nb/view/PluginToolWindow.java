@@ -31,12 +31,14 @@ import com.nb.util.AppRuntimeHelper;
 import com.nb.util.HttpUtil;
 import com.nb.util.LocalStorageHelper;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
@@ -73,90 +75,15 @@ public class PluginToolWindow {
         this.toolWindow = toolWindow;
         // 初始化主面板
         windowContent = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // 设置组件之间的间距
 
-        // 第一行
-        // tips按钮
-        tipsButton = new JButton(AllIcons.General.Information);
-        tipsButton.setToolTipText("how to use?");
-        tipsButton.setPreferredSize(new Dimension(32, 32));
-        tipsButton.setMaximumSize(new Dimension(32, 32));
-        tipsButton.setText(null); // 去除文本
+        GridBagConstraints gbc = new GridBagConstraints();
+//        gbc.insets = new Insets(5, 5, 5, 5); // 设置组件之间的间距
         gbc.gridx = 0;
         gbc.gridy = 0;
-        gbc.weightx = 0.0;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.anchor = GridBagConstraints.LINE_START; // 按钮靠左
-        windowContent.add(tipsButton, gbc);
-
-        gbc.gridx = 1;
-        gbc.weightx = 0.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-
-        settingsButton = new JButton(settingsIcon);
-        settingsButton.setPreferredSize(new Dimension(32, 32));
-        settingsButton.setMaximumSize(new Dimension(32, 32));
-        windowContent.add(settingsButton, gbc);
-
-        // 添加按钮点击事件以显示设置窗口
-        settingsButton.addActionListener(new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
-                scriptField.setText(LocalStorageHelper.getScript(project));
-                settingsDialog.setVisible(true);
-            }
-        });
-
-
-        // 工具拉框A
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(),PluginToolEnum.FLEXIBLE_TEST.getCode(),PluginToolEnum.MYBATIS_SQL.getCode()});
-        toolBox.setEnabled(false);
-        toolBox.setPreferredSize(new Dimension(120, 32));
-        toolBox.setMaximumSize(new Dimension(120, 32));
-        gbc.gridx = 2;
-        gbc.weightx = 0.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        windowContent.add(toolBox, gbc);
-
-
-        // 刷新按钮
-        refreshButton = new JButton(AllIcons.Actions.Refresh);
-        refreshButton.setToolTipText("refresh runtime spring project");
-        refreshButton.setPreferredSize(new Dimension(32, 32));
-        refreshButton.setMaximumSize(new Dimension(32, 32));
-        refreshButton.addActionListener(new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                refreshVisibleApp();
-                Notification notification = new Notification("No-Bug", "Info", "Runtime App Refresh Success!", NotificationType.INFORMATION);
-                Notifications.Bus.notify(notification, project);
-            }
-        });
-        gbc.gridx = 3;
-        gbc.weightx = 0.0;
-        windowContent.add(refreshButton, gbc);
-
-        // 运行时app下拉框
-        appBox = new ComboBox<>(new String[]{});
-        new Thread(() -> {
-            while (true) {
-                try {
-                    refreshVisibleApp();
-                    Thread.sleep(3 * 1000); // 每隔一分钟调用一次
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
-
-        gbc.gridx = 4;
         gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        windowContent.add(appBox, gbc);
-
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 允许 topPanel 拉伸以占据水平空间
+        JPanel topPanel = buildTopPanel();
+        windowContent.add(topPanel, gbc);
 
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
@@ -185,6 +112,64 @@ public class PluginToolWindow {
         toolBox.addActionListener(e -> onSwitchTool());
 
         initSettingsDialog();
+    }
+
+    private JPanel buildTopPanel() {
+        // 创建一个新的 JPanel 用于存放第一行的组件
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5)); // 使用 FlowLayout 确保组件的水平排列和固定间距
+
+// 添加 tipsButton 到 topPanel
+        tipsButton = new JButton(AllIcons.General.Information);
+        tipsButton.setToolTipText("how to use?");
+        tipsButton.setPreferredSize(new Dimension(32, 32));
+        tipsButton.setMaximumSize(new Dimension(32, 32));
+        tipsButton.setText(null);
+        topPanel.add(tipsButton);
+
+// 添加 settingsButton 到 topPanel
+        settingsButton = new JButton(settingsIcon);
+        settingsButton.setPreferredSize(new Dimension(32, 32));
+        settingsButton.setMaximumSize(new Dimension(32, 32));
+        // 添加按钮点击事件以显示设置窗口
+        settingsButton.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
+                scriptField.setText(LocalStorageHelper.getScript(project));
+                settingsDialog.setVisible(true);
+            }
+        });
+
+        topPanel.add(settingsButton);
+
+// 添加 toolBox 到 topPanel
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MYBATIS_SQL.getCode()});
+        toolBox.setEnabled(false);
+        topPanel.add(toolBox);
+
+
+        // 添加 VisibleApp Label
+        JLabel visibleAppLabel = new JLabel("VisibleApp:");
+        topPanel.add(visibleAppLabel);
+
+        // 添加 appBox 到 topPanel
+        appBox = new ComboBox<>(new String[]{});
+        appBox.addItemListener(e -> {
+            Object selectedItem = appBox.getSelectedItem();
+            appBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
+        });
+        new Thread(() -> {
+            while (true) {
+                try {
+                    refreshVisibleApp();
+                    Thread.sleep(3 * 1000); // 每隔一分钟调用一次
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+        topPanel.add(appBox);
+        return topPanel;
     }
 
 
