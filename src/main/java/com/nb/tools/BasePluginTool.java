@@ -3,8 +3,6 @@ package com.nb.tools;
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.psi.*;
@@ -402,27 +400,27 @@ public abstract class BasePluginTool {
         gbc.weighty = 0.0; // 顶部面板不占用垂直空间
 
         // Top panel for method selection and actions
-        JPanel topPanel = createTopPanel();
+        JPanel topPanel = createActionPanel();
         panel.add(topPanel, gbc);
 
         gbc.gridy = 1;
         gbc.weighty = 0.3; // Middle panel takes 30% of the space
 
         // Middle panel for input parameters
-        JPanel middlePanel = createMiddlePanel();
+        JPanel middlePanel = createInputPanel();
         panel.add(middlePanel, gbc);
 
         gbc.gridy = 2;
         gbc.weighty = 0.6; // Bottom panel takes 60% of the space
 
         // Bottom panel for output
-        JPanel bottomPanel = createBottomPanel();
+        JPanel bottomPanel = createOutputPanel();
         panel.add(bottomPanel, gbc);
     }
 
-    protected abstract JPanel createTopPanel();
+    protected abstract JPanel createActionPanel();
 
-    protected JPanel createMiddlePanel() {
+    protected JPanel createInputPanel() {
         JPanel middlePanel = new JPanel(new BorderLayout());
         inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
         middlePanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
@@ -430,9 +428,10 @@ public abstract class BasePluginTool {
         return middlePanel;
     }
 
-    protected JPanel createBottomPanel() {
+    protected JPanel createOutputPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
         outputTextArea = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        outputTextArea.setEnabled(false);
         bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
         return bottomPanel;
     }
@@ -491,7 +490,7 @@ public abstract class BasePluginTool {
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
         outputTextArea.setText("req is sent，reqId:" + reqId);
-        // 第二个 SwingWorker 用于定时轮询获取结果
+        // 第二个 SwingWorker 用于获取结果
         new SwingWorker<JSONObject, Void>() {
 
             @Override

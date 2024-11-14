@@ -35,7 +35,7 @@ public class FlexibleTestTool extends BasePluginTool implements ActionTool {
         super(pluginToolWindow);
     }
 
-    protected JPanel createTopPanel() {
+    protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);
@@ -155,6 +155,7 @@ public class FlexibleTestTool extends BasePluginTool implements ActionTool {
                 return;
             }
         }
+
         // 如果当前下拉框没有此选项，则新增该选项
         MethodAction item = new MethodAction(method);
         actionComboBox.addItem(item);

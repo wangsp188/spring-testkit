@@ -37,7 +37,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
 
 
 
-    protected JPanel createTopPanel() {
+    protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);

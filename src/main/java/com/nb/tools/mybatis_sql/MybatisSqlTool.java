@@ -56,7 +56,7 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
     }
 
     @Override
-    protected JPanel createTopPanel() {
+    protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel visibleAppLabel = new JLabel("action:");
         topPanel.add(visibleAppLabel);
@@ -109,7 +109,7 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
     }
 
     @Override
-    protected JPanel createBottomPanel() {
+    protected JPanel createOutputPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
         outputTextArea = new LanguageTextField(SqlLanguage.INSTANCE, getProject(), "", false);
         bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
@@ -132,26 +132,42 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
 
         inputEditorTextField.setText(JSONObject.toJSONString(jsonObject, true));
         XmlTagAction selectedItem = (XmlTagAction) actionComboBox.getSelectedItem();
-        if (selectedItem==null) {
+        if (selectedItem == null) {
             outputTextArea.setText("未选中节点，请先选中");
             return;
         }
-        outputTextArea.setText("......");
-        try {
-            String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
-            String statementId = selectedItem.getXmlTag().getAttributeValue("id");
+        String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
+        String statementId = selectedItem.getXmlTag().getAttributeValue("id");
+        outputTextArea.setText("wait...");
+        new SwingWorker<String, Void>() {
 
-            String sql = SqlGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(),jsonObject);
-            outputTextArea.setText(sql);
-        } catch (Throwable ex) {
-            outputTextArea.setText("Error: " + getStackTrace(ex));
-        }
+            @Override
+            protected String doInBackground() throws Exception {
+                return SqlGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(), jsonObject);
+            }
+
+            @Override
+            protected void done() {
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        String sql = get();
+                        if (sql == null) {
+                            return;
+                        }
+                        outputTextArea.setText(sql);
+                    } catch (Throwable ex) {
+                        outputTextArea.setText(getStackTrace(ex));
+                    }
+                });
+            }
+        }.execute();
+
     }
 
 
     @Override
     public void onSwitchAction(PsiElement psiElement) {
-        if(!(psiElement instanceof XmlTag)) {
+        if (!(psiElement instanceof XmlTag)) {
             Messages.showMessageDialog(getProject(),
                     "un support element",
                     "Error",
