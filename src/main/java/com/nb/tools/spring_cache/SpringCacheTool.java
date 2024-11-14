@@ -59,7 +59,7 @@ public class SpringCacheTool extends BasePluginTool  implements ActionTool {
         JButton delValButton = new JButton(AllIcons.Actions.GC);
         delValButton.setToolTipText("get keys and delete these");
         //        // 设置按钮大小
-        Dimension buttonSize = new Dimension(32, 32);
+        Dimension buttonSize = new Dimension(30, 30);
         getKeyButton.setPreferredSize(buttonSize);
         getValButton.setPreferredSize(buttonSize);
         delValButton.setPreferredSize(buttonSize);
