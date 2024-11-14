@@ -70,30 +70,30 @@ public class CallMethodTool extends BasePluginTool implements ActionTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerTask(runButton, AllIcons.Actions.Execute, outputTextArea, app.getSidePort(), new Supplier<JSONObject>() {
+                triggerTask(runButton, AllIcons.Actions.Execute, outputTextPane, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         String jsonInput = inputEditorTextField.getDocument().getText();
                         if (jsonInput == null || jsonInput.isBlank()) {
-                            outputTextArea.setText("参数框不可为空");
+                            outputTextPane.setText("参数框不可为空");
                             return null;
                         }
                         JSONArray jsonArray;
                         try {
                             jsonArray = JSONObject.parseArray(jsonInput);
                         } catch (Exception ex) {
-                            outputTextArea.setText("参数必须是json数组");
+                            outputTextPane.setText("参数必须是json数组");
                             return null;
                         }
                         inputEditorTextField.setText(JSONObject.toJSONString(jsonArray, true));
                         MethodAction selectedItem = (MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem==null) {
-                            outputTextArea.setText("未选中函数，请先选中");
+                            outputTextPane.setText("未选中函数，请先选中");
                             return null;
                         }
                         PsiMethod method = selectedItem.getMethod(); // 需要从实际应用中获取当前的选中的 PsiMethod
                         if (method.getParameterList().getParameters().length != jsonArray.size()) {
-                            outputTextArea.setText("参数量不对,预期是：" + method.getParameterList().getParameters().length + "个，提供了：" + jsonArray.size() + "个");
+                            outputTextPane.setText("参数量不对,预期是：" + method.getParameterList().getParameters().length + "个，提供了：" + jsonArray.size() + "个");
                             return null;
                         }
                         JSONObject params = buildParams(method, jsonArray, PluginToolEnum.CALL_METHOD.getCode());

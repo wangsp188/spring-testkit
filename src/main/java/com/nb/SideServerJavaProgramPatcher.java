@@ -22,7 +22,10 @@ import com.nb.util.LocalStorageHelper;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
+import java.net.URL;
+import java.nio.file.*;
 import java.util.Properties;
 
 public class SideServerJavaProgramPatcher extends JavaProgramPatcher {
@@ -30,15 +33,15 @@ public class SideServerJavaProgramPatcher extends JavaProgramPatcher {
     @Override
     public void patchJavaParameters(Executor executor, RunProfile runProfile, JavaParameters javaParameters) {
         try {
-            if(!(runProfile instanceof SpringBootApplicationRunConfigurationBase configurationBase)){
+            if (!(runProfile instanceof SpringBootApplicationRunConfigurationBase configurationBase)) {
                 Project project = null;
-                if(runProfile instanceof JavaRunConfigurationBase){
+                if (runProfile instanceof JavaRunConfigurationBase) {
                     Module[] modules = ((JavaRunConfigurationBase) runProfile).getModules();
-                    if(modules != null && modules.length > 0){
+                    if (modules != null && modules.length > 0) {
                         project = modules[0].getProject();
                     }
                 }
-                Notification notification = new Notification("No-Bug", "Warn", "not spring-boot, Good luck to you.", NotificationType.WARNING);
+                Notification notification = new Notification("No-Bug", "Warn", "not spring-boot<br/> Good luck to you.", NotificationType.WARNING);
                 Notifications.Bus.notify(notification, project);
                 return;
             }
@@ -46,7 +49,7 @@ public class SideServerJavaProgramPatcher extends JavaProgramPatcher {
             // 获取插件安装目录
             String pluginPath = PathManager.getPluginsPath();
             // 相对路径到你的 JAR 包
-            String relativeJarPath = "no-bug/lib/no-bug_side_server-0.0.1-SNAPSHOT.jar";
+            String relativeJarPath = "no-bug" + File.separator + "lib" + File.separator + "no-bug_side_server-0.0.1-SNAPSHOT.jar";
             String springStarterJarPath = pluginPath + File.separator + relativeJarPath;
             // 添加 Jar 到 classpath
             javaParameters.getClassPath().add(springStarterJarPath);
@@ -55,20 +58,23 @@ public class SideServerJavaProgramPatcher extends JavaProgramPatcher {
             vmParametersList.addProperty("nb.project.name", configurationBase.getProject().getName());
             vmParametersList.addProperty("nb.app.name", runProfile.getName());
 
-
             String appName = configurationBase.getMainClass().getName();
             String propertiesStr = LocalStorageHelper.getAppProperties(configurationBase.getProject(), appName);
+
+            Notification notification = new Notification("No-Bug", "Info", "No-Bug, No-Bug, No-Bug!<br/> You No-Bug", NotificationType.INFORMATION);
+            Notifications.Bus.notify(notification, configurationBase.getProject());
+
+
             if (LocalStorageHelper.defProperties.equals(propertiesStr)) {
                 return;
             }
-
             Properties properties = new Properties();
             properties.load(new StringReader(propertiesStr));
             // 添加系统指令：把 properties 转到 VM 参数
             for (String propertyName : properties.stringPropertyNames()) {
                 String propertyValue = properties.getProperty(propertyName);
-                vmParametersList.addProperty(propertyName,propertyValue);
-                System.err.println("新增Property:"+propertyName+"="+propertyValue);
+                vmParametersList.addProperty(propertyName, propertyValue);
+                System.err.println("No-Bug addProperty:" + propertyName + "=" + propertyValue);
             }
 
         } catch (Exception e) {

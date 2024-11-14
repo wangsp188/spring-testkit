@@ -1,33 +1,25 @@
 package com.nb.tools.mybatis_sql;
 
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.google.common.base.Splitter;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.icons.AllIcons;
-import com.intellij.json.JsonLanguage;
-import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiFileFactory;
+import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.xml.XmlTag;
-import com.intellij.sql.dialects.dateTime.SqlDtLanguage;
-import com.intellij.sql.dialects.mysql.MysqlBaseMetaLanguage;
 import com.intellij.sql.psi.SqlLanguage;
-import com.intellij.ui.LanguageTextField;
-import com.intellij.ui.components.JBScrollPane;
 import com.nb.tools.ActionTool;
 import com.nb.tools.BasePluginTool;
 import com.nb.tools.PluginToolEnum;
 import com.nb.view.PluginToolWindow;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.math.NumberUtils;
-import org.apache.ibatis.builder.xml.XMLMapperEntityResolver;
-import org.apache.ibatis.mapping.BoundSql;
-import org.apache.ibatis.mapping.ParameterMapping;
-import org.apache.ibatis.mapping.SqlSource;
-import org.apache.ibatis.parsing.XNode;
-import org.apache.ibatis.parsing.XPathParser;
-import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
-import org.apache.ibatis.session.Configuration;
 
 import javax.swing.*;
 import java.awt.*;
@@ -35,10 +27,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.ibatis.scripting.xmltags.ForEachSqlNode.ITEM_PREFIX;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MybatisSqlTool extends BasePluginTool implements ActionTool {
 
@@ -108,60 +97,116 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
         return topPanel;
     }
 
-    @Override
-    protected JPanel createOutputPanel() {
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        outputTextArea = new LanguageTextField(SqlLanguage.INSTANCE, getProject(), "", false);
-        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
-        return bottomPanel;
-    }
+//    @Override
+//    protected JPanel createOutputPanel() {
+//        JPanel bottomPanel = new JPanel(new BorderLayout());
+//        outputTextArea = new LanguageTextField(SqlLanguage.INSTANCE, getProject(), "", false);
+//        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
+//        return bottomPanel;
+//    }
 
     private void handleAction(String action) {
         String jsonInput = inputEditorTextField.getDocument().getText();
         if (jsonInput == null || jsonInput.isBlank()) {
-            outputTextArea.setText("参数框不可为空");
+            outputTextPane.setText("input parameter is blank");
             return;
         }
         JSONObject jsonObject;
         try {
             jsonObject = JSONObject.parseObject(jsonInput);
         } catch (Exception ex) {
-            outputTextArea.setText("参数必须是json数组");
+            outputTextPane.setText("input parameter must be json array");
             return;
         }
+
 
         inputEditorTextField.setText(JSONObject.toJSONString(jsonObject, true));
         XmlTagAction selectedItem = (XmlTagAction) actionComboBox.getSelectedItem();
         if (selectedItem == null) {
-            outputTextArea.setText("未选中节点，请先选中");
+            outputTextPane.setText("pls select tag");
             return;
         }
         String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
         String statementId = selectedItem.getXmlTag().getAttributeValue("id");
-        outputTextArea.setText("wait...");
+        outputTextPane.setText("wait...");
+//        new SwingWorker<String, Void>() {
+//
+//            @Override
+//            protected String doInBackground() throws Exception {
+//                System.err.println("xml: " + xmlContent + ", statementId: " + statementId + ", params:" + jsonObject.toJSONString());
+//                return MybatisGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(), jsonObject);
+//            }
+//
+//            @Override
+//            protected void done() {
+//                try {
+//                    String sql = get();
+//                    if (sql == null) {
+//                        SwingUtilities.invokeLater(() -> outputTextPane.setText("No SQL was generated."));
+//                        return;
+//                    }
+//
+//                    Project project = getProject();
+//                    AtomicReference<String> format = new AtomicReference<>(sql);
+//                    // Execute the write action directly on the right thread
+//                    WriteCommandAction.runWriteCommandAction(project, () -> {
+//                        ApplicationManager.getApplication().runReadAction(() -> {
+//                            PsiFile psiFile = PsiFileFactory.getInstance(project).createFileFromText("temp.sql", SqlLanguage.INSTANCE, sql);
+//                            CodeStyleManager.getInstance(project).reformat(psiFile);
+//                            Document formattedDocument = PsiDocumentManager.getInstance(project).getDocument(psiFile);
+//                            if (formattedDocument != null) {
+//                                format.set(formattedDocument.getText());
+//                            }
+//                        });
+//                    });
+//
+//                    // Update UI outside of the write action
+//                    SwingUtilities.invokeLater(() -> outputTextPane.setText(format.get()));
+//                } catch (Exception ex) {
+//                    SwingUtilities.invokeLater(() -> outputTextPane.setText(getStackTrace(ex)));
+//                }
+//            }
+//        }.execute();
         new SwingWorker<String, Void>() {
 
             @Override
             protected String doInBackground() throws Exception {
-                return SqlGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(), jsonObject);
+                System.err.println("xml: " + xmlContent + ", statementId: " + statementId + ", params:" + jsonObject.toJSONString());
+                return MybatisGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(), jsonObject);
             }
 
             @Override
             protected void done() {
-                SwingUtilities.invokeLater(() -> {
-                    try {
-                        String sql = get();
-                        if (sql == null) {
-                            return;
-                        }
-                        outputTextArea.setText(sql);
-                    } catch (Throwable ex) {
-                        outputTextArea.setText(getStackTrace(ex));
+                try {
+                    String sql = get();
+                    if (sql == null) {
+                        SwingUtilities.invokeLater(() -> outputTextPane.setText("No SQL was generated."));
+                        return;
                     }
-                });
+
+                    Project project = getProject();
+                    AtomicReference<String> format = new AtomicReference<>(sql);
+
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        // 进行写操作
+                        WriteCommandAction.runWriteCommandAction(project, () -> {
+                            PsiFile psiFile = PsiFileFactory.getInstance(project).createFileFromText("temp.sql", SqlLanguage.INSTANCE, sql);
+                            CodeStyleManager.getInstance(project).reformat(psiFile);
+                            Document formattedDocument = PsiDocumentManager.getInstance(project).getDocument(psiFile);
+                            if (formattedDocument != null) {
+                                format.set(formattedDocument.getText());
+                            }
+                        });
+
+                        // 在写操作完成后更新 UI
+                        SwingUtilities.invokeLater(() -> outputTextPane.setText(format.get()));
+                    }, ModalityState.defaultModalityState());
+
+                } catch (Exception ex) {
+                    SwingUtilities.invokeLater(() -> outputTextPane.setText(getStackTrace(ex)));
+                }
             }
         }.execute();
-
     }
 
 
@@ -201,7 +246,28 @@ public class MybatisSqlTool extends BasePluginTool implements ActionTool {
             inputEditorTextField.setText("[]");
             return;
         }
-        inputEditorTextField.setText("{}");
+
+        String xmlContent = xmlTagAction.getXmlTag().getParent().getContainingFile().getText();
+        String statementId = xmlTagAction.getXmlTag().getAttributeValue("id");
+
+        new SwingWorker<JSONObject, Void>() {
+            @Override
+            protected JSONObject doInBackground() throws Exception {
+                return MybatisGenerator.buildParamTemplate(xmlContent, statementId);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    JSONObject initParams = get();
+                    inputEditorTextField.setText(JSONObject.toJSONString(initParams, SerializerFeature.PrettyFormat, SerializerFeature.WriteMapNullValue));
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                    inputEditorTextField.setText("{\"nb\":\"init fail, You're on your own\"}");
+                }
+            }
+        }.execute();
+
     }
 
 

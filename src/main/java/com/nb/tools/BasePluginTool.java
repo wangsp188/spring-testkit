@@ -16,7 +16,10 @@ import com.nb.view.WindowHelper;
 import com.nb.view.PluginToolWindow;
 
 import javax.swing.*;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -33,7 +36,7 @@ public abstract class BasePluginTool {
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
     protected EditorTextField inputEditorTextField;
-    protected EditorTextField outputTextArea;
+    protected JTextPane outputTextPane;
 
     public BasePluginTool(PluginToolWindow pluginToolWindow) {
         // 初始化panel
@@ -414,7 +417,7 @@ public abstract class BasePluginTool {
         gbc.weighty = 0.6; // Bottom panel takes 60% of the space
 
         // Bottom panel for output
-        JPanel bottomPanel = createOutputPanel();
+        JComponent bottomPanel = createOutputPanel();
         panel.add(bottomPanel, gbc);
     }
 
@@ -424,26 +427,31 @@ public abstract class BasePluginTool {
         JPanel middlePanel = new JPanel(new BorderLayout());
         inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
         middlePanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
-
         return middlePanel;
     }
 
+    //    protected JPanel createOutputPanel() {
+//        JPanel bottomPanel = new JPanel(new BorderLayout());
+//        outputTextArea = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+//        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
+//        return bottomPanel;
+//    }
     protected JPanel createOutputPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
-        outputTextArea = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        outputTextArea.setEnabled(false);
-        bottomPanel.add(new JBScrollPane(outputTextArea), BorderLayout.CENTER);
+        outputTextPane = new JTextPane();
+        outputTextPane.setEditable(false);
+        bottomPanel.add(new JScrollPane(outputTextPane), BorderLayout.CENTER);
         return bottomPanel;
     }
 
-    protected void triggerTask(JButton triggerBtn, Icon executeIcon, EditorTextField outputTextArea, int sidePort, Supplier<JSONObject> submit) {
+    protected void triggerTask(JButton triggerBtn, Icon executeIcon, JTextComponent outputTextArea, int sidePort, Supplier<JSONObject> submit) {
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
             if (lastReqId == null) {
                 triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
                 return;
             }
             cancelReqs.add(lastReqId);
-            new SwingWorker<JSONObject, Void>(){
+            new SwingWorker<JSONObject, Void>() {
                 @Override
                 protected JSONObject doInBackground() throws Exception {
                     HashMap<String, Object> map = new HashMap<>();
@@ -528,7 +536,7 @@ public abstract class BasePluginTool {
         actionComboBox.setPreferredSize(new Dimension(200, 32));
         actionComboBox.addItemListener(e -> {
             Object selectedItem = actionComboBox.getSelectedItem();
-            actionComboBox.setToolTipText(selectedItem==null?"":selectedItem.toString()); // 动态更新 ToolTipText
+            actionComboBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
         });
         return actionComboBox;
     }

@@ -15,6 +15,7 @@ dependencies {
     // FastJSON 依赖
     implementation("com.alibaba:fastjson:1.2.83")
     implementation("org.mybatis:mybatis:3.5.3")
+//    implementation("com.fifesoft:rsyntaxtextarea:3.1.2")
     implementation(files("libs/no-bug_side_server-0.0.1-SNAPSHOT.jar"))
 }
 

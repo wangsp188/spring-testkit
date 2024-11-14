@@ -723,7 +723,7 @@ public class PluginToolWindow {
                 Properties properties = new Properties();
                 properties.load(new StringReader(propertiesStr));
             } catch (Throwable ex) {
-                Notification notification = new Notification("No-Bug", "Error", "Properties parsed error, pls check", NotificationType.ERROR);
+                Notification notification = new Notification("No-Bug", "Error", "Properties parsed error<br/> pls check", NotificationType.ERROR);
                 Notifications.Bus.notify(notification, project);
                 return;
             }
