@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "no-bug"
+rootProject.name = "spring-fling"
