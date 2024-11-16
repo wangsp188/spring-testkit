@@ -97,36 +97,41 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             System.out.println("not_support_directInvoke," + directInvoke + ":" + psiMethod.getContainingClass() + "#" + psiMethod.getName());
         }
 
-
-        // 添加第二个图标
-        LineMarkerInfo<PsiElement> generateTestMarker = new LineMarkerInfo<>(
-                psiMethod,
-                psiMethod.getTextRange(),
-                CALL_METHOD_CODER_ICON,
-                new Function<PsiElement, String>() {
-                    @Override
-                    public String fun(PsiElement element) {
-                        return "Generate and open test class for this method";
-                    }
-                },
-                new GutterIconNavigationHandler<PsiElement>() {
-                    @Override
-                    public void navigate(MouseEvent e, PsiElement elt) {
-                        if (GraphicsEnvironment.isHeadless()) {
-                            throw new HeadlessException("Cannot display UI elements in a headless environment.");
+        String createTest =  isCreateTest(psiMethod);
+        if (createTest == null) {
+            // 添加第二个图标
+            LineMarkerInfo<PsiElement> generateTestMarker = new LineMarkerInfo<>(
+                    psiMethod,
+                    psiMethod.getTextRange(),
+                    CALL_METHOD_CODER_ICON,
+                    new Function<PsiElement, String>() {
+                        @Override
+                        public String fun(PsiElement element) {
+                            return "Generate and open test class for this method";
                         }
-                        Project project = elt.getProject();
-                        generateAndOpenTestClass(project, (PsiMethod) elt);
-                    }
-                },
-                GutterIconRenderer.Alignment.RIGHT
-        );
-        lineMarkers.add(generateTestMarker);
+                    },
+                    new GutterIconNavigationHandler<PsiElement>() {
+                        @Override
+                        public void navigate(MouseEvent e, PsiElement elt) {
+                            if (GraphicsEnvironment.isHeadless()) {
+                                throw new HeadlessException("Cannot display UI elements in a headless environment.");
+                            }
+                            Project project = elt.getProject();
+                            generateAndOpenTestClass(project, (PsiMethod) elt);
+                        }
+                    },
+                    GutterIconRenderer.Alignment.RIGHT
+            );
+            lineMarkers.add(generateTestMarker);
+        } else {
+            System.out.println("not_support_createTest," + createTest + ":" + psiMethod.getContainingClass() + "#" + psiMethod.getName());
+        }
+
 
         return lineMarkers;
     }
 
-    private String isDirectInvoke(PsiMethod psiMethod) {
+    private String isCreateTest(PsiMethod psiMethod) {
         com.intellij.openapi.module.@Nullable Module module = ModuleUtilCore.findModuleForPsiElement(psiMethod);
         if (module == null) {
             return "not_find_module";
@@ -136,6 +141,10 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         if (testSourceRoot == null) {
             return "not_find_test_source";
         }
+        return null;
+    }
+
+    private String isDirectInvoke(PsiMethod psiMethod) {
 
         // 新增：检查所有参数都可以直接序列化
         for (PsiParameter parameter : psiMethod.getParameterList().getParameters()) {
