@@ -447,6 +447,9 @@ public class CallMethodIconProvider implements LineMarkerProvider {
                 }
             }
             PsiClass psiClass = PsiUtil.resolveClassInType(psiType);
+            if (psiClass==null) {
+                return psiType.getPresentableText();
+            }
             PsiImportStatement psiImportStatement = ApplicationManager.getApplication().runWriteAction(new Computable<PsiImportStatement>() {
                 @Override
                 public PsiImportStatement compute() {

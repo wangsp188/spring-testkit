@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "spring-fling"
+rootProject.name = "fling"
