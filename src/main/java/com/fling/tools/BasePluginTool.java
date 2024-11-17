@@ -1,6 +1,7 @@
 package com.fling.tools;
 
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
@@ -217,7 +218,25 @@ public abstract class BasePluginTool {
                     } else if (!result.getBooleanValue("success")) {
                         setOutputText("req is error\n" + result.getString("message"));
                     } else {
-                        setOutputText(JSONObject.toJSONString(result.get("data"), true));
+
+                        Object data = result.get("data");
+                        if (data == null) {
+                            setOutputText("null");
+                        } else if (data instanceof String
+                                || data instanceof Byte
+                                || data instanceof Short
+                                || data instanceof Integer
+                                || data instanceof Long
+                                || data instanceof Float
+                                || data instanceof Double
+                                || data instanceof Character
+                                || data instanceof Boolean
+                                || data.getClass().isEnum()) {
+                            setOutputText(data.toString());
+                        } else {
+                            String jsonString = JSONObject.toJSONString(data, SerializerFeature.PrettyFormat, SerializerFeature.WriteNonStringKeyAsString, SerializerFeature.WriteDateUseDateFormat);
+                            setOutputText(jsonString);
+                        }
                     }
                 } catch (Throwable ex) {
                     setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
