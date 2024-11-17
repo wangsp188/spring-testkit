@@ -236,7 +236,7 @@ public abstract class BasePluginTool {
                                 || data.getClass().isEnum()) {
                             setOutputText(data.toString());
                         } else {
-                            String jsonString = JSONObject.toJSONString(data, SerializerFeature.PrettyFormat, SerializerFeature.WriteNonStringKeyAsString, SerializerFeature.WriteDateUseDateFormat);
+                            String jsonString = JSONObject.toJSONString(data, SerializerFeature.PrettyFormat, SerializerFeature.WriteNonStringKeyAsString);
                             setOutputText(jsonString);
                         }
                     }

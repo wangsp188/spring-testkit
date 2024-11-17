@@ -94,7 +94,7 @@ public class SpringCacheTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerHttpTask(getValButton, AllIcons.Actions.GC, app.getSidePort(), new Supplier<JSONObject>() {
+                triggerHttpTask(getValButton, AllIcons.Actions.Find, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return handleAction(app.getSidePort(),"get_cache");
@@ -114,7 +114,7 @@ public class SpringCacheTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerHttpTask(getValButton, AllIcons.Actions.Find, app.getSidePort(), new Supplier<JSONObject>() {
+                triggerHttpTask(delValButton, AllIcons.Actions.GC, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return handleAction(app.getSidePort(),"delete_cache");
