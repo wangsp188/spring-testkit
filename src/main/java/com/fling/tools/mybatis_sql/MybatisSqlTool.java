@@ -179,14 +179,15 @@ public class MybatisSqlTool extends BasePluginTool {
     private void triggerChangeAction() {
         // 获取当前选中的值
         ToolHelper.XmlTagAction xmlTagAction = (ToolHelper.XmlTagAction) actionComboBox.getSelectedItem();
-        if (xmlTagAction == null) {
-            inputEditorTextField.setText("[]");
+        if (xmlTagAction == null || xmlTagAction.getXmlTag() == null || !xmlTagAction.getXmlTag().isValid()) {
+            inputEditorTextField.setText("{}");
             return;
         }
         if (xmlTagAction.getArgs() != null) {
             inputEditorTextField.setText(xmlTagAction.getArgs());
             return;
         }
+        inputEditorTextField.setText("init params ...");
         String xmlContent = xmlTagAction.getXmlTag().getParent().getContainingFile().getText();
         String statementId = xmlTagAction.getXmlTag().getAttributeValue("id");
 

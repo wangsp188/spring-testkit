@@ -26,7 +26,7 @@ public class ToolHelper {
 
 
     public static String buildMethodKey(PsiMethod method) {
-        if (method == null) {
+        if (method == null || !method.isValid()) {
             return null;
         }
         // 获取类名
@@ -51,7 +51,7 @@ public class ToolHelper {
     }
 
     public static String buildXmlTagKey(XmlTag xmlTag) {
-        if (xmlTag == null) {
+        if (xmlTag == null || !xmlTag.isValid()) {
             return null;
         }
 
@@ -94,6 +94,7 @@ public class ToolHelper {
             editorTextField.setText(method.getArgs());
             return;
         }
+        editorTextField.setText("init params ...");
         // 在这里执行耗时操作
         JSONObject initParams = doInitParams(method.getMethod());
         String jsonString = JSONObject.toJSONString(initParams, SerializerFeature.PrettyFormat, SerializerFeature.WriteNonStringKeyAsString);

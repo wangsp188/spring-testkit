@@ -17,6 +17,8 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -308,6 +310,44 @@ public abstract class BasePluginTool {
         actionComboBox.setPreferredSize(new Dimension(200, 32));
         actionComboBox.addActionListener(e -> {
             Object selectedItem = actionComboBox.getSelectedItem();
+            if(selectedItem instanceof ToolHelper.MethodAction){
+                PsiMethod method = ((ToolHelper.MethodAction) selectedItem).getMethod();
+                if(!method.isValid()) {
+                    // If not, remove the current item
+                    actionComboBox.removeItem(selectedItem);
+                    // Then, select the first valid item
+                    for(int i = 0; i < actionComboBox.getItemCount(); i++) {
+                        ToolHelper.MethodAction item = (ToolHelper.MethodAction) actionComboBox.getItemAt(i);
+                        PsiMethod itemMethod = item.getMethod();
+                        if(itemMethod.isValid()) {
+                            actionComboBox.setSelectedIndex(i);
+                            break;
+                        }
+                    }
+                    System.err.println("节点已失效，"+method);
+                    return;
+                }
+            } else if (selectedItem instanceof ToolHelper.XmlTagAction) {
+
+                XmlTag xmlTag = ((ToolHelper.XmlTagAction) selectedItem).getXmlTag();
+                if(!xmlTag.isValid()) {
+                    // If not, remove the current item
+                    actionComboBox.removeItem(selectedItem);
+                    // Then, select the first valid item
+                    for(int i = 0; i < actionComboBox.getItemCount(); i++) {
+                        ToolHelper.XmlTagAction item = (ToolHelper.XmlTagAction) actionComboBox.getItemAt(i);
+                        XmlTag itemMethod = item.getXmlTag();
+                        if(itemMethod.isValid()) {
+                            actionComboBox.setSelectedIndex(i);
+                            break;
+                        }
+                    }
+                    System.err.println("节点已失效，"+xmlTag);
+                    return;
+                }
+            }
+
+
             actionComboBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
             if (actionListener != null) {
                 actionListener.actionPerformed(e);

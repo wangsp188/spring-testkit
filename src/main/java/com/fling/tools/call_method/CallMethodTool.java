@@ -192,8 +192,8 @@ public class CallMethodTool extends BasePluginTool {
     private void triggerChangeAction() {
         // 获取当前选中的值
         ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
-        if (methodAction == null) {
-            inputEditorTextField.setText("[]");
+        if (methodAction == null || methodAction.getMethod() == null || !methodAction.getMethod().isValid()) {
+            inputEditorTextField.setText("{}");
             return;
         }
         ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
