@@ -34,7 +34,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Set;
 
 public class CallMethodIconProvider implements LineMarkerProvider {
 
@@ -62,6 +64,18 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             }
         }
     }
+
+    // 集合和 Map 类的全名
+    private static Set<String> serializableClasses = Set.of(
+            "java.util.ArrayList",
+            "java.util.LinkedList",
+            "java.util.HashSet",
+            "java.util.LinkedHashSet",
+            "java.util.TreeSet",
+            "java.util.HashMap",
+            "java.util.LinkedHashMap",
+            "java.util.TreeMap"
+    );
 
     private ArrayList<LineMarkerInfo<?>> createLineMarkers(PsiMethod psiMethod) {
         ArrayList<LineMarkerInfo<?>> lineMarkers = new ArrayList<>();
@@ -97,7 +111,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             System.out.println("not_support_directInvoke," + directInvoke + ":" + psiMethod.getContainingClass() + "#" + psiMethod.getName());
         }
 
-        String createTest =  isCreateTest(psiMethod);
+        String createTest = isCreateTest(psiMethod);
         if (createTest == null) {
             // 添加第二个图标
             LineMarkerInfo<PsiElement> generateTestMarker = new LineMarkerInfo<>(
@@ -145,11 +159,18 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     }
 
     private String isDirectInvoke(PsiMethod psiMethod) {
-
         // 新增：检查所有参数都可以直接序列化
         for (PsiParameter parameter : psiMethod.getParameterList().getParameters()) {
             PsiType parameterType = parameter.getType();
             PsiClass parameterClass = PsiUtil.resolveClassInType(parameterType);
+            if (parameterClass == null) {
+                continue;
+            }
+            // 判断是否是Collection或Map
+            if (parameterClass.isEnum() || serializableClasses.contains(parameterClass.getQualifiedName())) {
+                continue;
+            }
+
             if (parameterClass == null || parameterClass.isInterface() || parameterClass.hasModifierProperty(PsiModifier.ABSTRACT)) {
                 return "params_not_impl_class";
             }
@@ -170,6 +191,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         if (!(parent instanceof PsiMethod)) {
             return "not_method";
         }
+
         PsiMethod psiMethod = (PsiMethod) parent;
 
         if (psiMethod.isConstructor()) {
@@ -189,6 +211,11 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
         if (containsSpringInitializationMethod(containingClass, psiMethod)) {
             return "init_method";
+        }
+
+        // 检查是否是main函数
+        if ("main".equals(psiMethod.getName()) && psiMethod.hasModifierProperty(PsiModifier.STATIC)) {
+            return "main_method";
         }
 
         PsiFile psiFile = psiMethod.getContainingFile();

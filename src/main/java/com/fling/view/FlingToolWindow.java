@@ -5,6 +5,11 @@ import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
 import com.intellij.notification.NotificationType;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.StdFileTypes;
@@ -70,6 +75,7 @@ public class FlingToolWindow {
 
 
     public FlingToolWindow(Project project, ToolWindow toolWindow) {
+
         this.project = project;
         this.toolWindow = toolWindow;
         // 初始化主面板
@@ -103,7 +109,7 @@ public class FlingToolWindow {
         gbc.gridy = 2;
         gbc.weighty = 0.6; // Bottom panel takes 60% of the space
         // Bottom panel for output
-        JComponent bottomPanel = createOutputPanel();
+        JComponent bottomPanel = createOutputPanel(project);
         windowContent.add(bottomPanel, gbc);
     }
 
@@ -114,6 +120,7 @@ public class FlingToolWindow {
         // 添加 settingsButton 到 topPanel
         settingsButton = new JButton(settingsIcon);
         settingsButton.setPreferredSize(new Dimension(32, 32));
+        settingsButton.setToolTipText("Settings");
         topPanel.add(settingsButton);
 
         // 添加 tipsButton 到 topPanel
@@ -166,31 +173,34 @@ public class FlingToolWindow {
         return topPanel;
     }
 
-    protected JPanel createOutputPanel() {
+
+    protected JPanel createOutputPanel(Project project) {
+        // 创建主面板
         JPanel outputPanel = new JPanel(new BorderLayout());
         outputTextPane = new JTextPane();
         outputTextPane.setEditable(false);
 
-        // 新增一行，这一行包含左边一个label 右边一个copy按钮，以及一个修理的按钮
-        JPanel controlPanel = new JPanel(new BorderLayout());
-        JLabel label = new JLabel("Output:");
-        controlPanel.add(label, BorderLayout.WEST);
+        // 使用outputTextPane占用中心区域
+        outputPanel.add(new JBScrollPane(outputTextPane), BorderLayout.CENTER);
 
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton copyButton = new JButton(AllIcons.Actions.Copy);
-        copyButton.setPreferredSize(new Dimension(28, 28));
-        copyButton.addActionListener(e -> {
-//            拷贝outputTextPane的内容到剪切板
-            FlingHelper.copyToClipboard(getProject(), outputTextPane.getText(), "output is copied");
-        });
-        buttonPanel.add(copyButton);
+        // 创建工具栏
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        AnAction copyAction = new AnAction("Copy output to clipboard", "Copy output to clipboard", AllIcons.Actions.Copy) {
+            @Override
+            public void actionPerformed( AnActionEvent e) {
+                // 调用复制功能
+                FlingHelper.copyToClipboard(project, outputTextPane.getText(), "Output is copied");
+            }
+        };
+        actionGroup.add(copyAction);
 
-        controlPanel.add(buttonPanel, BorderLayout.EAST);
+        ActionToolbar actionToolbar = new ActionToolbarImpl("OutputToolbar",actionGroup,false);
+        JPanel toolbarPanel = new JPanel();
+        toolbarPanel.setLayout(new BoxLayout(toolbarPanel, BoxLayout.Y_AXIS));
+        toolbarPanel.add(actionToolbar.getComponent());
 
-        outputPanel.add(controlPanel, BorderLayout.NORTH);
-
-        // 剩余的部分使用一下output全部占用
-        outputPanel.add(new JScrollPane(outputTextPane), BorderLayout.CENTER);
+        // 将工具栏添加到输出面板的左侧
+        outputPanel.add(toolbarPanel, BorderLayout.WEST);
         return outputPanel;
     }
 
@@ -294,7 +304,6 @@ public class FlingToolWindow {
 
         // 显示当前选中的工具面板
         tool.getPanel().setVisible(true);
-
         // 刷新界面
         windowContent.revalidate();
         windowContent.repaint();

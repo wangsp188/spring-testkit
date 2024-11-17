@@ -1,10 +1,15 @@
 package com.fling.tools;
 
 import com.alibaba.fastjson.JSONObject;
-import com.fling.tools.flexible_test.FlexibleTestIconProvider;
+import com.fling.FlingHelper;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
@@ -15,6 +20,7 @@ import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
+import com.intellij.util.ui.JButtonAction;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,24 +31,24 @@ import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
 
-    private static final Icon FUNCTION_TEST_ICON = IconLoader.getIcon("/icons/function.svg", BasePluginTool.class);
-
 
     protected Set<String> cancelReqs = new HashSet<>(128);
     protected String lastReqId;
 
-    protected SwingWorker lastLocalFuture ;
+    protected SwingWorker lastLocalFuture;
 
 
-    protected FlingToolWindow toolWindow;
+    protected FlingToolWindow flingWindow;
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
     protected EditorTextField inputEditorTextField;
 
     public BasePluginTool(FlingToolWindow flingToolWindow) {
         // 初始化panel
-        this.toolWindow = flingToolWindow;
+        this.flingWindow = flingToolWindow;
         this.panel = new JPanel(new GridBagLayout());
+        // 设置inputPanel的边框为不可见
+        this.panel.setBorder(BorderFactory.createEmptyBorder());
         initializePanel();
     }
 
@@ -56,15 +62,15 @@ public abstract class BasePluginTool {
     }
 
     public Project getProject() {
-        return toolWindow.getProject();
+        return flingWindow.getProject();
     }
 
     public FlingToolWindow.VisibleApp getSelectedApp() {
-        return toolWindow.getSelectedApp();
+        return flingWindow.getSelectedApp();
     }
 
     public String getSelectedAppName() {
-        return toolWindow.getSelectedAppName();
+        return flingWindow.getSelectedAppName();
     }
 
 
@@ -84,9 +90,49 @@ public abstract class BasePluginTool {
         gbc.weighty = 0.3; // Middle panel takes 30% of the space
 
         // Middle panel for input parameters
-        JPanel inputPanel = buildInputPanel();
+        JPanel inputPanel = new JPanel(new BorderLayout());
+
+        // 创建一个ActionGroup来包含所有的动作
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        if (hasActionBox()) {
+            AnAction refreshAction = new AnAction("Refresh method parameters structure", "Refresh method parameters structure", AllIcons.Actions.Refresh) {
+                @Override
+                public void actionPerformed(AnActionEvent e) {
+                    refreshInputByActionBox();
+                }
+            };
+            actionGroup.add(refreshAction);
+        }
+
+
+        // 添加复制按钮的动作
+        AnAction copyAction = new AnAction("Copy input to clipboard", "Copy input to clipboard", AllIcons.Actions.Copy) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                FlingHelper.copyToClipboard(getProject(), inputEditorTextField.getText(), "Input is copied");
+            }
+        };
+        actionGroup.add(copyAction);
+
+
+        // 创建ActionToolbar
+        ActionToolbar actionToolbar = new ActionToolbarImpl("InputToolbar", actionGroup, false);
+        JComponent toolbarComponent = actionToolbar.getComponent();
+        toolbarComponent.setLayout(new BoxLayout(toolbarComponent, BoxLayout.Y_AXIS));
+
+
+        // 将工具栏添加到控制面板的左侧
+        inputPanel.add(toolbarComponent, BorderLayout.WEST);
+
+        inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        inputPanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
+
         panel.add(inputPanel, gbc);
     }
+
+    protected abstract boolean hasActionBox();
+
+    protected abstract void refreshInputByActionBox();
 
     protected abstract JPanel createActionPanel();
 
@@ -94,12 +140,6 @@ public abstract class BasePluginTool {
 
     public abstract void onSwitchAction(PsiElement psiElement);
 
-    protected JPanel buildInputPanel() {
-        JPanel inputPanel = new JPanel(new BorderLayout());
-        inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        inputPanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
-        return inputPanel;
-    }
 
     protected void triggerHttpTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
@@ -205,7 +245,7 @@ public abstract class BasePluginTool {
             return;
         }
         //使用线程池提交任务
-        lastLocalFuture = new SwingWorker<String,Void>() {
+        lastLocalFuture = new SwingWorker<String, Void>() {
 
             @Override
             protected String doInBackground() throws Exception {
@@ -225,7 +265,7 @@ public abstract class BasePluginTool {
                 } catch (Throwable e) {
                     e.printStackTrace();
                     SwingUtilities.invokeLater(() -> setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(e)));
-                }finally {
+                } finally {
                     triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
                 }
             }
@@ -237,38 +277,36 @@ public abstract class BasePluginTool {
 
 
     protected void setOutputText(String content) {
-        toolWindow.setOutputText(content);
+        flingWindow.setOutputText(content);
     }
 
-    protected ComboBox addActionComboBox(JPanel topPanel, ActionListener actionListener) {
+    protected ComboBox addActionComboBox(String tooltips, JPanel topPanel, ActionListener actionListener) {
         JButton testBtn = new JButton(AllIcons.Nodes.Method);
-        testBtn.setToolTipText("refresh method parameters structure");
-        testBtn.setPreferredSize(new Dimension(32,32));
+        testBtn.setPreferredSize(new Dimension(32, 32));
+        testBtn.setToolTipText(tooltips == null ? "" : tooltips);
         topPanel.add(testBtn);
         ComboBox actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(200, 32));
-        testBtn.addActionListener(new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Object selectedItem = actionComboBox.getSelectedItem();
-                if(selectedItem instanceof ToolHelper.MethodAction){
-                    ((ToolHelper.MethodAction) selectedItem).setArgs(null);
-                }else if(selectedItem instanceof ToolHelper.XmlTagAction){
-                    ((ToolHelper.XmlTagAction) selectedItem).setArgs(null);
-                }
-                actionComboBox.setSelectedItem(selectedItem);
-            }
-        });
         actionComboBox.addActionListener(e -> {
             Object selectedItem = actionComboBox.getSelectedItem();
             actionComboBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
-            if (actionListener!=null) {
+            if (actionListener != null) {
                 actionListener.actionPerformed(e);
             }
         });
         topPanel.add(actionComboBox);
 
         return actionComboBox;
+    }
+
+    protected void refreshInputByActionBox(JComboBox actionComboBox) {
+        Object selectedItem = actionComboBox.getSelectedItem();
+        if (selectedItem instanceof ToolHelper.MethodAction) {
+            ((ToolHelper.MethodAction) selectedItem).setArgs(null);
+        } else if (selectedItem instanceof ToolHelper.XmlTagAction) {
+            ((ToolHelper.XmlTagAction) selectedItem).setArgs(null);
+        }
+        actionComboBox.setSelectedItem(selectedItem);
     }
 
 }

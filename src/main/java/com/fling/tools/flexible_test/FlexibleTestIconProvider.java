@@ -78,6 +78,7 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
         if (!(parent instanceof PsiMethod)) {
             return "not_method";
         }
+
         PsiMethod method = (PsiMethod) parent;
         if (method.isConstructor()) {
             return "is_constructor";

@@ -33,7 +33,14 @@ public class FlexibleTestTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(topPanel, new ActionListener() {
+        actionComboBox = addActionComboBox("<html>\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                "<strong>flexible-test</strong><br>\n" +
+                "<ul>\n" +
+                "    <li>module test source 下 ${Flexible Test Package} 包内的 public 函数</li>\n" +
+                "    <li>非static</li>\n" +
+                "</ul>\n" +
+                "</html>",topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -43,7 +50,7 @@ public class FlexibleTestTool extends BasePluginTool {
 
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
-        runButton.setToolTipText("test function");
+        runButton.setToolTipText("test method");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
         runButton.setPreferredSize(buttonSize);
@@ -164,5 +171,14 @@ public class FlexibleTestTool extends BasePluginTool {
         ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
     }
 
+    @Override
+    protected boolean hasActionBox() {
+        return actionComboBox!=null;
+    }
+
+    @Override
+    protected void refreshInputByActionBox() {
+        refreshInputByActionBox(actionComboBox);
+    }
 
 }

@@ -35,7 +35,14 @@ public class SpringCacheTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(topPanel, new ActionListener() {
+        actionComboBox = addActionComboBox("<html >\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                "<strong>spring-cache</strong><br>\n" +
+                "<ul>\n" +
+                "    <li>spring bean 中带有 @Cacheable/@CacheEvict/@CachePut/@Caching 的 public 函数</li>\n" +
+                "    <li>非 static</li>\n" +
+                "</ul>\n" +
+                "</html>",topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -45,11 +52,11 @@ public class SpringCacheTool extends BasePluginTool {
 
 
         JButton getKeyButton = new JButton(KIcon);
-        getKeyButton.setToolTipText("get keys");
+        getKeyButton.setToolTipText("build keys");
         JButton getValButton = new JButton(AllIcons.Actions.Find);
-        getValButton.setToolTipText("get keys and get values for every key");
+        getValButton.setToolTipText("build keys and get values for every key");
         JButton delValButton = new JButton(AllIcons.Actions.GC);
-        delValButton.setToolTipText("get keys and delete these");
+        delValButton.setToolTipText("build keys and delete these");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(30, 30);
         getKeyButton.setPreferredSize(buttonSize);
@@ -220,5 +227,14 @@ public class SpringCacheTool extends BasePluginTool {
         ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
     }
 
+    @Override
+    protected boolean hasActionBox() {
+        return actionComboBox!=null;
+    }
+
+    @Override
+    protected void refreshInputByActionBox() {
+        refreshInputByActionBox(actionComboBox);
+    }
 
 }

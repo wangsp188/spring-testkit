@@ -46,7 +46,14 @@ public class MybatisSqlTool extends BasePluginTool {
     @Override
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(topPanel, new ActionListener() {
+        actionComboBox = addActionComboBox("<html>\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                "<strong>mybatis-sql</strong><br>\n" +
+                "<ul>\n" +
+                "    <li>mapper的xml文件内 sql标签</li>\n" +
+                "    <li>select/insert/update/delete</li>\n" +
+                "</ul>\n" +
+                "</html>",topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -201,6 +208,16 @@ public class MybatisSqlTool extends BasePluginTool {
             }
         }.execute();
 
+    }
+
+    @Override
+    protected boolean hasActionBox() {
+        return actionComboBox!=null;
+    }
+
+    @Override
+    protected void refreshInputByActionBox() {
+        refreshInputByActionBox(actionComboBox);
     }
 
 

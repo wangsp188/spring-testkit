@@ -1,6 +1,7 @@
 package com.fling.tools.spring_cache;
 
 import com.fling.tools.PluginToolEnum;
+import com.fling.tools.ToolHelper;
 import com.fling.view.FlingToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -8,9 +9,7 @@ import com.intellij.codeInsight.daemon.LineMarkerProvider;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiMethod;
-import com.intellij.psi.PsiModifierList;
+import com.intellij.psi.*;
 import com.intellij.util.Function;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -59,8 +58,33 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
     }
 
     private boolean hasCacheAnnotation(PsiModifierList modifierList) {
+        // 1. 检查方法是否为 public
+        if (!modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
+            return false;
+        }
+
+        // 3. 获取方法和类
+        PsiElement parent = modifierList.getParent();
+        if (!(parent instanceof PsiMethod)) {
+            return false;
+        }
+        PsiMethod psiMethod = (PsiMethod) parent;
+        PsiClass containingClass = psiMethod.getContainingClass();
+        if (containingClass == null) {
+            return false;
+        }
+        // 4. 检查类是否含有 Spring 可注册 Bean 的注解
+        if (!ToolHelper.isSpringBean(containingClass)) {
+            return false;
+        }
+
+        if (modifierList.hasModifierProperty(PsiModifier.STATIC)) {
+            return false;
+        }
+
         return modifierList.hasAnnotation("org.springframework.cache.annotation.Cacheable") ||
                 modifierList.hasAnnotation("org.springframework.cache.annotation.CacheEvict") ||
-                modifierList.hasAnnotation("org.springframework.cache.annotation.CachePut");
+                modifierList.hasAnnotation("org.springframework.cache.annotation.CachePut") ||
+                modifierList.hasAnnotation("org.springframework.cache.annotation.Caching");
     }
 }

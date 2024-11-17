@@ -61,6 +61,13 @@ public class MybatisSqlIconProvider implements LineMarkerProvider {
         if ("select".equals(tag.getName()) || "insert".equals(tag.getName()) || "update".equals(tag.getName()) || "delete".equals(tag.getName())){
             return true;
         }
+
+        // 检查是否位于mapper节点内
+        PsiElement parentElement = tag.getParent();
+        if (!(parentElement instanceof XmlTag) || !"mapper".equals(((XmlTag) parentElement).getName())) {
+            return false;
+        }
+
         return false;
     }
 

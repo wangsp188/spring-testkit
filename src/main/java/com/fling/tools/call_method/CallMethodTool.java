@@ -36,7 +36,15 @@ public class CallMethodTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(topPanel,new ActionListener() {
+        actionComboBox = addActionComboBox("<html>\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                "<strong>call-method</strong><br>\n" +
+                "<ul>\n" +
+                "    <li>spring bean 的 public 函数</li>\n" +
+                "    <li>非init/main</li>\n" +
+                "    <li>非test source</li>\n" +
+                "</ul>\n" +
+                "</html>",topPanel,new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -48,7 +56,7 @@ public class CallMethodTool extends BasePluginTool {
 
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
-        runButton.setToolTipText("test function");
+        runButton.setToolTipText("test method");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
         runButton.setPreferredSize(buttonSize);
@@ -191,4 +199,13 @@ public class CallMethodTool extends BasePluginTool {
         ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
     }
 
+    @Override
+    protected boolean hasActionBox() {
+        return actionComboBox!=null;
+    }
+
+    @Override
+    protected void refreshInputByActionBox() {
+        refreshInputByActionBox(actionComboBox);
+    }
 }
