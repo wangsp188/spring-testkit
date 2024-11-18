@@ -81,8 +81,6 @@ public class FlexibleTestTool extends BasePluginTool {
                             setOutputText("input parameter must be json obj");
                             return null;
                         }
-//                        String jsonString = JSONObject.toJSONString(jsonObject, true);
-//                        inputEditorTextField.setText(jsonString);
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
                             setOutputText("pls select method");

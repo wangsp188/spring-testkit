@@ -15,6 +15,7 @@ dependencies {
     // FastJSON 依赖
     implementation("com.alibaba:fastjson:1.2.83")
     implementation("org.mybatis:mybatis:3.5.3")
+    implementation("org.apache.commons:commons-lang3:3.14.0")
     implementation(files("libs/spring-fling_side_server-0.0.1.jar"))
 }
 

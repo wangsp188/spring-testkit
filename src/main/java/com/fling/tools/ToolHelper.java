@@ -3,6 +3,7 @@ package com.fling.tools;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.fling.util.JsonUtil;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
@@ -97,7 +98,7 @@ public class ToolHelper {
         editorTextField.setText("init params ...");
         // 在这里执行耗时操作
         JSONObject initParams = doInitParams(method.getMethod());
-        String jsonString = JSONObject.toJSONString(initParams, SerializerFeature.PrettyFormat, SerializerFeature.WriteNonStringKeyAsString);
+        String jsonString = JsonUtil.formatObj(initParams);
         editorTextField.setText(jsonString);
         method.setArgs(jsonString);
     }

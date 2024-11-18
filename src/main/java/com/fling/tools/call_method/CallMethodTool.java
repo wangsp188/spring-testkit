@@ -88,8 +88,6 @@ public class CallMethodTool extends BasePluginTool {
                             setOutputText("input parameter must be json object");
                             return null;
                         }
-//                        String jsonString = JSONObject.toJSONString(jsonObject, true);
-//                        inputEditorTextField.setText(jsonString);
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
                             setOutputText("pls select method");

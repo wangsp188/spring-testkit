@@ -1,8 +1,9 @@
 package com.fling.tools;
 
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
+import com.fling.tools.call_method.CallMethodIconProvider;
+import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
@@ -15,6 +16,7 @@ import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.xml.XmlTag;
@@ -31,6 +33,8 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
+
+    public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", CallMethodIconProvider.class);
 
 
     protected Set<String> cancelReqs = new HashSet<>(128);
@@ -95,6 +99,18 @@ public abstract class BasePluginTool {
 
         // 创建一个ActionGroup来包含所有的动作
         DefaultActionGroup actionGroup = new DefaultActionGroup();
+
+
+        // 添加复制按钮的动作
+        AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                flingWindow.openCurlDialog();
+            }
+        };
+        actionGroup.add(curlAction);
+
+
         if (hasActionBox()) {
             AnAction refreshAction = new AnAction("Refresh method parameters structure", "Refresh method parameters structure", AllIcons.Actions.Refresh) {
                 @Override
@@ -126,8 +142,8 @@ public abstract class BasePluginTool {
         inputPanel.add(toolbarComponent, BorderLayout.WEST);
 
         inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
         inputPanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
-
         panel.add(inputPanel, gbc);
     }
 
@@ -234,8 +250,7 @@ public abstract class BasePluginTool {
                                 || data.getClass().isEnum()) {
                             setOutputText(data.toString());
                         } else {
-                            String jsonString = JSONObject.toJSONString(data, SerializerFeature.PrettyFormat, SerializerFeature.WriteNonStringKeyAsString);
-                            setOutputText(jsonString);
+                            setOutputText(JsonUtil.formatObj(data));
                         }
                     }
                 } catch (Throwable ex) {

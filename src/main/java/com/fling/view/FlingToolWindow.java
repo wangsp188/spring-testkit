@@ -1,6 +1,7 @@
 package com.fling.view;
 
 import com.fling.RuntimeAppHelper;
+import com.fling.tools.CurlDialog;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
@@ -65,6 +66,7 @@ public class FlingToolWindow {
     private JLabel appLabel;
     private JComboBox<String> appBox;
     private JDialog settingsDialog;
+    private CurlDialog curlDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
@@ -113,6 +115,15 @@ public class FlingToolWindow {
         windowContent.add(bottomPanel, gbc);
     }
 
+    public BasePluginTool getNowTool() {
+        Object selectedItem = toolBox.getSelectedItem();
+        if (selectedItem == null) {
+            return null;
+        }
+        PluginToolEnum byCode = PluginToolEnum.getByCode(selectedItem.toString());
+        return byCode == null ? null : tools.get(byCode);
+    }
+
     private JPanel buildHeaderPanel() {
         // 创建一个新的 JPanel 用于存放第一行的组件
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5)); // 使用 FlowLayout 确保组件的水平排列和固定间距
@@ -131,6 +142,9 @@ public class FlingToolWindow {
         tipsButton.addActionListener(e -> openTipsDoc());
         topPanel.add(tipsButton);
 
+        curlDialog = new CurlDialog(this);
+
+        // 居中显示
 
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
@@ -187,14 +201,14 @@ public class FlingToolWindow {
         DefaultActionGroup actionGroup = new DefaultActionGroup();
         AnAction copyAction = new AnAction("Copy output to clipboard", "Copy output to clipboard", AllIcons.Actions.Copy) {
             @Override
-            public void actionPerformed( AnActionEvent e) {
+            public void actionPerformed(AnActionEvent e) {
                 // 调用复制功能
                 FlingHelper.copyToClipboard(project, outputTextPane.getText(), "Output is copied");
             }
         };
         actionGroup.add(copyAction);
 
-        ActionToolbar actionToolbar = new ActionToolbarImpl("OutputToolbar",actionGroup,false);
+        ActionToolbar actionToolbar = new ActionToolbarImpl("OutputToolbar", actionGroup, false);
         JPanel toolbarPanel = new JPanel();
         toolbarPanel.setLayout(new BoxLayout(toolbarPanel, BoxLayout.Y_AXIS));
         toolbarPanel.add(actionToolbar.getComponent());
@@ -269,6 +283,10 @@ public class FlingToolWindow {
                     "Unsupported Operation",
                     Messages.getWarningIcon());
         }
+    }
+
+    public void openCurlDialog() {
+        curlDialog.setVisible(true);
     }
 
 

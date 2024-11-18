@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
+import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.command.WriteCommandAction;
@@ -85,8 +86,6 @@ public class MybatisSqlTool extends BasePluginTool {
                             ex.printStackTrace();
                             return "input parameter must be json object";
                         }
-//                        String jsonString = JSONObject.toJSONString(jsonObject, true);
-//                        inputEditorTextField.setText(jsonString);
                         ToolHelper.XmlTagAction selectedItem = (ToolHelper.XmlTagAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
                             return "pls select tag";
@@ -201,7 +200,7 @@ public class MybatisSqlTool extends BasePluginTool {
             protected void done() {
                 try {
                     JSONObject initParams = get();
-                    inputEditorTextField.setText(JSONObject.toJSONString(initParams, SerializerFeature.PrettyFormat, SerializerFeature.WriteMapNullValue));
+                    inputEditorTextField.setText(JsonUtil.formatObj(initParams));
                 } catch (Throwable e) {
                     e.printStackTrace();
                     inputEditorTextField.setText("{\"nb\":\"init fail, You're on your own\"}");
