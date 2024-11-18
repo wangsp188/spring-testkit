@@ -2,6 +2,7 @@ package com.fling.tools.flexible_test;
 
 import com.fling.tools.PluginToolEnum;
 import com.fling.LocalStorageHelper;
+import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.view.FlingToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -21,7 +22,7 @@ import java.awt.event.MouseEvent;
 
 public class FlexibleTestIconProvider implements LineMarkerProvider {
 
-    private static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/spring-fling.svg", FlexibleTestIconProvider.class);
+    public static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/test-code.svg", CallMethodIconProvider.class);
 
 
     @Nullable

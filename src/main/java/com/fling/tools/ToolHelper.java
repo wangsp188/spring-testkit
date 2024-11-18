@@ -456,14 +456,14 @@ public class ToolHelper {
             if (method == null) {
                 return "unknown";
             }
-            return buildMethodKey(method);
+            String s = buildMethodKey(method);
+            return s == null ? "invalid" : s;
         }
 
         public PsiMethod getMethod() {
             return method;
         }
     }
-
 
 
     public static class XmlTagAction {
@@ -482,7 +482,8 @@ public class ToolHelper {
             if (xmlTag == null) {
                 return "unknown";
             }
-            return buildXmlTagKey(xmlTag);
+            String s = buildXmlTagKey(xmlTag);
+            return s == null ? "invalid" : s;
         }
 
 

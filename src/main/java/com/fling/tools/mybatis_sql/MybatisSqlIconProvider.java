@@ -20,7 +20,7 @@ import java.awt.event.MouseEvent;
 
 public class MybatisSqlIconProvider implements LineMarkerProvider {
 
-    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/spring-fling.svg", MybatisSqlIconProvider.class);
+    public static final Icon MY_SQL_ICON = IconLoader.getIcon("/icons/sql.svg", MybatisSqlIconProvider.class);
 
 
     @Nullable
@@ -36,7 +36,7 @@ public class MybatisSqlIconProvider implements LineMarkerProvider {
         return new LineMarkerInfo<>(
                 tag,
                 tag.getTextRange(),
-                CALL_METHOD_ICON,
+                MY_SQL_ICON,
                 new Function<PsiElement, String>() {
                     @Override
                     public String fun(PsiElement element) {

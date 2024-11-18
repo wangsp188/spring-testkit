@@ -33,7 +33,7 @@ public class FlexibleTestTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox("<html>\n" +
+        actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,"<html>\n" +
                 "<meta charset=\"UTF-8\">\n" +
                 "<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +

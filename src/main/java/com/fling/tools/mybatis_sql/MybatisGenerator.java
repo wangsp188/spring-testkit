@@ -263,10 +263,9 @@ public class MybatisGenerator {
         Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
             String fullParam = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
-            String baseParam = extractBaseParameter(fullParam);
             // Check if `.size()` is called in the text indicating it might be an array
-            boolean isArray = text.contains(baseParam + ".size()");
-            paramMap.put(baseParam, isArray || paramMap.getOrDefault(baseParam, false));
+            boolean isArray = text.contains(fullParam + ".size()");
+            paramMap.put(fullParam, isArray || paramMap.getOrDefault(fullParam, false));
         }
     }
 

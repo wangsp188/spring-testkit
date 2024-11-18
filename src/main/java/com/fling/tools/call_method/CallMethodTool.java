@@ -2,6 +2,7 @@ package com.fling.tools.call_method;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.tools.ToolHelper;
+import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.fling.util.HttpUtil;
@@ -36,7 +37,7 @@ public class CallMethodTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox("<html>\n" +
+        actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON, "<html>\n" +
                 "<meta charset=\"UTF-8\">\n" +
                 "<strong>call-method</strong><br>\n" +
                 "<ul>\n" +

@@ -2,6 +2,7 @@ package com.fling.tools.spring_cache;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.tools.ToolHelper;
+import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
@@ -35,7 +36,7 @@ public class SpringCacheTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox("<html >\n" +
+        actionComboBox = addActionComboBox(SpringCacheIconProvider.CACHEABLE_ICON, "<html >\n" +
                 "<meta charset=\"UTF-8\">\n" +
                 "<strong>spring-cache</strong><br>\n" +
                 "<ul>\n" +

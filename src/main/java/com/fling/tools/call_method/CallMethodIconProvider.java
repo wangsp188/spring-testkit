@@ -1,6 +1,7 @@
 package com.fling.tools.call_method;
 
 import com.fling.tools.ToolHelper;
+import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.view.FlingToolWindowFactory;
 import com.intellij.application.options.CodeStyle;
 import com.intellij.ide.highlighter.JavaFileType;
@@ -40,8 +41,7 @@ import java.util.Set;
 
 public class CallMethodIconProvider implements LineMarkerProvider {
 
-    private static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/spring-fling.svg", CallMethodIconProvider.class);
-    private static final Icon CALL_METHOD_CODER_ICON = IconLoader.getIcon("/icons/test-code.svg", CallMethodIconProvider.class);
+    public static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/spring-fling.svg", CallMethodIconProvider.class);
 
     @Nullable
     @Override
@@ -117,7 +117,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             LineMarkerInfo<PsiElement> generateTestMarker = new LineMarkerInfo<>(
                     psiMethod,
                     psiMethod.getTextRange(),
-                    CALL_METHOD_CODER_ICON,
+                    FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,
                     new Function<PsiElement, String>() {
                         @Override
                         public String fun(PsiElement element) {

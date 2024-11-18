@@ -20,7 +20,7 @@ import java.awt.event.MouseEvent;
 
 public class SpringCacheIconProvider implements LineMarkerProvider {
 
-    private static final Icon CACHEABLE_ICON = IconLoader.getIcon("/icons/cacheable.svg",SpringCacheIconProvider.class);
+    public static final Icon CACHEABLE_ICON = IconLoader.getIcon("/icons/cacheable.svg",SpringCacheIconProvider.class);
 
     @Nullable  
     @Override  
