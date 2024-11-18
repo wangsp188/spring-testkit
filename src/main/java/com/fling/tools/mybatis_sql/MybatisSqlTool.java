@@ -3,7 +3,6 @@ package com.fling.tools.mybatis_sql;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.tools.ToolHelper;
-import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
@@ -47,7 +46,7 @@ public class MybatisSqlTool extends BasePluginTool {
     @Override
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(MybatisSqlIconProvider.MY_SQL_ICON, "<html>\n" +
+        actionComboBox = addActionComboBox(MybatisSqlIconProvider.FLING_SQL_ICON, "<html>\n" +
                 "<meta charset=\"UTF-8\">\n" +
                 "<strong>mybatis-sql</strong><br>\n" +
                 "<ul>\n" +
