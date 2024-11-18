@@ -96,14 +96,18 @@ public class MybatisGenerator {
         StringBuilder finalSql = new StringBuilder();
         String[] sqlParts = sql.split("\\?");
         List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
-        for (int i = 0; i < sqlParts.length-1; i++) {
+        for (int i = 0; i < sqlParts.length; i++) {
             finalSql.append(sqlParts[i]);
-            ParameterMapping parameterMapping = parameterMappings.get(i);
-            String paramName = parameterMapping.getProperty();
-            Object paramValue = JSONPath.eval(parameters, "$." + paramName);
-            if (paramValue==null) {
-                paramValue  = boundSql.getAdditionalParameter(paramName);
+            Object paramValue = null;
+            if(parameterMappings.size()>i){
+                ParameterMapping parameterMapping = parameterMappings.get(i);
+                String paramName = parameterMapping.getProperty();
+                paramValue = JSONPath.eval(parameters, "$." + paramName);
+                if (paramValue==null) {
+                    paramValue  = boundSql.getAdditionalParameter(paramName);
+                }
             }
+
             //  根据类型jdbcType和 paramValue 拼接参数
             if (paramValue == null) {
                 finalSql.append("NULL");
@@ -113,7 +117,7 @@ public class MybatisGenerator {
                 finalSql.append(paramValue);
             }
         }
-        finalSql.append(sqlParts[sqlParts.length-1]);
+//        finalSql.append(sqlParts[sqlParts.length-1]);
         return finalSql.toString();
     }
 
