@@ -144,14 +144,14 @@ public class SpringCacheTool extends BasePluginTool {
             setOutputText("input parameter must be json obj");
             return null;
         }
-        String jsonString = JSONObject.toJSONString(jsonObject, true);
-        inputEditorTextField.setText(jsonString);
+//        String jsonString = JSONObject.toJSONString(jsonObject, true);
+//        inputEditorTextField.setText(jsonString);
         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
         if (selectedItem==null) {
             setOutputText("pls select method");
             return null;
         }
-        selectedItem.setArgs(jsonString);
+        selectedItem.setArgs(jsonInput);
         JSONObject paramsJson = buildParams(selectedItem.getMethod(), jsonObject, action);
         try {
             return HttpUtil.sendPost("http://localhost:" + sidePort + "/", paramsJson, JSONObject.class);

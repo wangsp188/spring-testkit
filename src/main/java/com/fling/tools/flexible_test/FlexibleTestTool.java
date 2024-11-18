@@ -81,14 +81,14 @@ public class FlexibleTestTool extends BasePluginTool {
                             setOutputText("input parameter must be json obj");
                             return null;
                         }
-                        String jsonString = JSONObject.toJSONString(jsonObject, true);
-                        inputEditorTextField.setText(jsonString);
+//                        String jsonString = JSONObject.toJSONString(jsonObject, true);
+//                        inputEditorTextField.setText(jsonString);
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
                             setOutputText("pls select method");
                             return null;
                         }
-                        selectedItem.setArgs(jsonString);
+                        selectedItem.setArgs(jsonInput);
                         JSONObject params = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
                         try {
                             return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", params, JSONObject.class);

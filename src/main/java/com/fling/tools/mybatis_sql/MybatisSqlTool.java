@@ -85,13 +85,13 @@ public class MybatisSqlTool extends BasePluginTool {
                             ex.printStackTrace();
                             return "input parameter must be json object";
                         }
-                        String jsonString = JSONObject.toJSONString(jsonObject, true);
-                        inputEditorTextField.setText(jsonString);
+//                        String jsonString = JSONObject.toJSONString(jsonObject, true);
+//                        inputEditorTextField.setText(jsonString);
                         ToolHelper.XmlTagAction selectedItem = (ToolHelper.XmlTagAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
-                            return "pls select method";
+                            return "pls select tag";
                         }
-                        selectedItem.setArgs(jsonString);
+                        selectedItem.setArgs(jsonInput);
                         String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
                         String statementId = selectedItem.getXmlTag().getAttributeValue("id");
                         System.err.println("xml: " + xmlContent + ", statementId: " + statementId + ", params:" + jsonObject.toJSONString());
