@@ -81,7 +81,7 @@ public class LocalStorageHelper {
                     "     * @param e      抛出的异常 脚本异常也会记录 可能为空\n" +
                     "     */\n" +
                     "    public void invokeAfter(String appNme, String tool, Map<String, String> params, Integer cost, Object ret, Throwable e) {\n" +
-                    "        System.err.println(\"ZCC-Fling\\n\"\n" +
+                    "        System.err.println(\"Spring-Fling\\n\"\n" +
                     "                + \"tool:\" + tool + \"\\n\"\n" +
                     "                + \"params:\" + params + \"\\n\"\n" +
                     "                + \"cost:\" + cost + \"\\n\"\n" +

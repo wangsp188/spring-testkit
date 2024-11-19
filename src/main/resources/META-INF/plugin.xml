@@ -5,10 +5,10 @@
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
-    <name>ZCC-Fling</name>
+    <name>Spring-Fling</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor email="dex.wang@zoom.com" url="https://www.yourcompany.com">zcc</vendor>
+    <vendor email="1061909924@qq.com" url="https://www.yourcompany.com">wang zhe peng</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
@@ -43,7 +43,7 @@
 
 
         <java.programPatcher implementation="com.fling.JavaProgramPatcher" />
-        <toolWindow id="ZCC-Fling" icon="/icons/spring-fling.svg" factoryClass="com.fling.view.FlingToolWindowFactory" anchor="right"/>
+        <toolWindow id="Fling" icon="/icons/spring-fling.svg" factoryClass="com.fling.view.FlingToolWindowFactory" anchor="right"/>
 <!--icon="PlatformDebuggerImplIcons.MemoryView.Active"-->
         <!-- Here you can register other extensions, for example, actions -->
     </extensions>

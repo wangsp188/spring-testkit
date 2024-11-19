@@ -12,7 +12,7 @@ import java.awt.datatransfer.StringSelection;
 
 public class FlingHelper {
 
-    private static final String pluginName = "ZCC-Fling";
+    private static final String pluginName = "Spring-Fling";
 
     public static void notify(Project project, NotificationType type, String content) {
         Notification notification = new Notification(pluginName, pluginName, content, type);

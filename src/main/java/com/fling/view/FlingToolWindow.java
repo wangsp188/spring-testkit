@@ -253,14 +253,16 @@ public class FlingToolWindow {
     }
 
     private void openTipsDoc() {
-        String url = "https://docs.zoom.us/doc/LXz2PDQkTo27BkDvEnbUVg";
+        String url = "https://www.yuque.com/momojiji-k3bmk/tkv3dg/kg43qvece1rgcnnp";
         Object selectedItem = toolBox.getSelectedItem();
         if ("spring-cache".equals(selectedItem)) {
-            url += "#4b4cacc4f7784057976c4a2ccb197d5b";
+            url += "#-3";
         } else if ("call-method".equals(selectedItem)) {
-            url += "#e0db2d19e4a5470d9f06b0ec833ebad3";
+            url += "#YuWKW";
         } else if ("flexible-test".equals(selectedItem)) {
-            url += "#79befe5c554f435bb7afffc1b855cd8f";
+            url += "#-2";
+        } else if ("mybatis-sql".equals(selectedItem)) {
+            url += "#-4";
         }
 
         if (Desktop.isDesktopSupported()) {
