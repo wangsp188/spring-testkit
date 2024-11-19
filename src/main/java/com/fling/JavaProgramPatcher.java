@@ -1,6 +1,7 @@
 package com.fling;
 
 import com.intellij.execution.Executor;
+import com.intellij.execution.JavaRunConfigurationBase;
 import com.intellij.execution.configurations.JavaParameters;
 import com.intellij.execution.configurations.ParametersList;
 import com.intellij.execution.configurations.RunProfile;
@@ -17,7 +18,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
     @Override
     public void patchJavaParameters(Executor executor, RunProfile runProfile, JavaParameters javaParameters) {
         try {
-            if (!(runProfile instanceof SpringBootApplicationRunConfigurationBase configurationBase)) {
+            if (!(runProfile instanceof JavaRunConfigurationBase configurationBase)) {
                 System.err.println("当前启动类非spring-boot");
                 return;
             }
@@ -34,10 +35,10 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             vmParametersList.addProperty("fling.project.name", configurationBase.getProject().getName());
             vmParametersList.addProperty("fling.app.name", runProfile.getName());
 
-            String appName = configurationBase.getMainClass().getName();
+            String appName = configurationBase.getName();
             String propertiesStr = LocalStorageHelper.getAppProperties(configurationBase.getProject(), appName);
 
-            FlingHelper.notify(configurationBase.getProject(),NotificationType.INFORMATION,"Eric bless, Never Bug");
+            FlingHelper.notify(configurationBase.getProject(),NotificationType.INFORMATION,"Buddha bless, Never Bug");
 
             if (LocalStorageHelper.defProperties.equals(propertiesStr)) {
                 return;
