@@ -208,9 +208,12 @@ public class FlingToolWindow {
         };
         actionGroup.add(copyAction);
 
+
         ActionToolbar actionToolbar = new ActionToolbarImpl("OutputToolbar", actionGroup, false);
         JPanel toolbarPanel = new JPanel();
         toolbarPanel.setLayout(new BoxLayout(toolbarPanel, BoxLayout.Y_AXIS));
+        // 设置目标组件为此面板
+        actionToolbar.setTargetComponent(toolbarPanel);
         toolbarPanel.add(actionToolbar.getComponent());
 
         // 将工具栏添加到输出面板的左侧

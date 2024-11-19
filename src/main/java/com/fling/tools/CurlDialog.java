@@ -30,7 +30,6 @@ public class CurlDialog extends JDialog {
     public static final Icon ADAPTER_INPUT_ICON = IconLoader.getIcon("/icons/adapter-input.svg", CurlDialog.class);
 
 
-
     private JTextArea inputTextArea;
     private JTextField urlField, methodField;
     private JTextArea paramsField, headersField, bodyField;
@@ -171,12 +170,12 @@ public class CurlDialog extends JDialog {
             public void actionPerformed(ActionEvent e) {
                 String text = inputTextArea.getText();
                 CurlEntity curlEntity = null;
-                if (StringUtils.isNotBlank(text)) {
-                    try {
+                try {
+                    if (StringUtils.isNotBlank(text)) {
                         curlEntity = CurlParserUtil.parse(text.trim());
-                    } catch (Throwable ex) {
-                        FlingHelper.notify(window.getProject(), NotificationType.ERROR, "parse curl error");
                     }
+                } catch (Throwable ex) {
+                    FlingHelper.notify(window.getProject(), NotificationType.ERROR, "parse curl error");
                 }
                 urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
                 methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
@@ -270,7 +269,7 @@ public class CurlDialog extends JDialog {
         northPanel.add(copyButton);
         if ("Params".equals(labelText) || "Body".equals(labelText)) {
             JButton adapterButton = new JButton(ADAPTER_INPUT_ICON);
-            adapterButton.setToolTipText("use "+labelText+" adapter to input params");
+            adapterButton.setToolTipText("use " + labelText + " adapter to input params");
             adapterButton.setPreferredSize(preferredSize);
             adapterButton.setMaximumSize(preferredSize);
             adapterButton.setMinimumSize(preferredSize);
@@ -278,35 +277,48 @@ public class CurlDialog extends JDialog {
             adapterButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (StringUtils.isBlank(field.getText())) {
-                        return;
-                    }
-                    Map<String, String> parse;
-                    try {
-                        parse = JSON.parseObject(field.getText(), new TypeReference<Map<String, String>>() {
-                        });
-                    } catch (Exception ex) {
-                        FlingHelper.notify(window.getProject(), NotificationType.ERROR, "the " + labelText + " is not json");
-                        return;
-                    }
+
+                    SwingUtilities.invokeLater(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            if (StringUtils.isBlank(field.getText())) {
+                                return;
+                            }
+                            Map<String, String> parse;
+                            try {
+                                parse = JSON.parseObject(field.getText(), new TypeReference<Map<String, String>>() {
+                                });
+                            } catch (Exception ex) {
+                                FlingHelper.notify(window.getProject(), NotificationType.ERROR, "the " + labelText + " is not json");
+                                return;
+                            }
 
 
-                    BasePluginTool nowTool = window.getNowTool();
-                    if (nowTool == null) {
-                        FlingHelper.notify(window.getProject(), NotificationType.ERROR, "not find selected tool");
-                        return;
-                    }
-                    String templateText = nowTool.inputEditorTextField.getText();
-                    JSONObject template;
-                    try {
-                        template = JSON.parseObject(templateText);
-                    } catch (Exception ex) {
-                        FlingHelper.notify(window.getProject(), NotificationType.ERROR, "now input is empty, pls init first");
-                        return;
-                    }
+                            BasePluginTool nowTool = window.getNowTool();
+                            if (nowTool == null) {
+                                FlingHelper.notify(window.getProject(), NotificationType.WARNING, "not find selected tool");
+                                return;
+                            }
+                            String templateText = nowTool.inputEditorTextField.getText();
+                            JSONObject template;
+                            try {
+                                template = JSON.parseObject(templateText);
+                            } catch (Exception ex) {
+                                FlingHelper.notify(window.getProject(), NotificationType.ERROR, "input is not json, pls check");
+                                return;
+                            }
 
-                    updateTemplate(template, parse);
-                    nowTool.inputEditorTextField.setText(JsonUtil.formatObj(template));
+                            if (template == null) {
+                                FlingHelper.notify(window.getProject(), NotificationType.WARNING, "input is empty, pls init first");
+                                return;
+                            }
+                            updateTemplate(template, parse);
+                            nowTool.inputEditorTextField.setText(JsonUtil.formatObj(template));
+                            FlingHelper.notify(window.getProject(), NotificationType.INFORMATION, "use " + labelText + " adapter to input params success");
+                        }
+                    });
+
                 }
             });
         }
@@ -320,6 +332,9 @@ public class CurlDialog extends JDialog {
 
 
     public static void updateTemplate(JSONObject template, Map<String, String> params) {
+        if (template == null || template.isEmpty()) {
+            return;
+        }
         for (String key : params.keySet()) {
             updateJsonObject(template, key, params.get(key));
         }

@@ -2,6 +2,7 @@ package com.fling.util;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,8 @@ public class JsonUtil {
         // 在静态块中初始化
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
         mapper.setDateFormat(dateFormat);
+        // 设置包含 null 值
+        mapper.setSerializationInclusion(JsonInclude.Include.ALWAYS);
     }
 
     public static String formatObj(Object obj) {

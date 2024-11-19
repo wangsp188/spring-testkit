@@ -105,7 +105,13 @@ public abstract class BasePluginTool {
         AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
             @Override
             public void actionPerformed(AnActionEvent e) {
-                flingWindow.openCurlDialog();
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        flingWindow.openCurlDialog();
+                    }
+                });
+
             }
         };
         actionGroup.add(curlAction);
@@ -115,7 +121,13 @@ public abstract class BasePluginTool {
             AnAction refreshAction = new AnAction("Refresh method parameters structure", "Refresh method parameters structure", AllIcons.Actions.Refresh) {
                 @Override
                 public void actionPerformed(AnActionEvent e) {
-                    refreshInputByActionBox();
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            refreshInputByActionBox();
+                        }
+                    });
+
                 }
             };
             actionGroup.add(refreshAction);

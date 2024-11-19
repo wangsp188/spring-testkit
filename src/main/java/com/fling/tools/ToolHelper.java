@@ -2,19 +2,13 @@ package com.fling.tools;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.util.JsonUtil;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
 import org.jetbrains.annotations.NotNull;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -24,6 +18,23 @@ import java.util.Date;
 import java.util.HashMap;
 
 public class ToolHelper {
+
+    public static boolean isPrimitiveWrapper(PsiType psiType) {
+        if (psiType == null) {
+            return false;
+        }
+
+        String canonicalText = psiType.getCanonicalText();
+
+        return "java.lang.Boolean".equals(canonicalText) ||
+                "java.lang.Byte".equals(canonicalText) ||
+                "java.lang.Character".equals(canonicalText) ||
+                "java.lang.Double".equals(canonicalText) ||
+                "java.lang.Float".equals(canonicalText) ||
+                "java.lang.Integer".equals(canonicalText) ||
+                "java.lang.Long".equals(canonicalText) ||
+                "java.lang.Short".equals(canonicalText);
+    }
 
 
     public static String buildMethodKey(PsiMethod method) {
@@ -111,24 +122,26 @@ public class ToolHelper {
             PsiType type = parameter.getType();
             String name = parameter.getName();
 
-            if (type.equalsToText("boolean") || type.equalsToText("java.lang.Boolean")) {
+            if (type.equalsToText("boolean")) {
                 initParams.put(name, false);
-            } else if (type.equalsToText("char") || type.equalsToText("java.lang.Character")) {
+            } else if (type.equalsToText("char")) {
                 initParams.put(name, '\0');
-            } else if (type.equalsToText("byte") || type.equalsToText("java.lang.Byte")) {
+            } else if (type.equalsToText("byte")) {
                 initParams.put(name, (byte) 0);
-            } else if (type.equalsToText("short") || type.equalsToText("java.lang.Short")) {
+            } else if (type.equalsToText("short")) {
                 initParams.put(name, (short) 0);
-            } else if (type.equalsToText("int") || type.equalsToText("java.lang.Integer")) {
+            } else if (type.equalsToText("int")) {
                 initParams.put(name, 0);
-            } else if (type.equalsToText("long") || type.equalsToText("java.lang.Long")) {
+            } else if (type.equalsToText("long")) {
                 initParams.put(name, 0L);
-            } else if (type.equalsToText("float") || type.equalsToText("java.lang.Float")) {
+            } else if (type.equalsToText("float")) {
                 initParams.put(name, 0.0f);
-            } else if (type.equalsToText("double") || type.equalsToText("java.lang.Double")) {
+            } else if (type.equalsToText("double")) {
                 initParams.put(name, 0.0);
+            } else if (isPrimitiveWrapper(type)) {
+                initParams.put(name, null);
             } else if (type.equalsToText("java.lang.String")) {
-                initParams.put(name, "");
+                initParams.put(name, null);
             } else if (type.equalsToText("java.util.Date")) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 initParams.put(name, sdf.format(new Date()));
@@ -262,12 +275,8 @@ public class ToolHelper {
     }
 
     private static Object getDefaultValueForType(PsiType type) {
-        if (type.equalsToText("java.lang.String")) {
-            return "";
-        } else if (type.equalsToText("java.lang.Integer") || type.equalsToText("int")) {
-            return 0;
-        } else if (type.equalsToText("java.lang.Boolean") || type.equalsToText("boolean")) {
-            return false;
+        if (type.equalsToText("java.lang.String") || isPrimitiveWrapper(type)) {
+            return null;
         } else if (type.equalsToText("java.util.Date")) {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             return sdf.format(new Date());
@@ -286,6 +295,9 @@ public class ToolHelper {
 
     private static Object initializeObjectFields(PsiType type) {
         if (!(type instanceof PsiClassType)) {
+            return null;
+        }
+        if (isPrimitiveWrapper(type)) {
             return null;
         }
 
@@ -334,12 +346,24 @@ public class ToolHelper {
                 fieldName = Character.toLowerCase(fieldName.charAt(0)) + fieldName.substring(1);
 
                 // 初始化字段值
-                if (fieldType.equalsToText("java.lang.String")) {
-                    fieldValues.put(fieldName, "");
-                } else if (fieldType.equalsToText("java.lang.Integer") || fieldType.equalsToText("int")) {
-                    fieldValues.put(fieldName, 0);
-                } else if (fieldType.equalsToText("java.lang.Boolean") || fieldType.equalsToText("boolean")) {
+                if (fieldType.equalsToText("java.lang.String") || isEnumType(fieldType)) {
+                    fieldValues.put(fieldName, null);
+                } else if (fieldType.equalsToText("boolean")) {
                     fieldValues.put(fieldName, false);
+                } else if (fieldType.equalsToText("char")) {
+                    fieldValues.put(fieldName, '\0');
+                } else if (fieldType.equalsToText("byte")) {
+                    fieldValues.put(fieldName, (byte) 0);
+                } else if (fieldType.equalsToText("short")) {
+                    fieldValues.put(fieldName, (short) 0);
+                } else if (fieldType.equalsToText("int")) {
+                    fieldValues.put(fieldName, 0);
+                } else if (fieldType.equalsToText("long")) {
+                    fieldValues.put(fieldName, 0L);
+                } else if (fieldType.equalsToText("float")) {
+                    fieldValues.put(fieldName, 0.0f);
+                } else if (fieldType.equalsToText("double")) {
+                    fieldValues.put(fieldName, 0.0);
                 } else if (fieldType.equalsToText("java.util.Date")) {
                     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                     fieldValues.put(fieldName, sdf.format(new Date()));
