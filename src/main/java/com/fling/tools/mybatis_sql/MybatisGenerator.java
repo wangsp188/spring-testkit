@@ -1,9 +1,10 @@
 package com.fling.tools.mybatis_sql;
 
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONPath;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
+import org.apache.commons.lang.StringUtils;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.mapping.*;
 import org.apache.ibatis.session.Configuration;
@@ -25,8 +26,10 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.*;
 import javax.xml.parsers.ParserConfigurationException;
+
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+
 import java.io.IOException;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -36,6 +39,7 @@ public class MybatisGenerator {
 
     /**
      * 构建sql
+     *
      * @param xmlContent
      * @param statementId
      * @param prepared
@@ -43,7 +47,7 @@ public class MybatisGenerator {
      * @return
      * @throws Exception
      */
-    public static String generateSql(String xmlContent, String statementId,boolean prepared, JSONObject parameters) throws Exception {
+    public static String generateSql(String xmlContent, String statementId, boolean prepared, JSONObject parameters) throws Exception {
         xmlContent = cleanXml(xmlContent, statementId);
         // Step 1: Initialize MyBatis Configuration and parse XML content
         // 使用正则表达式移除typeHandler属性 (注意：正则可能影响其他配置，请具体分析XML结构）
@@ -52,7 +56,7 @@ public class MybatisGenerator {
         // Initialize an environment (we don't need actual data source for SQL generation)
         Environment environment = new Environment(FlingHelper.getPluginName(), new JdbcTransactionFactory(), new FakeDataSource());
         configuration.setEnvironment(environment);
-        XMLMapperBuilder mapperBuilder = new XMLMapperBuilder(new StringReader(xmlContent), configuration,FlingHelper.getPluginName(), configuration.getSqlFragments());
+        XMLMapperBuilder mapperBuilder = new XMLMapperBuilder(new StringReader(xmlContent), configuration, FlingHelper.getPluginName(), configuration.getSqlFragments());
         mapperBuilder.parse(); // Parses the XML and adds statements to configuration
 
         // Step 3: Get the MappedStatement by statementId
@@ -62,7 +66,7 @@ public class MybatisGenerator {
 
         // Step 4: Prepare SQL with parameters
         String sql = boundSql.getSql();
-        if(prepared){
+        if (prepared) {
             return sql;
         }
         // Step 5: Generate final SQL by replacing placeholders with actual values
@@ -72,6 +76,7 @@ public class MybatisGenerator {
 
     /**
      * 构建sql参数模板
+     *
      * @param xmlContent
      * @param statementId
      * @return
@@ -80,7 +85,7 @@ public class MybatisGenerator {
      * @throws SAXException
      * @throws TransformerException
      */
-    public static  JSONObject buildParamTemplate(String xmlContent, String statementId) throws ParserConfigurationException, IOException, SAXException, TransformerException {
+    public static JSONObject buildParamTemplate(String xmlContent, String statementId) throws ParserConfigurationException, IOException, SAXException, TransformerException {
         xmlContent = cleanXml(xmlContent, statementId);
         Document document = parseXml(xmlContent);
         Element rootElement = document.getDocumentElement();
@@ -98,23 +103,21 @@ public class MybatisGenerator {
         List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
         for (int i = 0; i < sqlParts.length; i++) {
             finalSql.append(sqlParts[i]);
-            Object paramValue = null;
-            if(parameterMappings.size()>i){
+            if (parameterMappings.size() > i) {
                 ParameterMapping parameterMapping = parameterMappings.get(i);
                 String paramName = parameterMapping.getProperty();
-                paramValue = JSONPath.eval(parameters, "$." + paramName);
-                if (paramValue==null) {
-                    paramValue  = boundSql.getAdditionalParameter(paramName);
+                Object paramValue = JSONPath.eval(parameters, "$." + paramName);
+                if (paramValue == null) {
+                    paramValue = boundSql.getAdditionalParameter(paramName);
                 }
-            }
-
-            //  根据类型jdbcType和 paramValue 拼接参数
-            if (paramValue == null) {
-                finalSql.append("NULL");
-            } else if (paramValue instanceof String) {
-                finalSql.append("'").append(paramValue).append("'");
-            } else {
-                finalSql.append(paramValue);
+                //  根据类型jdbcType和 paramValue 拼接参数
+                if (paramValue == null) {
+                    finalSql.append("NULL");
+                } else if (paramValue instanceof String) {
+                    finalSql.append("'").append(paramValue).append("'");
+                } else {
+                    finalSql.append(paramValue);
+                }
             }
         }
 //        finalSql.append(sqlParts[sqlParts.length-1]);
@@ -226,11 +229,33 @@ public class MybatisGenerator {
             if (child.getNodeType() == Node.ELEMENT_NODE) {
                 Element element1 = (Element) child;
 
-                if(element1.getTagName().equals("foreach")){
+                if (element1.getTagName().equals("foreach")) {
                     String collectionAttr = element1.getAttribute("collection");
-                    if (!collectionAttr.isEmpty()) {
-                        paramMap.put(collectionAttr, true);
+                    if (collectionAttr.isEmpty()) {
+                        continue;
                     }
+                    paramMap.put(collectionAttr, true);
+
+
+                    // Check textual content for ${} and #{}
+                    NodeList children2 = element1.getChildNodes();
+                    StringBuilder textContent = new StringBuilder();
+
+                    // 遍历当前元素的子节点
+                    for (int i2 = 0; i2 < children2.getLength(); i2++) {
+                        Node child2 = children2.item(i2);
+
+                        // 只处理直接文本节点
+                        if (child2.getNodeType() == Node.TEXT_NODE) {
+                            textContent.append(child2.getTextContent());
+                        }
+                    }
+
+                    String item = element1.getAttribute("item");
+                    if (StringUtils.isNotBlank(item)) {
+                        extractInlineParametersColl(item, collectionAttr, textContent.toString(), paramMap);
+                    }
+
                     continue;
                 }
 
@@ -273,6 +298,21 @@ public class MybatisGenerator {
         }
     }
 
+    private static void extractInlineParametersColl(String item, String collection, String text, Map<String, Boolean> paramMap) {
+        Pattern pattern = Pattern.compile("\\$\\{([a-zA-Z_][a-zA-Z0-9_.]*)\\}|\\#\\{([a-zA-Z_][a-zA-Z0-9_.]*)\\}");
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            String fullParam = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+            //Check.1 if `.size()` is called in the text indicating it might be an array
+            if (!fullParam.startsWith(item + ".")) {
+                continue;
+            }
+
+            fullParam = collection + fullParam.substring(item.length());
+            paramMap.put(fullParam, false);
+        }
+    }
+
     private static void collectExpressionParameters(String expression, Map<String, Boolean> paramMap) {
         if (expression == null) {
             return;
@@ -285,53 +325,74 @@ public class MybatisGenerator {
         Matcher matcher = Pattern.compile("\\b([a-zA-Z_][a-zA-Z0-9_.]*)\\b").matcher(nexpression);
         while (matcher.find()) {
             String fullParam = matcher.group(1);
-
-            if (expression.contains(fullParam+".size()")) {
+            if (fullParam.equals("null")) {
+                continue;
+            }
+            if (expression.contains(fullParam + ".size()")) {
                 paramMap.put(fullParam, true);
-            }else{
+            } else {
                 paramMap.put(fullParam, false);
             }
         }
     }
 
-    private static String extractBaseParameter(String fullParam) {
-        if (fullParam.contains(".")) {
-            return fullParam.substring(0, fullParam.indexOf('.'));
-        }
-        return fullParam;
-    }
 
     private static JSONObject generateJsonTemplate(Map<String, Boolean> paramMap) {
+        // 使用 TreeMap 自动根据键排序
+//        key1 -> false array
+        //key1.na1 -> true array
+        //输出 {"key1":{"na1":[]}}
+
+        paramMap = new TreeMap<>(paramMap);
+
         JSONObject rootObject = new JSONObject();
-
         for (Map.Entry<String, Boolean> entry : paramMap.entrySet()) {
-            String fullPath = entry.getKey();
-            boolean isArray = entry.getValue();
+            try {
+                String fullPath = entry.getKey();
+                boolean isArray = entry.getValue();
 
-            String[] keys = fullPath.split("\\.");
-            JSONObject currentObject = rootObject;
+                String[] keys = fullPath.split("\\.");
 
-            for (int i = 0; i < keys.length; i++) {
-                String key = keys[i];
-                if (i == keys.length - 1) {
-                    // Last key, set value based on whether it's an array
-
-                    if (isArray) {
-                        currentObject.put(key, new ArrayList<>()); // Empty list
+                JSONObject currentObject = rootObject;
+                String nowPath = null;
+                for (int i = 0; i < keys.length; i++) {
+                    String key = keys[i];
+                    if (nowPath == null) {
+                        nowPath = key;
                     } else {
-                        currentObject.put(key, null); // Default null
+                        nowPath = nowPath + "." + key;
                     }
-                } else {
-                    // Create nested objects as needed
-                    currentObject.computeIfAbsent(key, k -> new JSONObject());
-                    currentObject = currentObject.getJSONObject(key);
+                    if (i == keys.length - 1) {
+                        // Last key, set value based on whether it's an array
+
+                        if (isArray) {
+                            currentObject.put(key, new JSONArray()); // Empty list
+                        } else {
+                            currentObject.put(key, null); // Default null
+                        }
+                    } else {
+                        Boolean b = paramMap.get(nowPath);
+                        if (b != null && b) {
+                            JSONArray jsonArray = (JSONArray) currentObject.computeIfAbsent(key, k -> new JSONArray());
+                            if (jsonArray.isEmpty()) {
+                                jsonArray.add(new JSONObject());
+                            }
+                            currentObject = (JSONObject) jsonArray.get(0);
+                        } else {
+                            // Create nested objects as needed
+                            currentObject = (JSONObject) currentObject.computeIfAbsent(key, k -> new JSONObject());
+                        }
+                    }
                 }
+            } catch (Throwable e) {
+                e.printStackTrace();
+                System.out.println("初始化mapper参数失败" + e);
             }
         }
         return rootObject;
     }
 
-    public static   class FakeDataSource implements DataSource {
+    public static class FakeDataSource implements DataSource {
         @Override
         public Connection getConnection() throws SQLException {
             throw new UnsupportedOperationException();
@@ -375,8 +436,6 @@ public class MybatisGenerator {
             return false;
         }
     }
-
-
 
 
 }

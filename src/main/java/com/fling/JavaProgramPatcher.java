@@ -2,13 +2,16 @@ package com.fling;
 
 import com.intellij.execution.Executor;
 import com.intellij.execution.JavaRunConfigurationBase;
+import com.intellij.execution.application.ApplicationConfiguration;
 import com.intellij.execution.configurations.JavaParameters;
 import com.intellij.execution.configurations.ParametersList;
+import com.intellij.execution.configurations.RunConfigurationBase;
 import com.intellij.execution.configurations.RunProfile;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.spring.boot.run.SpringBootApplicationRunConfigurationBase;
 
+import javax.swing.*;
 import java.io.File;
 import java.io.StringReader;
 import java.util.Properties;
@@ -18,7 +21,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
     @Override
     public void patchJavaParameters(Executor executor, RunProfile runProfile, JavaParameters javaParameters) {
         try {
-            if (!(runProfile instanceof JavaRunConfigurationBase configurationBase)) {
+            if (!(runProfile instanceof ApplicationConfiguration configurationBase)) {
                 System.err.println("当前启动类非spring-boot");
                 return;
             }
