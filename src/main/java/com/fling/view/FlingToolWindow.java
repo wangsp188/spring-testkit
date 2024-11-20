@@ -253,17 +253,8 @@ public class FlingToolWindow {
     }
 
     private void openTipsDoc() {
-        String url = "https://www.yuque.com/momojiji-k3bmk/tkv3dg/kg43qvece1rgcnnp";
+        String url = "https://gitee.com/wangsp188/spring-fling/blob/master/doc/Spring-Fling.md";
         Object selectedItem = toolBox.getSelectedItem();
-        if ("spring-cache".equals(selectedItem)) {
-            url += "#-3";
-        } else if ("call-method".equals(selectedItem)) {
-            url += "#YuWKW";
-        } else if ("flexible-test".equals(selectedItem)) {
-            url += "#-2";
-        } else if ("mybatis-sql".equals(selectedItem)) {
-            url += "#-4";
-        }
 
         if (Desktop.isDesktopSupported()) {
             Desktop desktop = Desktop.getDesktop();
