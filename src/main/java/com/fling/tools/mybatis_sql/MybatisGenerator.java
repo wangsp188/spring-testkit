@@ -173,7 +173,10 @@ public class MybatisGenerator {
 
         // Convert the modified XML to a string
         String dynamicXmlContent = transformDocumentToString(newDocument);
-        dynamicXmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + dynamicXmlContent;
+        dynamicXmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<!DOCTYPE mapper\n" +
+                "        PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\"\n" +
+                "        \"http://mybatis.org/dtd/mybatis-3-mapper.dtd\">" + dynamicXmlContent;
         return dynamicXmlContent;
     }
 
