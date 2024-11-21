@@ -1,4 +1,4 @@
-> Fling：想你所想，一步直达，让Spring-Web没有难测的Spring代码。
+> Fling：想你所想，一步直达，让Spring-Web没有难测的代码。
 >
 
 一句话：专注于提高<font style="color:rgb(230, 69, 147);">Spring-Boot</font>测试效率的<font style="color:rgb(230, 69, 147);">运行时调试插件</font>。
