@@ -37,7 +37,7 @@ public class FlexibleTestTool extends BasePluginTool {
                 "<meta charset=\"UTF-8\">\n" +
                 "<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
-                "    <li>module test source 下 ${Flexible Test Package} 包内的 public 函数</li>\n" +
+                "    <li>module test source 下 ${Test Package} 内的 public 函数</li>\n" +
                 "    <li>非static</li>\n" +
                 "</ul>\n" +
                 "</html>",topPanel, new ActionListener() {
@@ -121,6 +121,9 @@ public class FlexibleTestTool extends BasePluginTool {
         req.put("method", action);
         req.put("params", params);
         req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
+        req.put("monitor", monitorConfig.isEnable());
+        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         return req;
     }
 

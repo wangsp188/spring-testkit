@@ -1,5 +1,6 @@
 package com.fling.view;
 
+import com.alibaba.fastjson.JSON;
 import com.fling.RuntimeAppHelper;
 import com.fling.tools.CurlDialog;
 import com.intellij.icons.AllIcons;
@@ -16,6 +17,8 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.StdFileTypes;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Computable;
@@ -37,22 +40,31 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
+import com.intellij.ui.jcef.JBCefBrowser;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.cef.browser.CefBrowser;
+import org.cef.browser.CefFrame;
+import org.cef.handler.CefLoadHandlerAdapter;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.IOException;
-import java.io.StringReader;
+import java.io.*;
 import java.net.URI;
+import java.net.URL;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class FlingToolWindow {
 
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", BasePluginTool.class);
+    private static final Icon dagreIcon = IconLoader.getIcon("/icons/dagre.svg", BasePluginTool.class);
+
     public static final String PROJECT_DEFAULT = "project:default";
 
 
@@ -75,6 +87,24 @@ public class FlingToolWindow {
 
     protected JTextPane outputTextPane;
 
+    private static String linkRenderHtml;
+    protected ShowAnAction dagreAction;
+    protected List<Map<String, String>> outputProfile;
+
+
+    static {
+        URL resource = FlingToolWindow.class.getResource("/html/horse_up_down_class.html");
+        if (resource != null) {
+            try {
+                try (InputStream is = resource.openStream();
+                     BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+                    linkRenderHtml = reader.lines().collect(Collectors.joining("\n"));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
     public FlingToolWindow(Project project, ToolWindow toolWindow) {
 
@@ -207,6 +237,69 @@ public class FlingToolWindow {
             }
         };
         actionGroup.add(copyAction);
+
+        if (linkRenderHtml != null) {
+            dagreAction = new ShowAnAction("Dagre this req", "Dagre this req", dagreIcon) {
+
+                private JFrame frame;
+                private JBCefBrowser jbCefBrowser;
+
+                {
+                    // 创建 JFrame
+                    frame = new JFrame("Link Window");
+                    Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+                    frame.setSize(screenSize);
+                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+                    // 创建 JBCefBrowser 实例
+                    jbCefBrowser = new JBCefBrowser();
+                    jbCefBrowser.loadHTML(linkRenderHtml);
+
+                    // 将 JBCefBrowser 的组件添加到 JFrame
+                    frame.getContentPane().add(jbCefBrowser.getComponent(), BorderLayout.CENTER);
+
+                    // 注册监听器来处理项目关闭事件并关闭窗口
+                    ProjectManager.getInstance().addProjectManagerListener(project, new ProjectManagerListener() {
+                        @Override
+                        public void projectClosing(@NotNull Project closingProject) {
+                            if (closingProject.equals(project) && frame.isDisplayable()) {
+                                frame.dispose();
+                            }
+                        }
+                    });
+                }
+
+
+                @Override
+                public void actionPerformed(AnActionEvent e) {
+                    if (outputProfile == null) {
+                        FlingHelper.notify(project, NotificationType.ERROR, "Output profile is null.");
+                        return;
+                    }
+
+                    // 获取新的内容作为示例（根据实际情况构建 render_str）
+                    String renderStr = StringEscapeUtils.escapeJson(JSON.toJSONString(outputProfile));
+
+                    // 页面加载成功之后执行 JavaScript
+                    jbCefBrowser.getJBCefClient().addLoadHandler(new CefLoadHandlerAdapter() {
+                        @Override
+                        public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
+                            super.onLoadEnd(browser, frame, httpStatusCode);
+                            browser.executeJavaScript("$('#source').val('" + renderStr + "');maulRender();", frame.getURL(), 0);
+                        }
+                    }, jbCefBrowser.getCefBrowser());
+
+                    // 重新加载 HTML 内容，如果有必要
+                    jbCefBrowser.loadHTML(linkRenderHtml);
+
+                    // 设置窗口可见
+                    SwingUtilities.invokeLater(() -> frame.setVisible(true));
+                }
+
+            };
+            actionGroup.add(dagreAction);
+        }
 
 
         ActionToolbar actionToolbar = new ActionToolbarImpl("OutputToolbar", actionGroup, false);
@@ -404,14 +497,71 @@ public class FlingToolWindow {
             }
         });
     }
+//
+//    private JPanel createBasicOptionPanel(JTextField flexibleTestPackageNameField) {
+//        JPanel panel = new JPanel(new GridBagLayout());
+//        GridBagConstraints gbc = new GridBagConstraints();
+//        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距
+//
+//        // 通用的 GridBagConstraints 设置
+//        gbc.fill = GridBagConstraints.HORIZONTAL;
+//        gbc.anchor = GridBagConstraints.WEST;
+//        gbc.weightx = 0.0;
+//
+//        // 设置标签宽度的辅助方法
+//        Dimension labelDimension = new Dimension(150, 20);
+//
+//        JLabel packageNameLabel = new JLabel("Flexible Test Package:");
+//        packageNameLabel.setPreferredSize(labelDimension);
+//        packageNameLabel.setToolTipText("Which package do you want to enable flexible test?");
+//        gbc.gridx = 0;
+//        gbc.gridy = 0;
+//        panel.add(packageNameLabel, gbc);
+//
+//        gbc.gridx = 1;
+//        gbc.weightx = 1.0;
+//        panel.add(flexibleTestPackageNameField, gbc);
+//
+//
+//
+//        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+//        JButton saveButton = new JButton("Apply");
+//        saveButton.addActionListener(e -> {
+//            // 处理保存逻辑
+//        });
+//
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(e -> {
+//            saveButton.doClick();
+//            Window window = SwingUtilities.getWindowAncestor(panel);
+//            if (window != null) {
+//                window.dispose();
+//            }
+//        });
+//
+//        buttonPanel.add(saveButton);
+//        buttonPanel.add(closeButton);
+//
+//        gbc.gridx = 0;
+//        gbc.gridy = 3;
+//        gbc.gridwidth = 2;
+//        gbc.weightx = 0;
+//        gbc.fill = GridBagConstraints.HORIZONTAL;
+//        gbc.anchor = GridBagConstraints.SOUTH;
+//        panel.add(buttonPanel, gbc);
+//
+//        return panel;
+//    }
 
     private JPanel createBasicOptionPanel(JTextField flexibleTestPackageNameField) {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+        Dimension labelDimension = new Dimension(100, 20);
 
         // 输入框
-        JLabel packageNameLabel = new JLabel("Flexible Test Package:");
+        JLabel packageNameLabel = new JLabel("Test Package:");
+        packageNameLabel.setPreferredSize(labelDimension);
         packageNameLabel.setLabelFor(flexibleTestPackageNameField); // 关联标签和输入框
         packageNameLabel.setToolTipText("Which package do you want to enable flexible test?"); // 提示信息
 
@@ -426,9 +576,112 @@ public class FlingToolWindow {
         gbc.weightx = 1.0; // 让输入框占据剩余空间
         panel.add(flexibleTestPackageNameField, gbc);
 
+        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(project);
+
+
+        JRadioButton monitorToggleButton = new JRadioButton("Enable Monitor", false);
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 2;
+        gbc.weightx = 0.0; // Reset weightx
+        panel.add(monitorToggleButton, gbc);
+
+        JPanel monitorOptionsPanel = new JPanel(new GridBagLayout());
+        monitorOptionsPanel.setVisible(false);
+        monitorToggleButton.addActionListener(e -> monitorOptionsPanel.setVisible(monitorToggleButton.isSelected()));
+
+        if (monitorConfig.isEnable()) {
+            monitorToggleButton.setSelected(true);
+            monitorOptionsPanel.setVisible(true);
+        }
+        gbc.gridwidth = 1; // Reset gridwidth
+
+        JLabel monitorPrivateLabel = new JLabel("Monitor Private:");
+        monitorPrivateLabel.setPreferredSize(labelDimension);
+        JRadioButton monitorPrivate = new JRadioButton("public,protected", false);
+        monitorPrivate.addActionListener(e -> {
+            if (monitorPrivate.isSelected()) {
+                monitorPrivate.setText("public,protected,private");
+            } else {
+                monitorPrivate.setText("public,protected");
+            }
+        });
+        if (monitorConfig.isMonitorPrivate()) {
+            monitorPrivate.setSelected(true);
+            monitorPrivate.setText("public,protected,private");
+        }
+//        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
+//        JTextField functionTypeField = new JTextField("private,public,protected", 20);
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(monitorPrivateLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(monitorPrivate, gbc);
+
+
+        JLabel packageLabel = new JLabel("Package:");
+        packageLabel.setPreferredSize(labelDimension);
+        JTextField packagesField = new JTextField(monitorConfig.getPackages(), 20);
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(packageLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(packagesField, gbc);
+
+        JLabel classSuffixLabel = new JLabel("Class Suffix:");
+        classSuffixLabel.setPreferredSize(labelDimension);
+        JTextField classSuffixField = new JTextField(monitorConfig.getClsSuffix(), 20);
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(classSuffixLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(classSuffixField, gbc);
+
+
+        JLabel whiteClassLabel = new JLabel("White Class:");
+        whiteClassLabel.setPreferredSize(labelDimension);
+        JTextField whiteListField = new JTextField(monitorConfig.getWhites(), 20);
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(whiteClassLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(whiteListField, gbc);
+
+        JLabel blackClassLabel = new JLabel("Black Class:");
+        blackClassLabel.setPreferredSize(labelDimension);
+        JTextField blackListField = new JTextField(monitorConfig.getBlacks(), 20);
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(blackClassLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(blackListField, gbc);
+
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        panel.add(monitorOptionsPanel, gbc);
+
+
         // 新增一行值得占用
         gbc.gridx = 0;
-        gbc.gridy = 1; // 新的一行
+        gbc.gridy = 3; // 新的一行
         gbc.gridwidth = 2; // 占据两列
         gbc.weighty = 1.0; // 占用剩余空间
         gbc.fill = GridBagConstraints.BOTH; // 使下一行占用空间
@@ -447,9 +700,20 @@ public class FlingToolWindow {
                     LocalStorageHelper.setFlexibleTestPackage(project, null);
                     FlingHelper.notify(project, NotificationType.INFORMATION, "Package name is blank, use default package name");
                 } else {
-                    LocalStorageHelper.setFlexibleTestPackage(project, packageName);
-                    FlingHelper.notify(project, NotificationType.INFORMATION, "Package name is refreshed by " + packageName);
+                    LocalStorageHelper.setFlexibleTestPackage(project, packageName.trim());
+                    FlingHelper.notify(project, NotificationType.INFORMATION, "Package name is refreshed by " + packageName.trim());
                 }
+
+                LocalStorageHelper.MonitorConfig saveConfig = new LocalStorageHelper.MonitorConfig();
+                saveConfig.setEnable(monitorToggleButton.isSelected());
+                saveConfig.setMonitorPrivate(monitorPrivate.isSelected());
+                saveConfig.setPackages(packagesField.getText().trim());
+                saveConfig.setClsSuffix(classSuffixField.getText().trim());
+                saveConfig.setWhites(whiteListField.getText().trim());
+                saveConfig.setBlacks(blackListField.getText().trim());
+                LocalStorageHelper.setMonitorConfig(project, saveConfig);
+                FlingHelper.notify(project, NotificationType.INFORMATION, "Monitor is " + (saveConfig.isEnable() ? "enable" : "disable"));
+
                 FlingHelper.refresh(project);
             }
         };
@@ -475,7 +739,7 @@ public class FlingToolWindow {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 1; // 新的一行
+        gbc.gridy = 3; // 新的一行
         gbc.gridwidth = 2; // 占据两列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
@@ -836,6 +1100,14 @@ public class FlingToolWindow {
         outputTextPane.setText(outputText);
     }
 
+    public void setOutputProfile(List<Map<String, String>> outputProfile) {
+        this.outputProfile = outputProfile;
+        if (dagreAction != null) {
+//            System.out.println("不可见,"+ (outputProfile != null && !outputProfile.isEmpty()));
+            dagreAction.setShow(outputProfile != null && !outputProfile.isEmpty());
+        }
+    }
+
     public VisibleApp getSelectedApp() {
         String selectedItem = (String) appBox.getSelectedItem();
         if (selectedItem == null) {
@@ -850,6 +1122,30 @@ public class FlingToolWindow {
             return null;
         }
         return app.getAppName();
+    }
+
+
+    public static abstract class ShowAnAction extends AnAction {
+        private boolean show = false;
+
+        public ShowAnAction(String s, String s1, Icon dagreIcon) {
+            super(s, s1, dagreIcon);
+        }
+
+        @Override
+        public void update(AnActionEvent e) {
+            // 控制按钮的显示状态
+            e.getPresentation().setVisible(show);
+        }
+
+
+        public boolean isShow() {
+            return show;
+        }
+
+        public void setShow(boolean show) {
+            this.show = show;
+        }
     }
 }
 

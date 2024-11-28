@@ -1,6 +1,7 @@
 package com.fling.tools;
 
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.TypeReference;
 import com.fling.FlingHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.util.JsonUtil;
@@ -243,26 +244,29 @@ public abstract class BasePluginTool {
                     JSONObject result = get();
                     if (cancelReqs.remove(reqId)) {
                         System.out.println("请求已被取消，结果丢弃");
-                    } else if (!result.getBooleanValue("success")) {
-                        setOutputText("req is error\n" + result.getString("message"));
                     } else {
-
-                        Object data = result.get("data");
-                        if (data == null) {
-                            setOutputText("null");
-                        } else if (data instanceof String
-                                || data instanceof Byte
-                                || data instanceof Short
-                                || data instanceof Integer
-                                || data instanceof Long
-                                || data instanceof Float
-                                || data instanceof Double
-                                || data instanceof Character
-                                || data instanceof Boolean
-                                || data.getClass().isEnum()) {
-                            setOutputText(data.toString());
+                        if (!result.getBooleanValue("success")) {
+                            setOutputText("req is error\n" + result.getString("message"));
                         } else {
-                            setOutputText(JsonUtil.formatObj(data));
+                            List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
+                            });
+                            Object data = result.get("data");
+                            if (data == null) {
+                                setOutputText("null");
+                            } else if (data instanceof String
+                                    || data instanceof Byte
+                                    || data instanceof Short
+                                    || data instanceof Integer
+                                    || data instanceof Long
+                                    || data instanceof Float
+                                    || data instanceof Double
+                                    || data instanceof Character
+                                    || data instanceof Boolean
+                                    || data.getClass().isEnum()) {
+                                setOutputText(data.toString(),profile);
+                            } else {
+                                setOutputText(JsonUtil.formatObj(data),profile);
+                            }
                         }
                     }
                 } catch (Throwable ex) {
@@ -324,7 +328,14 @@ public abstract class BasePluginTool {
 
     protected void setOutputText(String content) {
         flingWindow.setOutputText(content);
+        flingWindow.setOutputProfile(null);
     }
+
+    protected void setOutputText(String content,List<Map<String, String>> outputProfile) {
+        flingWindow.setOutputText(content);
+        flingWindow.setOutputProfile(outputProfile);
+    }
+
 
     protected ComboBox addActionComboBox(Icon icon, String tooltips, JPanel topPanel, ActionListener actionListener) {
         JButton testBtn = new JButton(icon == null ? AllIcons.Nodes.Method : icon);

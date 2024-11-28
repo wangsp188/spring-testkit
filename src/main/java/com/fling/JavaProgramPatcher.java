@@ -1,5 +1,6 @@
 package com.fling;
 
+import com.alibaba.fastjson.JSON;
 import com.intellij.execution.Executor;
 import com.intellij.execution.JavaRunConfigurationBase;
 import com.intellij.execution.application.ApplicationConfiguration;
@@ -9,11 +10,15 @@ import com.intellij.execution.configurations.RunConfigurationBase;
 import com.intellij.execution.configurations.RunProfile;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.project.Project;
 import com.intellij.spring.boot.run.SpringBootApplicationRunConfigurationBase;
 
 import javax.swing.*;
 import java.io.File;
 import java.io.StringReader;
+import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Properties;
 
 public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgramPatcher {
@@ -25,6 +30,8 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 System.err.println("当前启动类非spring-boot");
                 return;
             }
+            Project project = configurationBase.getProject();
+
 
             // 获取插件安装目录
             String pluginPath = PathManager.getPluginsPath();
@@ -33,15 +40,37 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             String springStarterJarPath = pluginPath + File.separator + relativeJarPath;
             // 添加 Jar 到 classpath
             javaParameters.getClassPath().add(springStarterJarPath);
+            LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(project);
+            if (monitorConfig.isEnable()) {
+                //            增加参数 -javaagent:/Users/dexwang/sourcecode/java/spring-fling_side_server/agent/target/agent-1.0-SNAPSHOT.jar
+                String agentPath = "spring-fling" + File.separator + "lib" + File.separator + "spring-fling_agent-0.0.1.jar";
+
+                monitorConfig = JSON.parseObject(JSON.toJSONString(monitorConfig),LocalStorageHelper.MonitorConfig.class);
+                if (monitorConfig.judgeIsAppSthreePackage()) {
+                    String runClass = configurationBase.getRunClass();
+                    String[] parts = runClass.split("\\.");
+                    if (parts.length > 3) {
+                        String packagePrefix = String.join(".", Arrays.copyOfRange(parts, 0, 3));
+                        monitorConfig.setPackages(packagePrefix);
+                    } else {
+                        // 如果包名不足三段，可以根据需求选择适当的处理方式
+                        monitorConfig.setPackages(runClass.substring(0,runClass.lastIndexOf("."))); // 或者其他逻辑
+                    }
+                }
+                String base64Json = Base64.getEncoder().encodeToString(JSON.toJSONString(monitorConfig).getBytes("UTF-8"));
+                String encodedJson = URLEncoder.encode(base64Json, "UTF-8");
+                javaParameters.getVMParametersList().add("-javaagent:" + pluginPath + File.separator + agentPath+"="+encodedJson);
+            }
+
             // 设置系统属性
             ParametersList vmParametersList = javaParameters.getVMParametersList();
-            vmParametersList.addProperty("fling.project.name", configurationBase.getProject().getName());
+            vmParametersList.addProperty("fling.project.name", project.getName());
             vmParametersList.addProperty("fling.app.name", runProfile.getName());
 
             String appName = configurationBase.getName();
-            String propertiesStr = LocalStorageHelper.getAppProperties(configurationBase.getProject(), appName);
+            String propertiesStr = LocalStorageHelper.getAppProperties(project, appName);
 
-            FlingHelper.notify(configurationBase.getProject(),NotificationType.INFORMATION,"Buddha bless, Never Bug");
+            FlingHelper.notify(project,NotificationType.INFORMATION,"Buddha bless, Never Bug");
 
             if (LocalStorageHelper.defProperties.equals(propertiesStr)) {
                 return;

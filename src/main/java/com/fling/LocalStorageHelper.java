@@ -92,8 +92,24 @@ public class LocalStorageHelper {
                     "}";
 
 
+    public static final MonitorConfig defMonitorConfig = new MonitorConfig();
+
+    static {
+        defMonitorConfig.setEnable(false);
+        defMonitorConfig.setMonitorPrivate(false);
+        defMonitorConfig.setPackages("app.three.package");
+        defMonitorConfig.setClsSuffix("Controller,Service,Impl,Repository");
+        defMonitorConfig.setBlacks("");
+        defMonitorConfig.setWhites("");
+    }
+
+
     public static String getFlexibleTestPackage(Project project) {
         return getConfig(project).getFlexibleTestPackage();
+    }
+
+    public static MonitorConfig getMonitorConfig(Project project) {
+        return getConfig(project).getMonitorConfig();
     }
 
 
@@ -101,16 +117,14 @@ public class LocalStorageHelper {
         return getConfig(project).getScript();
     }
 
-    public static String getAppScript(Project project,String app) {
-        return getAppConfig(project,app).getScript();
+    public static String getAppScript(Project project, String app) {
+        return getAppConfig(project, app).getScript();
     }
 
 
-
-    public static String getAppProperties(Project project,String app) {
-        return getAppConfig(project,app).getProperties();
+    public static String getAppProperties(Project project, String app) {
+        return getAppConfig(project, app).getProperties();
     }
-
 
 
     public static void setFlexibleTestPackage(Project project, String flexibleTestPackage) {
@@ -119,6 +133,32 @@ public class LocalStorageHelper {
             projectConfig = new ProjectConfig();
         }
         projectConfig.setFlexibleTestPackage(flexibleTestPackage);
+        saveProjectConfig(project, projectConfig);
+    }
+
+    public static void setMonitorConfig(Project project, MonitorConfig monitorConfig) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        if (monitorConfig!=null) {
+            if (StringUtils.isBlank(monitorConfig.getPackages())) {
+                monitorConfig.setPackages("app.three.package");
+            }
+
+            if (StringUtils.isBlank(monitorConfig.getClsSuffix())) {
+                monitorConfig.setClsSuffix("Controller,Service,Impl,Repository");
+            }
+
+            if (StringUtils.isBlank(monitorConfig.getWhites())) {
+                monitorConfig.setWhites("");
+            }
+
+            if (StringUtils.isBlank(monitorConfig.getBlacks())) {
+                monitorConfig.setBlacks("");
+            }
+        }
+        projectConfig.setMonitorConfig(monitorConfig);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -141,7 +181,6 @@ public class LocalStorageHelper {
         }).setProperties(properties);
         saveProjectConfig(project, projectConfig);
     }
-
 
 
     public static void setScript(Project project, String script) {
@@ -179,10 +218,12 @@ public class LocalStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
             config.setScript(defScript);
+            config.setMonitorConfig(defMonitorConfig);
             return config;
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
+        config.setMonitorConfig(projectConfig.getMonitorConfig() == null ? defMonitorConfig : projectConfig.getMonitorConfig());
         config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
         return config;
     }
@@ -216,7 +257,6 @@ public class LocalStorageHelper {
         }
         return config;
     }
-
 
 
     private static ProjectConfig loadProjectConfig(Project project) {
@@ -260,6 +300,7 @@ public class LocalStorageHelper {
         private String flexibleTestPackage;
         private String script;
         private Map<String, Config> appConfigs;
+        private MonitorConfig monitorConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -284,6 +325,14 @@ public class LocalStorageHelper {
         public void setAppConfigs(Map<String, Config> appConfigs) {
             this.appConfigs = appConfigs;
         }
+
+        public MonitorConfig getMonitorConfig() {
+            return monitorConfig;
+        }
+
+        public void setMonitorConfig(MonitorConfig monitorConfig) {
+            this.monitorConfig = monitorConfig;
+        }
     }
 
     public static class Config {
@@ -291,6 +340,7 @@ public class LocalStorageHelper {
         private String flexibleTestPackage;
         private String script;
         private String properties;
+        private MonitorConfig monitorConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -314,6 +364,80 @@ public class LocalStorageHelper {
 
         public void setProperties(String properties) {
             this.properties = properties;
+        }
+
+        public MonitorConfig getMonitorConfig() {
+            return monitorConfig;
+        }
+
+        public void setMonitorConfig(MonitorConfig monitorConfig) {
+            this.monitorConfig = monitorConfig;
+        }
+    }
+
+
+    public static class MonitorConfig {
+
+        private boolean enable;
+        private boolean monitorPrivate;
+        private String packages;
+
+        private String clsSuffix;
+
+        private String whites;
+
+        private String blacks;
+
+        public boolean judgeIsAppSthreePackage(){
+            return "app.three.package".equals(packages);
+        }
+
+        public boolean isMonitorPrivate() {
+            return monitorPrivate;
+        }
+
+        public void setMonitorPrivate(boolean monitorPrivate) {
+            this.monitorPrivate = monitorPrivate;
+        }
+
+        public String getPackages() {
+            return packages;
+        }
+
+        public void setPackages(String packages) {
+            this.packages = packages;
+        }
+
+        public String getClsSuffix() {
+            return clsSuffix;
+        }
+
+        public void setClsSuffix(String clsSuffix) {
+            this.clsSuffix = clsSuffix;
+        }
+
+        public String getWhites() {
+            return whites;
+        }
+
+        public void setWhites(String whites) {
+            this.whites = whites;
+        }
+
+        public String getBlacks() {
+            return blacks;
+        }
+
+        public void setBlacks(String blacks) {
+            this.blacks = blacks;
+        }
+
+        public boolean isEnable() {
+            return enable;
+        }
+
+        public void setEnable(boolean enable) {
+            this.enable = enable;
         }
     }
 

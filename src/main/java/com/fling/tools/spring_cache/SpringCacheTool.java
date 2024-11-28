@@ -180,6 +180,9 @@ public class SpringCacheTool extends BasePluginTool {
         req.put("method", PluginToolEnum.SPRING_CACHE.getCode());
         req.put("params", params);
         req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
+        req.put("monitor", monitorConfig.isEnable());
+        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         return req;
     }
 

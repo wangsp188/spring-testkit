@@ -45,7 +45,7 @@ public class CallMethodTool extends BasePluginTool {
                 "    <li>非init/main</li>\n" +
                 "    <li>非test source</li>\n" +
                 "</ul>\n" +
-                "</html>",topPanel,new ActionListener() {
+                "</html>", topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -53,7 +53,6 @@ public class CallMethodTool extends BasePluginTool {
             }
         });
         // Populate methodComboBox with method names
-
 
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
@@ -150,7 +149,9 @@ public class CallMethodTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);
-
+        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
+        req.put("monitor", monitorConfig.isEnable());
+        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
         return req;
     }
@@ -200,7 +201,7 @@ public class CallMethodTool extends BasePluginTool {
 
     @Override
     protected boolean hasActionBox() {
-        return actionComboBox!=null;
+        return actionComboBox != null;
     }
 
     @Override
