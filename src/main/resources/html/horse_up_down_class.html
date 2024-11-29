@@ -103,9 +103,6 @@
 <body style="margin: 10px;">
 <div id='select'>
     <div style="width: 30%;float: right;">
-        <button class="spmin" data-toggle="modal" data-target="#pluginModal">
-            插件
-        </button>
         <div class="custom-control custom-switch" style="display: inline;cursor: pointer;">
             <input type="checkbox" class="custom-control-input"
                    id="toggle-merge" style="cursor: pointer;" checked>
@@ -130,10 +127,10 @@
             </svg>
         </a>
         <input class="spmin" autocomplete="off"
-               title="检索器模式：填写搜索词，回车触发加载；手动渲染：LinkInfo/toProfilerString"
-               placeholder="检索器模式：填写搜索词，回车触发加载；手动渲染：LinkInfo/toProfilerString" id="source"
+               title="LinkInfo/toProfilerString，回车触发加载；"
+               placeholder="LinkInfo/toProfilerString，回车触发加载；" id="source"
                style="width: 55%;"/>
-        <button class="spmin" data-toggle="tooltip" title="仅适用于手动copy链路在左侧输入框时渲染链路" onclick="maulRender()">手动渲染</button>
+        <button class="spmin"  onclick="maulRender()">渲染</button>
         <a id="switch_width_btn" style="background-color:aliceblue;float: right;cursor: pointer;"
            onclick="switch_width()">
             <svg style="display: none;" data-toggle="tooltip" title="收起详情面板" id="switch_width_btn_close"
@@ -1746,7 +1743,7 @@ def detail(group: str, biz: str, action: str
 
                 var html = "";
                 //结束显示耗时条
-                if (model.cost > -1 && data.cost > -1 && model.linkid != '0' &&  (model.req_id == data.req_id || fetchReqId(model)==model.req_id)) {
+                if (model.cost > -1 && data.cost > -1 &&  (model.req_id == data.req_id || fetchReqId(model)==model.req_id)) {
                     var beginPoint = ((model.begin - data.begin) * 280) / data.cost;
                     var endPoint = ((model.end - data.begin) * 280) / data.cost;
                     var firstWidth = beginPoint;
@@ -1755,9 +1752,8 @@ def detail(group: str, biz: str, action: str
                     var color = model.timeout ? 'f02400' : (model.slow ? '#f0ad4e' : '#5cb85c');
                     html = html.concat("<span style='float:right;width:70px;color:" + color + "'>[" + model.begin + "," + model.cost + "," + Math.floor(model.cost * 100 / data.cost) + "%]</span><div style='height:10px;'><div class='progress-bar all' style='width:" + firstWidth + "px;'></div><div class='progress-bar' style='width:" + secondWidth + "px;background-color:" + color + "'></div><div class='progress-bar all' style='width:" + thirdWitdh + "px;'></div></div>");
                 }
-                var detailButton = $("#detail_code").val().trim().length > 0 ? ("<button class=\"spmin\" onclick=\"detailLogs('" + (model.group ? model.group : '') + "','" + (model.biz ? model.biz : '') + "','" + (model.action ? model.action : '') + "','" + (model.req_id ? model.req_id : document.getElementById("reqSpan").innerHTML) + "','" + model.linkid + "','" + (model.success ? model.success : '') + "','" + (model.status ? model.status : '') + "')\">详情</button>") : "";
 
-                html = html.concat("<details open><summary>基础 <button class=\"spmin\" onclick=\"prepareOps('" + model.group + "','" + model.biz + "','" + model.action + "')\">ops/切换</button> <button class=\"spmin\" onclick=\"slsKeywords('" + model.req_id + "','" + model.linkid + "')\">kql</button>  " + detailButton + "</summary>");
+                html = html.concat("<details open><summary>基础 </summary>");
                 html = html.concat("<li>linkid： " + model.linkid + "</li>");
                 if (model.req_id) {
                     let switch_btn = ''
@@ -2828,7 +2824,7 @@ def detail(group: str, biz: str, action: str
     //回车加载
     $('#source').bind('keyup', function (event) {
         if (event.keyCode === 13) {
-            load();
+            maulRender();
         }
     });
     $('#opssource').bind('keyup', function (event) {

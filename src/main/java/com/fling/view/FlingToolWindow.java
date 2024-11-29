@@ -596,7 +596,7 @@ public class FlingToolWindow {
         }
         gbc.gridwidth = 1; // Reset gridwidth
 
-        JLabel monitorPrivateLabel = new JLabel("Monitor Private:");
+        JLabel monitorPrivateLabel = new JLabel("Method Type:");
         monitorPrivateLabel.setPreferredSize(labelDimension);
         JRadioButton monitorPrivate = new JRadioButton("public,protected", false);
         monitorPrivate.addActionListener(e -> {
