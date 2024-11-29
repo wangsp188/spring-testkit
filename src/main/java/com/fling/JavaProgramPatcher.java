@@ -11,6 +11,10 @@ import com.intellij.execution.configurations.RunProfile;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiAnnotation;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.spring.boot.run.SpringBootApplicationRunConfigurationBase;
 
 import javax.swing.*;
@@ -30,7 +34,28 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 System.err.println("当前启动类非spring-boot");
                 return;
             }
+
             Project project = configurationBase.getProject();
+//            我想验证这个类是要带有@SpringBootApplication注解的才可以
+            // Get the main class from the configuration
+            String mainClassName = configurationBase.getRunClass();
+
+            // Use the Java PSI (Program Structure Interface) to find the class in the project
+            JavaPsiFacade javaPsiFacade = JavaPsiFacade.getInstance(project);
+            PsiClass psiClass = javaPsiFacade.findClass(mainClassName,
+                    GlobalSearchScope.allScope(project));
+
+            if (psiClass == null) {
+                System.err.println("无法找到指定的主类: " + mainClassName);
+                return;
+            }
+
+            // Check for the @SpringBootApplication annotation
+            PsiAnnotation springBootAnnotation = psiClass.getAnnotation("org.springframework.boot.autoconfigure.SpringBootApplication");
+            if (springBootAnnotation == null) {
+                System.err.println("主类不包含@SpringBootApplication注解");
+                return;
+            }
 
 
             // 获取插件安装目录

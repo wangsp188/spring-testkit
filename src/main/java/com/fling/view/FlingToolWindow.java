@@ -4,13 +4,11 @@ import com.alibaba.fastjson.JSON;
 import com.fling.RuntimeAppHelper;
 import com.fling.tools.CurlDialog;
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.DataManager;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
 import com.intellij.notification.NotificationType;
-import com.intellij.openapi.actionSystem.ActionToolbar;
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.FileType;
@@ -25,6 +23,7 @@ import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.WindowManager;
 import com.intellij.psi.*;
 import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -88,7 +87,8 @@ public class FlingToolWindow {
     protected JTextPane outputTextPane;
 
     private static String linkRenderHtml;
-    protected ShowAnAction dagreAction;
+    protected DefaultActionGroup actionGroup;
+    protected AnAction dagreAction;
     protected List<Map<String, String>> outputProfile;
 
 
@@ -228,7 +228,7 @@ public class FlingToolWindow {
         outputPanel.add(new JBScrollPane(outputTextPane), BorderLayout.CENTER);
 
         // 创建工具栏
-        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup = new DefaultActionGroup();
         AnAction copyAction = new AnAction("Copy output to clipboard", "Copy output to clipboard", AllIcons.Actions.Copy) {
             @Override
             public void actionPerformed(AnActionEvent e) {
@@ -239,7 +239,7 @@ public class FlingToolWindow {
         actionGroup.add(copyAction);
 
         if (linkRenderHtml != null) {
-            dagreAction = new ShowAnAction("Dagre this req", "Dagre this req", dagreIcon) {
+            dagreAction = new AnAction("Dagre this req", "Dagre this req", dagreIcon) {
 
                 private JFrame frame;
                 private JBCefBrowser jbCefBrowser;
@@ -1104,7 +1104,13 @@ public class FlingToolWindow {
         this.outputProfile = outputProfile;
         if (dagreAction != null) {
 //            System.out.println("不可见,"+ (outputProfile != null && !outputProfile.isEmpty()));
-            dagreAction.setShow(outputProfile != null && !outputProfile.isEmpty());
+            if (outputProfile != null && !outputProfile.isEmpty() && !actionGroup.containsAction(dagreAction)) {
+                actionGroup.add(dagreAction);
+            }else if((outputProfile==null || outputProfile.isEmpty()) && actionGroup.containsAction(dagreAction)) {
+                actionGroup.remove(dagreAction);
+            }
+            windowContent.revalidate(); // 重新验证布局
+            windowContent.repaint();
         }
     }
 
@@ -1124,29 +1130,6 @@ public class FlingToolWindow {
         return app.getAppName();
     }
 
-
-    public static abstract class ShowAnAction extends AnAction {
-        private boolean show = false;
-
-        public ShowAnAction(String s, String s1, Icon dagreIcon) {
-            super(s, s1, dagreIcon);
-        }
-
-        @Override
-        public void update(AnActionEvent e) {
-            // 控制按钮的显示状态
-            e.getPresentation().setVisible(show);
-        }
-
-
-        public boolean isShow() {
-            return show;
-        }
-
-        public void setShow(boolean show) {
-            this.show = show;
-        }
-    }
 }
 
 
