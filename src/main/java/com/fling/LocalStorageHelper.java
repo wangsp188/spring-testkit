@@ -97,6 +97,7 @@ public class LocalStorageHelper {
     static {
         defMonitorConfig.setEnable(false);
         defMonitorConfig.setMonitorPrivate(false);
+        defMonitorConfig.setLogMybatis(false);
         defMonitorConfig.setPackages("app.three.package");
         defMonitorConfig.setClsSuffix("Controller,Service,Impl,Repository");
         defMonitorConfig.setBlacks("");
@@ -382,7 +383,7 @@ public class LocalStorageHelper {
         private boolean monitorPrivate;
         private boolean monitorWeb = true;
         private boolean monitorMybatis = true;
-        private boolean logMybatis = true;
+        private boolean logMybatis = false;
         private String packages;
 
         private String clsSuffix;
