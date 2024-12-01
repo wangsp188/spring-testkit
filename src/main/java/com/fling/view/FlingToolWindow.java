@@ -250,7 +250,7 @@ public class FlingToolWindow {
         actionGroup.add(copyAction);
 
         if (linkRenderHtml != null) {
-            dagreAction = new AnAction("Dagre this req", "Dagre this req", dagreIcon) {
+            dagreAction = new AnAction("graph this req", "Dagre this req", dagreIcon) {
 
                 private JFrame frame;
                 private JBCefBrowser jbCefBrowser;
@@ -510,62 +510,6 @@ public class FlingToolWindow {
             }
         });
     }
-//
-//    private JPanel createBasicOptionPanel(JTextField flexibleTestPackageNameField) {
-//        JPanel panel = new JPanel(new GridBagLayout());
-//        GridBagConstraints gbc = new GridBagConstraints();
-//        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距
-//
-//        // 通用的 GridBagConstraints 设置
-//        gbc.fill = GridBagConstraints.HORIZONTAL;
-//        gbc.anchor = GridBagConstraints.WEST;
-//        gbc.weightx = 0.0;
-//
-//        // 设置标签宽度的辅助方法
-//        Dimension labelDimension = new Dimension(150, 20);
-//
-//        JLabel packageNameLabel = new JLabel("Flexible Test Package:");
-//        packageNameLabel.setPreferredSize(labelDimension);
-//        packageNameLabel.setToolTipText("Which package do you want to enable flexible test?");
-//        gbc.gridx = 0;
-//        gbc.gridy = 0;
-//        panel.add(packageNameLabel, gbc);
-//
-//        gbc.gridx = 1;
-//        gbc.weightx = 1.0;
-//        panel.add(flexibleTestPackageNameField, gbc);
-//
-//
-//
-//        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-//        JButton saveButton = new JButton("Apply");
-//        saveButton.addActionListener(e -> {
-//            // 处理保存逻辑
-//        });
-//
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(e -> {
-//            saveButton.doClick();
-//            Window window = SwingUtilities.getWindowAncestor(panel);
-//            if (window != null) {
-//                window.dispose();
-//            }
-//        });
-//
-//        buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
-//
-//        gbc.gridx = 0;
-//        gbc.gridy = 3;
-//        gbc.gridwidth = 2;
-//        gbc.weightx = 0;
-//        gbc.fill = GridBagConstraints.HORIZONTAL;
-//        gbc.anchor = GridBagConstraints.SOUTH;
-//        panel.add(buttonPanel, gbc);
-//
-//        return panel;
-//    }
-
     private JPanel createBasicOptionPanel(JTextField flexibleTestPackageNameField) {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -759,7 +703,7 @@ public class FlingToolWindow {
 
 
         JLabel monitorPrivateLabel = new JLabel("Method Type:");
-        monitorPrivateLabel.setToolTipText("You can choose which methods of the class to monitor");
+        monitorPrivateLabel.setToolTipText("You can choose which methods of the class to monitor, this config support hot reload");
         monitorPrivateLabel.setPreferredSize(labelDimension);
         JRadioButton monitorPrivate = new JRadioButton("We will monitor the public and protected methods of the selected class", false);
         monitorPrivate.addActionListener(e -> {
