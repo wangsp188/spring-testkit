@@ -141,7 +141,7 @@ public class LocalStorageHelper {
         if (projectConfig == null) {
             projectConfig = new ProjectConfig();
         }
-        if (monitorConfig!=null) {
+        if (monitorConfig != null) {
             if (StringUtils.isBlank(monitorConfig.getPackages())) {
                 monitorConfig.setPackages("app.three.package");
             }
@@ -380,6 +380,9 @@ public class LocalStorageHelper {
 
         private boolean enable;
         private boolean monitorPrivate;
+        private boolean monitorWeb = true;
+        private boolean monitorMybatis = true;
+        private boolean logMybatis = true;
         private String packages;
 
         private String clsSuffix;
@@ -388,7 +391,7 @@ public class LocalStorageHelper {
 
         private String blacks;
 
-        public boolean judgeIsAppSthreePackage(){
+        public boolean judgeIsAppSthreePackage() {
             return "app.three.package".equals(packages);
         }
 
@@ -438,6 +441,30 @@ public class LocalStorageHelper {
 
         public void setEnable(boolean enable) {
             this.enable = enable;
+        }
+
+        public boolean isMonitorWeb() {
+            return monitorWeb;
+        }
+
+        public void setMonitorWeb(boolean monitorWeb) {
+            this.monitorWeb = monitorWeb;
+        }
+
+        public boolean isMonitorMybatis() {
+            return monitorMybatis;
+        }
+
+        public void setMonitorMybatis(boolean monitorMybatis) {
+            this.monitorMybatis = monitorMybatis;
+        }
+
+        public boolean isLogMybatis() {
+            return logMybatis;
+        }
+
+        public void setLogMybatis(boolean logMybatis) {
+            this.logMybatis = logMybatis;
         }
     }
 

@@ -195,11 +195,11 @@ public abstract class BasePluginTool {
                     try {
                         JSONObject result = get();
                         if (cancelReqs.remove(lastReqId)) {
-                            setOutputText("req is cancel, reqId:" + lastReqId);
+                            setOutputText("req is cancel, reqId:" + lastReqId, null);
                         }
                     } catch (Throwable e) {
                         if (cancelReqs.remove(lastReqId)) {
-                            setOutputText("cancel req error, reqId:" + lastReqId + "\n" + ToolHelper.getStackTrace(e));
+                            setOutputText("cancel req error, reqId:" + lastReqId + "\n" + ToolHelper.getStackTrace(e), null);
                         }
                     }
                 }
@@ -211,20 +211,20 @@ public abstract class BasePluginTool {
         try {
             response = submit.get();
         } catch (Throwable e) {
-            setOutputText("submit req error \n" + ToolHelper.getStackTrace(e));
+            setOutputText("submit req error \n" + ToolHelper.getStackTrace(e),null);
             return;
         }
         if (response == null) {
             return;
         }
         if (!response.getBooleanValue("success") || response.getString("data") == null) {
-            setOutputText("submit req error \n" + response.getString("message"));
+            setOutputText("submit req error \n" + response.getString("message"),null);
             return;
         }
         String reqId = response.getString("data");
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
-        setOutputText("req is sent，reqId:" + reqId);
+        setOutputText("req is sent，reqId:" + reqId,null);
         // 第二个 SwingWorker 用于获取结果
         new SwingWorker<JSONObject, Void>() {
 
@@ -245,14 +245,14 @@ public abstract class BasePluginTool {
                     if (cancelReqs.remove(reqId)) {
                         System.out.println("请求已被取消，结果丢弃");
                     } else {
+                        List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
+                        });
                         if (!result.getBooleanValue("success")) {
-                            setOutputText("req is error\n" + result.getString("message"));
+                            setOutputText("req is error\n" + result.getString("message"), profile);
                         } else {
-                            List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
-                            });
                             Object data = result.get("data");
                             if (data == null) {
-                                setOutputText("null");
+                                setOutputText("null", profile);
                             } else if (data instanceof String
                                     || data instanceof Byte
                                     || data instanceof Short
@@ -263,9 +263,9 @@ public abstract class BasePluginTool {
                                     || data instanceof Character
                                     || data instanceof Boolean
                                     || data.getClass().isEnum()) {
-                                setOutputText(data.toString(),profile);
+                                setOutputText(data.toString(), profile);
                             } else {
-                                setOutputText(JsonUtil.formatObj(data),profile);
+                                setOutputText(JsonUtil.formatObj(data), profile);
                             }
                         }
                     }
@@ -328,10 +328,9 @@ public abstract class BasePluginTool {
 
     protected void setOutputText(String content) {
         flingWindow.setOutputText(content);
-        flingWindow.setOutputProfile(null);
     }
 
-    protected void setOutputText(String content,List<Map<String, String>> outputProfile) {
+    protected void setOutputText(String content, List<Map<String, String>> outputProfile) {
         flingWindow.setOutputText(content);
         flingWindow.setOutputProfile(outputProfile);
     }

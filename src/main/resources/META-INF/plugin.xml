@@ -49,12 +49,8 @@
     </extensions>
 
     <actions>
-        <action id="Fling_log_to_link" class="com.fling.links.Log2LinksAction" text="Fling_log_to_link"
-                description="Processes the selected text and copies the results to clipboard">
-            <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
-        </action>
-        <action id="Fling_popup_log_to_link" class="com.fling.links.Log2LinksWebViewAction" text="Fling_popup_log_to_link"
-                description="Processes the selected text and copies the results to clipboard">
+        <action id="popup_graph_fling_profiler" class="com.fling.links.FlingLinkViewAction" text="popup_graph_fling_profiler"
+                description="Processes the selected FLING_PROFILER and graph it">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
     </actions>

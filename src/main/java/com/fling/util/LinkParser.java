@@ -1,23 +1,9 @@
-package com.fling.links;
+package com.fling.util;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.fling.FlingHelper;
-import com.intellij.notification.Notification;
-import com.intellij.notification.NotificationType;
-import com.intellij.notification.Notifications;
-import com.intellij.openapi.actionSystem.ActionUpdateThread;
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.ide.CopyPasteManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
-import org.jetbrains.annotations.NotNull;
 
-import java.awt.datatransfer.StringSelection;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -25,55 +11,44 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class Log2LinksAction extends AnAction {
-
-
-    @Override
-    public @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.BGT;
-    }
-
-    @Override
-    public void actionPerformed( AnActionEvent e) {
-        // 获取项目和编辑器信息
-        Project project = e.getProject();
-        if (project == null) return;
-
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        if (editor == null) return;
-
-        // 获取选中文本内容
-        String selectedText = editor.getSelectionModel().getSelectedText();
-        if (selectedText == null || selectedText.isEmpty()) {
-            Messages.showMessageDialog(project, "No text selected.", "Information", Messages.getInformationIcon());
-            return;
-        }
-
-        // 处理选中文本内容（解析逻辑）
-        List<Map<String, String>> processedText = parseLinkLos(selectedText);
-        if (processedText == null || processedText.isEmpty()) {
-            FlingHelper.notify(project, NotificationType.WARNING, "don't find valid link");
-            return;
-        }
-
-        // 将结果复制到剪贴板
-        CopyPasteManager.getInstance().setContents(new StringSelection(JSON.toJSONString(processedText)));
-        // 在右下角显示提示
-        FlingHelper.notify(project, NotificationType.INFORMATION, "Text copied to clipboard.");
-    }
-
-    @Override
-    public void update( AnActionEvent e) {
-        // 检查当前是否有选中的文本
-        Editor editor = e.getData(CommonDataKeys.EDITOR);
-        e.getPresentation().setEnabledAndVisible(editor != null && editor.getSelectionModel().hasSelection());
-    }
-
+public class LinkParser {
 
 
     private static Pattern timestampPattern = Pattern.compile("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}");
 
-    public static List<Map<String,String>> parseLinkLos(String content){
+
+    public static List<Map<String, String>> parseFlingLogs(String content) {
+        if (content == null || content.isEmpty()) {
+            return new ArrayList<>();
+        }
+//FLING_LINK - 0 fling#ToolApplication#call-method(N,error_InvocationTargetException,NORMAL,0,3)_req_id|Hc2HI8L4x7lR9Vpb@0;_time|2024-12-01 19:40:44.637$M$0.1 #SpringCacheService#hello(N,error_IllegalArgumentException,NORMAL,3,0)
+
+        if (!content.contains("FLING_PROFILER -")) {
+            return new ArrayList<>();
+        }
+        String profiler = content.substring(content.indexOf("FLING_PROFILER -") + "FLING_PROFILER -".length()).trim();
+        String reqid = null;
+        String cost = null;
+        int i = profiler.indexOf("_req_id|");
+        if (i > 0) {
+            int y = profiler.indexOf(";", i);
+            if (y > 0) {
+                reqid = profiler.substring(i + "_req_id|".length(), y);
+            }
+            String coststr = profiler.substring(0, i - 1);
+            cost = coststr.substring(coststr.lastIndexOf(",") + 1);
+        }
+        ArrayList<Map<String, String>> objects = new ArrayList<>();
+        HashMap<String, String> e = new HashMap<>();
+        e.put("link", profiler);
+        e.put("req_id", reqid);
+        e.put("cost", cost);
+        objects.add(e);
+        return objects;
+    }
+
+
+    public static List<Map<String, String>> parseLinkLos(String content) {
         List<LogEntry> logEntries = parseLogs(content);
         List<Map<String, String>> listLogs = logEntries.stream()
                 .filter(logEntry -> logEntry.getTraceid() != null && logEntry.getRpcid() != null && "S_LINK".equals(logEntry.getLogger()))
@@ -97,15 +72,15 @@ public class Log2LinksAction extends AnAction {
                             try {
                                 JSONObject jsonObject = JSON.parseObject(message.split("\\[L\\]")[1].trim());
                                 cost = jsonObject.getString("cost");
-                                if (jsonObject.get("digests")!=null) {
+                                if (jsonObject.get("digests") != null) {
                                     JSONArray digests = jsonObject.getJSONArray("digests");
                                     for (Object digest : digests) {
                                         JSONObject digestObj = JSON.parseObject(JSON.toJSONString(digest));
-                                        if (digestObj==null) {
+                                        if (digestObj == null) {
                                             continue;
                                         }
                                         if ("_req_id".equals(digestObj.getString("k"))) {
-                                            reqId = digestObj.get("v")==null?null:digestObj.getString("v");
+                                            reqId = digestObj.get("v") == null ? null : digestObj.getString("v");
                                             break;
                                         }
                                     }
@@ -138,10 +113,10 @@ public class Log2LinksAction extends AnAction {
                     }
                 }).collect(Collectors.toSet());
 
-        HashMap<String,List<String>> objectObjectHashMap = new HashMap<>();
+        HashMap<String, List<String>> objectObjectHashMap = new HashMap<>();
         Set<String> filterReqIds = new HashSet<>();
         for (LogEntry logEntry : logEntries) {
-            if (!"S_DIGEST".equals(logEntry.getLogger()) || logEntry.getTraceid()==null || logEntry.getRpcid()==null) {
+            if (!"S_DIGEST".equals(logEntry.getLogger()) || logEntry.getTraceid() == null || logEntry.getRpcid() == null) {
                 continue;
             }
             if (alreadyReqIds.contains(logEntry.getTraceid() + "@" + logEntry.getRpcid())) {
@@ -149,44 +124,44 @@ public class Log2LinksAction extends AnAction {
             }
             int index = logEntry.getMessage().indexOf("[D]");
 
-            if(index<0){
+            if (index < 0) {
                 continue;
             }
 
-            String info = logEntry.getMessage().substring(index+1);
+            String info = logEntry.getMessage().substring(index + 1);
             index = info.indexOf(",");
-            if(index<0){
+            if (index < 0) {
                 continue;
             }
-            info = info.substring(index+1);
+            info = info.substring(index + 1);
 
-            String linkId = info.substring(0,info.indexOf("]"));
+            String linkId = info.substring(0, info.indexOf("]"));
 
-            String group  = info.substring(info.indexOf("]")+1,info.indexOf(";"));
+            String group = info.substring(info.indexOf("]") + 1, info.indexOf(";"));
 
-            if(group.startsWith("callback_") && linkId.equals("0")){
+            if (group.startsWith("callback_") && linkId.equals("0")) {
                 filterReqIds.add(logEntry.getTraceid() + "@" + logEntry.getRpcid());
                 continue;
             }
 
 
-            info = info.substring(info.indexOf(";")+1);
-            String biz = info.substring(0,info.indexOf(";"));
-            String action = info.substring(info.indexOf(";")+1,info.indexOf(","));
-            info = info.substring(info.indexOf(",")+1);
-            String hasError = info.substring(0,info.indexOf(","));
-            info = info.substring(info.indexOf(",")+1);
-            String status = info.substring(0,info.indexOf(","));
-            info = info.substring(info.indexOf(",")+1);
-            String cost = info.substring(0,info.indexOf(","));
-            String performance = info.substring(info.indexOf(",")+1,info.indexOf(";"));
+            info = info.substring(info.indexOf(";") + 1);
+            String biz = info.substring(0, info.indexOf(";"));
+            String action = info.substring(info.indexOf(";") + 1, info.indexOf(","));
+            info = info.substring(info.indexOf(",") + 1);
+            String hasError = info.substring(0, info.indexOf(","));
+            info = info.substring(info.indexOf(",") + 1);
+            String status = info.substring(0, info.indexOf(","));
+            info = info.substring(info.indexOf(",") + 1);
+            String cost = info.substring(0, info.indexOf(","));
+            String performance = info.substring(info.indexOf(",") + 1, info.indexOf(";"));
 
             index = info.indexOf("[attachment]:");
             String disgests = "";
-            if(index>-1){
+            if (index > -1) {
                 disgests = info.substring(info.indexOf(";") + 1, info.indexOf("[attachment]:")).trim();
-                if(disgests.endsWith(";")){
-                    disgests = disgests.substring(0, disgests.length()-1);
+                if (disgests.endsWith(";")) {
+                    disgests = disgests.substring(0, disgests.length() - 1);
                 }
             }
 
@@ -210,15 +185,15 @@ public class Log2LinksAction extends AnAction {
         for (Map.Entry<String, List<String>> stringListEntry : objectObjectHashMap.entrySet()) {
             HashMap<String, String> e = new HashMap<>();
             e.put("req_id", stringListEntry.getKey());
-            e.put("link", String.join("$M$",stringListEntry.getValue()));
+            e.put("link", String.join("$M$", stringListEntry.getValue()));
             listLogs.add(e);
         }
         return listLogs;
     }
 
 
-    public static List<LogEntry> parseLogs(String content){
-        if (content==null || content.trim().isEmpty()) {
+    public static List<LogEntry> parseLogs(String content) {
+        if (content == null || content.trim().isEmpty()) {
             return new ArrayList<>();
         }
 
@@ -228,17 +203,17 @@ public class Log2LinksAction extends AnAction {
         List<LogEntry> logs = new ArrayList<>();
         for (String logLine : logLines) {
 
-            if(logLine==null || logLine.trim().isEmpty()){
+            if (logLine == null || logLine.trim().isEmpty()) {
                 continue;
             }
             int i = logLine.indexOf("[");
-            if(i<0){
+            if (i < 0) {
                 continue;
             }
-            String time = logLine.substring(0,i);
+            String time = logLine.substring(0, i);
             String log = logLine.substring(i);
             LogEntry logEntity = parseSingleLog(log);
-            if (logEntity==null || logEntity.getLevel()==null || logEntity.getMessage()==null) {
+            if (logEntity == null || logEntity.getLevel() == null || logEntity.getMessage() == null) {
                 continue;
             }
             logEntity.timestamp = time;
@@ -255,7 +230,7 @@ public class Log2LinksAction extends AnAction {
         if (!matcher.find()) {
             return null;
         }
-        return new LogEntry(null,matcher.group("traceid").trim(),matcher.group("rpcid").trim(),matcher.group("thread").trim(),matcher.group("level").trim(), matcher.group("logger").trim(),logEntry.substring(matcher.end()).trim());
+        return new LogEntry(null, matcher.group("traceid").trim(), matcher.group("rpcid").trim(), matcher.group("thread").trim(), matcher.group("level").trim(), matcher.group("logger").trim(), logEntry.substring(matcher.end()).trim());
     }
 
     private static List<String> splitLogsByTimestamp(String logsContent) {
@@ -277,7 +252,6 @@ public class Log2LinksAction extends AnAction {
 
         return logLines;
     }
-
 
 
     public static class LogEntry {

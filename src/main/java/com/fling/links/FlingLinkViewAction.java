@@ -1,6 +1,8 @@
 package com.fling.links;
 
 import com.alibaba.fastjson.JSON;
+import com.fling.util.LinkParser;
+import com.fling.view.FlingToolWindow;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
@@ -25,16 +27,27 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.net.URL;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class Log2LinksWebViewAction extends AnAction {
-
-    private static Path tempFilePath;
+public class FlingLinkViewAction extends AnAction {
 
     private static String renderHtml;
+
+    static {
+        URL resource = FlingToolWindow.class.getResource("/html/horse_up_down_class.html");
+        if (resource != null) {
+            try {
+                try (InputStream is = resource.openStream();
+                     BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+                    renderHtml = reader.lines().collect(Collectors.joining("\n"));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
     @Override
     public @NotNull ActionUpdateThread getActionUpdateThread() {
@@ -67,7 +80,7 @@ public class Log2LinksWebViewAction extends AnAction {
         }
 
         // 处理选中文本内容（解析逻辑）
-        List<Map<String, String>> processedText = Log2LinksAction.parseLinkLos(selectedText);
+        List<Map<String, String>> processedText = LinkParser.parseFlingLogs(selectedText);
         if (processedText == null || processedText.isEmpty()) {
             // 在右下角显示提示
             Notification notification = new Notification("Console Text Processor", "Empty", "don't find valid link", NotificationType.INFORMATION);
@@ -94,7 +107,7 @@ public class Log2LinksWebViewAction extends AnAction {
         });
 
 //        String localFileURL = getOrCreateLocalFileURL();
-        String htmlContent = getHTMLContent();
+        String htmlContent = renderHtml;
         if (htmlContent == null) {
             Messages.showMessageDialog(project, "Local file not found.", "Error", Messages.getErrorIcon());
             return;
@@ -118,26 +131,6 @@ public class Log2LinksWebViewAction extends AnAction {
             }
         },jbCefBrowser.getCefBrowser());
 
-    }
-
-
-    private String getHTMLContent()  {
-        if (renderHtml!=null) {
-            return renderHtml;
-        }
-        URL resource = getClass().getResource("/html/horse_up_down_class.html");
-        if (resource == null) {
-            return null;
-        }
-
-        try {
-            try (InputStream is = resource.openStream();
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-                return renderHtml = reader.lines().collect(Collectors.joining("\n"));
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
 }

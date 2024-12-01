@@ -49,6 +49,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -76,6 +78,7 @@ public class FlingToolWindow {
 
     private JLabel appLabel;
     private JComboBox<String> appBox;
+    private Map<String, Boolean> monitorMap;
     private JDialog settingsDialog;
     private CurlDialog curlDialog;
     private JPanel whitePanel = new JPanel();
@@ -185,6 +188,7 @@ public class FlingToolWindow {
         tools.put(PluginToolEnum.MYBATIS_SQL, new MybatisSqlTool(this));
         // 添加 toolBox 到 topPanel
         toolBox = new ComboBox<>(new String[]{PluginToolEnum.CALL_METHOD.getCode(), PluginToolEnum.SPRING_CACHE.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MYBATIS_SQL.getCode()});
+        toolBox.setPreferredSize(new Dimension(120, 32));
 //        toolBox.setEnabled(false);
         toolBox.addActionListener(e -> onSwitchTool());
         topPanel.add(toolBox);
@@ -196,10 +200,17 @@ public class FlingToolWindow {
 
         // 添加 appBox 到 topPanel
         appBox = new ComboBox<>(new String[]{});
-        appBox.setPreferredSize(new Dimension(150, 32));
+        appBox.setPreferredSize(new Dimension(150, 30));
+        Border border = appBox.getBorder();
         appBox.addItemListener(e -> {
             Object selectedItem = appBox.getSelectedItem();
             appBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
+
+            if (selectedItem != null && monitorMap != null && Boolean.TRUE.equals(monitorMap.get(selectedItem.toString()))) {
+                appBox.setBorder(new LineBorder(new Color(114, 169, 107), 1));
+            } else {
+                appBox.setBorder(border);
+            }
         });
         new Thread(() -> {
             while (true) {
@@ -298,7 +309,6 @@ public class FlingToolWindow {
                 }
 
             };
-            actionGroup.add(dagreAction);
         }
 
 
@@ -319,6 +329,7 @@ public class FlingToolWindow {
         if (items == null) {
             return;
         }
+        HashMap<String, Boolean> map2 = new HashMap<>();
         Iterator<String> iterator = items.iterator();
         HashMap<String, String> map = new HashMap<>();
         map.put("method", "hello");
@@ -330,7 +341,8 @@ public class FlingToolWindow {
             }
             VisibleApp visibleApp = parseApp(item);
             try {
-                HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
+                Map map1 = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
+                map2.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(map1.get("data"))));
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
@@ -343,6 +355,7 @@ public class FlingToolWindow {
         for (String item : items) {
             appBox.addItem(item.substring(0, item.lastIndexOf(":")));
         }
+        monitorMap = map2;
     }
 
     private void openTipsDoc() {
@@ -576,19 +589,34 @@ public class FlingToolWindow {
         gbc.weightx = 1.0; // 让输入框占据剩余空间
         panel.add(flexibleTestPackageNameField, gbc);
 
+        // 添加分割线
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(10, 0, 10, 0); // 上下方间距稍大一些
+        panel.add(new JSeparator(), gbc);
+
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(project);
 
 
         JRadioButton monitorToggleButton = new JRadioButton("Enable Monitor", false);
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 2;
         gbc.weightx = 0.0; // Reset weightx
         panel.add(monitorToggleButton, gbc);
 
         JPanel monitorOptionsPanel = new JPanel(new GridBagLayout());
         monitorOptionsPanel.setVisible(false);
-        monitorToggleButton.addActionListener(e -> monitorOptionsPanel.setVisible(monitorToggleButton.isSelected()));
+        monitorToggleButton.addActionListener(e -> {
+            monitorOptionsPanel.setVisible(monitorToggleButton.isSelected());
+            if (monitorToggleButton.isSelected()) {
+                monitorToggleButton.setText("We will use bytecode staking to enhance the classes for link monitoring");
+            } else {
+                monitorToggleButton.setText("Enable Monitor");
+            }
+        });
 
         if (monitorConfig.isEnable()) {
             monitorToggleButton.setSelected(true);
@@ -596,37 +624,92 @@ public class FlingToolWindow {
         }
         gbc.gridwidth = 1; // Reset gridwidth
 
-        JLabel monitorPrivateLabel = new JLabel("Method Type:");
-        monitorPrivateLabel.setPreferredSize(labelDimension);
-        JRadioButton monitorPrivate = new JRadioButton("public,protected", false);
-        monitorPrivate.addActionListener(e -> {
-            if (monitorPrivate.isSelected()) {
-                monitorPrivate.setText("public,protected,private");
+
+        JLabel monitorWebLabel = new JLabel("Monitor Web:");
+        monitorWebLabel.setToolTipText("We can monitor the DispatcherServlet for spring-web");
+        monitorWebLabel.setPreferredSize(labelDimension);
+        JRadioButton monitorWeb = new JRadioButton("", false);
+        monitorWeb.addActionListener(e -> {
+            if (monitorWeb.isSelected()) {
+                monitorWeb.setText("We will monitor the DispatcherServlet for spring-web");
             } else {
-                monitorPrivate.setText("public,protected");
+                monitorWeb.setText("");
             }
         });
-        if (monitorConfig.isMonitorPrivate()) {
-            monitorPrivate.setSelected(true);
-            monitorPrivate.setText("public,protected,private");
+        if (monitorConfig.isMonitorWeb()) {
+            monitorWeb.setSelected(true);
+            monitorWeb.setText("We will monitor the DispatcherServlet for spring-web");
         }
 //        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
 //        JTextField functionTypeField = new JTextField("private,public,protected", 20);
         gbc.gridx = 0;
-        gbc.gridy = 0;
+        gbc.gridy = 3;
         gbc.weightx = 0.0;
-        monitorOptionsPanel.add(monitorPrivateLabel, gbc);
+        monitorOptionsPanel.add(monitorWebLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        monitorOptionsPanel.add(monitorPrivate, gbc);
+        monitorOptionsPanel.add(monitorWeb, gbc);
 
+
+        JLabel monitorMybatisLabel = new JLabel("Monitor Mybatis:");
+        monitorMybatisLabel.setToolTipText("We can use the mybatis Interceptor mechanism to monitor Executor");
+        monitorMybatisLabel.setPreferredSize(labelDimension);
+        JRadioButton monitorMybatis = new JRadioButton("", false);
+        monitorMybatis.addActionListener(e -> {
+            if (monitorMybatis.isSelected()) {
+                monitorMybatis.setText("We will use the mybatis Interceptor mechanism to monitor Executor");
+            } else {
+                monitorMybatis.setText("");
+            }
+        });
+        if (monitorConfig.isMonitorMybatis()) {
+            monitorMybatis.setSelected(true);
+            monitorMybatis.setText("We will use the mybatis Interceptor mechanism to monitor Executor");
+        }
+//        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
+//        JTextField functionTypeField = new JTextField("private,public,protected", 20);
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(monitorMybatisLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(monitorMybatis, gbc);
+
+        JLabel logMybatisLabel = new JLabel("Log Mybatis:");
+        logMybatisLabel.setToolTipText("We can output sql in mybatis format");
+        logMybatisLabel.setPreferredSize(labelDimension);
+        JRadioButton logMybatis = new JRadioButton("", false);
+        logMybatis.addActionListener(e -> {
+            if (logMybatis.isSelected()) {
+                logMybatis.setText("We will output sql in mybatis format");
+            } else {
+                logMybatis.setText("");
+            }
+        });
+        if (monitorConfig.isLogMybatis()) {
+            logMybatis.setSelected(true);
+            logMybatis.setText("We will output sql in mybatis format");
+        }
+//        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
+//        JTextField functionTypeField = new JTextField("private,public,protected", 20);
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(logMybatisLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(logMybatis, gbc);
 
         JLabel packageLabel = new JLabel("Package:");
+        packageLabel.setToolTipText("Please fill in the package name of the class you want to monitor, multiple use, split;\napp.three.package means that the first three packages of the startup class are automatically intercepted");
         packageLabel.setPreferredSize(labelDimension);
         JTextField packagesField = new JTextField(monitorConfig.getPackages(), 20);
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 6;
         gbc.weightx = 0.0;
         monitorOptionsPanel.add(packageLabel, gbc);
 
@@ -635,10 +718,11 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(packagesField, gbc);
 
         JLabel classSuffixLabel = new JLabel("Class Suffix:");
+        classSuffixLabel.setToolTipText("Please fill in the class suffix of the class you want to monitor, multiple use, split");
         classSuffixLabel.setPreferredSize(labelDimension);
         JTextField classSuffixField = new JTextField(monitorConfig.getClsSuffix(), 20);
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 7;
         gbc.weightx = 0.0;
         monitorOptionsPanel.add(classSuffixLabel, gbc);
 
@@ -648,10 +732,11 @@ public class FlingToolWindow {
 
 
         JLabel whiteClassLabel = new JLabel("White Class:");
+        whiteClassLabel.setToolTipText("Monitoring class whitelist list, multiple use, split");
         whiteClassLabel.setPreferredSize(labelDimension);
         JTextField whiteListField = new JTextField(monitorConfig.getWhites(), 20);
         gbc.gridx = 0;
-        gbc.gridy = 3;
+        gbc.gridy = 8;
         gbc.weightx = 0.0;
         monitorOptionsPanel.add(whiteClassLabel, gbc);
 
@@ -660,10 +745,11 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(whiteListField, gbc);
 
         JLabel blackClassLabel = new JLabel("Black Class:");
+        blackClassLabel.setToolTipText("Monitoring class black list, multiple use, split");
         blackClassLabel.setPreferredSize(labelDimension);
         JTextField blackListField = new JTextField(monitorConfig.getBlacks(), 20);
         gbc.gridx = 0;
-        gbc.gridy = 4;
+        gbc.gridy = 9;
         gbc.weightx = 0.0;
         monitorOptionsPanel.add(blackClassLabel, gbc);
 
@@ -672,8 +758,35 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(blackListField, gbc);
 
 
+        JLabel monitorPrivateLabel = new JLabel("Method Type:");
+        monitorPrivateLabel.setToolTipText("You can choose which methods of the class to monitor");
+        monitorPrivateLabel.setPreferredSize(labelDimension);
+        JRadioButton monitorPrivate = new JRadioButton("We will monitor the public and protected methods of the selected class", false);
+        monitorPrivate.addActionListener(e -> {
+            if (monitorPrivate.isSelected()) {
+                monitorPrivate.setText("We will monitor the all methods of the selected class");
+            } else {
+                monitorPrivate.setText("We will monitor the public and protected methods of the selected class");
+            }
+        });
+        if (monitorConfig.isMonitorPrivate()) {
+            monitorPrivate.setSelected(true);
+            monitorPrivate.setText("We will monitor the all methods of the selected class");
+        }
+//        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
+//        JTextField functionTypeField = new JTextField("private,public,protected", 20);
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 10;
+        gbc.weightx = 0.0;
+        monitorOptionsPanel.add(monitorPrivateLabel, gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        monitorOptionsPanel.add(monitorPrivate, gbc);
+
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
         panel.add(monitorOptionsPanel, gbc);
@@ -681,7 +794,7 @@ public class FlingToolWindow {
 
         // 新增一行值得占用
         gbc.gridx = 0;
-        gbc.gridy = 3; // 新的一行
+        gbc.gridy = 4; // 新的一行
         gbc.gridwidth = 2; // 占据两列
         gbc.weighty = 1.0; // 占用剩余空间
         gbc.fill = GridBagConstraints.BOTH; // 使下一行占用空间
@@ -711,9 +824,11 @@ public class FlingToolWindow {
                 saveConfig.setClsSuffix(classSuffixField.getText().trim());
                 saveConfig.setWhites(whiteListField.getText().trim());
                 saveConfig.setBlacks(blackListField.getText().trim());
+                saveConfig.setMonitorWeb(monitorWeb.isSelected());
+                saveConfig.setMonitorMybatis(monitorMybatis.isSelected());
+                saveConfig.setLogMybatis(logMybatis.isSelected());
                 LocalStorageHelper.setMonitorConfig(project, saveConfig);
                 FlingHelper.notify(project, NotificationType.INFORMATION, "Monitor is " + (saveConfig.isEnable() ? "enable" : "disable"));
-
                 FlingHelper.refresh(project);
             }
         };
@@ -739,7 +854,7 @@ public class FlingToolWindow {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 3; // 新的一行
+        gbc.gridy = 5; // 新的一行
         gbc.gridwidth = 2; // 占据两列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
@@ -1106,7 +1221,7 @@ public class FlingToolWindow {
 //            System.out.println("不可见,"+ (outputProfile != null && !outputProfile.isEmpty()));
             if (outputProfile != null && !outputProfile.isEmpty() && !actionGroup.containsAction(dagreAction)) {
                 actionGroup.add(dagreAction);
-            }else if((outputProfile==null || outputProfile.isEmpty()) && actionGroup.containsAction(dagreAction)) {
+            } else if ((outputProfile == null || outputProfile.isEmpty()) && actionGroup.containsAction(dagreAction)) {
                 actionGroup.remove(dagreAction);
             }
             windowContent.revalidate(); // 重新验证布局
