@@ -328,6 +328,7 @@ public abstract class BasePluginTool {
 
     protected void setOutputText(String content) {
         flingWindow.setOutputText(content);
+        flingWindow.setOutputProfile(null);
     }
 
     protected void setOutputText(String content, List<Map<String, String>> outputProfile) {
