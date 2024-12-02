@@ -325,24 +325,30 @@ public class FlingToolWindow {
     }
 
     private void refreshVisibleApp() {
-        List<String> items = RuntimeAppHelper.loadProjectRuntimes(project.getName());
-        if (items == null) {
+        List<String> newItems = RuntimeAppHelper.loadProjectRuntimes(project.getName());
+        if (newItems == null) {
             return;
         }
-        HashMap<String, Boolean> map2 = new HashMap<>();
-        Iterator<String> iterator = items.iterator();
-        HashMap<String, String> map = new HashMap<>();
-        map.put("method", "hello");
+
+        // 用于比较的 map，判断是否有变化
+        HashMap<String, Boolean> newMap = new HashMap<>();
+        HashMap<String, String> requestData = new HashMap<>();
+        requestData.put("method", "hello");
+
+        Iterator<String> iterator = newItems.iterator();
         while (iterator.hasNext()) {
             String item = iterator.next();
             if (item == null) {
                 iterator.remove();
                 continue;
             }
+
+            // 获取 visibleApp 实例
             VisibleApp visibleApp = parseApp(item);
             try {
-                Map map1 = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
-                map2.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(map1.get("data"))));
+                // 发送请求获取实时数据
+                Map response = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", requestData, Map.class);
+                newMap.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(response.get("data"))));
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
@@ -350,13 +356,72 @@ public class FlingToolWindow {
             }
         }
 
-        // 清理 appBox 的内容，并使用 newStrings 重新赋值
+        // 记录当前选中的项
+        String selectedItem = (String) appBox.getSelectedItem();
+
+        // 获取当前下拉框中的所有项
+        List<String> currentItems = new ArrayList<>();
+        for (int i = 0; i < appBox.getItemCount(); i++) {
+            currentItems.add(appBox.getItemAt(i).toString());
+        }
+
+        // 更新 monitorMap
+        monitorMap = newMap;
+        // 比较新旧项是否有变化
+        boolean hasChanges = !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
+        if (!hasChanges) {
+            return;
+        }
+        // 更新下拉框内容
         appBox.removeAllItems();
-        for (String item : items) {
+        for (String item : newItems) {
             appBox.addItem(item.substring(0, item.lastIndexOf(":")));
         }
-        monitorMap = map2;
+
+        // 保持选中项不变
+        if (selectedItem != null && appBox.getItemCount() > 0) {
+            for (int i = 0; i < appBox.getItemCount(); i++) {
+                if (appBox.getItemAt(i).equals(selectedItem)) {
+                    appBox.setSelectedIndex(i);
+                    break;
+                }
+            }
+        }
     }
+
+//    private void refreshVisibleApp() {
+//        List<String> items = RuntimeAppHelper.loadProjectRuntimes(project.getName());
+//        if (items == null) {
+//            return;
+//        }
+//        HashMap<String, Boolean> map2 = new HashMap<>();
+//        Iterator<String> iterator = items.iterator();
+//        HashMap<String, String> map = new HashMap<>();
+//        map.put("method", "hello");
+//        while (iterator.hasNext()) {
+//            String item = iterator.next();
+//            if (item == null) {
+//                iterator.remove();
+//                continue;
+//            }
+//            VisibleApp visibleApp = parseApp(item);
+//            try {
+//                Map map1 = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
+//                map2.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(map1.get("data"))));
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//                iterator.remove();
+//                RuntimeAppHelper.removeApp(project.getName(), visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
+//            }
+//        }
+//
+//        // 清理 appBox 的内容，并使用 newStrings 重新赋值
+//        appBox.removeAllItems();
+//        for (String item : items) {
+//            appBox.addItem(item.substring(0, item.lastIndexOf(":")));
+//        }
+//        monitorMap = map2;
+//    }
 
     private void openTipsDoc() {
         String url = "https://gitee.com/wangsp188/spring-fling/blob/master/doc/Spring-Fling.md";
@@ -544,7 +609,7 @@ public class FlingToolWindow {
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(project);
 
 
-        JRadioButton monitorToggleButton = new JRadioButton("Enable Monitor", false);
+        JRadioButton monitorToggleButton = new JRadioButton("Enable Trace", false);
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 2;
@@ -772,7 +837,7 @@ public class FlingToolWindow {
                 saveConfig.setMonitorMybatis(monitorMybatis.isSelected());
                 saveConfig.setLogMybatis(logMybatis.isSelected());
                 LocalStorageHelper.setMonitorConfig(project, saveConfig);
-                FlingHelper.notify(project, NotificationType.INFORMATION, "Monitor is " + (saveConfig.isEnable() ? "enable" : "disable"));
+                FlingHelper.notify(project, NotificationType.INFORMATION, "Trace is " + (saveConfig.isEnable() ? "enable" : "disable"));
                 FlingHelper.refresh(project);
             }
         };
