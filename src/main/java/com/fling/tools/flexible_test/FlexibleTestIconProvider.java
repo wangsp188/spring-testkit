@@ -85,6 +85,12 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return "is_constructor";
         }
 
+        // 新增内部类过滤逻辑
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass == null || containingClass.getName() == null) {
+            return "is_inner_class";
+        }
+
         PsiFile psiFile = method.getContainingFile();
 
         // 3. 必须是在Java的test模块下

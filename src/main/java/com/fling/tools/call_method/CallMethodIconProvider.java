@@ -200,7 +200,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
 
         PsiClass containingClass = psiMethod.getContainingClass();
-        if (containingClass == null) {
+        if (containingClass == null || containingClass.getName() == null) {
             return "containingClassNull";
         }
 
@@ -321,7 +321,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
                     "}\n";
 
     private static final String TEST_METHOD_TEMPLATE =
-            "public %s %s() {\n" +
+            "public %s %s() throws Throwable{\n" +
                     "%s" +
                     "$_1_$%s;\n" +
                     "}\n";
