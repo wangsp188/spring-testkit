@@ -621,9 +621,9 @@ public class FlingToolWindow {
         monitorToggleButton.addActionListener(e -> {
             monitorOptionsPanel.setVisible(monitorToggleButton.isSelected());
             if (monitorToggleButton.isSelected()) {
-                monitorToggleButton.setText("We will use bytecode staking to enhance the classes for link monitoring");
+                monitorToggleButton.setText("We will use bytecode staking to enhance the classes to support link trace");
             } else {
-                monitorToggleButton.setText("Enable Monitor");
+                monitorToggleButton.setText("Enable Trace");
             }
         });
 
@@ -634,20 +634,20 @@ public class FlingToolWindow {
         gbc.gridwidth = 1; // Reset gridwidth
 
 
-        JLabel monitorWebLabel = new JLabel("Monitor Web:");
-        monitorWebLabel.setToolTipText("We can monitor the DispatcherServlet for spring-web");
+        JLabel monitorWebLabel = new JLabel("Trace Web:");
+        monitorWebLabel.setToolTipText("We can trace the DispatcherServlet for spring-web");
         monitorWebLabel.setPreferredSize(labelDimension);
         JRadioButton monitorWeb = new JRadioButton("", false);
         monitorWeb.addActionListener(e -> {
             if (monitorWeb.isSelected()) {
-                monitorWeb.setText("We will monitor the DispatcherServlet for spring-web");
+                monitorWeb.setText("We will trace the DispatcherServlet for spring-web");
             } else {
                 monitorWeb.setText("");
             }
         });
         if (monitorConfig.isMonitorWeb()) {
             monitorWeb.setSelected(true);
-            monitorWeb.setText("We will monitor the DispatcherServlet for spring-web");
+            monitorWeb.setText("We will trace the DispatcherServlet for spring-web");
         }
 //        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
 //        JTextField functionTypeField = new JTextField("private,public,protected", 20);
@@ -661,20 +661,20 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(monitorWeb, gbc);
 
 
-        JLabel monitorMybatisLabel = new JLabel("Monitor Mybatis:");
-        monitorMybatisLabel.setToolTipText("We can use the mybatis Interceptor mechanism to monitor Executor");
+        JLabel monitorMybatisLabel = new JLabel("Trace Mybatis:");
+        monitorMybatisLabel.setToolTipText("We can use the mybatis Interceptor mechanism to trace Executor");
         monitorMybatisLabel.setPreferredSize(labelDimension);
         JRadioButton monitorMybatis = new JRadioButton("", false);
         monitorMybatis.addActionListener(e -> {
             if (monitorMybatis.isSelected()) {
-                monitorMybatis.setText("We will use the mybatis Interceptor mechanism to monitor Executor");
+                monitorMybatis.setText("We will use the mybatis Interceptor mechanism to trace Executor");
             } else {
                 monitorMybatis.setText("");
             }
         });
         if (monitorConfig.isMonitorMybatis()) {
             monitorMybatis.setSelected(true);
-            monitorMybatis.setText("We will use the mybatis Interceptor mechanism to monitor Executor");
+            monitorMybatis.setText("We will use the mybatis Interceptor mechanism to trace Executor");
         }
 //        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
 //        JTextField functionTypeField = new JTextField("private,public,protected", 20);
@@ -714,7 +714,7 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(logMybatis, gbc);
 
         JLabel packageLabel = new JLabel("Package:");
-        packageLabel.setToolTipText("Please fill in the package name of the class you want to monitor, multiple use, split;\napp.three.package means that the first three packages of the startup class are automatically intercepted");
+        packageLabel.setToolTipText("Please fill in the package name of the class you want to trace, multiple use, split;\napp.three.package means that the first three packages of the startup class are automatically intercepted");
         packageLabel.setPreferredSize(labelDimension);
         JTextField packagesField = new JTextField(monitorConfig.getPackages(), 20);
         gbc.gridx = 0;
@@ -727,7 +727,7 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(packagesField, gbc);
 
         JLabel classSuffixLabel = new JLabel("Class Suffix:");
-        classSuffixLabel.setToolTipText("Please fill in the class suffix of the class you want to monitor, multiple use, split");
+        classSuffixLabel.setToolTipText("Please fill in the class suffix of the class you want to trace, multiple use, split");
         classSuffixLabel.setPreferredSize(labelDimension);
         JTextField classSuffixField = new JTextField(monitorConfig.getClsSuffix(), 20);
         gbc.gridx = 0;
@@ -741,7 +741,7 @@ public class FlingToolWindow {
 
 
         JLabel whiteClassLabel = new JLabel("White Class:");
-        whiteClassLabel.setToolTipText("Monitoring class whitelist list, multiple use, split");
+        whiteClassLabel.setToolTipText("Tracing class whitelist list, multiple use, split");
         whiteClassLabel.setPreferredSize(labelDimension);
         JTextField whiteListField = new JTextField(monitorConfig.getWhites(), 20);
         gbc.gridx = 0;
@@ -754,7 +754,7 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(whiteListField, gbc);
 
         JLabel blackClassLabel = new JLabel("Black Class:");
-        blackClassLabel.setToolTipText("Monitoring class black list, multiple use, split");
+        blackClassLabel.setToolTipText("Tracing class black list, multiple use, split");
         blackClassLabel.setPreferredSize(labelDimension);
         JTextField blackListField = new JTextField(monitorConfig.getBlacks(), 20);
         gbc.gridx = 0;
@@ -768,19 +768,19 @@ public class FlingToolWindow {
 
 
         JLabel monitorPrivateLabel = new JLabel("Method Type:");
-        monitorPrivateLabel.setToolTipText("You can choose which methods of the class to monitor, this config support hot reload");
+        monitorPrivateLabel.setToolTipText("You can choose which methods of the class to trace, this config support hot reload");
         monitorPrivateLabel.setPreferredSize(labelDimension);
-        JRadioButton monitorPrivate = new JRadioButton("We will monitor the public and protected methods of the selected class", false);
+        JRadioButton monitorPrivate = new JRadioButton("We will trace the public and protected methods of the selected class", false);
         monitorPrivate.addActionListener(e -> {
             if (monitorPrivate.isSelected()) {
-                monitorPrivate.setText("We will monitor the all methods of the selected class");
+                monitorPrivate.setText("We will trace the all methods of the selected class");
             } else {
-                monitorPrivate.setText("We will monitor the public and protected methods of the selected class");
+                monitorPrivate.setText("We will trace the public and protected methods of the selected class");
             }
         });
         if (monitorConfig.isMonitorPrivate()) {
             monitorPrivate.setSelected(true);
-            monitorPrivate.setText("We will monitor the all methods of the selected class");
+            monitorPrivate.setText("We will trace the all methods of the selected class");
         }
 //        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
 //        JTextField functionTypeField = new JTextField("private,public,protected", 20);
