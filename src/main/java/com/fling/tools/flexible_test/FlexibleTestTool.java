@@ -2,11 +2,13 @@ package com.fling.tools.flexible_test;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.tools.ToolHelper;
+import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
@@ -18,6 +20,8 @@ import java.awt.event.ActionListener;
 import java.util.function.Supplier;
 
 public class FlexibleTestTool extends BasePluginTool {
+
+    public static final Icon FLEXIBLE_TEST_DISABLE_ICON = IconLoader.getIcon("/icons/test-code-disable.svg", CallMethodIconProvider.class);
 
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
@@ -33,14 +37,11 @@ public class FlexibleTestTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,"<html>\n" +
-                "<meta charset=\"UTF-8\">\n" +
-                "<strong>flexible-test</strong><br>\n" +
+        actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,FLEXIBLE_TEST_DISABLE_ICON,"<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>module test source 下 ${Test Package} 内的 public 函数</li>\n" +
                 "    <li>非static</li>\n" +
-                "</ul>\n" +
-                "</html>",topPanel, new ActionListener() {
+                "</ul>",topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -120,7 +121,9 @@ public class FlexibleTestTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);
-        req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        if(useScript){
+            req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        }
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());

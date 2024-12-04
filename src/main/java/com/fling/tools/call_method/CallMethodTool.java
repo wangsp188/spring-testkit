@@ -8,6 +8,7 @@ import com.intellij.icons.AllIcons;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
@@ -21,6 +22,8 @@ import java.awt.event.ItemListener;
 import java.util.function.Supplier;
 
 public class CallMethodTool extends BasePluginTool {
+
+    public static final Icon CALL_METHOD_DISABLE_ICON = IconLoader.getIcon("/icons/spring-fling-disable.svg", CallMethodIconProvider.class);
 
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
@@ -37,15 +40,12 @@ public class CallMethodTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON, "<html>\n" +
-                "<meta charset=\"UTF-8\">\n" +
-                "<strong>call-method</strong><br>\n" +
-                "<ul>\n" +
+        actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON,CALL_METHOD_DISABLE_ICON,
+                "<strong>call-method</strong>\n<ul>\n" +
                 "    <li>spring bean 的 public 函数</li>\n" +
                 "    <li>非init/main</li>\n" +
                 "    <li>非test source</li>\n" +
-                "</ul>\n" +
-                "</html>", topPanel, new ActionListener() {
+                "</ul>", topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -152,7 +152,9 @@ public class CallMethodTool extends BasePluginTool {
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
-        req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        if(useScript){
+            req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        }
         return req;
     }
 

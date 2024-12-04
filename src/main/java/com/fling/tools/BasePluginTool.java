@@ -28,6 +28,7 @@ import com.fling.util.HttpUtil;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
@@ -48,6 +49,7 @@ public abstract class BasePluginTool {
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
     protected EditorTextField inputEditorTextField;
+    protected boolean useScript;
 
     public BasePluginTool(FlingToolWindow flingToolWindow) {
         // 初始化panel
@@ -211,20 +213,20 @@ public abstract class BasePluginTool {
         try {
             response = submit.get();
         } catch (Throwable e) {
-            setOutputText("submit req error \n" + ToolHelper.getStackTrace(e),null);
+            setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
             return;
         }
         if (response == null) {
             return;
         }
         if (!response.getBooleanValue("success") || response.getString("data") == null) {
-            setOutputText("submit req error \n" + response.getString("message"),null);
+            setOutputText("submit req error \n" + response.getString("message"), null);
             return;
         }
         String reqId = response.getString("data");
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
-        setOutputText("req is sent，reqId:" + reqId,null);
+        setOutputText("req is sent，reqId:" + reqId, null);
         // 第二个 SwingWorker 用于获取结果
         new SwingWorker<JSONObject, Void>() {
 
@@ -337,10 +339,39 @@ public abstract class BasePluginTool {
     }
 
 
-    protected ComboBox addActionComboBox(Icon icon, String tooltips, JPanel topPanel, ActionListener actionListener) {
-        JButton testBtn = new JButton(icon == null ? AllIcons.Nodes.Method : icon);
+    protected ComboBox addActionComboBox(Icon icon, Icon disableIcon, String tooltips, JPanel topPanel, ActionListener actionListener) {
+        JButton testBtn = new JButton(icon);
+        if (icon != disableIcon) {
+            useScript = true;
+            testBtn.setToolTipText("<html>\n" +
+                    "<meta charset=\"UTF-8\">\n" +
+                    "<strong>脚本已打开</strong><br>\n" + tooltips + "\n</html>");
+            testBtn.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (testBtn.getIcon() == icon) {
+                        useScript = false;
+                        testBtn.setIcon(disableIcon);
+                        testBtn.setToolTipText("<html>\n" +
+                                "<meta charset=\"UTF-8\">\n" +
+                                "<strong>脚本已关闭</strong><br>\n" + tooltips + "\n</html>");
+                    } else {
+                        useScript = true;
+                        testBtn.setIcon(icon);
+                        testBtn.setToolTipText("<html>\n" +
+                                "<meta charset=\"UTF-8\">\n" +
+                                "<strong>脚本已打开</strong><br>\n" + tooltips + "\n</html>");
+                    }
+                }
+            });
+        } else {
+            useScript = false;
+            testBtn.setToolTipText("<html>\n" +
+                    "<meta charset=\"UTF-8\">\n" +
+                    "<strong>不支持脚本</strong><br>\n" + tooltips + "\n</html>");
+        }
+
         testBtn.setPreferredSize(new Dimension(32, 32));
-        testBtn.setToolTipText(tooltips == null ? "" : tooltips);
         topPanel.add(testBtn);
         ComboBox actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(200, 32));

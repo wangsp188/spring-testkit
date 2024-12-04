@@ -10,6 +10,7 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -31,6 +32,9 @@ import java.util.function.Supplier;
 
 public class MybatisSqlTool extends BasePluginTool {
 
+    public static final Icon FLING_SQL_DISABLE_ICON = IconLoader.getIcon("/icons/fling-sql-disable.svg", MybatisSqlIconProvider.class);
+
+
     private JComboBox<ToolHelper.XmlTagAction> actionComboBox;
 
 
@@ -47,14 +51,11 @@ public class MybatisSqlTool extends BasePluginTool {
     @Override
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(MybatisSqlIconProvider.FLING_SQL_ICON, "<html>\n" +
-                "<meta charset=\"UTF-8\">\n" +
-                "<strong>mybatis-sql</strong><br>\n" +
+        actionComboBox = addActionComboBox(FLING_SQL_DISABLE_ICON,FLING_SQL_DISABLE_ICON, "<strong>mybatis-sql</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>mapper的xml文件内 sql标签</li>\n" +
                 "    <li>select/insert/update/delete</li>\n" +
-                "</ul>\n" +
-                "</html>",topPanel, new ActionListener() {
+                "</ul>",topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {

@@ -22,6 +22,9 @@ import java.util.function.Supplier;
 public class SpringCacheTool extends BasePluginTool {
     private static final Icon KIcon = IconLoader.getIcon("/icons/k.svg", SpringCacheTool.class);
 
+    public static final Icon CACHEABLE_DISABLE_ICON = IconLoader.getIcon("/icons/cacheable-disable.svg",SpringCacheIconProvider.class);
+
+
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
 
     {
@@ -36,14 +39,11 @@ public class SpringCacheTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionComboBox = addActionComboBox(SpringCacheIconProvider.CACHEABLE_ICON, "<html >\n" +
-                "<meta charset=\"UTF-8\">\n" +
-                "<strong>spring-cache</strong><br>\n" +
+        actionComboBox = addActionComboBox(SpringCacheIconProvider.CACHEABLE_ICON,CACHEABLE_DISABLE_ICON, "<strong>spring-cache</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>spring bean 中带有 @Cacheable/@CacheEvict/@CachePut/@Caching 的 public 函数</li>\n" +
                 "    <li>非 static</li>\n" +
-                "</ul>\n" +
-                "</html>",topPanel, new ActionListener() {
+                "</ul>",topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -179,7 +179,9 @@ public class SpringCacheTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", PluginToolEnum.SPRING_CACHE.getCode());
         req.put("params", params);
-        req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        if(useScript){
+            req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+        }
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
