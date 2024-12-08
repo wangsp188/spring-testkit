@@ -38,7 +38,7 @@ public class SpringCacheTool extends BasePluginTool {
 
 
     protected JPanel createActionPanel() {
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel topPanel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(SpringCacheIconProvider.CACHEABLE_ICON,CACHEABLE_DISABLE_ICON, "<strong>spring-cache</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>spring bean 中带有 @Cacheable/@CacheEvict/@CachePut/@Caching 的 public 函数</li>\n" +
@@ -52,6 +52,12 @@ public class SpringCacheTool extends BasePluginTool {
         });
 
 
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.0;
+        gbc.gridx = 2;
+        gbc.gridy = 0;
         JButton getKeyButton = new JButton(KIcon);
         getKeyButton.setToolTipText("build keys");
         JButton getValButton = new JButton(AllIcons.Actions.Find);
@@ -124,10 +130,11 @@ public class SpringCacheTool extends BasePluginTool {
             }
         });
 
-        topPanel.add(getKeyButton);
-        topPanel.add(getValButton);
+        topPanel.add(getKeyButton,gbc);
+        gbc.gridx = 3;
+        topPanel.add(getValButton,gbc);
+        gbc.gridx = 4;
         topPanel.add(delValButton);
-
         return topPanel;
     }
 

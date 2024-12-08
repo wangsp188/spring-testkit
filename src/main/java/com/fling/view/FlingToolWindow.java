@@ -36,6 +36,7 @@ import com.fling.tools.flexible_test.FlexibleTestTool;
 import com.fling.tools.mybatis_sql.MybatisSqlTool;
 import com.fling.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBList;
+import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
@@ -609,7 +610,7 @@ public class FlingToolWindow {
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(project);
 
 
-        JRadioButton monitorToggleButton = new JRadioButton("Enable Trace", false);
+        JRadioButton monitorToggleButton = new JBRadioButton("Enable Trace", false);
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 2;
@@ -637,7 +638,7 @@ public class FlingToolWindow {
         JLabel monitorWebLabel = new JLabel("Trace Web:");
         monitorWebLabel.setToolTipText("We can trace the DispatcherServlet for spring-web");
         monitorWebLabel.setPreferredSize(labelDimension);
-        JRadioButton monitorWeb = new JRadioButton("", false);
+        JRadioButton monitorWeb = new JBRadioButton("", false);
         monitorWeb.addActionListener(e -> {
             if (monitorWeb.isSelected()) {
                 monitorWeb.setText("We will trace the DispatcherServlet for spring-web");
@@ -664,7 +665,7 @@ public class FlingToolWindow {
         JLabel monitorMybatisLabel = new JLabel("Trace Mybatis:");
         monitorMybatisLabel.setToolTipText("We can use the mybatis Interceptor mechanism to trace Executor");
         monitorMybatisLabel.setPreferredSize(labelDimension);
-        JRadioButton monitorMybatis = new JRadioButton("", false);
+        JRadioButton monitorMybatis = new JBRadioButton("", false);
         monitorMybatis.addActionListener(e -> {
             if (monitorMybatis.isSelected()) {
                 monitorMybatis.setText("We will use the mybatis Interceptor mechanism to trace Executor");
@@ -690,7 +691,7 @@ public class FlingToolWindow {
         JLabel logMybatisLabel = new JLabel("Log Mybatis:");
         logMybatisLabel.setToolTipText("We can output sql in mybatis format");
         logMybatisLabel.setPreferredSize(labelDimension);
-        JRadioButton logMybatis = new JRadioButton("", false);
+        JRadioButton logMybatis = new JBRadioButton("", false);
         logMybatis.addActionListener(e -> {
             if (logMybatis.isSelected()) {
                 logMybatis.setText("We will output sql in mybatis format");
@@ -770,7 +771,7 @@ public class FlingToolWindow {
         JLabel monitorPrivateLabel = new JLabel("Method Type:");
         monitorPrivateLabel.setToolTipText("You can choose which methods of the class to trace, this config support hot reload");
         monitorPrivateLabel.setPreferredSize(labelDimension);
-        JRadioButton monitorPrivate = new JRadioButton("We will trace the public and protected methods of the selected class", false);
+        JRadioButton monitorPrivate = new JBRadioButton("We will trace the public and protected methods of the selected class", false);
         monitorPrivate.addActionListener(e -> {
             if (monitorPrivate.isSelected()) {
                 monitorPrivate.setText("We will trace the all methods of the selected class");

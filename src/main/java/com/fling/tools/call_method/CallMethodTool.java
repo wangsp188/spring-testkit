@@ -2,7 +2,6 @@ package com.fling.tools.call_method;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.tools.ToolHelper;
-import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.fling.util.HttpUtil;
@@ -12,6 +11,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
+import com.intellij.ui.components.JBRadioButton;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,10 +25,15 @@ public class CallMethodTool extends BasePluginTool {
 
     public static final Icon CALL_METHOD_DISABLE_ICON = IconLoader.getIcon("/icons/spring-fling-disable.svg", CallMethodIconProvider.class);
 
+    public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", CallMethodIconProvider.class);
+    public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", CallMethodIconProvider.class);
+
+
+
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
 
-    private JRadioButton useProxyRadioButton;
+    private JToggleButton useProxyButton;
 
     {
         this.tool = PluginToolEnum.CALL_METHOD;
@@ -39,7 +44,7 @@ public class CallMethodTool extends BasePluginTool {
     }
 
     protected JPanel createActionPanel() {
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel topPanel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON,CALL_METHOD_DISABLE_ICON,
                 "<strong>call-method</strong>\n<ul>\n" +
                 "    <li>spring bean 的 public 函数</li>\n" +
@@ -54,6 +59,30 @@ public class CallMethodTool extends BasePluginTool {
         });
         // Populate methodComboBox with method names
 
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 2;
+        gbc.gridy = 0;
+
+        // Add the radio button
+        useProxyButton = new JToggleButton(PROXY_ICON,true);
+        useProxyButton.setPreferredSize(new Dimension(32, 32));
+        useProxyButton.setToolTipText("use proxy obj call method");
+        useProxyButton.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (useProxyButton.isSelected()) {
+                    useProxyButton.setIcon(PROXY_ICON);
+                    useProxyButton.setToolTipText("use proxy obj call method");
+                } else {
+                    useProxyButton.setIcon(PROXY_DISABLE_ICON);
+                    useProxyButton.setToolTipText("use original obj call method");
+                }
+            }
+        });
+        topPanel.add(useProxyButton,gbc);
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
         runButton.setToolTipText("test method");
@@ -104,26 +133,8 @@ public class CallMethodTool extends BasePluginTool {
             }
         });
 
-
-        topPanel.add(runButton);
-
-
-        // Add the radio button
-        useProxyRadioButton = new JRadioButton();
-        useProxyRadioButton.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                if (useProxyRadioButton.isSelected()) {
-                    useProxyRadioButton.setText("Proxy");
-                    useProxyRadioButton.setToolTipText("use proxy obj call method");
-                } else {
-                    useProxyRadioButton.setText("Original");
-                    useProxyRadioButton.setToolTipText("use original obj call method");
-                }
-            }
-        });
-        useProxyRadioButton.setSelected(true);
-        topPanel.add(useProxyRadioButton);
+        gbc.gridx = 3;
+        topPanel.add(runButton,gbc);
 
         return topPanel;
     }
@@ -145,7 +156,7 @@ public class CallMethodTool extends BasePluginTool {
         }
         params.put("argTypes", JSONObject.toJSONString(argTypes));
         params.put("args", ToolHelper.adapterParams(method, args).toJSONString());
-        params.put("original", !useProxyRadioButton.isSelected());
+        params.put("original", !useProxyButton.isSelected());
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);

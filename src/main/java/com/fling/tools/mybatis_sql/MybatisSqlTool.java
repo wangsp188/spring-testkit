@@ -1,8 +1,8 @@
 package com.fling.tools.mybatis_sql;
 
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.tools.ToolHelper;
+import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.util.Container;
 import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
@@ -35,10 +35,14 @@ public class MybatisSqlTool extends BasePluginTool {
     public static final Icon FLING_SQL_DISABLE_ICON = IconLoader.getIcon("/icons/fling-sql-disable.svg", MybatisSqlIconProvider.class);
 
 
+    public static final Icon REPLACE_DISABLE_ICON = IconLoader.getIcon("/icons/replace-disable.svg", CallMethodIconProvider.class);
+    public static final Icon REPLACE_ICON = IconLoader.getIcon("/icons/replace.svg", CallMethodIconProvider.class);
+
+
     private JComboBox<ToolHelper.XmlTagAction> actionComboBox;
 
 
-    private JRadioButton prepareRadioButton;
+    private JToggleButton replaceParamsButton;
 
     {
         this.tool = PluginToolEnum.FLEXIBLE_TEST;
@@ -50,7 +54,7 @@ public class MybatisSqlTool extends BasePluginTool {
 
     @Override
     protected JPanel createActionPanel() {
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel topPanel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(FLING_SQL_DISABLE_ICON,FLING_SQL_DISABLE_ICON, "<strong>mybatis-sql</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>mapper的xml文件内 sql标签</li>\n" +
@@ -63,6 +67,30 @@ public class MybatisSqlTool extends BasePluginTool {
             }
         });
 
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.0;
+        gbc.gridx = 2;
+        gbc.gridy = 0;
+        // Add the radio button
+        replaceParamsButton = new JToggleButton(REPLACE_DISABLE_ICON,false);
+        replaceParamsButton.setPreferredSize(new Dimension(32,32));
+        replaceParamsButton.setToolTipText("build PreparedSql");
+        replaceParamsButton.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (replaceParamsButton.isSelected()) {
+                    replaceParamsButton.setIcon(REPLACE_ICON);
+                    replaceParamsButton.setToolTipText("build FinalSql");
+
+                } else {
+                    replaceParamsButton.setIcon(REPLACE_DISABLE_ICON);
+                    replaceParamsButton.setToolTipText("build PreparedSql");
+                }
+            }
+        });
+        topPanel.add(replaceParamsButton,gbc);
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
         runButton.setToolTipText("build sql");
@@ -96,7 +124,7 @@ public class MybatisSqlTool extends BasePluginTool {
                         String statementId = selectedItem.getXmlTag().getAttributeValue("id");
                         System.err.println("xml: " + xmlContent + ", statementId: " + statementId + ", params:" + jsonObject.toJSONString());
                         try {
-                            String sql = MybatisGenerator.generateSql(xmlContent, statementId, prepareRadioButton.isSelected(), jsonObject);
+                            String sql = MybatisGenerator.generateSql(xmlContent, statementId, !replaceParamsButton.isSelected(), jsonObject);
                             if (StringUtils.isBlank(sql)) {
                                 return sql;
                             }
@@ -119,25 +147,9 @@ public class MybatisSqlTool extends BasePluginTool {
             }
         });
 
+        gbc.gridx = 3;
+        topPanel.add(runButton,gbc);
 
-        topPanel.add(runButton);
-
-        // Add the radio button
-        prepareRadioButton = new JRadioButton();
-        prepareRadioButton.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                if (prepareRadioButton.isSelected()) {
-                    prepareRadioButton.setText("Prepared");
-                    prepareRadioButton.setToolTipText("build PreparedSql");
-                } else {
-                    prepareRadioButton.setText("Final");
-                    prepareRadioButton.setToolTipText("build FinalSql");
-                }
-            }
-        });
-        prepareRadioButton.setSelected(true);
-        topPanel.add(prepareRadioButton);
         return topPanel;
     }
 

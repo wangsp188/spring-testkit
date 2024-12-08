@@ -425,11 +425,11 @@ public class ToolHelper {
         if (throwable == null) {
             return "";
         }
-        while (throwable instanceof InvocationTargetException) {
-            throwable = ((InvocationTargetException) throwable).getTargetException();
-        }
         if (throwable.getCause() != null && throwable.getCause() != throwable) {
             throwable = throwable.getCause();
+        }
+        while (throwable instanceof InvocationTargetException) {
+            throwable = ((InvocationTargetException) throwable).getTargetException();
         }
         final StringWriter sw = new StringWriter();
         throwable.printStackTrace(new PrintWriter(sw, true));

@@ -36,7 +36,7 @@ public class FlexibleTestTool extends BasePluginTool {
     }
 
     protected JPanel createActionPanel() {
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel topPanel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,FLEXIBLE_TEST_DISABLE_ICON,"<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>module test source 下 ${Test Package} 内的 public 函数</li>\n" +
@@ -49,6 +49,12 @@ public class FlexibleTestTool extends BasePluginTool {
             }
         });
 
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.weightx = 0.0;
+        gbc.gridx = 2;
+        gbc.gridy = 0;
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
         runButton.setToolTipText("test method");
@@ -98,7 +104,7 @@ public class FlexibleTestTool extends BasePluginTool {
                 });
             }
         });
-        topPanel.add(runButton);
+        topPanel.add(runButton,gbc);
         return topPanel;
     }
 

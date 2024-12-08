@@ -340,6 +340,12 @@ public abstract class BasePluginTool {
 
 
     protected ComboBox addActionComboBox(Icon icon, Icon disableIcon, String tooltips, JPanel topPanel, ActionListener actionListener) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.0;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
         JButton testBtn = new JButton(icon);
         if (icon != disableIcon) {
             useScript = true;
@@ -372,7 +378,7 @@ public abstract class BasePluginTool {
         }
 
         testBtn.setPreferredSize(new Dimension(32, 32));
-        topPanel.add(testBtn);
+        topPanel.add(testBtn, gbc);
         ComboBox actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(200, 32));
         actionComboBox.addActionListener(e -> {
@@ -420,8 +426,11 @@ public abstract class BasePluginTool {
                 actionListener.actionPerformed(e);
             }
         });
-        topPanel.add(actionComboBox);
-
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        topPanel.add(actionComboBox, gbc);
         return actionComboBox;
     }
 

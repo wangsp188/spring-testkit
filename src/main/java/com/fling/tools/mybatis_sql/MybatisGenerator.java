@@ -53,11 +53,15 @@ public class MybatisGenerator {
         // 使用正则表达式移除typeHandler属性 (注意：正则可能影响其他配置，请具体分析XML结构）
         // Step 2: Parse the mapper XML and build a MappedStatement
         Configuration configuration = new Configuration();
-        // Initialize an environment (we don't need actual data source for SQL generation)
-        Environment environment = new Environment(FlingHelper.getPluginName(), new JdbcTransactionFactory(), new FakeDataSource());
-        configuration.setEnvironment(environment);
-        XMLMapperBuilder mapperBuilder = new XMLMapperBuilder(new StringReader(xmlContent), configuration, FlingHelper.getPluginName(), configuration.getSqlFragments());
-        mapperBuilder.parse(); // Parses the XML and adds statements to configuration
+        try {
+            // Initialize an environment (we don't need actual data source for SQL generation)
+            Environment environment = new Environment(FlingHelper.getPluginName(), new JdbcTransactionFactory(), new FakeDataSource());
+            configuration.setEnvironment(environment);
+            XMLMapperBuilder mapperBuilder = new XMLMapperBuilder(new StringReader(xmlContent), configuration, FlingHelper.getPluginName(), configuration.getSqlFragments());
+            mapperBuilder.parse(); // Parses the XML and adds statements to configuration
+        } catch (Throwable e) {
+            throw new RuntimeException("mapper parse error，errorType:" + e.getClass().getName() + ", " + e.getMessage());
+        }
 
         // Step 3: Get the MappedStatement by statementId
         MappedStatement mappedStatement = configuration.getMappedStatement(statementId);
@@ -98,81 +102,90 @@ public class MybatisGenerator {
 
     private static String buildCompleteSql(String sql, BoundSql boundSql, JSONObject parameters) {
         // Iterate over parameters and replace "?" placeholders
-        StringBuilder finalSql = new StringBuilder();
-        String[] sqlParts = sql.split("\\?");
-        List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
-        for (int i = 0; i < sqlParts.length; i++) {
-            finalSql.append(sqlParts[i]);
-            if (parameterMappings.size() > i) {
-                ParameterMapping parameterMapping = parameterMappings.get(i);
-                String paramName = parameterMapping.getProperty();
-                Object paramValue = JSONPath.eval(parameters, "$." + paramName);
-                if (paramValue == null) {
-                    paramValue = boundSql.getAdditionalParameter(paramName);
-                }
-                //  根据类型jdbcType和 paramValue 拼接参数
-                if (paramValue == null) {
-                    finalSql.append("NULL");
-                } else if (paramValue instanceof String) {
-                    finalSql.append("'").append(paramValue).append("'");
-                } else {
-                    finalSql.append(paramValue);
+        try {
+            StringBuilder finalSql = new StringBuilder();
+            String[] sqlParts = sql.split("\\?");
+            List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
+            for (int i = 0; i < sqlParts.length; i++) {
+                finalSql.append(sqlParts[i]);
+                if (parameterMappings.size() > i) {
+                    ParameterMapping parameterMapping = parameterMappings.get(i);
+                    String paramName = parameterMapping.getProperty();
+                    Object paramValue = JSONPath.eval(parameters, "$." + paramName);
+                    if (paramValue == null) {
+                        paramValue = boundSql.getAdditionalParameter(paramName);
+                    }
+                    //  根据类型jdbcType和 paramValue 拼接参数
+                    if (paramValue == null) {
+                        finalSql.append("NULL");
+                    } else if (paramValue instanceof String) {
+                        finalSql.append("'").append(paramValue).append("'");
+                    } else {
+                        finalSql.append(paramValue);
+                    }
                 }
             }
-        }
 //        finalSql.append(sqlParts[sqlParts.length-1]);
-        return finalSql.toString();
+            return finalSql.toString();
+        } catch (Throwable e) {
+            throw new RuntimeException("params replace error，errorType:" + e.getClass().getName() + ", " + e.getMessage());
+        }
     }
 
 
     private static @NotNull String cleanXml(String xmlContent, String statementId) throws ParserConfigurationException, IOException, SAXException, TransformerException {
         // Step 1: Parse XML and find <mapper> node
         Document document = parseXml(xmlContent);
-        Element mapperElement = (Element) document.getElementsByTagName("mapper").item(0);
+        String dynamicXmlContent = null;
+        try {
+            Element mapperElement = (Element) document.getElementsByTagName("mapper").item(0);
 
-        // Step 2: Cache all <sql> nodes
-        Map<String, Element> sqlFragments = new HashMap<>();
-        NodeList children = mapperElement.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node child = children.item(i);
-            if (child.getNodeType() == Node.ELEMENT_NODE && "sql".equals(child.getNodeName())) {
-                Element sqlElement = (Element) child;
-                String id = sqlElement.getAttribute("id");
-                sqlFragments.put(id, sqlElement);
+            // Step 2: Cache all <sql> nodes
+            Map<String, Element> sqlFragments = new HashMap<>();
+            NodeList children = mapperElement.getChildNodes();
+            for (int i = 0; i < children.getLength(); i++) {
+                Node child = children.item(i);
+                if (child.getNodeType() == Node.ELEMENT_NODE && "sql".equals(child.getNodeName())) {
+                    Element sqlElement = (Element) child;
+                    String id = sqlElement.getAttribute("id");
+                    sqlFragments.put(id, sqlElement);
+                }
             }
-        }
 
-        // Step 3: Find target statement node and clean it
-        Element statementElement = null;
-        for (int i = 0; i < children.getLength(); i++) {
-            Node child = children.item(i);
-            if (child.getNodeType() == Node.ELEMENT_NODE && statementId.equals(((Element) child).getAttribute("id"))) {
-                statementElement = (Element) child;
-                cleanStatementNode(statementElement);
-                break;
+            // Step 3: Find target statement node and clean it
+            Element statementElement = null;
+            for (int i = 0; i < children.getLength(); i++) {
+                Node child = children.item(i);
+                if (child.getNodeType() == Node.ELEMENT_NODE && statementId.equals(((Element) child).getAttribute("id"))) {
+                    statementElement = (Element) child;
+                    cleanStatementNode(statementElement);
+                    break;
+                }
             }
+
+            if (statementElement == null) {
+                throw new IllegalArgumentException("Statement not found: " + statementId);
+            }
+
+            // Step 4: Create a dynamic mapper XML with cached <sql> nodes and the cleaned statement
+            Document newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+            Element newMapperElement = newDocument.createElement("mapper");
+            newDocument.appendChild(newMapperElement);
+
+            for (Element sqlFragment : sqlFragments.values()) {
+                Node importedNode = newDocument.importNode(sqlFragment, true);
+                newMapperElement.appendChild(importedNode);
+            }
+
+            Node importedStatement = newDocument.importNode(statementElement, true);
+            newMapperElement.appendChild(importedStatement);
+            newMapperElement.setAttribute("namespace", FlingHelper.getPluginName());
+
+            // Convert the modified XML to a string
+            dynamicXmlContent = transformDocumentToString(newDocument);
+        } catch (Throwable e) {
+            throw new RuntimeException("clean xml error, errorType:" + e.getClass().getName() + ", " + e.getMessage());
         }
-
-        if (statementElement == null) {
-            throw new IllegalArgumentException("Statement not found: " + statementId);
-        }
-
-        // Step 4: Create a dynamic mapper XML with cached <sql> nodes and the cleaned statement
-        Document newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
-        Element newMapperElement = newDocument.createElement("mapper");
-        newDocument.appendChild(newMapperElement);
-
-        for (Element sqlFragment : sqlFragments.values()) {
-            Node importedNode = newDocument.importNode(sqlFragment, true);
-            newMapperElement.appendChild(importedNode);
-        }
-
-        Node importedStatement = newDocument.importNode(statementElement, true);
-        newMapperElement.appendChild(importedStatement);
-        newMapperElement.setAttribute("namespace", FlingHelper.getPluginName());
-
-        // Convert the modified XML to a string
-        String dynamicXmlContent = transformDocumentToString(newDocument);
         dynamicXmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                 "<!DOCTYPE mapper\n" +
                 "        PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\"\n" +
@@ -181,10 +194,14 @@ public class MybatisGenerator {
     }
 
     private static Document parseXml(String xmlContent) throws ParserConfigurationException, IOException, SAXException {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setIgnoringElementContentWhitespace(true);
-        DocumentBuilder builder = factory.newDocumentBuilder();
-        return builder.parse(new InputSource(new StringReader(xmlContent)));
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setIgnoringElementContentWhitespace(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            return builder.parse(new InputSource(new StringReader(xmlContent)));
+        } catch (Throwable e) {
+            throw new RuntimeException("xml parse error，errorType:" + e.getClass().getName() + ", " + e.getMessage());
+        }
     }
 
     private static void cleanStatementNode(Element element) {
@@ -226,16 +243,39 @@ public class MybatisGenerator {
         NodeList children = element.getChildNodes();
         for (int i = 0; i < children.getLength(); i++) {
             Node child = children.item(i);
-            if (child.getNodeType() == Node.ELEMENT_NODE) {
-                Element element1 = (Element) child;
+            try {
+                if (child.getNodeType() == Node.ELEMENT_NODE) {
+                    Element element1 = (Element) child;
 
-                if (element1.getTagName().equals("foreach")) {
-                    String collectionAttr = element1.getAttribute("collection");
-                    if (collectionAttr.isEmpty()) {
+                    if (element1.getTagName().equals("foreach")) {
+                        String collectionAttr = element1.getAttribute("collection");
+                        if (collectionAttr.isEmpty()) {
+                            continue;
+                        }
+                        paramMap.put(collectionAttr, true);
+
+
+                        // Check textual content for ${} and #{}
+                        NodeList children2 = element1.getChildNodes();
+                        StringBuilder textContent = new StringBuilder();
+
+                        // 遍历当前元素的子节点
+                        for (int i2 = 0; i2 < children2.getLength(); i2++) {
+                            Node child2 = children2.item(i2);
+
+                            // 只处理直接文本节点
+                            if (child2.getNodeType() == Node.TEXT_NODE) {
+                                textContent.append(child2.getTextContent());
+                            }
+                        }
+
+                        String item = element1.getAttribute("item");
+                        if (StringUtils.isNotBlank(item)) {
+                            extractInlineParametersColl(item, collectionAttr, textContent.toString(), paramMap);
+                        }
+
                         continue;
                     }
-                    paramMap.put(collectionAttr, true);
-
 
                     // Check textual content for ${} and #{}
                     NodeList children2 = element1.getChildNodes();
@@ -251,38 +291,20 @@ public class MybatisGenerator {
                         }
                     }
 
-                    String item = element1.getAttribute("item");
-                    if (StringUtils.isNotBlank(item)) {
-                        extractInlineParametersColl(item, collectionAttr, textContent.toString(), paramMap);
+                    extractInlineParameters(textContent.toString(), paramMap);
+
+                    // Check attributes like `test` and `collection`
+                    String testAttr = element1.getAttribute("test");
+                    if (!testAttr.isEmpty()) {
+                        collectExpressionParameters(testAttr, paramMap);
                     }
 
-                    continue;
+                    // Recursively process child elements
+                    extractParametersFromElement(element1, paramMap);
                 }
-
-                // Check textual content for ${} and #{}
-                NodeList children2 = element1.getChildNodes();
-                StringBuilder textContent = new StringBuilder();
-
-                // 遍历当前元素的子节点
-                for (int i2 = 0; i2 < children2.getLength(); i2++) {
-                    Node child2 = children2.item(i2);
-
-                    // 只处理直接文本节点
-                    if (child2.getNodeType() == Node.TEXT_NODE) {
-                        textContent.append(child2.getTextContent());
-                    }
-                }
-
-                extractInlineParameters(textContent.toString(), paramMap);
-
-                // Check attributes like `test` and `collection`
-                String testAttr = element1.getAttribute("test");
-                if (!testAttr.isEmpty()) {
-                    collectExpressionParameters(testAttr, paramMap);
-                }
-
-                // Recursively process child elements
-                extractParametersFromElement(element1, paramMap);
+            } catch (Throwable e) {
+                e.printStackTrace();
+                System.out.println("参数解析异常" + e);
             }
         }
     }
