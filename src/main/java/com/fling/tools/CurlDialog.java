@@ -247,7 +247,7 @@ public class CurlDialog extends JDialog {
         copyButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingHelper.copyToClipboard(window.getProject(), field.getText(), labelText + " is Copied");
+                FlingHelper.copyToClipboard(window.getProject(), field.getText(), labelText + " was Copied");
             }
         });
 

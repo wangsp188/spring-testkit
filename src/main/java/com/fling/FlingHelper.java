@@ -24,7 +24,7 @@ public class FlingHelper {
             return;
         }
         Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
-        FlingHelper.notify(project, NotificationType.INFORMATION, copyMsg == null ? "copy success" : copyMsg);
+        FlingHelper.notify(project, NotificationType.INFORMATION, copyMsg == null ? "Copy success" : copyMsg);
     }
 
     public static void refresh(Project project) {

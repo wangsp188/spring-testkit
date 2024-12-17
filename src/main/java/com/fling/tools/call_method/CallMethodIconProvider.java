@@ -68,6 +68,8 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     // 集合和 Map 类的全名
     private static Set<String> serializableClasses = Set.of(
             "java.util.ArrayList",
+            "java.util.List",
+            "java.util.Set",
             "java.util.LinkedList",
             "java.util.HashSet",
             "java.util.LinkedHashSet",

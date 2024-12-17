@@ -50,6 +50,7 @@ public abstract class BasePluginTool {
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
     protected EditorTextField inputEditorTextField;
     protected boolean useScript;
+    protected DefaultActionGroup actionGroup;
 
     public BasePluginTool(FlingToolWindow flingToolWindow) {
         // 初始化panel
@@ -101,23 +102,8 @@ public abstract class BasePluginTool {
         JPanel inputPanel = new JPanel(new BorderLayout());
 
         // 创建一个ActionGroup来包含所有的动作
-        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup = new DefaultActionGroup();
 
-
-        // 添加复制按钮的动作
-        AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        flingWindow.openCurlDialog();
-                    }
-                });
-
-            }
-        };
-        actionGroup.add(curlAction);
 
 
         if (hasActionBox()) {
@@ -141,10 +127,25 @@ public abstract class BasePluginTool {
         AnAction copyAction = new AnAction("Copy input to clipboard", "Copy input to clipboard", AllIcons.Actions.Copy) {
             @Override
             public void actionPerformed(AnActionEvent e) {
-                FlingHelper.copyToClipboard(getProject(), inputEditorTextField.getText(), "Input is copied");
+                FlingHelper.copyToClipboard(getProject(), inputEditorTextField.getText(), "Input was copied");
             }
         };
         actionGroup.add(copyAction);
+
+        // 添加复制按钮的动作
+        AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        flingWindow.openCurlDialog();
+                    }
+                });
+
+            }
+        };
+        actionGroup.add(curlAction);
 
 
         // 创建ActionToolbar

@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.fling.RuntimeAppHelper;
 import com.fling.tools.CurlDialog;
 import com.intellij.icons.AllIcons;
-import com.intellij.ide.DataManager;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
 import com.intellij.notification.NotificationType;
@@ -23,7 +22,6 @@ import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.WindowManager;
 import com.intellij.psi.*;
 import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -92,7 +90,7 @@ public class FlingToolWindow {
 
     private static String linkRenderHtml;
     protected DefaultActionGroup actionGroup;
-    protected AnAction dagreAction;
+    protected AnAction traceAction;
     protected List<Map<String, String>> outputProfile;
 
 
@@ -245,13 +243,13 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(AnActionEvent e) {
                 // 调用复制功能
-                FlingHelper.copyToClipboard(project, outputTextPane.getText(), "Output is copied");
+                FlingHelper.copyToClipboard(project, outputTextPane.getText(), "Output was copied");
             }
         };
         actionGroup.add(copyAction);
 
         if (linkRenderHtml != null) {
-            dagreAction = new AnAction("graph this req", "Dagre this req", dagreIcon) {
+            traceAction = new AnAction("Dagre this req", "Dagre this req", dagreIcon) {
 
                 private JFrame frame;
                 private JBCefBrowser jbCefBrowser;
@@ -389,40 +387,6 @@ public class FlingToolWindow {
             }
         }
     }
-
-//    private void refreshVisibleApp() {
-//        List<String> items = RuntimeAppHelper.loadProjectRuntimes(project.getName());
-//        if (items == null) {
-//            return;
-//        }
-//        HashMap<String, Boolean> map2 = new HashMap<>();
-//        Iterator<String> iterator = items.iterator();
-//        HashMap<String, String> map = new HashMap<>();
-//        map.put("method", "hello");
-//        while (iterator.hasNext()) {
-//            String item = iterator.next();
-//            if (item == null) {
-//                iterator.remove();
-//                continue;
-//            }
-//            VisibleApp visibleApp = parseApp(item);
-//            try {
-//                Map map1 = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, Map.class);
-//                map2.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(map1.get("data"))));
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//                iterator.remove();
-//                RuntimeAppHelper.removeApp(project.getName(), visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
-//            }
-//        }
-//
-//        // 清理 appBox 的内容，并使用 newStrings 重新赋值
-//        appBox.removeAllItems();
-//        for (String item : items) {
-//            appBox.addItem(item.substring(0, item.lastIndexOf(":")));
-//        }
-//        monitorMap = map2;
-//    }
 
     private void openTipsDoc() {
         String url = "https://gitee.com/wangsp188/spring-fling/blob/master/doc/Spring-Fling.md";
@@ -1227,15 +1191,18 @@ public class FlingToolWindow {
 
     public void setOutputProfile(List<Map<String, String>> outputProfile) {
         this.outputProfile = outputProfile;
-        if (dagreAction != null) {
+        if (traceAction != null) {
 //            System.out.println("不可见,"+ (outputProfile != null && !outputProfile.isEmpty()));
-            if (outputProfile != null && !outputProfile.isEmpty() && !actionGroup.containsAction(dagreAction)) {
-                actionGroup.add(dagreAction);
-            } else if ((outputProfile == null || outputProfile.isEmpty()) && actionGroup.containsAction(dagreAction)) {
-                actionGroup.remove(dagreAction);
+            if (outputProfile != null && !outputProfile.isEmpty() && !actionGroup.containsAction(traceAction)) {
+                actionGroup.add(traceAction);
+            } else if ((outputProfile == null || outputProfile.isEmpty()) && actionGroup.containsAction(traceAction)) {
+                actionGroup.remove(traceAction);
             }
-            windowContent.revalidate(); // 重新验证布局
-            windowContent.repaint();
+
+            SwingUtilities.invokeLater(() -> {
+                windowContent.revalidate(); // 重新验证布局
+                windowContent.repaint();
+            });
         }
     }
 
