@@ -35,11 +35,13 @@
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="com.fling.listener.FlingProjectListener"/>
         <!-- Register LineMarkerProvider -->
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.spring_cache.SpringCacheIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.flexible_test.FlexibleTestIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.call_method.CallMethodIconProvider"/>
         <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mybatis_sql.MybatisSqlIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.doc.DocIconProvider"/>
 
 
         <java.programPatcher implementation="com.fling.JavaProgramPatcher" />

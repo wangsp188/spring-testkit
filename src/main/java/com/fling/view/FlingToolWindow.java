@@ -2,6 +2,8 @@ package com.fling.view;
 
 import com.alibaba.fastjson.JSON;
 import com.fling.RuntimeAppHelper;
+import com.fling.doc.DocHelper;
+import com.fling.doc.DocIconProvider;
 import com.fling.tools.CurlDialog;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
@@ -9,6 +11,7 @@ import com.intellij.lang.properties.PropertiesLanguage;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.StdFileTypes;
@@ -17,6 +20,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
@@ -33,11 +37,13 @@ import com.fling.tools.call_method.CallMethodTool;
 import com.fling.tools.flexible_test.FlexibleTestTool;
 import com.fling.tools.mybatis_sql.MybatisSqlTool;
 import com.fling.tools.spring_cache.SpringCacheTool;
+import com.intellij.ui.components.AnActionLink;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
+import com.intellij.ui.dsl.builder.AlignX;
 import com.intellij.ui.jcef.JBCefBrowser;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -168,15 +174,62 @@ public class FlingToolWindow {
 
         // 添加 tipsButton 到 topPanel
         tipsButton = new JButton(AllIcons.General.Information);
-        tipsButton.setToolTipText("how to use?");
+        tipsButton.setToolTipText("Fling doc");
         tipsButton.setPreferredSize(new Dimension(32, 32));
         tipsButton.setText(null);
-        tipsButton.addActionListener(e -> openTipsDoc());
+        tipsButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                DefaultActionGroup actionGroup = new DefaultActionGroup();
+                // 创建一个动作组
+                actionGroup.add(new AnAction("How to use " + FlingHelper.getPluginName() + " ?", null, AllIcons.General.Information) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        openTipsDoc();
+                    }
+                });
+                actionGroup.add(new AnAction("Init project doc config file", null, DocIconProvider.DOC_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        // 使用 Application.runWriteAction 进行写操作
+                        Application application = ApplicationManager.getApplication();
+                        application.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                DocHelper.initDocDirectory(project);
+                            }
+                        });
+
+                    }
+                });
+                actionGroup.add(new AnAction("Refresh project docs", null, DocIconProvider.DOC_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        Application application = ApplicationManager.getApplication();
+                        application.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    DocHelper.refreshDoc(project);
+                                    FlingHelper.refresh(project);
+                                    Map<DocHelper.DocSource, Map<String, DocHelper.Doc>> docs = DocHelper.getProjectDocs(project);
+                                    FlingHelper.notify(project, NotificationType.INFORMATION, "Refresh project docs success," + JSON.toJSONString(docs));
+                                } catch (Exception ex) {
+                                    FlingHelper.notify(project, NotificationType.ERROR, "Refresh project doc failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                                }
+                            }
+                        });
+                    }
+                });
+
+                JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("TipsPopup", actionGroup).getComponent();
+                popupMenu.show(tipsButton, 0, tipsButton.getHeight());
+            }
+        });
         topPanel.add(tipsButton);
 
         curlDialog = new CurlDialog(this);
-
-        // 居中显示
 
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
@@ -315,7 +368,9 @@ public class FlingToolWindow {
         JPanel toolbarPanel = new JPanel();
         toolbarPanel.setLayout(new BoxLayout(toolbarPanel, BoxLayout.Y_AXIS));
         // 设置目标组件为此面板
-        actionToolbar.setTargetComponent(toolbarPanel);
+        actionToolbar.setTargetComponent(outputTextPane);
+//        actionToolbar.setTargetComponent(toolbarPanel);
+
         toolbarPanel.add(actionToolbar.getComponent());
 
         // 将工具栏添加到输出面板的左侧
@@ -495,7 +550,7 @@ public class FlingToolWindow {
         optionList.setSelectedIndex(0);
         // 右侧内容显示区域
         JPanel rightContent = new JPanel(new CardLayout());
-        rightContent.add(createBasicOptionPanel(flexibleTestPackageNameField), "fling");
+        rightContent.add(new JBScrollPane(createBasicOptionPanel(flexibleTestPackageNameField)), "fling");
         rightContent.add(createScriptOptionPanel(), "script");
         rightContent.add(createPropertiesOptionPanel(), "spring-properties");
         DumbService.getInstance(project).smartInvokeLater(() -> {
@@ -540,6 +595,7 @@ public class FlingToolWindow {
             }
         });
     }
+
     private JPanel createBasicOptionPanel(JTextField flexibleTestPackageNameField) {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -595,6 +651,7 @@ public class FlingToolWindow {
         if (monitorConfig.isEnable()) {
             monitorToggleButton.setSelected(true);
             monitorOptionsPanel.setVisible(true);
+            monitorToggleButton.setText("We will use bytecode staking to enhance the classes to support link trace");
         }
         gbc.gridwidth = 1; // Reset gridwidth
 

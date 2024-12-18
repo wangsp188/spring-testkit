@@ -150,6 +150,7 @@ public abstract class BasePluginTool {
 
         // 创建ActionToolbar
         ActionToolbar actionToolbar = new ActionToolbarImpl("InputToolbar", actionGroup, false);
+        actionToolbar.setTargetComponent(inputEditorTextField);
         JComponent toolbarComponent = actionToolbar.getComponent();
         toolbarComponent.setLayout(new BoxLayout(toolbarComponent, BoxLayout.Y_AXIS));
 
