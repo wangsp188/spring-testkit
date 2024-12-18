@@ -68,8 +68,8 @@ import java.util.stream.Collectors;
 
 public class FlingToolWindow {
 
-    private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", BasePluginTool.class);
-    private static final Icon dagreIcon = IconLoader.getIcon("/icons/dagre.svg", BasePluginTool.class);
+    private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", FlingToolWindow.class);
+    private static final Icon dagreIcon = IconLoader.getIcon("/icons/dagre.svg", FlingToolWindow.class);
 
     public static final String PROJECT_DEFAULT = "project:default";
 
