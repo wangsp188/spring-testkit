@@ -45,6 +45,7 @@ import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.intellij.ui.dsl.builder.AlignX;
 import com.intellij.ui.jcef.JBCefBrowser;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.cef.browser.CefBrowser;
@@ -56,6 +57,8 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.LineBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -70,8 +73,6 @@ public class FlingToolWindow {
 
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", FlingToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/dagre.svg", FlingToolWindow.class);
-
-    public static final String PROJECT_DEFAULT = "project:default";
 
 
     private Project project;
@@ -90,6 +91,8 @@ public class FlingToolWindow {
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
     private JComboBox<String> scriptAppBox;
+    private JComboBox<String> controllerScriptAppBox;
+    private JTextField controllerEnvTextField;
     private JComboBox<String> propertiesAppBox;
 
     protected JTextPane outputTextPane;
@@ -543,7 +546,7 @@ public class FlingToolWindow {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"fling", "script", "spring-properties"};
+        String[] options = {"fling", "tool-script", "controller-adapter", "spring-properties"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
@@ -551,8 +554,9 @@ public class FlingToolWindow {
         // 右侧内容显示区域
         JPanel rightContent = new JPanel(new CardLayout());
         rightContent.add(new JBScrollPane(createBasicOptionPanel(flexibleTestPackageNameField)), "fling");
-        rightContent.add(createScriptOptionPanel(), "script");
+        rightContent.add(createScriptOptionPanel(), "tool-script");
         rightContent.add(createPropertiesOptionPanel(), "spring-properties");
+        rightContent.add(createControllerOptionPanel(), "controller-adapter");
         DumbService.getInstance(project).smartInvokeLater(() -> {
             // 事件或代码在索引准备好后运行
             findSpringBootApplicationClasses();
@@ -586,7 +590,12 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
-                scriptAppBox.setSelectedIndex(0);
+                if (scriptAppBox.getItemCount() > 0) {
+                    scriptAppBox.setSelectedIndex(0);
+                }
+                if (controllerScriptAppBox.getItemCount() > 0) {
+                    controllerScriptAppBox.setSelectedIndex(0);
+                }
                 if (propertiesAppBox.getItemCount() > 0) {
                     // 选择第一个选项
                     propertiesAppBox.setSelectedIndex(0);
@@ -934,6 +943,7 @@ public class FlingToolWindow {
                 public void run() {
                     for (PsiClass applicationClass : springBootApplicationClasses) {
                         scriptAppBox.addItem(applicationClass.getName());
+                        controllerScriptAppBox.addItem(applicationClass.getName());
                         propertiesAppBox.addItem(applicationClass.getName());
                     }
                 }
@@ -946,7 +956,7 @@ public class FlingToolWindow {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        LanguageTextField scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.getScript(project), false);
+        LanguageTextField scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.defScript, false);
 
         // 布局输入框
         gbc.gridx = 0;
@@ -958,10 +968,10 @@ public class FlingToolWindow {
         gbc.anchor = GridBagConstraints.NORTHWEST;
         panel.add(new JBScrollPane(scriptField), gbc);
 
-        String[] apps = new String[]{PROJECT_DEFAULT};
+        String[] apps = new String[]{};
 
         // 添加标签和组合框
-        JLabel comboBoxLabel = new JLabel("Scope:");
+        JLabel comboBoxLabel = new JLabel("App:");
         scriptAppBox = new ComboBox<>(apps);
         // 添加标签到新行
         gbc.gridx = 0;
@@ -986,11 +996,10 @@ public class FlingToolWindow {
             public void actionPerformed(ActionEvent e) {
                 String selectedApp = (String) scriptAppBox.getSelectedItem();
                 if (selectedApp == null) {
-                    scriptField.setText(null);
-                } else if (PROJECT_DEFAULT.equals(selectedApp)) {
-                    scriptField.setText(LocalStorageHelper.getScript(project));
+                    scriptField.setText(LocalStorageHelper.defScript);
                 } else {
-                    scriptField.setText(LocalStorageHelper.getAppScript(project, selectedApp));
+                    String appScript = LocalStorageHelper.getAppScript(project, selectedApp);
+                    scriptField.setText(appScript == null ? LocalStorageHelper.defScript : appScript);
                 }
             }
         });
@@ -1025,19 +1034,11 @@ public class FlingToolWindow {
                 return;
             }
             if (StringUtils.isBlank(script)) {
-                if (PROJECT_DEFAULT.equals(selectedApp)) {
-                    LocalStorageHelper.setScript(project, null);
-                } else {
-                    LocalStorageHelper.setAppScript(project, selectedApp, null);
-                }
+                LocalStorageHelper.setAppScript(project, selectedApp, null);
                 FlingHelper.notify(project, NotificationType.INFORMATION, "Script is blank");
                 return;
             }
-            if (PROJECT_DEFAULT.equals(selectedApp)) {
-                LocalStorageHelper.setScript(project, script);
-            } else {
-                LocalStorageHelper.setAppScript(project, selectedApp, script);
-            }
+            LocalStorageHelper.setAppScript(project, selectedApp, script);
             FlingHelper.notify(project, NotificationType.INFORMATION, "Script is saved");
         };
         saveButton.addActionListener(saveListener);
@@ -1061,6 +1062,185 @@ public class FlingToolWindow {
         gbc.gridx = 0;
         gbc.gridy = 2; // 新的一行
         gbc.gridwidth = 3; // 占据三列
+        gbc.weightx = 0.0; // 重置权重
+        gbc.weighty = 0.0; // 重置权重
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
+        gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
+        panel.add(buttonPanel, gbc);
+
+        return panel;
+    }
+
+    private JPanel createControllerOptionPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+
+        LanguageTextField scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.defControllerAdapter.getScript(), false);
+
+        // 布局输入框
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 5; // 占据3列
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        panel.add(new JBScrollPane(scriptField), gbc);
+
+        String[] apps = new String[]{};
+
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+
+        controllerEnvTextField = new JTextField(10); // 设定文本框的列数
+        controllerEnvTextField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            private void updateToolTip() {
+                String text = controllerEnvTextField.getText().trim();
+                if (StringUtils.isBlank(text)) {
+                    controllerEnvTextField.setToolTipText("not config env list");
+                } else {
+                    controllerEnvTextField.setToolTipText("env list is " + JSON.toJSONString(text.split(",")));
+                }
+            }
+        });
+        controllerEnvTextField.setText("");
+
+        JLabel envLabel = new JLabel("Env:");
+        envLabel.setLabelFor(controllerEnvTextField);
+        envLabel.setToolTipText("Optional environment list; multiple use , split");
+
+        // 添加标签和组合框
+        JLabel comboBoxLabel = new JLabel("App:");
+        controllerScriptAppBox = new ComboBox<>(apps);
+
+
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        panel.add(comboBoxLabel, gbc);
+
+        // 添加组合框到标签右边
+        gbc.gridx = 1;
+        gbc.gridy = 0; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(controllerScriptAppBox, gbc);
+
+
+        gbc.gridx = 2;
+        gbc.gridy = 0; // 第一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(envLabel, gbc);
+
+        // 添加环境文本框
+        gbc.gridx = 3;
+        gbc.gridy = 0; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(controllerEnvTextField, gbc);
+
+
+        controllerScriptAppBox.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedApp = (String) controllerScriptAppBox.getSelectedItem();
+                if (selectedApp == null) {
+                    scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
+                    controllerEnvTextField.setText("");
+                } else {
+                    LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(project, selectedApp);
+                    scriptField.setText(controllerAdapter.getScript() == null ? LocalStorageHelper.defControllerAdapter.getScript() : controllerAdapter.getScript());
+                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerAdapter.getEnvs()) ? "" : String.join(",", controllerAdapter.getEnvs()));
+                }
+            }
+        });
+
+        // 添加新按钮到组合框右边
+        JButton newButton = new JButton(AllIcons.Actions.Rollback);
+        newButton.setToolTipText("use default script");
+        newButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
+            }
+        });
+        gbc.gridx = 4;  // 放在同一行的尾部
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        panel.add(newButton, gbc);
+
+
+        // 创建按钮面板，使用FlowLayout以右对齐
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        // 保存按钮
+        JButton saveButton = new JButton("Apply");
+        ActionListener saveListener = e -> {
+            String script = scriptField.getText();
+            String selectedApp = (String) controllerScriptAppBox.getSelectedItem();
+            if (selectedApp == null) {
+                return;
+            }
+
+            LocalStorageHelper.ControllerAdapter controllerAdapter = new LocalStorageHelper.ControllerAdapter();
+            controllerAdapter.setScript(StringUtils.isBlank(script) ? LocalStorageHelper.defControllerAdapter.getScript() : script);
+            controllerAdapter.setEnvs(StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? null : Arrays.asList(controllerEnvTextField.getText().trim().split(",")));
+            LocalStorageHelper.setAppControllerAdapter(project, selectedApp, controllerAdapter);
+            FlingHelper.notify(project, NotificationType.INFORMATION, "ControllerAdapter is saved");
+        };
+        saveButton.addActionListener(saveListener);
+
+        // 关闭按钮
+        JButton closeButton = new JButton("OK");
+        closeButton.addActionListener(e -> {
+            saveListener.actionPerformed(e);
+            // 关闭当前窗口
+            Window window = SwingUtilities.getWindowAncestor(panel);
+            if (window != null) {
+                window.dispose();
+            }
+        });
+
+        // 将按钮添加到按钮面板
+        buttonPanel.add(saveButton);
+        buttonPanel.add(closeButton);
+
+        // 将按钮面板添加到主面板的底部
+        gbc.gridx = 0;
+        gbc.gridy = 2; // 新的一行
+        gbc.gridwidth = 5; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
         gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间

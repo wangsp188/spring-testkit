@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -30,7 +31,7 @@ public class LocalStorageHelper {
 
     public static final String defProperties = "#Here properties takes precedence over spring.properties\n"
             + "#You can write some configurations for local startup use, like log level\n"
-            + "logging.level.com.example=WARN";
+            + "logging.level.com.fling=INFO";
 
     public static final String defScript =
             "import org.springframework.beans.factory.annotation.Autowired;\n" +
@@ -85,13 +86,18 @@ public class LocalStorageHelper {
                     "\n" +
                     "}";
 
+    public static final ControllerAdapter defControllerAdapter = new ControllerAdapter();
+
+    static {
+        defControllerAdapter.setScript("import1");
+    }
 
     public static final MonitorConfig defMonitorConfig = new MonitorConfig();
 
     static {
         defMonitorConfig.setEnable(false);
         defMonitorConfig.setMonitorPrivate(false);
-        defMonitorConfig.setLogMybatis(false);
+        defMonitorConfig.setLogMybatis(true);
         defMonitorConfig.setPackages("app.three.package");
         defMonitorConfig.setClsSuffix("Controller,Service,Impl,Repository");
         defMonitorConfig.setBlacks("");
@@ -108,12 +114,12 @@ public class LocalStorageHelper {
     }
 
 
-    public static String getScript(Project project) {
-        return getConfig(project).getScript();
-    }
-
     public static String getAppScript(Project project, String app) {
         return getAppConfig(project, app).getScript();
+    }
+
+    public static ControllerAdapter getAppControllerAdapter(Project project, String app) {
+        return getAppConfig(project, app).getControllerAdapter();
     }
 
 
@@ -178,15 +184,6 @@ public class LocalStorageHelper {
     }
 
 
-    public static void setScript(Project project, String script) {
-        ProjectConfig projectConfig = loadProjectConfig(project);
-        if (projectConfig == null) {
-            projectConfig = new ProjectConfig();
-        }
-        projectConfig.setScript(script);
-        saveProjectConfig(project, projectConfig);
-    }
-
     public static void setAppScript(Project project, String app, String script) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
@@ -206,20 +203,37 @@ public class LocalStorageHelper {
         saveProjectConfig(project, projectConfig);
     }
 
+    public static void setAppControllerAdapter(Project project, String app, ControllerAdapter adapter) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        if (projectConfig.getAppConfigs() == null) {
+            projectConfig.setAppConfigs(new HashMap<>());
+        }
+
+
+        projectConfig.getAppConfigs().computeIfAbsent(app, new Function<String, Config>() {
+            @Override
+            public Config apply(String s) {
+                return new Config();
+            }
+        }).setControllerAdapter(adapter);
+        saveProjectConfig(project, projectConfig);
+    }
+
 
     private static Config getConfig(Project project) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
-            config.setScript(defScript);
             config.setMonitorConfig(defMonitorConfig);
             return config;
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
         config.setMonitorConfig(projectConfig.getMonitorConfig() == null ? defMonitorConfig : projectConfig.getMonitorConfig());
-        config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
         return config;
     }
 
@@ -230,6 +244,7 @@ public class LocalStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
             config.setScript(defScript);
+            config.setControllerAdapter(defControllerAdapter);
             config.setProperties(defProperties);
             return config;
         }
@@ -237,6 +252,7 @@ public class LocalStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
             config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
+            config.setControllerAdapter(projectConfig.getControllerAdapter() == null ? defControllerAdapter : projectConfig.getControllerAdapter());
             config.setProperties(defProperties);
             return config;
         }
@@ -246,6 +262,9 @@ public class LocalStorageHelper {
         }
         if (config.getScript() == null) {
             config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
+        }
+        if (config.getControllerAdapter() == null) {
+            config.setControllerAdapter(projectConfig.getControllerAdapter() == null ? defControllerAdapter : projectConfig.getControllerAdapter());
         }
         if (config.getProperties() == null) {
             config.setProperties(defProperties);
@@ -294,6 +313,7 @@ public class LocalStorageHelper {
 
         private String flexibleTestPackage;
         private String script;
+        private ControllerAdapter controllerAdapter;
         private Map<String, Config> appConfigs;
         private MonitorConfig monitorConfig;
 
@@ -328,12 +348,21 @@ public class LocalStorageHelper {
         public void setMonitorConfig(MonitorConfig monitorConfig) {
             this.monitorConfig = monitorConfig;
         }
+
+        public ControllerAdapter getControllerAdapter() {
+            return controllerAdapter;
+        }
+
+        public void setControllerAdapter(ControllerAdapter controllerAdapter) {
+            this.controllerAdapter = controllerAdapter;
+        }
     }
 
     public static class Config {
 
         private String flexibleTestPackage;
         private String script;
+        private ControllerAdapter controllerAdapter;
         private String properties;
         private MonitorConfig monitorConfig;
 
@@ -367,6 +396,36 @@ public class LocalStorageHelper {
 
         public void setMonitorConfig(MonitorConfig monitorConfig) {
             this.monitorConfig = monitorConfig;
+        }
+
+        public ControllerAdapter getControllerAdapter() {
+            return controllerAdapter;
+        }
+
+        public void setControllerAdapter(ControllerAdapter controllerAdapter) {
+            this.controllerAdapter = controllerAdapter;
+        }
+    }
+
+
+    public static class ControllerAdapter{
+        private String script;
+        private List<String> envs;
+
+        public String getScript() {
+            return script;
+        }
+
+        public void setScript(String script) {
+            this.script = script;
+        }
+
+        public List<String> getEnvs() {
+            return envs;
+        }
+
+        public void setEnvs(List<String> envs) {
+            this.envs = envs;
         }
     }
 

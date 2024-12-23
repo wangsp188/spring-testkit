@@ -106,9 +106,6 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 
             FlingHelper.notify(project,NotificationType.INFORMATION,"Buddha bless, Never Bug");
 
-            if (LocalStorageHelper.defProperties.equals(propertiesStr)) {
-                return;
-            }
             Properties properties = new Properties();
             properties.load(new StringReader(propertiesStr));
             // 添加系统指令：把 properties 转到 VM 参数
