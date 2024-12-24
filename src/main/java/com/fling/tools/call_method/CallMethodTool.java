@@ -49,11 +49,12 @@ import java.util.regex.Pattern;
 
 public class CallMethodTool extends BasePluginTool {
 
-    public static final Icon CALL_METHOD_DISABLE_ICON = IconLoader.getIcon("/icons/spring-fling-disable.svg", CallMethodIconProvider.class);
+    public static final Icon CALL_METHOD_DISABLE_ICON = IconLoader.getIcon("/icons/spring-fling-disable.svg", CallMethodTool.class);
 
-    public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", CallMethodIconProvider.class);
-    public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", CallMethodIconProvider.class);
-    public static final Icon CONTROLLER_ADAPTER_ICON = IconLoader.getIcon("/icons/controller.svg", CallMethodIconProvider.class);
+    public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", CallMethodTool.class);
+    public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", CallMethodTool.class);
+    public static final Icon CONTROLLER_ADAPTER_ICON = IconLoader.getIcon("/icons/controller.svg", CallMethodTool.class);
+    public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", CallMethodTool.class);
 
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
@@ -68,7 +69,7 @@ public class CallMethodTool extends BasePluginTool {
 
     public CallMethodTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
-        copyCurlAction = new AnAction("Copy to clipboard", "Copy to clipboard", CONTROLLER_ADAPTER_ICON) {
+        copyCurlAction = new AnAction("Controller Adapter", "Controller Adapter", CONTROLLER_ADAPTER_ICON) {
 
             @Override
             public void actionPerformed(AnActionEvent e) {
@@ -93,7 +94,7 @@ public class CallMethodTool extends BasePluginTool {
                     }
                     for (String env : envs) {
                         //显示的一个图标加上标题
-                        AnAction documentation = new AnAction("build with " + app + ":" + env, "build with " + app + ":" + env, AllIcons.Actions.Copy) {
+                        AnAction documentation = new AnAction("generate with " + app + ":" + env, "generate with " + app + ":" + env, GENERATE_ICON) {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 handleControllerAdapter(app, env, script, selectedItem.getMethod());
@@ -104,7 +105,7 @@ public class CallMethodTool extends BasePluginTool {
                 }
 
                 JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerAdapterPopup", controllerActionGroup).getComponent();
-                popupMenu.show(inputEditorTextField, 0, 0);
+                popupMenu.show(inputEditorTextField, 0, 80);
             }
 
         };
@@ -113,7 +114,7 @@ public class CallMethodTool extends BasePluginTool {
     private void handleControllerAdapter(String app, String env, String script, PsiMethod method) {
         String jsonParams = inputEditorTextField.getText();
         String httpMethod = "GET"; // Default to GET
-        String path1 = "";
+        String path1 = "/";
 
         PsiClass containingClass = method.getContainingClass();
         if (containingClass.hasAnnotation("org.springframework.web.bind.annotation.RequestMapping")) {
@@ -125,9 +126,9 @@ public class CallMethodTool extends BasePluginTool {
             if (classValue instanceof PsiLiteralExpression && StringUtils.isNotBlank((CharSequence) ((PsiLiteralExpression) classValue).getValue())) {
                 String s = String.valueOf(((PsiLiteralExpression) classValue).getValue());
                 if (s.startsWith("/")) {
-                    path1 += s;
+                    path1 += s.substring(1);
                 } else {
-                    path1 += ("/" + s);
+                    path1 += s;
                 }
             }
         }
@@ -200,11 +201,6 @@ public class CallMethodTool extends BasePluginTool {
             break;
         }
 
-//        StringBuilder header = new StringBuilder();
-
-        // Add authorization header
-//        header.append("  -H 'Authorization: Bearer your_token'");
-
         // Process parameters
         // Get the parameters
         PsiParameter[] parameters = method.getParameterList().getParameters();
@@ -258,7 +254,6 @@ public class CallMethodTool extends BasePluginTool {
                 jsonBody = "{}";
             }
             parse.remove(requestBodyKey);
-//            header.append(" \\\n  -H 'Content-Type: application/json' \\\n  -d '").append(jsonBody).append("'");
         }
 
 
@@ -300,9 +295,6 @@ public class CallMethodTool extends BasePluginTool {
             }
         }
 
-        FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append("curl -X ").append(httpMethod.toUpperCase()).append(" 'http://localhost:" + (selectedApp == null ? "8080" : selectedApp.getPort())).append(path1);
         Map<String, String> urlParams = new HashMap<>();
         if (!flattenedParse.isEmpty()) {
             Container<Boolean> first = new Container<>();
@@ -316,36 +308,24 @@ public class CallMethodTool extends BasePluginTool {
                     }
                     s = s == null ? stringObjectEntry.getKey() : s;
                     urlParams.put(s, String.valueOf(stringObjectEntry.getValue()));
-//                    try {
-//                        if (!first.get()) {
-//                            urlBuilder.append("?");
-//                            first.set(false);
-//                        } else {
-//                            urlBuilder.append("&");
-//                        }
-//                        urlBuilder.append(s).append("=").append(URLEncoder.encode(String.valueOf(stringObjectEntry.getValue()), "UTF-8"));
-//                    } catch (UnsupportedEncodingException ex) {
-//                    }
                 }
             });
         }
-        urlBuilder.append("'");
-
-        String ret = null;
         try {
-            ret = invokeControllerScript(script, app, env, httpMethod, path1, urlParams, jsonBody);
-//                urlBuilder + " \\\n" + header
+            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
             FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
         } catch (Throwable ex) {
-            FlingHelper.notify(getProject(), NotificationType.ERROR, "Adapter invoke error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            ex.printStackTrace();
+            FlingHelper.notify(getProject(), NotificationType.ERROR, "Adapter generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
         }
     }
 
 
-    public static String invokeControllerScript(String code, String app, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+        FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "build", new Object[]{app, env, httpMethod, path, params, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env,  selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 

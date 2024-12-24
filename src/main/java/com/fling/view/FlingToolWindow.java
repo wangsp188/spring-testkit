@@ -1127,7 +1127,7 @@ public class FlingToolWindow {
                 }
             }
         });
-        controllerEnvTextField.setText("");
+        controllerEnvTextField.setText(String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()));
 
         JLabel envLabel = new JLabel("Env:");
         envLabel.setLabelFor(controllerEnvTextField);
@@ -1177,11 +1177,11 @@ public class FlingToolWindow {
                 String selectedApp = (String) controllerScriptAppBox.getSelectedItem();
                 if (selectedApp == null) {
                     scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
-                    controllerEnvTextField.setText("");
+                    controllerEnvTextField.setText(String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()));
                 } else {
                     LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(project, selectedApp);
                     scriptField.setText(controllerAdapter.getScript() == null ? LocalStorageHelper.defControllerAdapter.getScript() : controllerAdapter.getScript());
-                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerAdapter.getEnvs()) ? "" : String.join(",", controllerAdapter.getEnvs()));
+                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerAdapter.getEnvs()) ? String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()) : String.join(",", controllerAdapter.getEnvs()));
                 }
             }
         });
@@ -1193,6 +1193,7 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
+                controllerEnvTextField.setText(String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()));
             }
         });
         gbc.gridx = 4;  // 放在同一行的尾部
@@ -1218,7 +1219,7 @@ public class FlingToolWindow {
 
             LocalStorageHelper.ControllerAdapter controllerAdapter = new LocalStorageHelper.ControllerAdapter();
             controllerAdapter.setScript(StringUtils.isBlank(script) ? LocalStorageHelper.defControllerAdapter.getScript() : script);
-            controllerAdapter.setEnvs(StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? null : Arrays.asList(controllerEnvTextField.getText().trim().split(",")));
+            controllerAdapter.setEnvs(StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? LocalStorageHelper.defControllerAdapter.getEnvs() : Arrays.asList(controllerEnvTextField.getText().trim().split(",")));
             LocalStorageHelper.setAppControllerAdapter(project, selectedApp, controllerAdapter);
             FlingHelper.notify(project, NotificationType.INFORMATION, "ControllerAdapter is saved");
         };
