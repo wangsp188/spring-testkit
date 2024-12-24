@@ -28,6 +28,7 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
+    <depends>org.intellij.groovy</depends>
     <depends>Git4Idea</depends>
     <depends>com.intellij.spring.boot</depends>
     <depends>com.intellij.database</depends>

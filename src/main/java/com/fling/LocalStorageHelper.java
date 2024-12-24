@@ -243,7 +243,7 @@ public class LocalStorageHelper {
         if (projectConfig == null) {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
-            config.setScript(defScript);
+//            config.setScript(defScript);
             config.setControllerAdapter(defControllerAdapter);
             config.setProperties(defProperties);
             return config;
@@ -251,7 +251,7 @@ public class LocalStorageHelper {
         if (app == null || projectConfig.getAppConfigs() == null || !projectConfig.getAppConfigs().containsKey(app)) {
             Config config = new Config();
             config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
-            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
+//            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
             config.setControllerAdapter(projectConfig.getControllerAdapter() == null ? defControllerAdapter : projectConfig.getControllerAdapter());
             config.setProperties(defProperties);
             return config;
@@ -260,9 +260,9 @@ public class LocalStorageHelper {
         if (config.getFlexibleTestPackage() == null) {
             config.setFlexibleTestPackage(defFlexibleTestPackage);
         }
-        if (config.getScript() == null) {
-            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
-        }
+//        if (config.getScript() == null) {
+//            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
+//        }
         if (config.getControllerAdapter() == null) {
             config.setControllerAdapter(projectConfig.getControllerAdapter() == null ? defControllerAdapter : projectConfig.getControllerAdapter());
         }

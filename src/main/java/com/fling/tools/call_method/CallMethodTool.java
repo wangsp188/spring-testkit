@@ -1,6 +1,5 @@
 package com.fling.tools.call_method;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
@@ -8,28 +7,26 @@ import com.fling.FlingHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
-import com.google.gson.Gson;
 import com.intellij.icons.AllIcons;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.intellij.notification.NotificationType;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectManager;
-import com.intellij.openapi.project.ProjectManagerListener;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
-import com.intellij.ui.components.JBRadioButton;
-import com.intellij.ui.jcef.JBCefBrowser;
-import org.apache.commons.lang3.StringEscapeUtils;
+import groovy.lang.Binding;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.cef.browser.CefBrowser;
-import org.cef.browser.CefFrame;
-import org.cef.handler.CefLoadHandlerAdapter;
+import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -39,11 +36,12 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.util.*;
-import java.util.function.BiConsumer;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -55,7 +53,7 @@ public class CallMethodTool extends BasePluginTool {
 
     public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", CallMethodIconProvider.class);
     public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", CallMethodIconProvider.class);
-    public static final Icon COPY_CURL_ICON = IconLoader.getIcon("/icons/copy-curl.svg", CallMethodIconProvider.class);
+    public static final Icon CONTROLLER_ADAPTER_ICON = IconLoader.getIcon("/icons/controller.svg", CallMethodIconProvider.class);
 
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
@@ -70,7 +68,7 @@ public class CallMethodTool extends BasePluginTool {
 
     public CallMethodTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
-        copyCurlAction = new AnAction("Copy curl to clipboard", "Copy curl to clipboard", COPY_CURL_ICON) {
+        copyCurlAction = new AnAction("Copy to clipboard", "Copy to clipboard", CONTROLLER_ADAPTER_ICON) {
 
             @Override
             public void actionPerformed(AnActionEvent e) {
@@ -78,231 +76,279 @@ public class CallMethodTool extends BasePluginTool {
                 if (selectedItem == null) {
                     return;
                 }
-
-                PsiMethod method = selectedItem.getMethod();
-                String jsonParams = inputEditorTextField.getText();
-                String httpMethod = "GET"; // Default to GET
-                String endpoint = "";
-
-                PsiClass containingClass = method.getContainingClass();
-                if (containingClass.hasAnnotation("org.springframework.web.bind.annotation.RequestMapping")) {
-                    PsiAnnotation annotation = containingClass.getAnnotation("org.springframework.web.bind.annotation.RequestMapping");
-                    PsiAnnotationMemberValue classValue = annotation.findAttributeValue("value");
-                    if (classValue == null || (classValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) classValue).getValue())))) {
-                        classValue = annotation.findAttributeValue("path");
-                    }
-                    if (classValue instanceof PsiLiteralExpression && StringUtils.isNotBlank((CharSequence) ((PsiLiteralExpression) classValue).getValue())) {
-                        String s = String.valueOf(((PsiLiteralExpression) classValue).getValue());
-                        if (s.startsWith("/")) {
-                            endpoint += s;
-                        } else {
-                            endpoint += ("/" + s);
-                        }
-                    }
+                List<String> porjectAppList = getPorjectAppList();
+                if (CollectionUtils.isEmpty(porjectAppList)) {
+                    porjectAppList = new ArrayList<>();
+                    porjectAppList.add(null);
                 }
 
-                String[] requestMethodAnnotations = new String[]{
-                        "org.springframework.web.bind.annotation.RequestMapping",
-                        "org.springframework.web.bind.annotation.GetMapping",
-                        "org.springframework.web.bind.annotation.PostMapping",
-                        "org.springframework.web.bind.annotation.PutMapping",
-                        "org.springframework.web.bind.annotation.DeleteMapping",
-                        "org.springframework.web.bind.annotation.PatchMapping"
-                };
-
-
-                // Check for method-level annotations to determine HTTP method and path
-                for (String annotationFqn : requestMethodAnnotations) {
-                    PsiAnnotation methodAnnotation = method.getModifierList().findAnnotation(annotationFqn);
-                    if (methodAnnotation == null) {
-                        continue;
+                DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
+                for (String app : porjectAppList) {
+                    LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(flingToolWindow.getProject(), app);
+                    String script = controllerAdapter.getScript();
+                    List<String> envs = controllerAdapter.getEnvs();
+                    if (CollectionUtils.isEmpty(envs)) {
+                        envs = new ArrayList<>();
+                        envs.add(null);
                     }
-                    if (annotationFqn.contains("GetMapping")) {
-                        httpMethod = "GET";
-                    } else if (annotationFqn.contains("PostMapping")) {
-                        httpMethod = "POST";
-                    } else if (annotationFqn.contains("PutMapping")) {
-                        httpMethod = "PUT";
-                    } else if (annotationFqn.contains("DeleteMapping")) {
-                        httpMethod = "DELETE";
-                    } else if (annotationFqn.contains("PatchMapping")) {
-                        httpMethod = "PATCH";
-                    } else if (annotationFqn.contains("RequestMapping")) {
-                        //从注解中的method属性取出一个 method,注意,method 是个数组,随便取一个就好
-                        PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("method");
-                        if (methodValue instanceof PsiArrayInitializerMemberValue) {
-                            PsiArrayInitializerMemberValue arrayValue = (PsiArrayInitializerMemberValue) methodValue;
-                            if (arrayValue.getInitializers().length > 0) {
-                                PsiAnnotationMemberValue firstMethodValue = arrayValue.getInitializers()[0];
-                                if (firstMethodValue instanceof PsiReferenceExpression) {
-                                    PsiReferenceExpression reference = (PsiReferenceExpression) firstMethodValue;
-                                    String methodName = reference.getReferenceName();
-                                    if (methodName != null) {
-                                        httpMethod = methodName; // 假设这里返回的是类似 "GET", "POST" 等字符串
-                                    }
-                                }
+                    for (String env : envs) {
+                        //显示的一个图标加上标题
+                        AnAction documentation = new AnAction("build with " + app + ":" + env, "build with " + app + ":" + env, AllIcons.Actions.Copy) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                handleControllerAdapter(app, env, script, selectedItem.getMethod());
                             }
-                        }
-                    }
-
-                    PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("value");
-                    if (methodValue == null || (methodValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue())))) {
-                        methodValue = methodAnnotation.findAttributeValue("path");
-                    }
-
-                    if (methodValue instanceof PsiLiteralExpression && StringUtils.isNotBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue()))) {
-                        String s = String.valueOf(((PsiLiteralExpression) methodValue).getValue());
-                        if (endpoint.endsWith("/")) {
-                            if (s.startsWith("/")) {
-                                endpoint += s.substring(1);
-                            } else {
-                                endpoint += methodValue.getText();
-                            }
-                        } else {
-                            if (s.startsWith("/")) {
-                                endpoint += s;
-                            } else {
-                                endpoint += ("/" + s);
-                            }
-                        }
-                    }
-                    break;
-                }
-
-                StringBuilder header = new StringBuilder();
-
-                // Add authorization header
-                header.append("  -H 'Authorization: Bearer your_token'");
-
-                // Process parameters
-                // Get the parameters
-                PsiParameter[] parameters = method.getParameterList().getParameters();
-                JSONObject parse = JSONObject.parseObject(jsonParams);
-                ArrayList<String> paths = new ArrayList<>();
-                Map<String, String> aliasmap = new HashMap<>();
-                String requestBodyKey = null;
-                for (PsiParameter parameter : parameters) {
-                    PsiAnnotation requestBodyAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestBody");
-                    if (requestBodyAnnotation != null) {
-                        if (httpMethod.equals("GET")) {
-                            httpMethod = "POST";
-                        }
-                        requestBodyKey = parameter.getName();
-                        continue;
-                    }
-                    //判断是否含有 requestParam注解,如果有,则将别名注册到 aliasmap 中,key 是形参名,val 是 requestparam 的配置
-                    // 如果不存在 @RequestBody 注解，则检查 @RequestParam 注解
-                    PsiAnnotation requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestParam");
-                    boolean path = false;
-                    if (requestParamAnnotation == null) {
-                        requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.PathVariable");
-                        path = true;
-                    }
-                    if (requestParamAnnotation == null) {
-                        continue;
-                    }
-
-                    if (path) {
-                        paths.add(parameter.getName());
-                    }
-                    // 获取 @RequestParam 注解中的配置值
-                    PsiAnnotationMemberValue requestParamValue = requestParamAnnotation.findAttributeValue("value");
-                    if (requestParamValue == null || (requestParamValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) requestParamValue).getValue())))) {
-                        requestParamValue = requestParamAnnotation.findAttributeValue("name");
-                    }
-                    if (requestParamValue instanceof PsiLiteralExpression) {
-                        String cs = String.valueOf(((PsiLiteralExpression) requestParamValue).getValue());
-                        if (StringUtils.isNotBlank(cs)) {
-                            // 将别名注册到 aliasMap 中
-                            aliasmap.put(parameter.getName(), cs);
-                        }
+                        };
+                        controllerActionGroup.add(documentation); // 将动作添加到动作组中
                     }
                 }
 
-                if (requestBodyKey != null) {
-                    String requestBody = null;
-                    if (parse.get(requestBodyKey) != null) {
-                        requestBody = JSONObject.toJSONString(parse.get(requestBodyKey), SerializerFeature.WriteMapNullValue);
-                    } else {
-                        requestBody = "{}";
-                    }
-                    parse.remove(requestBodyKey);
-                    header.append(" \\\n  -H 'Content-Type: application/json' \\\n  -d '").append(requestBody).append("'");
-                }
-
-
-//               parse是个双层 map 参数
-//                我想让双层key展开平铺
-                JSONObject flattenedParse = new JSONObject();
-                flattenJson(parse, flattenedParse);
-//                @requestParam Set<String> ids 这种是需要支持的
-                Iterator<Map.Entry<String, Object>> iterator = parse.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    Map.Entry<String, Object> entry = iterator.next();
-                    if (entry.getValue() instanceof JSONArray) {
-                        flattenedParse.put(entry.getKey(), StringUtils.join((JSONArray) entry.getValue(), ","));
-                        iterator.remove();
-                    }
-                }
-
-                if (!paths.isEmpty()) {
-                    for (String path : paths) {
-                        String val = null;
-                        try {
-                            val = URLEncoder.encode(String.valueOf(flattenedParse.get(path)),"UTF-8");
-                        } catch (UnsupportedEncodingException ex) {
-                        }
-                        flattenedParse.remove(path);
-
-                        if (aliasmap.containsKey(path)) {
-                            path = aliasmap.get(path);
-                        }
-                        endpoint = endpoint.replace("{" + path + "}", val);
-//                        path 支持写类似正则的内容,类似/{userId1}/orders/{orderId:\\d+}
-//                        请手动在 endpoint 中找{+path:的内容再找到下一个}进行补充替换
-                        // 处理带有正则的路径变量，例如：/{userId1}/orders/{orderId:\\d+}
-                        Pattern pattern = Pattern.compile("\\{" + Pattern.quote(path) + ":.*?\\}");
-                        Matcher matcher = pattern.matcher(endpoint);
-                        if (matcher.find()) {
-                            endpoint = matcher.replaceFirst(val);
-                        }
-                    }
-                }
-
-                FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
-                StringBuilder urlBuilder = new StringBuilder();
-                urlBuilder.append("curl -X ").append(httpMethod.toUpperCase()).append(" 'http://localhost:" + (selectedApp == null ? "8080" : selectedApp.getPort())).append(endpoint);
-                if (!flattenedParse.isEmpty()) {
-                    Container<Boolean> first = new Container<>();
-                    first.set(true);
-                    flattenedParse.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
-                        @Override
-                        public void accept(Map.Entry<String, Object> stringObjectEntry) {
-                            try {
-                                String s = aliasmap.get(stringObjectEntry.getKey());
-                                if (s != null && StringUtils.isBlank(s)) {
-                                    return;
-                                }
-                                s = s == null ? stringObjectEntry.getKey() : s;
-                                if (!first.get()) {
-                                    urlBuilder.append("?");
-                                    first.set(false);
-                                } else {
-                                    urlBuilder.append("&");
-                                }
-                                urlBuilder.append(s).append("=").append(URLEncoder.encode(String.valueOf(stringObjectEntry.getValue()), "UTF-8"));
-                            } catch (UnsupportedEncodingException ex) {
-                            }
-                        }
-                    });
-                }
-                urlBuilder.append("'");
-
-                FlingHelper.copyToClipboard(getProject(), urlBuilder + " \\\n" + header, "The curl was copied to the clipboard, Please fill in the Authorization header yourself.");
+                JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerAdapterPopup", controllerActionGroup).getComponent();
+                popupMenu.show(inputEditorTextField, 0, 0);
             }
 
         };
     }
+
+    private void handleControllerAdapter(String app, String env, String script, PsiMethod method) {
+        String jsonParams = inputEditorTextField.getText();
+        String httpMethod = "GET"; // Default to GET
+        String path1 = "";
+
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass.hasAnnotation("org.springframework.web.bind.annotation.RequestMapping")) {
+            PsiAnnotation annotation = containingClass.getAnnotation("org.springframework.web.bind.annotation.RequestMapping");
+            PsiAnnotationMemberValue classValue = annotation.findAttributeValue("value");
+            if (classValue == null || (classValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) classValue).getValue())))) {
+                classValue = annotation.findAttributeValue("path");
+            }
+            if (classValue instanceof PsiLiteralExpression && StringUtils.isNotBlank((CharSequence) ((PsiLiteralExpression) classValue).getValue())) {
+                String s = String.valueOf(((PsiLiteralExpression) classValue).getValue());
+                if (s.startsWith("/")) {
+                    path1 += s;
+                } else {
+                    path1 += ("/" + s);
+                }
+            }
+        }
+
+        String[] requestMethodAnnotations = new String[]{
+                "org.springframework.web.bind.annotation.RequestMapping",
+                "org.springframework.web.bind.annotation.GetMapping",
+                "org.springframework.web.bind.annotation.PostMapping",
+                "org.springframework.web.bind.annotation.PutMapping",
+                "org.springframework.web.bind.annotation.DeleteMapping",
+                "org.springframework.web.bind.annotation.PatchMapping"
+        };
+
+
+        // Check for method-level annotations to determine HTTP method and path
+        for (String annotationFqn : requestMethodAnnotations) {
+            PsiAnnotation methodAnnotation = method.getModifierList().findAnnotation(annotationFqn);
+            if (methodAnnotation == null) {
+                continue;
+            }
+            if (annotationFqn.contains("GetMapping")) {
+                httpMethod = "GET";
+            } else if (annotationFqn.contains("PostMapping")) {
+                httpMethod = "POST";
+            } else if (annotationFqn.contains("PutMapping")) {
+                httpMethod = "PUT";
+            } else if (annotationFqn.contains("DeleteMapping")) {
+                httpMethod = "DELETE";
+            } else if (annotationFqn.contains("PatchMapping")) {
+                httpMethod = "PATCH";
+            } else if (annotationFqn.contains("RequestMapping")) {
+                //从注解中的method属性取出一个 method,注意,method 是个数组,随便取一个就好
+                PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("method");
+                if (methodValue instanceof PsiArrayInitializerMemberValue) {
+                    PsiArrayInitializerMemberValue arrayValue = (PsiArrayInitializerMemberValue) methodValue;
+                    if (arrayValue.getInitializers().length > 0) {
+                        PsiAnnotationMemberValue firstMethodValue = arrayValue.getInitializers()[0];
+                        if (firstMethodValue instanceof PsiReferenceExpression) {
+                            PsiReferenceExpression reference = (PsiReferenceExpression) firstMethodValue;
+                            String methodName = reference.getReferenceName();
+                            if (methodName != null) {
+                                httpMethod = methodName; // 假设这里返回的是类似 "GET", "POST" 等字符串
+                            }
+                        }
+                    }
+                }
+            }
+
+            PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("value");
+            if (methodValue == null || (methodValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue())))) {
+                methodValue = methodAnnotation.findAttributeValue("path");
+            }
+
+            if (methodValue instanceof PsiLiteralExpression && StringUtils.isNotBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue()))) {
+                String s = String.valueOf(((PsiLiteralExpression) methodValue).getValue());
+                if (path1.endsWith("/")) {
+                    if (s.startsWith("/")) {
+                        path1 += s.substring(1);
+                    } else {
+                        path1 += methodValue.getText();
+                    }
+                } else {
+                    if (s.startsWith("/")) {
+                        path1 += s;
+                    } else {
+                        path1 += ("/" + s);
+                    }
+                }
+            }
+            break;
+        }
+
+//        StringBuilder header = new StringBuilder();
+
+        // Add authorization header
+//        header.append("  -H 'Authorization: Bearer your_token'");
+
+        // Process parameters
+        // Get the parameters
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        JSONObject parse = JSONObject.parseObject(jsonParams);
+        ArrayList<String> paths = new ArrayList<>();
+        Map<String, String> aliasmap = new HashMap<>();
+        String requestBodyKey = null;
+        for (PsiParameter parameter : parameters) {
+            PsiAnnotation requestBodyAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestBody");
+            if (requestBodyAnnotation != null) {
+                if (httpMethod.equals("GET")) {
+                    httpMethod = "POST";
+                }
+                requestBodyKey = parameter.getName();
+                continue;
+            }
+            //判断是否含有 requestParam注解,如果有,则将别名注册到 aliasmap 中,key 是形参名,val 是 requestparam 的配置
+            // 如果不存在 @RequestBody 注解，则检查 @RequestParam 注解
+            PsiAnnotation requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestParam");
+            boolean path = false;
+            if (requestParamAnnotation == null) {
+                requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.PathVariable");
+                path = true;
+            }
+            if (requestParamAnnotation == null) {
+                continue;
+            }
+
+            if (path) {
+                paths.add(parameter.getName());
+            }
+            // 获取 @RequestParam 注解中的配置值
+            PsiAnnotationMemberValue requestParamValue = requestParamAnnotation.findAttributeValue("value");
+            if (requestParamValue == null || (requestParamValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) requestParamValue).getValue())))) {
+                requestParamValue = requestParamAnnotation.findAttributeValue("name");
+            }
+            if (requestParamValue instanceof PsiLiteralExpression) {
+                String cs = String.valueOf(((PsiLiteralExpression) requestParamValue).getValue());
+                if (StringUtils.isNotBlank(cs)) {
+                    // 将别名注册到 aliasMap 中
+                    aliasmap.put(parameter.getName(), cs);
+                }
+            }
+        }
+
+        String jsonBody = null;
+        if (requestBodyKey != null) {
+            if (parse.get(requestBodyKey) != null) {
+                jsonBody = JSONObject.toJSONString(parse.get(requestBodyKey), SerializerFeature.WriteMapNullValue);
+            } else {
+                jsonBody = "{}";
+            }
+            parse.remove(requestBodyKey);
+//            header.append(" \\\n  -H 'Content-Type: application/json' \\\n  -d '").append(jsonBody).append("'");
+        }
+
+
+//               parse是个双层 map 参数
+//                我想让双层key展开平铺
+        JSONObject flattenedParse = new JSONObject();
+        flattenJson(parse, flattenedParse);
+//                @requestParam Set<String> ids 这种是需要支持的
+        Iterator<Map.Entry<String, Object>> iterator = parse.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Object> entry = iterator.next();
+            if (entry.getValue() instanceof JSONArray) {
+                flattenedParse.put(entry.getKey(), StringUtils.join((JSONArray) entry.getValue(), ","));
+                iterator.remove();
+            }
+        }
+
+        if (!paths.isEmpty()) {
+            for (String path : paths) {
+                String val = null;
+                try {
+                    val = URLEncoder.encode(String.valueOf(flattenedParse.get(path)), "UTF-8");
+                } catch (UnsupportedEncodingException ex) {
+                }
+                flattenedParse.remove(path);
+
+                if (aliasmap.containsKey(path)) {
+                    path = aliasmap.get(path);
+                }
+                path1 = path1.replace("{" + path + "}", val);
+//                        path 支持写类似正则的内容,类似/{userId1}/orders/{orderId:\\d+}
+//                        请手动在 path1 中找{+path:的内容再找到下一个}进行补充替换
+                // 处理带有正则的路径变量，例如：/{userId1}/orders/{orderId:\\d+}
+                Pattern pattern = Pattern.compile("\\{" + Pattern.quote(path) + ":.*?\\}");
+                Matcher matcher = pattern.matcher(path1);
+                if (matcher.find()) {
+                    path1 = matcher.replaceFirst(val);
+                }
+            }
+        }
+
+        FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append("curl -X ").append(httpMethod.toUpperCase()).append(" 'http://localhost:" + (selectedApp == null ? "8080" : selectedApp.getPort())).append(path1);
+        Map<String, String> urlParams = new HashMap<>();
+        if (!flattenedParse.isEmpty()) {
+            Container<Boolean> first = new Container<>();
+            first.set(true);
+            flattenedParse.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
+                @Override
+                public void accept(Map.Entry<String, Object> stringObjectEntry) {
+                    String s = aliasmap.get(stringObjectEntry.getKey());
+                    if (s != null && StringUtils.isBlank(s)) {
+                        return;
+                    }
+                    s = s == null ? stringObjectEntry.getKey() : s;
+                    urlParams.put(s, String.valueOf(stringObjectEntry.getValue()));
+//                    try {
+//                        if (!first.get()) {
+//                            urlBuilder.append("?");
+//                            first.set(false);
+//                        } else {
+//                            urlBuilder.append("&");
+//                        }
+//                        urlBuilder.append(s).append("=").append(URLEncoder.encode(String.valueOf(stringObjectEntry.getValue()), "UTF-8"));
+//                    } catch (UnsupportedEncodingException ex) {
+//                    }
+                }
+            });
+        }
+        urlBuilder.append("'");
+
+        String ret = null;
+        try {
+            ret = invokeControllerScript(script, app, env, httpMethod, path1, urlParams, jsonBody);
+//                urlBuilder + " \\\n" + header
+            FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
+        } catch (Throwable ex) {
+            FlingHelper.notify(getProject(), NotificationType.ERROR, "Adapter invoke error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+        }
+    }
+
+
+    public static String invokeControllerScript(String code, String app, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+        GroovyShell groovyShell = new GroovyShell();
+        Script script = groovyShell.parse(code);
+        Object build = InvokerHelper.invokeMethod(script, "build", new Object[]{app, env, httpMethod, path, params, jsonBody});
+        return build == null ? "" : String.valueOf(build);
+    }
+
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new GridBagLayout());

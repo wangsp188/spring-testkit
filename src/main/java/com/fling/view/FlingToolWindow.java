@@ -53,6 +53,7 @@ import org.cef.browser.CefFrame;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.plugins.groovy.GroovyLanguage;
 
 import javax.swing.*;
 import javax.swing.border.Border;
@@ -90,6 +91,7 @@ public class FlingToolWindow {
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
+    private List<String> appList = new ArrayList<>();
     private JComboBox<String> scriptAppBox;
     private JComboBox<String> controllerScriptAppBox;
     private JTextField controllerEnvTextField;
@@ -942,6 +944,7 @@ public class FlingToolWindow {
                 @Override
                 public void run() {
                     for (PsiClass applicationClass : springBootApplicationClasses) {
+                        appList.add(applicationClass.getName());
                         scriptAppBox.addItem(applicationClass.getName());
                         controllerScriptAppBox.addItem(applicationClass.getName());
                         propertiesAppBox.addItem(applicationClass.getName());
@@ -1075,8 +1078,7 @@ public class FlingToolWindow {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
-
-        LanguageTextField scriptField = new LanguageTextField(JavaLanguage.INSTANCE, getProject(), LocalStorageHelper.defControllerAdapter.getScript(), false);
+        LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, getProject(), LocalStorageHelper.defControllerAdapter.getScript(), false);
 
         // 布局输入框
         gbc.gridx = 0;
@@ -1457,6 +1459,10 @@ public class FlingToolWindow {
             return null;
         }
         return app.getAppName();
+    }
+
+    public List<String> getProjectAppList(){
+        return appList;
     }
 
 }

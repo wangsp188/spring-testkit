@@ -28,7 +28,7 @@ intellij {
     version.set("2023.2.6")
     type.set("IU") // Target IDE Platform
 
-    plugins.set(listOf("com.intellij.java","Git4Idea","com.intellij.spring.boot","com.intellij.database"))
+    plugins.set(listOf("com.intellij.java","Git4Idea","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
 }
 
 tasks {

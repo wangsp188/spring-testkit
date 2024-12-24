@@ -78,6 +78,10 @@ public abstract class BasePluginTool {
         return flingWindow.getSelectedApp();
     }
 
+    public List<String> getPorjectAppList() {
+        return flingWindow.getProjectAppList();
+    }
+
     public String getSelectedAppName() {
         return flingWindow.getSelectedAppName();
     }
