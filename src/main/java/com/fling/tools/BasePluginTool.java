@@ -13,7 +13,11 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.Computable;
@@ -42,7 +46,7 @@ public abstract class BasePluginTool {
     protected Set<String> cancelReqs = new HashSet<>(128);
     protected String lastReqId;
 
-    protected SwingWorker lastLocalFuture;
+//    protected SwingWorker lastLocalFuture;
 
 
     protected FlingToolWindow flingWindow;
@@ -232,58 +236,109 @@ public abstract class BasePluginTool {
         String reqId = response.getString("data");
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
-        setOutputText("req is sent，reqId:" + reqId, null);
+        setOutputText("req is send，reqId:" + reqId, null);
         // 第二个 SwingWorker 用于获取结果
-        new SwingWorker<JSONObject, Void>() {
+//        new SwingWorker<JSONObject, Void>() {
+//
+//            @Override
+//            protected JSONObject doInBackground() throws Exception {
+//                HashMap<String, Object> map = new HashMap<>();
+//                map.put("method", "get_task_ret");
+//                HashMap<Object, Object> params = new HashMap<>();
+//                params.put("reqId", reqId);
+//                map.put("params", params);
+//                return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class);
+//            }
+//
+//            @Override
+//            protected void done() {
+//                try {
+//                    JSONObject result = get();
+//                    if (cancelReqs.remove(reqId)) {
+//                        System.out.println("请求已被取消，结果丢弃");
+//                    } else {
+//                        List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
+//                        });
+//                        if (!result.getBooleanValue("success")) {
+//                            setOutputText("req is error\n" + result.getString("message"), profile);
+//                        } else {
+//                            Object data = result.get("data");
+//                            if (data == null) {
+//                                setOutputText("null", profile);
+//                            } else if (data instanceof String
+//                                    || data instanceof Byte
+//                                    || data instanceof Short
+//                                    || data instanceof Integer
+//                                    || data instanceof Long
+//                                    || data instanceof Float
+//                                    || data instanceof Double
+//                                    || data instanceof Character
+//                                    || data instanceof Boolean
+//                                    || data.getClass().isEnum()) {
+//                                setOutputText(data.toString(), profile);
+//                            } else {
+//                                setOutputText(JsonUtil.formatObj(data), profile);
+//                            }
+//                        }
+//                    }
+//                } catch (Throwable ex) {
+//                    setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
+//                } finally {
+//                    triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+//                }
+//            }
+//        }.execute();
 
-            @Override
-            protected JSONObject doInBackground() throws Exception {
-                HashMap<String, Object> map = new HashMap<>();
-                map.put("method", "get_task_ret");
-                HashMap<Object, Object> params = new HashMap<>();
-                params.put("reqId", reqId);
-                map.put("params", params);
-                return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class);
-            }
 
+        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Req is send，wait ...", false) {
             @Override
-            protected void done() {
+            public void run( ProgressIndicator indicator) {
                 try {
-                    JSONObject result = get();
-                    if (cancelReqs.remove(reqId)) {
-                        System.out.println("请求已被取消，结果丢弃");
-                    } else {
-                        List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
-                        });
-                        if (!result.getBooleanValue("success")) {
-                            setOutputText("req is error\n" + result.getString("message"), profile);
+                    HashMap<String, Object> map = new HashMap<>();
+                    map.put("method", "get_task_ret");
+                    HashMap<Object, Object> params = new HashMap<>();
+                    params.put("reqId", reqId);
+                    map.put("params", params);
+
+                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class);
+
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (cancelReqs.remove(reqId)) {
+                            System.out.println("请求已被取消，结果丢弃");
                         } else {
-                            Object data = result.get("data");
-                            if (data == null) {
-                                setOutputText("null", profile);
-                            } else if (data instanceof String
-                                    || data instanceof Byte
-                                    || data instanceof Short
-                                    || data instanceof Integer
-                                    || data instanceof Long
-                                    || data instanceof Float
-                                    || data instanceof Double
-                                    || data instanceof Character
-                                    || data instanceof Boolean
-                                    || data.getClass().isEnum()) {
-                                setOutputText(data.toString(), profile);
+                            List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {});
+                            if (!result.getBooleanValue("success")) {
+                                setOutputText("req is error\n" + result.getString("message"), profile);
                             } else {
-                                setOutputText(JsonUtil.formatObj(data), profile);
+                                Object data = result.get("data");
+                                if (data == null) {
+                                    setOutputText("null", profile);
+                                } else if (data instanceof String
+                                        || data instanceof Byte
+                                        || data instanceof Short
+                                        || data instanceof Integer
+                                        || data instanceof Long
+                                        || data instanceof Float
+                                        || data instanceof Double
+                                        || data instanceof Character
+                                        || data instanceof Boolean
+                                        || data.getClass().isEnum()) {
+                                    setOutputText(data.toString(), profile);
+                                } else {
+                                    setOutputText(JsonUtil.formatObj(data), profile);
+                                }
                             }
                         }
-                    }
+                        triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+                    });
                 } catch (Throwable ex) {
-                    setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
-                } finally {
-                    triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
+                        triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+                    });
                 }
             }
-        }.execute();
+        });
     }
 
     protected void triggerLocalTask(JButton triggerBtn, Icon executeIcon, Supplier<String> submit) {
@@ -302,8 +357,8 @@ public abstract class BasePluginTool {
 //            }
             return;
         }
-        //使用线程池提交任务
-        lastLocalFuture = new SwingWorker<String, Void>() {
+//        使用线程池提交任务
+        SwingWorker worker = new SwingWorker<String, Void>() {
 
             @Override
             protected String doInBackground() throws Exception {
@@ -328,9 +383,11 @@ public abstract class BasePluginTool {
                 }
             }
         };
-        setOutputText("req is sent");
+
+        // 立即更新UI
+        setOutputText("Build sql ...");
         triggerBtn.setIcon(AllIcons.Hierarchy.MethodNotDefined);
-        lastLocalFuture.execute();
+        worker.execute();
     }
 
 

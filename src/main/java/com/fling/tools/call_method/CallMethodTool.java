@@ -18,13 +18,15 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
-import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -100,9 +102,10 @@ public class CallMethodTool extends BasePluginTool {
                                 @Override
                                 public void actionPerformed(@NotNull AnActionEvent e) {
                                     Application application = ApplicationManager.getApplication();
-                                    application.invokeLater(new Runnable() {
+                                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Invoke generate function...", false) {
+
                                         @Override
-                                        public void run() {
+                                        public void run(@NotNull ProgressIndicator indicator) {
                                             application.runReadAction(new Runnable() {
                                                 @Override
                                                 public void run() {
@@ -126,7 +129,7 @@ public class CallMethodTool extends BasePluginTool {
                 }
 
                 JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerAdapterPopup", controllerActionGroup).getComponent();
-                popupMenu.show(inputEditorTextField, 0, 80);
+                popupMenu.show(inputEditorTextField, 0, 90);
             }
 
         };

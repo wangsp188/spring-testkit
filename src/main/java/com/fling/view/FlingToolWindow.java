@@ -15,6 +15,9 @@ import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.StdFileTypes;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
@@ -45,12 +48,16 @@ import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.intellij.ui.dsl.builder.AlignX;
 import com.intellij.ui.jcef.JBCefBrowser;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefLoadHandlerAdapter;
+import org.codehaus.groovy.control.CompilationFailedException;
+import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.groovy.GroovyLanguage;
@@ -1208,6 +1215,34 @@ public class FlingToolWindow {
         // 创建按钮面板，使用FlowLayout以右对齐
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
+        //测试按钮
+        JButton testButton = new JButton(AllIcons.Actions.Rerun);
+        testButton.setToolTipText("Test generate function use simple params");
+        ActionListener testListener = e -> {
+            FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
+            String scriptCode = scriptField.getText();
+            String env = StringUtils.isBlank(controllerEnvTextField.getText().trim())?"local":controllerEnvTextField.getText().trim().split(",")[0];
+            ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Test generate function...", false) {
+
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    try {
+                        GroovyShell groovyShell = new GroovyShell();
+                        Script script = groovyShell.parse(scriptCode);
+                        HashMap<String, String> params = new HashMap<>();
+                        params.put("param1", "1");
+                        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/re_test", params, "{}"});
+                        String ret = build == null ? "" : String.valueOf(build);
+                        FlingHelper.notify(getProject(), NotificationType.INFORMATION, "Test generate function result is \n" + ret);
+                    } catch (Throwable ex) {
+                        FlingHelper.notify(getProject(), NotificationType.ERROR, "Test generate function error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                    }
+                }
+            });
+
+        };
+        testButton.addActionListener(testListener);
+
         // 保存按钮
         JButton saveButton = new JButton("Apply");
         ActionListener saveListener = e -> {
@@ -1237,6 +1272,7 @@ public class FlingToolWindow {
         });
 
         // 将按钮添加到按钮面板
+        buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
         buttonPanel.add(closeButton);
 
@@ -1462,7 +1498,7 @@ public class FlingToolWindow {
         return app.getAppName();
     }
 
-    public List<String> getProjectAppList(){
+    public List<String> getProjectAppList() {
         return appList;
     }
 

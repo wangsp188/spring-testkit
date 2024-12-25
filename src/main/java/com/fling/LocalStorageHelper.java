@@ -90,112 +90,151 @@ public class LocalStorageHelper {
     public static final ControllerAdapter defControllerAdapter = new ControllerAdapter();
 
     static {
-        defControllerAdapter.setScript("import groovy.json.JsonOutput\n" +
+        defControllerAdapter.setScript("package com.fling.tools.call_method;\n" +
+                "\n" +
+                "import groovy.json.JsonOutput\n" +
                 "import groovy.json.JsonSlurper\n" +
+                "\n" +
+                "import java.io.FileNotFoundException;\n" +
+                "import java.io.IOException;\n" +
+                "import java.net.HttpURLConnection;\n" +
+                "import java.net.URLEncoder;\n" +
+                "import java.util.Map;\n" +
                 "\n" +
                 "\n" +
                 "/**\n" +
                 " * groovy脚本，在idea-plugin环境执行\n" +
                 " * 构建函数，返回结果会被copy到剪切板，建议采用curl格式\n" +
-                " * \n" +
+                " * <p>\n" +
                 " * 不可使用项目中类，不可使用项目中类，不可使用项目中类\n" +
-                " * \n" +
+                " * <p>\n" +
                 " * 运行代码如下\n" +
-                " * \n" +
-                " GroovyShell groovyShell = new GroovyShell();\n" +
-                " Script script = groovyShell.parse(this-code);\n" +
-                " Object build = InvokerHelper.invokeMethod(script, \"generate\", new Object[]{env,  selectedAppPort, httpMethod, path, params, jsonBody});\n" +
-                " return build == null ? \"\" : String.valueOf(build);\n" +
-                " * \n" +
+                " * <p>\n" +
+                " * GroovyShell groovyShell = new GroovyShell();\n" +
+                " * Script script = groovyShell.parse(this-code);\n" +
+                " * Object build = InvokerHelper.invokeMethod(script, \"generate\", new Object[]{env,  selectedAppPort, httpMethod, path, params, jsonBody});\n" +
+                " * return build == null ? \"\" : String.valueOf(build);\n" +
+                " * <p>\n" +
                 " * 工具函数\n" +
                 " * buildCurl：构建curl函数\n" +
                 " * http：发起http请求函数\n" +
-                " * \n" +
-                " * @param env 环境，非空\n" +
+                " *\n" +
+                " * @param env        环境，非空\n" +
                 " * @param httpMethod GET/POST 等等http方法，非空\n" +
-                " * @param path /uri 非空\n" +
-                " * @param params 传递的参数，k和v都是string，非空\n" +
-                " * @param jsonBody json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
+                " * @param path       /uri 非空\n" +
+                " * @param params     传递的参数，k和v都是string，非空\n" +
+                " * @param jsonBody   json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
                 " * @return 返回结果会被copy到剪切板\n" +
                 " */\n" +
-                "def generate(String env, Integer runtimePort,String httpMethod,String path,Map<String,String> params,String jsonBody) {\n" +
+                "def generate(String env, Integer runtimePort, String httpMethod, String path, Map<String, String> params, String jsonBody) {\n" +
                 "    String domain = \"http://localhost:8080\"\n" +
-                "    if(\"local\" == env && runtimePort!=null){\n" +
-                "        domain = \"http://localhost:\"+runtimePort\n" +
+                "    if (\"local\" == env && runtimePort != null) {\n" +
+                "        domain = \"http://localhost:\" + runtimePort\n" +
                 "    }\n" +
                 "    String token = getToken(env)\n" +
-                "    buildCurl(domain,httpMethod,path,params,[\"Authorization\":\"Bearer ${token}\"],jsonBody)\n" +
+                "    buildCurl(domain, httpMethod, path, params,[\"Authorization\":\"Bearer ${token}\"],jsonBody)\n" +
                 "}\n" +
                 "\n" +
                 "\n" +
-                "\n" +
-                "def getToken(env){\n" +
+                "def getToken(env) {\n" +
                 "    // your project logic\n" +
                 "    return \"your_token\"\n" +
                 "}\n" +
                 "\n" +
                 "\n" +
-                "class HttpResponse {\n" +
+                "class HttpRes {\n" +
+                "    Integer status\n" +
                 "    String body\n" +
                 "    Map<String, List<String>> headers\n" +
                 "\n" +
                 "    String toJson() {\n" +
                 "        def responseMap = [\n" +
-                "                body: parseBodyAsJson(),\n" +
-                "                headers: filterNullKeys(headers)\n" +
+                "                status:\n" +
+                "                        status,\n" +
+                "                body:parseBodyAsJson(),\n" +
+                "                headers:filterNullKeys(headers)\n" +
                 "        ]\n" +
-                "        return JsonOutput.prettyPrint(JsonOutput.toJson(responseMap))\n" +
+                "        return JsonOutput.toJson(responseMap)\n" +
                 "    }\n" +
                 "\n" +
                 "    private Object parseBodyAsJson() {\n" +
                 "        try {\n" +
                 "            return new JsonSlurper().parseText(body)\n" +
                 "        } catch (Exception e) {\n" +
-                "            return body // 如果不是JSON格式，返回原始body  \n" +
+                "            return body\n" +
                 "        }\n" +
                 "    }\n" +
-                "    \n" +
+                "\n" +
                 "    private Map<String, List<String>> filterNullKeys(Map<String, List<String>> map) {\n" +
-                "        return map.findAll { k, v -> k != null }\n" +
+                "        return map.findAll {\n" +
+                "            k, v -> k != null\n" +
+                "        }\n" +
                 "    }\n" +
                 "}\n" +
                 "\n" +
-                "HttpResponse http(String httpMethod,String uri, Map<String, String> headers, Map<String, String> params, String jsonBody) {\n" +
+                "HttpRes http(String httpMethod, String uri, Map<String, String> headers, Map<String, String> params, String jsonBody) {\n" +
                 "    if (params) {\n" +
-                "        def queryString = params.collect { k, v -> \"${URLEncoder.encode(k, 'UTF-8')}=${URLEncoder.encode(v==null?\"\":v, 'UTF-8')}\" }.join('&')\n" +
+                "        def queryString = params.collect {\n" +
+                "            k, v -> \"${URLEncoder.encode(k, 'UTF-8')}=${URLEncoder.encode(v==null?\" \":v, 'UTF-8')}\"\n" +
+                "        }.join('&')\n" +
                 "        uri += \"?${queryString}\"\n" +
                 "    }\n" +
-                "    HttpURLConnection connection = new URL(uri).openConnection()\n" +
-                "    connection.setRequestMethod(httpMethod.toUpperCase())\n" +
-                "   \n" +
-                "    if(headers){\n" +
-                "        headers.each { key, value ->\n" +
-                "            connection.setRequestProperty(key, value)\n" +
+                "    HttpURLConnection connection = null\n" +
+                "    try {\n" +
+                "        connection = new URL(uri).openConnection()\n" +
+                "        connection.setRequestMethod(httpMethod.toUpperCase())\n" +
+                "\n" +
+                "        if (headers) {\n" +
+                "            headers.each {\n" +
+                "                key, value ->\n" +
+                "                    connection.setRequestProperty(key, value)\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        if (jsonBody) {\n" +
+                "            connection.setRequestProperty(\"Content-Type\", \"application/json\")\n" +
+                "            connection.doOutput = true\n" +
+                "            connection.outputStream.withWriter(\"UTF-8\") {\n" +
+                "                writer ->\n" +
+                "                    writer << jsonBody\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        def responseCode = connection.responseCode\n" +
+                "        def responseHeaders = connection.headerFields\n" +
+                "\n" +
+                "        def responseBody\n" +
+                "        try {\n" +
+                "            responseBody = connection.inputStream.withReader(\"UTF-8\") {\n" +
+                "                reader ->\n" +
+                "                    reader.text\n" +
+                "            }\n" +
+                "        } catch (Throwable e) {\n" +
+                "            responseBody = connection.errorStream.withReader(\"UTF-8\") {\n" +
+                "                reader ->\n" +
+                "                    reader.text\n" +
+                "            }\n" +
+                "        }\n" +
+                "        return new HttpRes(status:responseCode, body:responseBody, headers:responseHeaders)\n" +
+                "    } catch (ConnectException e) {\n" +
+                "        return new HttpRes(status:503, body:\"Service unavailable\", headers: [:])\n" +
+                "    } catch (FileNotFoundException e) {\n" +
+                "        return new HttpRes(status:404, body:\"Resource not found: ${e.message}\", headers: [:])\n" +
+                "    } catch (IOException e) {\n" +
+                "        return new HttpRes(status:500, body:\"IO Exception: ${e.message}\", headers: [:])\n" +
+                "    } finally {\n" +
+                "        if (connection != null) {\n" +
+                "            connection.disconnect()\n" +
                 "        }\n" +
                 "    }\n" +
-                "\n" +
-                "    if (jsonBody) {\n" +
-                "        connection.setRequestProperty(\"Content-Type\", \"application/json\")\n" +
-                "        connection.doOutput = true\n" +
-                "        connection.outputStream.withWriter(\"UTF-8\") { writer ->\n" +
-                "            writer << jsonBody\n" +
-                "        }\n" +
-                "    }\n" +
-                "\n" +
-                "    def responseHeaders = connection.headerFields\n" +
-                "    def responseBody = connection.inputStream.withReader(\"UTF-8\") { reader ->\n" +
-                "        reader.text\n" +
-                "    }\n" +
-                "\n" +
-                "    return new HttpResponse(body: responseBody, headers: responseHeaders)\n" +
                 "}\n" +
                 "\n" +
                 "\n" +
-                "def buildCurl(domain, httpMethod, path, params, headers, jsonBody){\n" +
+                "def buildCurl(domain, httpMethod, path, params, headers, jsonBody) {\n" +
                 "    StringBuilder ret = new StringBuilder()\n" +
                 "    ret.append(\"curl -X ${httpMethod.toUpperCase()} '${domain}${path}\")\n" +
                 "\n" +
-                "    if(params!=null && params.size()>0){\n" +
+                "    if (params != null && params.size() > 0) {\n" +
                 "        ret.append(\"?\");\n" +
                 "        params.forEach((key, value) -> {\n" +
                 "            ret.append(URLEncoder.encode(key, \"UTF-8\"))\n" +
@@ -208,15 +247,15 @@ public class LocalStorageHelper {
                 "    }\n" +
                 "    ret.append(\"' \")\n" +
                 "\n" +
-                "    if(headers!=null && headers.size()>0){\n" +
+                "    if (headers != null && headers.size() > 0) {\n" +
                 "        headers.forEach((key, value) -> {\n" +
-                "            if(\"Content-Type\" == key){\n" +
+                "            if (\"Content-Type\" == key) {\n" +
                 "                return\n" +
                 "            }\n" +
                 "            ret.append(\" \\\\\\n  -H '${key}: ${value}'\")\n" +
                 "        });\n" +
                 "    }\n" +
-                "    if(jsonBody!=null){\n" +
+                "    if (jsonBody != null) {\n" +
                 "        ret.append(\" \\\\\\n  -H 'Content-Type: application/json' \\\\\\n  -d '${jsonBody}'\")\n" +
                 "    }\n" +
                 "    return ret\n" +
