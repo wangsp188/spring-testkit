@@ -290,7 +290,7 @@ public abstract class BasePluginTool {
 //        }.execute();
 
 
-        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Req is send，wait ...", false) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing, please wait...", false) {
             @Override
             public void run( ProgressIndicator indicator) {
                 try {
