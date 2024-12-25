@@ -113,7 +113,6 @@ public abstract class BasePluginTool {
         actionGroup = new DefaultActionGroup();
 
 
-
         if (hasActionBox()) {
             AnAction refreshAction = new AnAction("Refresh method parameters structure", "Refresh method parameters structure", AllIcons.Actions.Refresh) {
                 @Override
@@ -237,62 +236,10 @@ public abstract class BasePluginTool {
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
         setOutputText("req is send，reqId:" + reqId, null);
-        // 第二个 SwingWorker 用于获取结果
-//        new SwingWorker<JSONObject, Void>() {
-//
-//            @Override
-//            protected JSONObject doInBackground() throws Exception {
-//                HashMap<String, Object> map = new HashMap<>();
-//                map.put("method", "get_task_ret");
-//                HashMap<Object, Object> params = new HashMap<>();
-//                params.put("reqId", reqId);
-//                map.put("params", params);
-//                return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class);
-//            }
-//
-//            @Override
-//            protected void done() {
-//                try {
-//                    JSONObject result = get();
-//                    if (cancelReqs.remove(reqId)) {
-//                        System.out.println("请求已被取消，结果丢弃");
-//                    } else {
-//                        List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
-//                        });
-//                        if (!result.getBooleanValue("success")) {
-//                            setOutputText("req is error\n" + result.getString("message"), profile);
-//                        } else {
-//                            Object data = result.get("data");
-//                            if (data == null) {
-//                                setOutputText("null", profile);
-//                            } else if (data instanceof String
-//                                    || data instanceof Byte
-//                                    || data instanceof Short
-//                                    || data instanceof Integer
-//                                    || data instanceof Long
-//                                    || data instanceof Float
-//                                    || data instanceof Double
-//                                    || data instanceof Character
-//                                    || data instanceof Boolean
-//                                    || data.getClass().isEnum()) {
-//                                setOutputText(data.toString(), profile);
-//                            } else {
-//                                setOutputText(JsonUtil.formatObj(data), profile);
-//                            }
-//                        }
-//                    }
-//                } catch (Throwable ex) {
-//                    setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
-//                } finally {
-//                    triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
-//                }
-//            }
-//        }.execute();
 
-
-        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing, please wait...", false) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing "+getTool().getCode()+", please wait...", false) {
             @Override
-            public void run( ProgressIndicator indicator) {
+            public void run(ProgressIndicator indicator) {
                 try {
                     HashMap<String, Object> map = new HashMap<>();
                     map.put("method", "get_task_ret");
@@ -306,28 +253,34 @@ public abstract class BasePluginTool {
                         if (cancelReqs.remove(reqId)) {
                             System.out.println("请求已被取消，结果丢弃");
                         } else {
-                            List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {});
-                            if (!result.getBooleanValue("success")) {
-                                setOutputText("req is error\n" + result.getString("message"), profile);
+                            if (result == null) {
+                                setOutputText("req is error\n result is null", null);
                             } else {
-                                Object data = result.get("data");
-                                if (data == null) {
-                                    setOutputText("null", profile);
-                                } else if (data instanceof String
-                                        || data instanceof Byte
-                                        || data instanceof Short
-                                        || data instanceof Integer
-                                        || data instanceof Long
-                                        || data instanceof Float
-                                        || data instanceof Double
-                                        || data instanceof Character
-                                        || data instanceof Boolean
-                                        || data.getClass().isEnum()) {
-                                    setOutputText(data.toString(), profile);
+                                List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
+                                });
+                                if (!result.getBooleanValue("success")) {
+                                    setOutputText("req is error\n" + result.getString("message"), profile);
                                 } else {
-                                    setOutputText(JsonUtil.formatObj(data), profile);
+                                    Object data = result.get("data");
+                                    if (data == null) {
+                                        setOutputText("null", profile);
+                                    } else if (data instanceof String
+                                            || data instanceof Byte
+                                            || data instanceof Short
+                                            || data instanceof Integer
+                                            || data instanceof Long
+                                            || data instanceof Float
+                                            || data instanceof Double
+                                            || data instanceof Character
+                                            || data instanceof Boolean
+                                            || data.getClass().isEnum()) {
+                                        setOutputText(data.toString(), profile);
+                                    } else {
+                                        setOutputText(JsonUtil.formatObj(data), profile);
+                                    }
                                 }
                             }
+
                         }
                         triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
                     });

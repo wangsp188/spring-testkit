@@ -102,7 +102,7 @@ public class CallMethodTool extends BasePluginTool {
                                 @Override
                                 public void actionPerformed(@NotNull AnActionEvent e) {
                                     Application application = ApplicationManager.getApplication();
-                                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Invoke generate function...", false) {
+                                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait...", false) {
 
                                         @Override
                                         public void run(@NotNull ProgressIndicator indicator) {

@@ -1,10 +1,13 @@
 package com.fling.view;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.fling.RuntimeAppHelper;
 import com.fling.doc.DocHelper;
 import com.fling.doc.DocIconProvider;
 import com.fling.tools.CurlDialog;
+import com.fling.tools.ToolHelper;
+import com.fling.util.JsonUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
@@ -75,12 +78,15 @@ import java.net.URI;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class FlingToolWindow {
 
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", FlingToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/dagre.svg", FlingToolWindow.class);
+    private static final Icon FIRE_TEST_ICON = IconLoader.getIcon("/icons/fire-test.svg", FlingToolWindow.class);
 
 
     private Project project;
@@ -1035,6 +1041,104 @@ public class FlingToolWindow {
         // 创建按钮面板，使用FlowLayout以右对齐
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
+        //测试按钮
+        JButton testButton = new JButton(FIRE_TEST_ICON);
+        testButton.setPreferredSize(new Dimension(20, 20));
+        testButton.setToolTipText("Fire-Test tool-script use hello world code");
+        ActionListener testListener = e -> {
+            Object selectedItem = scriptAppBox.getSelectedItem();
+            if (selectedItem == null) {
+                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Please select a app");
+                return;
+            }
+            String script = scriptField.getText();
+
+
+            VisibleApp visibleApp = Optional.ofNullable(monitorMap)
+                    .orElse(new HashMap<>())
+                    .keySet()
+                    .stream()
+                    .map(new Function<String, VisibleApp>() {
+                        @Override
+                        public VisibleApp apply(String s) {
+                            return parseApp(s);
+                        }
+                    })
+                    .filter(new Predicate<VisibleApp>() {
+                        @Override
+                        public boolean test(VisibleApp visibleApp) {
+                            return Objects.equals(visibleApp.getAppName(), selectedItem);
+                        }
+                    })
+                    .findFirst()
+                    .orElse(null);
+            if (visibleApp == null) {
+                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Please start Application named " + selectedItem);
+                return;
+            }
+            ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Fire-Test tool-script, please wait ...", false) {
+
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    try {
+                        String code = "import java.util.Date;\n" +
+                                "\n" +
+                                "class HelloFling {\n" +
+                                "\n" +
+                                "    public String hello(String name, Date date) {\n" +
+                                "        return \"Hello \" + name + \", now is \" + date;\n" +
+                                "    }\n" +
+                                "}";
+                        JSONObject params = new JSONObject();
+                        params.put("code", code);
+                        params.put("methodName", "hello");
+                        params.put("argTypes", "[\"java.lang.String\",\"java.util.Date\"]");
+                        params.put("args", "[\"Fling\"," + System.currentTimeMillis() + "]");
+                        JSONObject req = new JSONObject();
+                        req.put("method", "flexible-test");
+                        req.put("params", params);
+                        req.put("script", script);
+                        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
+                        req.put("monitor", monitorConfig.isEnable());
+                        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
+                        String reqId;
+                        try {
+                            JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", req, JSONObject.class);
+                            if (submitRes == null) {
+                                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\nFailed to submit req\nsubmitRes is null");
+                                return;
+                            }
+                            if (!submitRes.getBooleanValue("success") || submitRes.getString("data") == null) {
+                                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\nFailed to submit req\n" + submitRes.getString("message"));
+                                return;
+                            }
+                            reqId = submitRes.getString("data");
+                        } catch (Exception ex) {
+                            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\nFailed to submit req\n" + ex.getClass().getSimpleName() + "," + ex.getMessage());
+                            return;
+                        }
+
+                        HashMap<String, Object> getRetReq = new HashMap<>();
+                        getRetReq.put("method", "get_task_ret");
+                        params.clear();
+                        params.put("reqId", reqId);
+                        getRetReq.put("params", params);
+
+                        JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", getRetReq, JSONObject.class);
+                        if (result == null || !result.getBooleanValue("success")) {
+                            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\n" + (result == null ? "result is null" : result.getString("message")));
+                            return;
+                        }
+                        FlingHelper.alert(getProject(), Messages.getInformationIcon(), "Test tool-script success\n" + result.get("data"));
+                    } catch (Throwable ex) {
+                        FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                    }
+                }
+            });
+
+        };
+        testButton.addActionListener(testListener);
+
         // 保存按钮
         JButton saveButton = new JButton("Apply");
         ActionListener saveListener = e -> {
@@ -1065,6 +1169,7 @@ public class FlingToolWindow {
         });
 
         // 将按钮添加到按钮面板
+        buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
         buttonPanel.add(closeButton);
 
@@ -1216,13 +1321,14 @@ public class FlingToolWindow {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
         //测试按钮
-        JButton testButton = new JButton(AllIcons.Actions.Rerun);
-        testButton.setToolTipText("Test generate function use simple params");
+        JButton testButton = new JButton(FIRE_TEST_ICON);
+        testButton.setPreferredSize(new Dimension(20, 20));
+        testButton.setToolTipText("Fire-Test generate function use simple params");
         ActionListener testListener = e -> {
             FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
             String scriptCode = scriptField.getText();
-            String env = StringUtils.isBlank(controllerEnvTextField.getText().trim())?"local":controllerEnvTextField.getText().trim().split(",")[0];
-            ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Test generate function...", false) {
+            String env = StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? "local" : controllerEnvTextField.getText().trim().split(",")[0];
+            ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Fire-Test generate function, please wait...", false) {
 
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
@@ -1233,9 +1339,9 @@ public class FlingToolWindow {
                         params.put("param1", "1");
                         Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/re_test", params, "{}"});
                         String ret = build == null ? "" : String.valueOf(build);
-                        FlingHelper.notify(getProject(), NotificationType.INFORMATION, "Test generate function result is \n" + ret);
+                        FlingHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
                     } catch (Throwable ex) {
-                        FlingHelper.notify(getProject(), NotificationType.ERROR, "Test generate function error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                        FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test generate function error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
                     }
                 }
             });

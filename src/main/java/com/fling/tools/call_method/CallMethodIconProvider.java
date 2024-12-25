@@ -12,6 +12,7 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Computable;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
+import com.intellij.psi.impl.file.PsiDirectoryFactory;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -153,10 +155,10 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             return "not_find_module";
         }
 
-        VirtualFile testSourceRoot = getTestSourceRoot(module);
-        if (testSourceRoot == null) {
-            return "not_find_test_source";
-        }
+//        VirtualFile testSourceRoot = getTestSourceRoot(module);
+//        if (testSourceRoot == null) {
+//            return "not_find_test_source";
+//        }
         return null;
     }
 
@@ -261,8 +263,13 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
         VirtualFile testSourceRoot = getTestSourceRoot(module);
         if (testSourceRoot == null) {
-            FlingHelper.notify(project, NotificationType.WARNING, "Test source root not found for the " + module.getName() + " module.");
-            return;
+            // 如果没有找到，尝试创建目录
+            try {
+                testSourceRoot = createTestRoot(module);
+            } catch (Throwable e) {
+                FlingHelper.notify(module.getProject(), NotificationType.ERROR, "Failed to create test source root: " + e.getMessage());
+                return;
+            }
         }
 
         PsiClass containingClass = method.getContainingClass();
@@ -277,6 +284,36 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         }
 
         generateOrAddTestMethod(method, project, testDir);
+    }
+
+    private @NotNull VirtualFile createTestRoot(com.intellij.openapi.module.@NotNull Module module) throws IOException {
+        return ApplicationManager.getApplication().runWriteAction(new Computable<VirtualFile>() {
+            @Override
+            public VirtualFile compute() {
+                try {
+                    VirtualFile testSourceRoot;
+                    VirtualFile baseDir = ModuleRootManager.getInstance(module).getContentRoots()[0]; // 获取模块的根目录
+                    VirtualFile srcDir = baseDir.findChild("src");
+                    if (srcDir == null) {
+                        srcDir = baseDir.createChildDirectory(this, "src");
+                    }
+
+                    VirtualFile testDir = srcDir.findChild("test");
+                    if (testDir == null) {
+                        testDir = srcDir.createChildDirectory(this, "test");
+                    }
+
+                    testSourceRoot = testDir.findChild("java");
+                    if (testSourceRoot == null) {
+                        testSourceRoot = testDir.createChildDirectory(this, "java");
+                    }
+                    return testSourceRoot;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+
     }
 
     private VirtualFile getTestSourceRoot(com.intellij.openapi.module.@Nullable Module module) {
@@ -511,7 +548,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
         // Determine if the method is void and adjust the template accordingly
         String returnStatement = returnType.equals("void") ? "" : "return ";
-        String returnTypeInMethod = returnType.equals("void") ? "void" : returnType;
+        String returnTypeInMethod = returnType.equals("void") ? "void" : "Object";
 
         // 创建测试方法内容
         String testMethodContent = String.format(TEST_METHOD_TEMPLATE,
