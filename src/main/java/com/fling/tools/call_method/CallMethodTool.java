@@ -78,30 +78,37 @@ public class CallMethodTool extends BasePluginTool {
                     return;
                 }
                 List<String> porjectAppList = getPorjectAppList();
-                if (CollectionUtils.isEmpty(porjectAppList)) {
-                    porjectAppList = new ArrayList<>();
-                    porjectAppList.add(null);
-                }
 
                 DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-                for (String app : porjectAppList) {
-                    LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(flingToolWindow.getProject(), app);
-                    String script = controllerAdapter.getScript();
-                    List<String> envs = controllerAdapter.getEnvs();
-                    if (CollectionUtils.isEmpty(envs)) {
-                        envs = new ArrayList<>();
-                        envs.add(null);
-                    }
-                    for (String env : envs) {
-                        //显示的一个图标加上标题
-                        AnAction documentation = new AnAction("generate with " + app + ":" + env, "generate with " + app + ":" + env, GENERATE_ICON) {
-                            @Override
-                            public void actionPerformed(@NotNull AnActionEvent e) {
-                                handleControllerAdapter(app, env, script, selectedItem.getMethod());
+                if (CollectionUtils.isNotEmpty(porjectAppList)) {
+                    for (String app : porjectAppList) {
+                        LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(flingToolWindow.getProject(), app);
+                        String script = controllerAdapter.getScript();
+                        List<String> envs = controllerAdapter.getEnvs();
+                        if (CollectionUtils.isEmpty(envs)) {
+                            continue;
+                        }
+                        for (String env : envs) {
+                            if (env == null) {
+                                continue;
                             }
-                        };
-                        controllerActionGroup.add(documentation); // 将动作添加到动作组中
+                            //显示的一个图标加上标题
+                            AnAction documentation = new AnAction("generate with " + app + ":" + env, "generate with " + app + ":" + env, GENERATE_ICON) {
+                                @Override
+                                public void actionPerformed(@NotNull AnActionEvent e) {
+                                    handleControllerAdapter(env, script, selectedItem.getMethod());
+                                }
+                            };
+                            controllerActionGroup.add(documentation); // 将动作添加到动作组中
+                        }
                     }
+                }
+
+
+                if (controllerActionGroup.getChildrenCount() == 0) {
+                    //没有自定义逻辑，则直接处理
+                    handleControllerAdapter(null, LocalStorageHelper.defControllerAdapter.getScript(), selectedItem.getMethod());
+                    return;
                 }
 
                 JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerAdapterPopup", controllerActionGroup).getComponent();
@@ -111,7 +118,7 @@ public class CallMethodTool extends BasePluginTool {
         };
     }
 
-    private void handleControllerAdapter(String app, String env, String script, PsiMethod method) {
+    private void handleControllerAdapter(String env, String script, PsiMethod method) {
         String jsonParams = inputEditorTextField.getText();
         String httpMethod = "GET"; // Default to GET
         String path1 = "/";
@@ -313,7 +320,11 @@ public class CallMethodTool extends BasePluginTool {
         }
         try {
             String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
-            FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
+            if (env == null || Objects.equals(LocalStorageHelper.defControllerAdapter.getScript(),script)) {
+                FlingHelper.copyToClipboard(getProject(), ret, "Curl was copied to the clipboard, please replace it with the real authentication token.");
+            } else {
+                FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
+            }
         } catch (Throwable ex) {
             ex.printStackTrace();
             FlingHelper.notify(getProject(), NotificationType.ERROR, "Adapter generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
@@ -325,7 +336,7 @@ public class CallMethodTool extends BasePluginTool {
         FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env,  selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 

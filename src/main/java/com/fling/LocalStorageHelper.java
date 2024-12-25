@@ -222,7 +222,6 @@ public class LocalStorageHelper {
                 "    return ret\n" +
                 "}\n" +
                 "\n");
-        defControllerAdapter.setEnvs(Arrays.asList("local"));
     }
 
     public static final MonitorConfig defMonitorConfig = new MonitorConfig();

@@ -1127,7 +1127,7 @@ public class FlingToolWindow {
                 }
             }
         });
-        controllerEnvTextField.setText(String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()));
+        controllerEnvTextField.setText("");
 
         JLabel envLabel = new JLabel("Env:");
         envLabel.setLabelFor(controllerEnvTextField);
@@ -1177,11 +1177,11 @@ public class FlingToolWindow {
                 String selectedApp = (String) controllerScriptAppBox.getSelectedItem();
                 if (selectedApp == null) {
                     scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
-                    controllerEnvTextField.setText(String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()));
+                    controllerEnvTextField.setText("");
                 } else {
                     LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(project, selectedApp);
                     scriptField.setText(controllerAdapter.getScript() == null ? LocalStorageHelper.defControllerAdapter.getScript() : controllerAdapter.getScript());
-                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerAdapter.getEnvs()) ? String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()) : String.join(",", controllerAdapter.getEnvs()));
+                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerAdapter.getEnvs()) ? "" : String.join(",", controllerAdapter.getEnvs()));
                 }
             }
         });
@@ -1193,7 +1193,7 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
-                controllerEnvTextField.setText(String.join(",", LocalStorageHelper.defControllerAdapter.getEnvs()));
+                controllerEnvTextField.setText("");
             }
         });
         gbc.gridx = 4;  // 放在同一行的尾部
