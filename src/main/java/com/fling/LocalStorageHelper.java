@@ -90,9 +90,7 @@ public class LocalStorageHelper {
     public static final ControllerAdapter defControllerAdapter = new ControllerAdapter();
 
     static {
-        defControllerAdapter.setScript("package com.fling.tools.call_method;\n" +
-                "\n" +
-                "import groovy.json.JsonOutput\n" +
+        defControllerAdapter.setScript("import groovy.json.JsonOutput\n" +
                 "import groovy.json.JsonSlurper\n" +
                 "\n" +
                 "import java.io.FileNotFoundException;\n" +
