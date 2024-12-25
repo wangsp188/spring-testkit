@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
+import com.fling.doc.DocHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
@@ -15,6 +16,8 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
@@ -96,7 +99,18 @@ public class CallMethodTool extends BasePluginTool {
                             AnAction documentation = new AnAction("generate with " + app + ":" + env, "generate with " + app + ":" + env, GENERATE_ICON) {
                                 @Override
                                 public void actionPerformed(@NotNull AnActionEvent e) {
-                                    handleControllerAdapter(env, script, selectedItem.getMethod());
+                                    Application application = ApplicationManager.getApplication();
+                                    application.invokeLater(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            application.runReadAction(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    handleControllerAdapter(env, script, selectedItem.getMethod());
+                                                }
+                                            });
+                                        }
+                                    });
                                 }
                             };
                             controllerActionGroup.add(documentation); // 将动作添加到动作组中
@@ -320,7 +334,7 @@ public class CallMethodTool extends BasePluginTool {
         }
         try {
             String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
-            if (env == null || Objects.equals(LocalStorageHelper.defControllerAdapter.getScript(),script)) {
+            if (env == null || Objects.equals(LocalStorageHelper.defControllerAdapter.getScript(), script)) {
                 FlingHelper.copyToClipboard(getProject(), ret, "Curl was copied to the clipboard, please replace it with the real authentication token.");
             } else {
                 FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
