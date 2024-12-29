@@ -39,17 +39,24 @@ public class DocIconProvider implements LineMarkerProvider {
     public static final Icon URL_ICON = IconLoader.getIcon("/icons/url.svg", DocIconProvider.class);
 
 
-    private JDialog dialog = new JDialog();
+    private JDialog dialog ;
     {
-        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
-        // Calculate size to be 80% of the screen size
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int width = (int) (screenSize.width * 0.8);
-        int height = (int) (screenSize.height * 0.8);
-        dialog.setSize(width, height);
-        // Center the dialog on the screen
-        dialog.setLocationRelativeTo(null);
-        //注册到
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                dialog = new JDialog();
+                dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+                // Calculate size to be 80% of the screen size
+                Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+                int width = (int) (screenSize.width * 0.8);
+                int height = (int) (screenSize.height * 0.8);
+                dialog.setSize(width, height);
+                // Center the dialog on the screen
+                dialog.setLocationRelativeTo(null);
+                //注册到
+            }
+        });
+
     }
 
 
