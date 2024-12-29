@@ -6,8 +6,6 @@ import com.fling.RuntimeAppHelper;
 import com.fling.doc.DocHelper;
 import com.fling.doc.DocIconProvider;
 import com.fling.tools.CurlDialog;
-import com.fling.tools.ToolHelper;
-import com.fling.util.JsonUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
@@ -43,13 +41,11 @@ import com.fling.tools.call_method.CallMethodTool;
 import com.fling.tools.flexible_test.FlexibleTestTool;
 import com.fling.tools.mybatis_sql.MybatisSqlTool;
 import com.fling.tools.spring_cache.SpringCacheTool;
-import com.intellij.ui.components.AnActionLink;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
-import com.intellij.ui.dsl.builder.AlignX;
 import com.intellij.ui.jcef.JBCefBrowser;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
@@ -59,7 +55,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefLoadHandlerAdapter;
-import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -100,6 +95,7 @@ public class FlingToolWindow {
     private JComboBox<String> appBox;
     private Map<String, Boolean> monitorMap;
     private JDialog settingsDialog;
+    private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
@@ -295,6 +291,7 @@ public class FlingToolWindow {
         topPanel.add(appBox);
 
         initSettingsDialog();
+        initStoreDialog();
         return topPanel;
     }
 
@@ -394,6 +391,10 @@ public class FlingToolWindow {
         // 将工具栏添加到输出面板的左侧
         outputPanel.add(toolbarPanel, BorderLayout.WEST);
         return outputPanel;
+    }
+
+    public void visibleStoreDialog(){
+        storeDialog.visible(true);
     }
 
     private void refreshVisibleApp() {
@@ -553,6 +554,10 @@ public class FlingToolWindow {
     }
 
 
+    private void initStoreDialog() {
+        storeDialog = new ReqStoreDialog(this);
+    }
+
     private void initSettingsDialog() {
         JTextField flexibleTestPackageNameField = new JTextField(LocalStorageHelper.getFlexibleTestPackage(project), 20);
 
@@ -561,7 +566,7 @@ public class FlingToolWindow {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"fling", "tool-script", "controller-adapter", "spring-properties"};
+        String[] options = {"fling", "tool-script", "controller-command", "spring-properties"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
@@ -571,7 +576,7 @@ public class FlingToolWindow {
         rightContent.add(new JBScrollPane(createBasicOptionPanel(flexibleTestPackageNameField)), "fling");
         rightContent.add(createScriptOptionPanel(), "tool-script");
         rightContent.add(createPropertiesOptionPanel(), "spring-properties");
-        rightContent.add(createControllerOptionPanel(), "controller-adapter");
+        rightContent.add(createControllerOptionPanel(), "controller-command");
         DumbService.getInstance(project).smartInvokeLater(() -> {
             // 事件或代码在索引准备好后运行
             findSpringBootApplicationClasses();
@@ -786,8 +791,8 @@ public class FlingToolWindow {
         monitorOptionsPanel.add(classSuffixField, gbc);
 
 
-        JLabel whiteClassLabel = new JLabel("White Class:");
-        whiteClassLabel.setToolTipText("Tracing class whitelist list, multiple use, split");
+        JLabel whiteClassLabel = new JLabel("Allow Class:");
+        whiteClassLabel.setToolTipText("Tracing class allow list, multiple use, split");
         whiteClassLabel.setPreferredSize(labelDimension);
         JTextField whiteListField = new JTextField(monitorConfig.getWhites(), 20);
         gbc.gridx = 0;
@@ -799,8 +804,8 @@ public class FlingToolWindow {
         gbc.weightx = 1.0;
         monitorOptionsPanel.add(whiteListField, gbc);
 
-        JLabel blackClassLabel = new JLabel("Black Class:");
-        blackClassLabel.setToolTipText("Tracing class black list, multiple use, split");
+        JLabel blackClassLabel = new JLabel("Deny Class:");
+        blackClassLabel.setToolTipText("Tracing class deny list, multiple use, split");
         blackClassLabel.setPreferredSize(labelDimension);
         JTextField blackListField = new JTextField(monitorConfig.getBlacks(), 20);
         gbc.gridx = 0;
@@ -956,11 +961,19 @@ public class FlingToolWindow {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
-                    for (PsiClass applicationClass : springBootApplicationClasses) {
-                        appList.add(applicationClass.getName());
-                        scriptAppBox.addItem(applicationClass.getName());
-                        controllerScriptAppBox.addItem(applicationClass.getName());
-                        propertiesAppBox.addItem(applicationClass.getName());
+                    List<String> apps = springBootApplicationClasses.stream().map(new Function<PsiClass, String>() {
+                        @Override
+                        public String apply(PsiClass psiClass) {
+                            return psiClass.getName();
+                        }
+                    }).distinct().toList();
+
+                    storeDialog.initApps(apps);
+                    for (String app : apps) {
+                        appList.add(app);
+                        scriptAppBox.addItem(app);
+                        controllerScriptAppBox.addItem(app);
+                        propertiesAppBox.addItem(app);
                     }
                 }
             });
@@ -1190,8 +1203,7 @@ public class FlingToolWindow {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
-        LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, getProject(), LocalStorageHelper.defControllerAdapter.getScript(), false);
-
+        LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, getProject(), LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), false);
         // 布局输入框
         gbc.gridx = 0;
         gbc.gridy = 1;
@@ -1288,12 +1300,12 @@ public class FlingToolWindow {
             public void actionPerformed(ActionEvent e) {
                 String selectedApp = (String) controllerScriptAppBox.getSelectedItem();
                 if (selectedApp == null) {
-                    scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
+                    scriptField.setText(LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript());
                     controllerEnvTextField.setText("");
                 } else {
-                    LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(project, selectedApp);
-                    scriptField.setText(controllerAdapter.getScript() == null ? LocalStorageHelper.defControllerAdapter.getScript() : controllerAdapter.getScript());
-                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerAdapter.getEnvs()) ? "" : String.join(",", controllerAdapter.getEnvs()));
+                    LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(project, selectedApp);
+                    scriptField.setText(controllerCommand.getScript() == null ? LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript() : controllerCommand.getScript());
+                    controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerCommand.getEnvs()) ? "" : String.join(",", controllerCommand.getEnvs()));
                 }
             }
         });
@@ -1304,7 +1316,7 @@ public class FlingToolWindow {
         newButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                scriptField.setText(LocalStorageHelper.defControllerAdapter.getScript());
+                scriptField.setText(LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript());
                 controllerEnvTextField.setText("");
             }
         });
@@ -1358,11 +1370,11 @@ public class FlingToolWindow {
                 return;
             }
 
-            LocalStorageHelper.ControllerAdapter controllerAdapter = new LocalStorageHelper.ControllerAdapter();
-            controllerAdapter.setScript(StringUtils.isBlank(script) ? LocalStorageHelper.defControllerAdapter.getScript() : script);
-            controllerAdapter.setEnvs(StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? LocalStorageHelper.defControllerAdapter.getEnvs() : Arrays.asList(controllerEnvTextField.getText().trim().split(",")));
-            LocalStorageHelper.setAppControllerAdapter(project, selectedApp, controllerAdapter);
-            FlingHelper.notify(project, NotificationType.INFORMATION, "ControllerAdapter is saved");
+            LocalStorageHelper.ControllerCommand controllerCommand = new LocalStorageHelper.ControllerCommand();
+            controllerCommand.setScript(StringUtils.isBlank(script) ? LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript() : script);
+            controllerCommand.setEnvs(StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? LocalStorageHelper.DEF_CONTROLLER_COMMAND.getEnvs() : Arrays.asList(controllerEnvTextField.getText().trim().split(",")));
+            LocalStorageHelper.setAppControllerCommand(project, selectedApp, controllerCommand);
+            FlingHelper.notify(project, NotificationType.INFORMATION, "ControllerCommand is saved");
         };
         saveButton.addActionListener(saveListener);
 
@@ -1586,6 +1598,15 @@ public class FlingToolWindow {
                 windowContent.repaint();
             });
         }
+    }
+
+    public List<VisibleApp> getVisibleApps() {
+        ArrayList<VisibleApp> objects = new ArrayList<>();
+        for (int i = 0; i < appBox.getItemCount(); i++) {
+            String itemAt = appBox.getItemAt(i);
+            objects.add(parseApp(itemAt));
+        }
+        return objects;
     }
 
     public VisibleApp getSelectedApp() {

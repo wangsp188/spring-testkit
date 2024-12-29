@@ -3,7 +3,7 @@ package com.fling;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.project.Project;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.FileReader;
@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,10 +86,10 @@ public class LocalStorageHelper {
                     "\n" +
                     "}";
 
-    public static final ControllerAdapter defControllerAdapter = new ControllerAdapter();
+    public static final ControllerCommand DEF_CONTROLLER_COMMAND = new ControllerCommand();
 
     static {
-        defControllerAdapter.setScript("import groovy.json.JsonOutput\n" +
+        DEF_CONTROLLER_COMMAND.setScript("import groovy.json.JsonOutput\n" +
                 "import groovy.json.JsonSlurper\n" +
                 "\n" +
                 "import java.io.FileNotFoundException;\n" +
@@ -102,7 +101,7 @@ public class LocalStorageHelper {
                 "\n" +
                 "/**\n" +
                 " * groovy脚本，在idea-plugin环境执行\n" +
-                " * 构建函数，返回结果会被copy到剪切板，建议采用curl格式\n" +
+                " * controller command构建函数，返回结果会被copy到剪切板，建议采用curl格式\n" +
                 " * <p>\n" +
                 " * 不可使用项目中类，不可使用项目中类，不可使用项目中类\n" +
                 " * <p>\n" +
@@ -287,8 +286,8 @@ public class LocalStorageHelper {
         return getAppConfig(project, app).getScript();
     }
 
-    public static ControllerAdapter getAppControllerAdapter(Project project, String app) {
-        return getAppConfig(project, app).getControllerAdapter();
+    public static ControllerCommand getAppControllerCommand(Project project, String app) {
+        return getAppConfig(project, app).getControllerCommand();
     }
 
 
@@ -372,7 +371,7 @@ public class LocalStorageHelper {
         saveProjectConfig(project, projectConfig);
     }
 
-    public static void setAppControllerAdapter(Project project, String app, ControllerAdapter adapter) {
+    public static void setAppControllerCommand(Project project, String app, ControllerCommand adapter) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
             projectConfig = new ProjectConfig();
@@ -387,7 +386,7 @@ public class LocalStorageHelper {
             public Config apply(String s) {
                 return new Config();
             }
-        }).setControllerAdapter(adapter);
+        }).setControllerCommand(adapter);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -413,7 +412,7 @@ public class LocalStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
 //            config.setScript(defScript);
-            config.setControllerAdapter(defControllerAdapter);
+            config.setControllerCommand(DEF_CONTROLLER_COMMAND);
             config.setProperties(defProperties);
             return config;
         }
@@ -421,7 +420,7 @@ public class LocalStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
 //            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
-            config.setControllerAdapter(projectConfig.getControllerAdapter() == null ? defControllerAdapter : projectConfig.getControllerAdapter());
+            config.setControllerCommand(projectConfig.getControllerCommand() == null ? DEF_CONTROLLER_COMMAND : projectConfig.getControllerCommand());
             config.setProperties(defProperties);
             return config;
         }
@@ -432,8 +431,8 @@ public class LocalStorageHelper {
 //        if (config.getScript() == null) {
 //            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
 //        }
-        if (config.getControllerAdapter() == null) {
-            config.setControllerAdapter(projectConfig.getControllerAdapter() == null ? defControllerAdapter : projectConfig.getControllerAdapter());
+        if (config.getControllerCommand() == null) {
+            config.setControllerCommand(projectConfig.getControllerCommand() == null ? DEF_CONTROLLER_COMMAND : projectConfig.getControllerCommand());
         }
         if (config.getProperties() == null) {
             config.setProperties(defProperties);
@@ -482,7 +481,7 @@ public class LocalStorageHelper {
 
         private String flexibleTestPackage;
         private String script;
-        private ControllerAdapter controllerAdapter;
+        private ControllerCommand controllerCommand;
         private Map<String, Config> appConfigs;
         private MonitorConfig monitorConfig;
 
@@ -518,12 +517,12 @@ public class LocalStorageHelper {
             this.monitorConfig = monitorConfig;
         }
 
-        public ControllerAdapter getControllerAdapter() {
-            return controllerAdapter;
+        public ControllerCommand getControllerCommand() {
+            return controllerCommand;
         }
 
-        public void setControllerAdapter(ControllerAdapter controllerAdapter) {
-            this.controllerAdapter = controllerAdapter;
+        public void setControllerCommand(ControllerCommand controllerCommand) {
+            this.controllerCommand = controllerCommand;
         }
     }
 
@@ -531,7 +530,7 @@ public class LocalStorageHelper {
 
         private String flexibleTestPackage;
         private String script;
-        private ControllerAdapter controllerAdapter;
+        private ControllerCommand controllerCommand;
         private String properties;
         private MonitorConfig monitorConfig;
 
@@ -567,17 +566,18 @@ public class LocalStorageHelper {
             this.monitorConfig = monitorConfig;
         }
 
-        public ControllerAdapter getControllerAdapter() {
-            return controllerAdapter;
+        public ControllerCommand getControllerCommand() {
+            return controllerCommand;
         }
 
-        public void setControllerAdapter(ControllerAdapter controllerAdapter) {
-            this.controllerAdapter = controllerAdapter;
+        public void setControllerCommand(ControllerCommand controllerCommand) {
+            this.controllerCommand = controllerCommand;
         }
     }
 
 
-    public static class ControllerAdapter{
+    public static class ControllerCommand {
+//        controllerInstruction
         private String script;
         private List<String> envs;
 

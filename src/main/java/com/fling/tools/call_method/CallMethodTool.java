@@ -4,7 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
-import com.fling.doc.DocHelper;
+import com.fling.ReqStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
@@ -12,10 +12,7 @@ import com.intellij.icons.AllIcons;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.intellij.notification.NotificationType;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -31,6 +28,7 @@ import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
 
@@ -41,7 +39,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URLEncoder;
@@ -58,7 +55,7 @@ public class CallMethodTool extends BasePluginTool {
 
     public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", CallMethodTool.class);
     public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", CallMethodTool.class);
-    public static final Icon CONTROLLER_ADAPTER_ICON = IconLoader.getIcon("/icons/controller.svg", CallMethodTool.class);
+    public static final Icon CONTROLLER_ICON = IconLoader.getIcon("/icons/controller.svg", CallMethodTool.class);
     public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", CallMethodTool.class);
 
 
@@ -74,7 +71,75 @@ public class CallMethodTool extends BasePluginTool {
 
     public CallMethodTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
-        copyCurlAction = new AnAction("Controller Adapter", "Controller Adapter", CONTROLLER_ADAPTER_ICON) {
+
+        AnAction storeAction = new AnAction("Save this req", "Save this req", AllIcons.Actions.MenuSaveall) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                List<String> projectAppList = flingToolWindow.getProjectAppList();
+                if (projectAppList.isEmpty()) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Can not find app");
+                    return;
+                }
+
+                // 调用复制功能
+                ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+                if (methodAction == null || !methodAction.getMethod().isValid()) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Please select a valid method");
+                    return;
+                }
+
+                String app = projectAppList.get(0);
+
+                String text = inputEditorTextField.getText();
+                JSONObject args = null;
+                try {
+                    args = JSONObject.parseObject(text);
+                } catch (Exception ex) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Input parameter must be json object");
+                    return;
+                }
+
+
+                PsiMethod method = methodAction.getMethod();
+                PsiClass containingClass = method.getContainingClass();
+                String typeClass = containingClass.getQualifiedName();
+                String beanName = ToolHelper.getBeanNameFromClass(containingClass);
+
+                PsiParameter[] parameters = method.getParameterList().getParameters();
+                String[] argTypes = new String[parameters.length];
+                for (int i = 0; i < parameters.length; i++) {
+                    argTypes[i] = parameters[i].getType().getCanonicalText();
+                }
+                JSONArray storeArgs = ToolHelper.adapterParams(method, args);
+
+                ReqStorageHelper.SavedReq savedReq = new ReqStorageHelper.SavedReq();
+                savedReq.setTitle("default");
+                ReqStorageHelper.CallMethodMeta methodMeta = new ReqStorageHelper.CallMethodMeta();
+                methodMeta.setArgs(storeArgs);
+                methodMeta.setTypeClass(typeClass);
+                methodMeta.setBeanName(beanName);
+                methodMeta.setMethodName(method.getName());
+                methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
+                methodMeta.setOriginal(!useProxyButton.isSelected());
+                savedReq.setMeta(JSONObject.parseObject(JSONArray.toJSONString(methodMeta)));
+
+                ReqStorageHelper.saveAppReq(getProject(), app, "default",ReqStorageHelper.ItemType.call_method,ToolHelper.buildMethodKey(method),savedReq);
+                FlingHelper.notify(getProject(), NotificationType.INFORMATION, "Req already Saved");
+            }
+        };
+        actionGroup.add(storeAction);
+
+
+        AnAction historyAction = new AnAction("Open Store", "Open Store", AllIcons.Vcs.History) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                // 调用复制功能
+                flingWindow.visibleStoreDialog();
+            }
+        };
+        actionGroup.add(historyAction);
+
+        copyCurlAction = new AnAction("Controller Command", "Controller Command", CONTROLLER_ICON) {
 
             @Override
             public void actionPerformed(AnActionEvent e) {
@@ -87,9 +152,9 @@ public class CallMethodTool extends BasePluginTool {
                 DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
                 if (CollectionUtils.isNotEmpty(porjectAppList)) {
                     for (String app : porjectAppList) {
-                        LocalStorageHelper.ControllerAdapter controllerAdapter = LocalStorageHelper.getAppControllerAdapter(flingToolWindow.getProject(), app);
-                        String script = controllerAdapter.getScript();
-                        List<String> envs = controllerAdapter.getEnvs();
+                        LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
+                        String script = controllerCommand.getScript();
+                        List<String> envs = controllerCommand.getEnvs();
                         if (CollectionUtils.isEmpty(envs)) {
                             continue;
                         }
@@ -124,7 +189,7 @@ public class CallMethodTool extends BasePluginTool {
 
                 if (controllerActionGroup.getChildrenCount() == 0) {
                     //没有自定义逻辑，则直接处理
-                    handleControllerAdapter(null, LocalStorageHelper.defControllerAdapter.getScript(), selectedItem.getMethod());
+                    handleControllerAdapter(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
                     return;
                 }
 
@@ -143,17 +208,14 @@ public class CallMethodTool extends BasePluginTool {
         PsiClass containingClass = method.getContainingClass();
         if (containingClass.hasAnnotation("org.springframework.web.bind.annotation.RequestMapping")) {
             PsiAnnotation annotation = containingClass.getAnnotation("org.springframework.web.bind.annotation.RequestMapping");
-            PsiAnnotationMemberValue classValue = annotation.findAttributeValue("value");
-            if (classValue == null || (classValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) classValue).getValue())))) {
-                classValue = annotation.findAttributeValue("path");
+            String controllerPath = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
+            if (StringUtils.isBlank(controllerPath)) {
+                controllerPath = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("path"));
             }
-            if (classValue instanceof PsiLiteralExpression && StringUtils.isNotBlank((CharSequence) ((PsiLiteralExpression) classValue).getValue())) {
-                String s = String.valueOf(((PsiLiteralExpression) classValue).getValue());
-                if (s.startsWith("/")) {
-                    path1 += s.substring(1);
-                } else {
-                    path1 += s;
-                }
+            if (StringUtils.isNotBlank(controllerPath) && controllerPath.startsWith("/")) {
+                path1 += controllerPath.substring(1);
+            } else {
+                path1 += controllerPath;
             }
         }
 
@@ -185,40 +247,34 @@ public class CallMethodTool extends BasePluginTool {
                 httpMethod = "PATCH";
             } else if (annotationFqn.contains("RequestMapping")) {
                 //从注解中的method属性取出一个 method,注意,method 是个数组,随便取一个就好
-                PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("method");
-                if (methodValue instanceof PsiArrayInitializerMemberValue) {
-                    PsiArrayInitializerMemberValue arrayValue = (PsiArrayInitializerMemberValue) methodValue;
-                    if (arrayValue.getInitializers().length > 0) {
-                        PsiAnnotationMemberValue firstMethodValue = arrayValue.getInitializers()[0];
-                        if (firstMethodValue instanceof PsiReferenceExpression) {
-                            PsiReferenceExpression reference = (PsiReferenceExpression) firstMethodValue;
-                            String methodName = reference.getReferenceName();
-                            if (methodName != null) {
-                                httpMethod = methodName; // 假设这里返回的是类似 "GET", "POST" 等字符串
-                            }
-                        }
-                    }
+                String mappingMethod = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("method"));
+                if (StringUtils.isNotBlank(mappingMethod)) {
+                    httpMethod = mappingMethod.toUpperCase();
                 }
             }
+
+            String reqPath = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("value"));
+            if (StringUtils.isBlank(reqPath)) {
+                reqPath = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("path"));
+            }
+
 
             PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("value");
             if (methodValue == null || (methodValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue())))) {
                 methodValue = methodAnnotation.findAttributeValue("path");
             }
-
-            if (methodValue instanceof PsiLiteralExpression && StringUtils.isNotBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue()))) {
-                String s = String.valueOf(((PsiLiteralExpression) methodValue).getValue());
+            if (StringUtils.isNotBlank(reqPath)) {
                 if (path1.endsWith("/")) {
-                    if (s.startsWith("/")) {
-                        path1 += s.substring(1);
+                    if (reqPath.startsWith("/")) {
+                        path1 += reqPath.substring(1);
                     } else {
                         path1 += methodValue.getText();
                     }
                 } else {
-                    if (s.startsWith("/")) {
-                        path1 += s;
+                    if (reqPath.startsWith("/")) {
+                        path1 += reqPath;
                     } else {
-                        path1 += ("/" + s);
+                        path1 += ("/" + reqPath);
                     }
                 }
             }
@@ -228,7 +284,13 @@ public class CallMethodTool extends BasePluginTool {
         // Process parameters
         // Get the parameters
         PsiParameter[] parameters = method.getParameterList().getParameters();
-        JSONObject parse = JSONObject.parseObject(jsonParams);
+        JSONObject parse = null;
+        try {
+            parse = JSONObject.parseObject(jsonParams);
+        } catch (Exception e) {
+            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Input parameter must be json object");
+            return;
+        }
         ArrayList<String> paths = new ArrayList<>();
         Map<String, String> aliasmap = new HashMap<>();
         String requestBodyKey = null;
@@ -337,14 +399,17 @@ public class CallMethodTool extends BasePluginTool {
         }
         try {
             String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
-            if (env == null || Objects.equals(LocalStorageHelper.defControllerAdapter.getScript(), script)) {
+            if (env == null || Objects.equals(LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), script)) {
                 FlingHelper.copyToClipboard(getProject(), ret, "Curl was copied to the clipboard, please replace it with the real authentication token.");
             } else {
                 FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
             }
+        } catch (CompilationFailedException ex) {
+            ex.printStackTrace();
+            FlingHelper.notify(getProject(), NotificationType.ERROR, "Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage());
         } catch (Throwable ex) {
             ex.printStackTrace();
-            FlingHelper.notify(getProject(), NotificationType.ERROR, "Adapter generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            FlingHelper.notify(getProject(), NotificationType.ERROR, "Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
         }
     }
 
@@ -475,6 +540,7 @@ public class CallMethodTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);
+
         LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());

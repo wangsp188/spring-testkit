@@ -1,7 +1,8 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
-    id("org.jetbrains.intellij") version "1.17.4"
+    id("org.jetbrains.intellij.platform") version "2.2.0"
+//    id("org.jetbrains.intellij.platform.migration") version "2.2.0"
 }
 
 group = "com.fling"
@@ -9,27 +10,47 @@ version = "1.0"
 
 repositories {
     mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
 }
 
 dependencies {
     // FastJSON 依赖
     implementation("com.alibaba:fastjson:1.2.83")
-    implementation("org.mybatis:mybatis:3.5.3")
+    implementation("org.mybatis:mybatis:3.5.6")
     implementation("org.apache.commons:commons-lang3:3.14.0")
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
     implementation(files("libs/spring-fling_link-0.0.1.jar"))
     implementation(files("libs/spring-fling_side_server-0.0.1.jar"))
     implementation(files("libs/spring-fling_agent-0.0.1.jar"))
+    intellijPlatform{
+        create("IU","2024.2")
+//        intellijIdeaUltimate("2024.2")
+//        "Git4Idea"
+        bundledPlugins(listOf("com.intellij.java","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
+    }
+}
+
+
+intellijPlatform{
+    pluginConfiguration{
+        ideaVersion {
+            sinceBuild = "231"
+            untilBuild = "253.*"
+        }
+    }
 }
 
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
-intellij {
-    version.set("2023.2.6")
-    type.set("IU") // Target IDE Platform
+//intellij {
+//    version.set("2024.2")
+//    type.set("IU") // Target IDE Platform
+//
+//    plugins.set(listOf("com.intellij.java","Git4Idea","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
+//}
 
-    plugins.set(listOf("com.intellij.java","Git4Idea","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
-}
 
 tasks {
     // Set the JVM compatibility versions
@@ -43,7 +64,7 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set("232")
-        untilBuild.set("242.*")
+        untilBuild.set("253.*")
     }
 
     signPlugin {

@@ -213,10 +213,16 @@ public class MybatisSqlTool extends BasePluginTool {
             protected void done() {
                 try {
                     JSONObject initParams = get();
+
+                    try {
+                        JSONObject jsonObject = JSONObject.parseObject(inputEditorTextField.getText());
+                        ToolHelper.migration(jsonObject, initParams);
+                    } catch (Throwable e) {
+                    }
                     inputEditorTextField.setText(JsonUtil.formatObj(initParams));
                 } catch (Throwable e) {
                     e.printStackTrace();
-                    inputEditorTextField.setText("{\"nb\":\"init fail, You're on your own\"}");
+                    inputEditorTextField.setText("{\"Fling\":\"init fail, You're on your own\"}");
                 }
             }
         }.execute();

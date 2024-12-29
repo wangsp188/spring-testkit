@@ -16,6 +16,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 
 public class ToolHelper {
 
@@ -109,6 +110,12 @@ public class ToolHelper {
         editorTextField.setText("init params ...");
         // 在这里执行耗时操作
         JSONObject initParams = doInitParams(method.getMethod());
+
+        try {
+            JSONObject jsonObject = JSONObject.parseObject(editorTextField.getText());
+            migration(jsonObject, initParams);
+        } catch (Throwable e) {
+        }
         String jsonString = JsonUtil.formatObj(initParams);
         editorTextField.setText(jsonString);
         method.setArgs(jsonString);
@@ -455,6 +462,84 @@ public class ToolHelper {
         }
 
         return false;
+    }
+
+    // 处理 PsiArrayInitializerMemberValue 和常量引用
+    public static String getAnnotationValueText(PsiAnnotationMemberValue value) {
+        if (value==null) {
+            return null;
+        }
+        if (value instanceof PsiArrayInitializerMemberValue arrayValue) {
+            // 处理数组初始化
+            for (PsiAnnotationMemberValue memberValue : arrayValue.getInitializers()) {
+                String text = extractTextFromValue(memberValue);
+                if (text != null) {
+                    return text;
+                }
+            }
+        } else {
+            return extractTextFromValue(value);
+        }
+        return null;
+    }
+
+    // 提取文本内容，处理常量引用
+    private static String extractTextFromValue(PsiAnnotationMemberValue value) {
+        if (value instanceof PsiLiteralExpression) {
+            return String.valueOf(((PsiLiteralExpression) value).getValue());
+        } else if (value instanceof PsiReferenceExpression referenceExpression) {
+            // 处理常量引用
+            PsiElement resolvedElement = referenceExpression.resolve();
+            if (resolvedElement instanceof PsiField field) {
+                PsiExpression initializer = field.getInitializer();
+                if (initializer instanceof PsiLiteralExpression) {
+                    return String.valueOf(((PsiLiteralExpression) initializer).getValue());
+                }
+            }
+        } else if (value != null) {
+            return value.getText();
+        }
+        return null;
+    }
+
+    public static void migration(JSONObject from, JSONObject to){
+        if (to==null || from ==null) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : to.entrySet()) {
+            Object value = entry.getValue();
+            if (value==null) {
+                Object object = from.get(entry.getKey());
+                if (object!=null) {
+                    entry.setValue(object);
+                }
+            }else if(value instanceof JSONObject){
+                Object object = from.get(entry.getKey());
+                if(object instanceof JSONObject){
+                    migration((JSONObject) value, (JSONObject) object);
+                }
+            }else if(value instanceof String && value.equals("")){
+                Object object = from.get(entry.getKey());
+                if(object instanceof String){
+                    entry.setValue(object);
+                }
+            }else if(value instanceof Integer && value.equals(0)){
+                Object object = from.get(entry.getKey());
+                if(object instanceof Integer){
+                    entry.setValue(object);
+                }
+            }else if (value instanceof Long && value.equals(0L)){
+                Object object = from.get(entry.getKey());
+                if(object instanceof Long){
+                    entry.setValue(object);
+                }
+            }else if(value instanceof Double && value.equals(0.0)){
+                Object object = from.get(entry.getKey());
+                if(object instanceof Double){
+                    entry.setValue(object);
+                }
+            }
+        }
     }
 
     public static class MethodAction {
