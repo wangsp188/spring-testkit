@@ -1,9 +1,10 @@
 package com.fling.tools.flexible_test;
 
 import com.alibaba.fastjson.JSONObject;
+import com.fling.FlingHelper;
+import com.fling.ReqStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
-import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
@@ -12,11 +13,14 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
 
 public class FlexibleTestTool extends BasePluginTool {
@@ -33,6 +37,55 @@ public class FlexibleTestTool extends BasePluginTool {
 
     public FlexibleTestTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
+    }
+
+    @Override
+    protected boolean canStore() {
+        return true;
+    }
+
+    @Override
+    protected String verifyNowStore() {
+        ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+        if (methodAction == null || !methodAction.getMethod().isValid()) {
+            return "Please select a valid method";
+        }
+        try {
+            JSONObject.parseObject(inputEditorTextField.getText().trim());
+        } catch (Exception e) {
+            return "Input parameter must be json object";
+        }
+        return null;
+    }
+
+    @Override
+    protected void handleStore(String app, String group, String title) {
+        PsiMethod method = ((ToolHelper.MethodAction) actionComboBox.getSelectedItem()).getMethod();
+        String text = inputEditorTextField.getText();
+        JSONObject args = JSONObject.parseObject(text);
+        PsiClass containingClass = method.getContainingClass();
+        // 获取包含这个类的文件
+        String code = containingClass.getContainingFile().getText();
+
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        String[] argTypes = new String[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            argTypes[i] = parameters[i].getType().getCanonicalText();
+        }
+
+        List<String> argNames = ToolHelper.fetchNames(method);
+
+        ReqStorageHelper.SavedReq savedReq = new ReqStorageHelper.SavedReq();
+        savedReq.setTitle(StringUtils.isBlank(title) ? "undefined" : title);
+        savedReq.setArgs(args);
+
+        ReqStorageHelper.FlexibleTestMeta methodMeta = new ReqStorageHelper.FlexibleTestMeta();
+        methodMeta.setCode(code);
+        methodMeta.setMethodName(method.getName());
+        methodMeta.setArgNames(argNames);
+        methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
+        methodMeta.setUseScript(useScript);
+        ReqStorageHelper.saveAppReq(getProject(), app, StringUtils.isBlank(group) ? "undefined" : group, ReqStorageHelper.ItemType.flexible_test, ToolHelper.buildMethodKey(method), methodMeta, savedReq.getTitle(), savedReq);
     }
 
     protected JPanel createActionPanel() {
@@ -57,7 +110,7 @@ public class FlexibleTestTool extends BasePluginTool {
         gbc.gridy = 0;
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
-        runButton.setToolTipText("test method");
+        runButton.setToolTipText("Execute this");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
         runButton.setPreferredSize(buttonSize);
@@ -94,12 +147,7 @@ public class FlexibleTestTool extends BasePluginTool {
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);
-                        JSONObject params = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
-                        try {
-                            return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", params, JSONObject.class);
-                        } catch (Exception ex) {
-                            throw new RuntimeException(ex);
-                        }
+                        return buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
                     }
                 });
             }

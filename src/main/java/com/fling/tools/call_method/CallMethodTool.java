@@ -18,12 +18,18 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.popup.ComponentPopupBuilder;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
+import com.intellij.ui.components.JBTextField;
+import com.intellij.util.ui.JBUI;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -59,11 +65,10 @@ public class CallMethodTool extends BasePluginTool {
     public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", CallMethodTool.class);
 
 
+    private JButton controllerCommandButton;
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
 
     private JToggleButton useProxyButton;
-
-    protected AnAction copyCurlAction;
 
     {
         this.tool = PluginToolEnum.CALL_METHOD;
@@ -72,132 +77,137 @@ public class CallMethodTool extends BasePluginTool {
     public CallMethodTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
 
-        AnAction storeAction = new AnAction("Save this req", "Save this req", AllIcons.Actions.MenuSaveall) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                List<String> projectAppList = flingToolWindow.getProjectAppList();
-                if (projectAppList.isEmpty()) {
-                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Can not find app");
-                    return;
-                }
-
-                // 调用复制功能
-                ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
-                if (methodAction == null || !methodAction.getMethod().isValid()) {
-                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Please select a valid method");
-                    return;
-                }
-
-                String app = projectAppList.get(0);
-
-                String text = inputEditorTextField.getText();
-                JSONObject args = null;
-                try {
-                    args = JSONObject.parseObject(text);
-                } catch (Exception ex) {
-                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Input parameter must be json object");
-                    return;
-                }
-
-
-                PsiMethod method = methodAction.getMethod();
-                PsiClass containingClass = method.getContainingClass();
-                String typeClass = containingClass.getQualifiedName();
-                String beanName = ToolHelper.getBeanNameFromClass(containingClass);
-
-                PsiParameter[] parameters = method.getParameterList().getParameters();
-                String[] argTypes = new String[parameters.length];
-                for (int i = 0; i < parameters.length; i++) {
-                    argTypes[i] = parameters[i].getType().getCanonicalText();
-                }
-                JSONArray storeArgs = ToolHelper.adapterParams(method, args);
-
-                ReqStorageHelper.SavedReq savedReq = new ReqStorageHelper.SavedReq();
-                savedReq.setTitle("default");
-                ReqStorageHelper.CallMethodMeta methodMeta = new ReqStorageHelper.CallMethodMeta();
-                methodMeta.setArgs(storeArgs);
-                methodMeta.setTypeClass(typeClass);
-                methodMeta.setBeanName(beanName);
-                methodMeta.setMethodName(method.getName());
-                methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
-                methodMeta.setOriginal(!useProxyButton.isSelected());
-                savedReq.setMeta(JSONObject.parseObject(JSONArray.toJSONString(methodMeta)));
-
-                ReqStorageHelper.saveAppReq(getProject(), app, "default",ReqStorageHelper.ItemType.call_method,ToolHelper.buildMethodKey(method),savedReq);
-                FlingHelper.notify(getProject(), NotificationType.INFORMATION, "Req already Saved");
+        controllerCommandButton = new JButton(CONTROLLER_ICON);
+        controllerCommandButton.setPreferredSize(new Dimension(32, 32));
+        controllerCommandButton.setToolTipText("Generate controller command");
+        controllerCommandButton.addActionListener(e -> {
+            ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+            if (selectedItem == null) {
+                return;
             }
-        };
-        actionGroup.add(storeAction);
+            List<String> porjectAppList = getPorjectAppList();
 
-
-        AnAction historyAction = new AnAction("Open Store", "Open Store", AllIcons.Vcs.History) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                // 调用复制功能
-                flingWindow.visibleStoreDialog();
-            }
-        };
-        actionGroup.add(historyAction);
-
-        copyCurlAction = new AnAction("Controller Command", "Controller Command", CONTROLLER_ICON) {
-
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
-                if (selectedItem == null) {
-                    return;
-                }
-                List<String> porjectAppList = getPorjectAppList();
-
-                DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-                if (CollectionUtils.isNotEmpty(porjectAppList)) {
-                    for (String app : porjectAppList) {
-                        LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
-                        String script = controllerCommand.getScript();
-                        List<String> envs = controllerCommand.getEnvs();
-                        if (CollectionUtils.isEmpty(envs)) {
+            DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
+            if (CollectionUtils.isNotEmpty(porjectAppList)) {
+                for (String app : porjectAppList) {
+                    LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
+                    String script = controllerCommand.getScript();
+                    List<String> envs = controllerCommand.getEnvs();
+                    if (CollectionUtils.isEmpty(envs)) {
+                        continue;
+                    }
+                    for (String env : envs) {
+                        if (env == null) {
                             continue;
                         }
-                        for (String env : envs) {
-                            if (env == null) {
-                                continue;
-                            }
-                            //显示的一个图标加上标题
-                            AnAction documentation = new AnAction("generate with " + app + ":" + env, "generate with " + app + ":" + env, GENERATE_ICON) {
-                                @Override
-                                public void actionPerformed(@NotNull AnActionEvent e) {
-                                    Application application = ApplicationManager.getApplication();
-                                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait...", false) {
+                        //显示的一个图标加上标题
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, GENERATE_ICON) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                Application application = ApplicationManager.getApplication();
+                                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
 
-                                        @Override
-                                        public void run(@NotNull ProgressIndicator indicator) {
-                                            application.runReadAction(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    handleControllerAdapter(env, script, selectedItem.getMethod());
-                                                }
-                                            });
-                                        }
-                                    });
-                                }
-                            };
-                            controllerActionGroup.add(documentation); // 将动作添加到动作组中
-                        }
+                                    @Override
+                                    public void run(@NotNull ProgressIndicator indicator) {
+                                        application.runReadAction(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                handleControllerAdapter(env, script, selectedItem.getMethod());
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        controllerActionGroup.add(documentation); // 将动作添加到动作组中
                     }
                 }
-
-
-                if (controllerActionGroup.getChildrenCount() == 0) {
-                    //没有自定义逻辑，则直接处理
-                    handleControllerAdapter(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
-                    return;
-                }
-
-                JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerAdapterPopup", controllerActionGroup).getComponent();
-                popupMenu.show(inputEditorTextField, 0, 90);
             }
 
-        };
+
+            if (controllerActionGroup.getChildrenCount() == 0) {
+                //没有自定义逻辑，则直接处理
+
+                Application application = ApplicationManager.getApplication();
+                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
+
+                    @Override
+                    public void run(@NotNull ProgressIndicator indicator) {
+                        application.runReadAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                handleControllerAdapter(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
+                            }
+                        });
+                    }
+                });
+
+                return;
+            }
+
+            JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerCommandPopup", controllerActionGroup).getComponent();
+            popupMenu.show(controllerCommandButton, 0, 0);
+        });
+    }
+
+
+    protected boolean canStore() {
+        return true;
+    }
+
+    protected String verifyNowStore() {
+        ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+        if (methodAction == null || !methodAction.getMethod().isValid()) {
+            return "Please select a valid method";
+        }
+        try {
+            JSONObject.parseObject(inputEditorTextField.getText().trim());
+        } catch (Exception e) {
+            return "Input parameter must be json object";
+        }
+        return null;
+    }
+
+
+    protected void handleStore(String app, String group, String title) {
+        PsiMethod method = ((ToolHelper.MethodAction) actionComboBox.getSelectedItem()).getMethod();
+        String text = inputEditorTextField.getText();
+        JSONObject args = null;
+        try {
+            args = JSONObject.parseObject(text);
+        } catch (Exception ex) {
+            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Input parameter must be json object");
+            return;
+        }
+        PsiClass containingClass = method.getContainingClass();
+        String typeClass = containingClass.getQualifiedName();
+        String beanName = ToolHelper.getBeanNameFromClass(containingClass);
+
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        String[] argTypes = new String[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            argTypes[i] = parameters[i].getType().getCanonicalText();
+        }
+
+        List<String> argNames = ToolHelper.fetchNames(method);
+
+        ReqStorageHelper.SavedReq savedReq = new ReqStorageHelper.SavedReq();
+        savedReq.setTitle(StringUtils.isBlank(title) ? "undefined" : title);
+        savedReq.setArgs(args);
+
+        ReqStorageHelper.CallMethodMeta methodMeta = new ReqStorageHelper.CallMethodMeta();
+        methodMeta.setTypeClass(typeClass);
+        methodMeta.setBeanName(beanName);
+        methodMeta.setMethodName(method.getName());
+        methodMeta.setArgNames(argNames);
+        methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
+        methodMeta.setUseScript(useScript);
+        ReqStorageHelper.SubItemType subItemType = null;
+        if (Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
+            subItemType = ReqStorageHelper.SubItemType.controller;
+        }
+        methodMeta.setSubType(subItemType);
+        ReqStorageHelper.saveAppReq(getProject(), app, StringUtils.isBlank(group) ? "undefined" : group, ReqStorageHelper.ItemType.call_method, ToolHelper.buildMethodKey(method), methodMeta, savedReq.getTitle(), savedReq);
     }
 
     private void handleControllerAdapter(String env, String script, PsiMethod method) {
@@ -288,7 +298,7 @@ public class CallMethodTool extends BasePluginTool {
         try {
             parse = JSONObject.parseObject(jsonParams);
         } catch (Exception e) {
-            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Input parameter must be json object");
+            setOutputText("Input parameter must be json object");
             return;
         }
         ArrayList<String> paths = new ArrayList<>();
@@ -397,19 +407,16 @@ public class CallMethodTool extends BasePluginTool {
                 }
             });
         }
+        setOutputText("Generate controller command ...");
         try {
             String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
-            if (env == null || Objects.equals(LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), script)) {
-                FlingHelper.copyToClipboard(getProject(), ret, "Curl was copied to the clipboard, please replace it with the real authentication token.");
-            } else {
-                FlingHelper.copyToClipboard(getProject(), ret, "Result was copied to the clipboard.");
-            }
+            setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
-            FlingHelper.notify(getProject(), NotificationType.ERROR, "Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage());
         } catch (Throwable ex) {
             ex.printStackTrace();
-            FlingHelper.notify(getProject(), NotificationType.ERROR, "Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
         }
     }
 
@@ -424,13 +431,13 @@ public class CallMethodTool extends BasePluginTool {
 
 
     protected JPanel createActionPanel() {
-        JPanel topPanel = new JPanel(new GridBagLayout());
+        JPanel panel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON, CALL_METHOD_DISABLE_ICON,
                 "<strong>call-method</strong>\n<ul>\n" +
                         "    <li>spring bean 的 public 函数</li>\n" +
                         "    <li>非init/main</li>\n" +
                         "    <li>非test source</li>\n" +
-                        "</ul>", topPanel, new ActionListener() {
+                        "</ul>", panel, new ActionListener() {
 
                     @Override
                     public void actionPerformed(ActionEvent e) {
@@ -462,10 +469,10 @@ public class CallMethodTool extends BasePluginTool {
                 }
             }
         });
-        topPanel.add(useProxyButton, gbc);
+        panel.add(useProxyButton, gbc);
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
-        runButton.setToolTipText("test method");
+        runButton.setToolTipText("Execute this");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
         runButton.setPreferredSize(buttonSize);
@@ -502,21 +509,16 @@ public class CallMethodTool extends BasePluginTool {
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);
-                        JSONObject params = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.CALL_METHOD.getCode());
-                        try {
-                            return HttpUtil.sendPost("http://localhost:" + app.getSidePort() + "/", params, JSONObject.class);
-                        } catch (Exception ex) {
-                            throw new RuntimeException(ex);
-                        }
+                        return buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.CALL_METHOD.getCode());
                     }
                 });
             }
         });
 
         gbc.gridx = 3;
-        topPanel.add(runButton, gbc);
+        panel.add(runButton, gbc);
 
-        return topPanel;
+        return panel;
     }
 
     private JSONObject buildParams(PsiMethod method, JSONObject args, String action) {
@@ -593,10 +595,11 @@ public class CallMethodTool extends BasePluginTool {
 
         PsiMethod method = methodAction.getMethod();
         boolean requestMethod = isRequestMethod(method);
-        if (requestMethod && !actionGroup.containsAction(copyCurlAction)) {
-            actionGroup.add(copyCurlAction);
-        } else if (!requestMethod && actionGroup.containsAction(copyCurlAction)) {
-            actionGroup.remove(copyCurlAction);
+        //判断panel1是否存在button1
+        if (requestMethod && !Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
+            actionPanel.add(controllerCommandButton);
+        } else if (!requestMethod && Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
+            actionPanel.remove(controllerCommandButton);
         }
         ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
     }

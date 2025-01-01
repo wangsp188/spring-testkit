@@ -81,11 +81,11 @@ public class CurlDialog extends JDialog {
         pack();
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setSize(screenSize.width / 2, screenSize.height / 2);
+        setSize((int) (screenSize.width*0.7), (int) (screenSize.height*0.7));
         setLocationRelativeTo(null);
     }
 
-    private @NotNull JPanel buildResultPanel(FlingToolWindow window) {
+    private JPanel buildResultPanel(FlingToolWindow window) {
         JPanel panelResults = new JPanel();
         GridBagLayout gridbag = new GridBagLayout();
         GridBagConstraints c = new GridBagConstraints();
@@ -161,8 +161,8 @@ public class CurlDialog extends JDialog {
 
         addPlaceholderToTextArea(inputTextArea, "input your curl and click right button to parse");
         JButton parseButton = new JButton(PARSE_CURL_ICON);
-//        Dimension preferredSize = new Dimension(30, 30);
-//        parseButton.setPreferredSize(preferredSize);
+        Dimension preferredSize = new Dimension(30, 30);
+        parseButton.setPreferredSize(preferredSize);
 //        parseButton.setMaximumSize(preferredSize);
 //        parseButton.setMinimumSize(preferredSize);
         parseButton.addActionListener(new ActionListener() {
@@ -240,6 +240,7 @@ public class CurlDialog extends JDialog {
         JPanel panel = new JPanel(new BorderLayout());
         JLabel label = new JLabel(labelText);
         JButton copyButton = new JButton(AllIcons.Actions.Copy);
+        copyButton.setToolTipText("Copy this");
         Dimension preferredSize = new Dimension(30, 30);
         copyButton.setPreferredSize(preferredSize);
         copyButton.setMaximumSize(preferredSize);

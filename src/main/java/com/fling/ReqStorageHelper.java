@@ -4,7 +4,9 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.openapi.project.Project;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -36,11 +38,11 @@ public class ReqStorageHelper {
         if (stringListMap == null) {
             return;
         }
-        List<GroupItems> itemsList = stringListMap.get(app);
-        if (itemsList == null) {
+        List<GroupItems> groupList = stringListMap.get(app);
+        if (groupList == null) {
             return;
         }
-        Optional<GroupItems> groupOptional = itemsList.stream().filter(new Predicate<GroupItems>() {
+        Optional<GroupItems> groupOptional = groupList.stream().filter(new Predicate<GroupItems>() {
             @Override
             public boolean test(GroupItems groupItems) {
                 return Objects.equals(group, groupItems.getGroup());
@@ -77,11 +79,38 @@ public class ReqStorageHelper {
         if (!reqOptional.isPresent()) {
             return;
         }
-        item.getReqs().remove(reqOptional.get());
+        List<SavedReq> reqs = item.getReqs();
+        reqs.removeIf(new Predicate<SavedReq>() {
+            @Override
+            public boolean test(SavedReq savedReq) {
+                return Objects.equals(title, savedReq.getTitle());
+            }
+        });
+        if (CollectionUtils.isEmpty(reqs)) {
+            List<Item> items = groupItems.getItems();
+            items.removeIf(new Predicate<Item>() {
+                @Override
+                public boolean test(Item item) {
+                    return Objects.equals(type, item.getType()) && Objects.equals(group, item.getGroup()) && Objects.equals(name, item.getName());
+                }
+            });
+            if(CollectionUtils.isEmpty(items)) {
+                groupList.removeIf(new Predicate<GroupItems>() {
+                    @Override
+                    public boolean test(GroupItems groupItems) {
+                        return Objects.equals(group, groupItems.getGroup());
+                    }
+                });
+
+                if(CollectionUtils.isEmpty(groupList)) {
+                    stringListMap.remove(app);
+                }
+            }
+        }
         saveWebReqs(project, stringListMap);
     }
 
-    public static void saveAppReq(Project project, String app, String group, ReqStorageHelper.ItemType itemType, String name, ReqStorageHelper.SavedReq req) {
+    public static void saveAppReq(Project project, String app, String group, ReqStorageHelper.ItemType itemType,String name,Object meta,String oldTitle, ReqStorageHelper.SavedReq req) {
         Map<String, List<GroupItems>> stringListMap = loadWebReqs(project);
         if (stringListMap == null) {
             stringListMap = new HashMap<>();
@@ -121,12 +150,14 @@ public class ReqStorageHelper {
             item = itemOptional.get();
             item.setName(name);
             item.setType(itemType);
+            item.setMeta(JSON.parseObject(JSON.toJSONString(meta, SerializerFeature.WriteMapNullValue)));
             item.setGroup(group);
         } else {
             item = new Item();
             item.setName(name);
             item.setType(itemType);
             item.setGroup(group);
+            item.setMeta(JSON.parseObject(JSON.toJSONString(meta, SerializerFeature.WriteMapNullValue)));
             List<Item> items = groupItems.getItems();
             if (items == null) {
                 items = new ArrayList<>();
@@ -143,14 +174,14 @@ public class ReqStorageHelper {
                 .filter(new Predicate<SavedReq>() {
                     @Override
                     public boolean test(SavedReq savedReq) {
-                        return Objects.equals(req.getTitle(), savedReq.getTitle());
+                        return Objects.equals(oldTitle, savedReq.getTitle());
                     }
                 }).findFirst();
 
         if (reqOptional.isPresent()) {
             SavedReq savedReq = reqOptional.get();
             savedReq.setTitle(req.getTitle());
-            savedReq.setMeta(req.getMeta());
+            savedReq.setArgs(req.getArgs());
         } else {
             List<SavedReq> reqs = item.getReqs();
             if (reqs == null) {
@@ -180,7 +211,7 @@ public class ReqStorageHelper {
     private synchronized static void saveWebReqs(Project project, Map<String, List<GroupItems>> groupItems) {
         File configFile = getStoreFile(project);
         try (FileWriter writer = new FileWriter(configFile)) {
-            JSON.writeJSONString(writer, groupItems);
+            JSON.writeJSONString(writer, groupItems,SerializerFeature.WriteMapNullValue);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -224,20 +255,46 @@ public class ReqStorageHelper {
 
     public static enum ItemType {
         call_method,
-        controller_command,
         flexible_test
+    }
+
+    public static enum SubItemType {
+        controller
     }
 
     public static class Item {
 
         /**
          * call-method
-         * controller-command
          * flexible-test
          */
         private ItemType type;
         private String group;
         private String name;
+
+        private JSONObject meta;
+
+        public <T> T metaObj(Class<T> type) {
+            if (meta == null) {
+                return null;
+            }
+            return JSON.parseObject(meta.toJSONString(), type);
+        }
+
+        public SubItemType fetchSubType(){
+            if (type!= ItemType.call_method) {
+                return null;
+            }
+            return metaObj(CallMethodMeta.class).getSubType();
+        }
+
+        public JSONObject getMeta() {
+            return meta;
+        }
+
+        public void setMeta(JSONObject meta) {
+            this.meta = meta;
+        }
 
         private List<SavedReq> reqs = new ArrayList<>();
 
@@ -272,21 +329,25 @@ public class ReqStorageHelper {
         public void setGroup(String group) {
             this.group = group;
         }
+
+
     }
 
 
     public static class SavedReq {
 
         private String title;
-        private JSONObject meta;
 
+        private JSONObject args;
 
-        public <T> T metaObj(Class<T> type) {
-            if (meta == null) {
-                return null;
-            }
-            return JSON.parseObject(meta.toJSONString(), type);
+        public JSONObject getArgs() {
+            return args;
         }
+
+        public void setArgs(JSONObject args) {
+            this.args = args;
+        }
+
 
         public String getTitle() {
             return title;
@@ -296,13 +357,6 @@ public class ReqStorageHelper {
             this.title = title;
         }
 
-        public JSONObject getMeta() {
-            return meta;
-        }
-
-        public void setMeta(JSONObject meta) {
-            this.meta = meta;
-        }
 
 
         public String toString() {
@@ -313,22 +367,15 @@ public class ReqStorageHelper {
 
     public static class CallMethodMeta {
 
+        private SubItemType subType;
         private String typeClass;
         private String beanName;
         private String methodName;
+        private boolean useScript;
         private String argTypes;
-        private boolean original;
-        private String method;
+        private List<String> argNames;
 
-        private JSONArray args;
 
-        public JSONArray getArgs() {
-            return args;
-        }
-
-        public void setArgs(JSONArray args) {
-            this.args = args;
-        }
 
         public String getTypeClass() {
             return typeClass;
@@ -362,20 +409,80 @@ public class ReqStorageHelper {
             this.argTypes = argTypes;
         }
 
-        public boolean isOriginal() {
-            return original;
+        public boolean isUseScript() {
+            return useScript;
         }
 
-        public void setOriginal(boolean original) {
-            this.original = original;
+        public void setUseScript(boolean useScript) {
+            this.useScript = useScript;
         }
 
-        public String getMethod() {
-            return method;
+
+        public List<String> getArgNames() {
+            return argNames;
         }
 
-        public void setMethod(String method) {
-            this.method = method;
+        public void setArgNames(List<String> argNames) {
+            this.argNames = argNames;
+        }
+
+        public SubItemType getSubType() {
+            return subType;
+        }
+
+        public void setSubType(SubItemType subType) {
+            this.subType = subType;
+        }
+    }
+
+
+    public static class FlexibleTestMeta {
+
+        private boolean useScript;
+        private String code;
+        private String methodName;
+        private String argTypes;
+        private List<String> argNames;
+
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+
+        public boolean isUseScript() {
+            return useScript;
+        }
+
+        public void setUseScript(boolean useScript) {
+            this.useScript = useScript;
+        }
+
+        public String getMethodName() {
+            return methodName;
+        }
+
+        public void setMethodName(String methodName) {
+            this.methodName = methodName;
+        }
+
+        public String getArgTypes() {
+            return argTypes;
+        }
+
+        public void setArgTypes(String argTypes) {
+            this.argTypes = argTypes;
+        }
+
+        public List<String> getArgNames() {
+            return argNames;
+        }
+
+        public void setArgNames(List<String> argNames) {
+            this.argNames = argNames;
         }
     }
 }

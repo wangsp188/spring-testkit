@@ -12,7 +12,6 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Computable;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
-import com.intellij.psi.impl.file.PsiDirectoryFactory;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
@@ -29,31 +28,28 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.util.Function;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
+import com.intellij.openapi.module.Module;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 public class CallMethodIconProvider implements LineMarkerProvider {
 
     public static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/spring-fling.svg", CallMethodIconProvider.class);
 
-    @Nullable
     @Override
-    public LineMarkerInfo<?> getLineMarkerInfo(@NotNull PsiElement element) {
+    public LineMarkerInfo<?> getLineMarkerInfo( PsiElement element) {
         return null; // 不再使用单个图标的方法
     }
 
 
     @Override
-    public void collectSlowLineMarkers(java.util.@NotNull List<? extends PsiElement> elements, @NotNull Collection<? super LineMarkerInfo<?>> result) {
+    public void collectSlowLineMarkers(List<? extends PsiElement> elements, Collection<? super LineMarkerInfo<?>> result) {
         for (PsiElement element : elements) {
             if (element instanceof PsiMethod) {
                 PsiMethod method = (PsiMethod) element;
@@ -151,7 +147,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     }
 
     private String isCreateTest(PsiMethod psiMethod) {
-        com.intellij.openapi.module.@Nullable Module module = ModuleUtilCore.findModuleForPsiElement(psiMethod);
+        Module module = ModuleUtilCore.findModuleForPsiElement(psiMethod);
         if (module == null) {
             return "not_find_module";
         }
@@ -185,7 +181,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         return null;
     }
 
-    private String isBeanMethod(@NotNull PsiModifierList modifierList) {
+    private String isBeanMethod(PsiModifierList modifierList) {
         // 1. 检查方法是否为 public
         if (!modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
             return "not_public";
@@ -239,7 +235,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         return null;
     }
 
-    private boolean containsSpringInitializationMethod(@NotNull PsiClass psiClass, PsiMethod psiMethod) {
+    private boolean containsSpringInitializationMethod(PsiClass psiClass, PsiMethod psiMethod) {
         if (psiMethod.hasAnnotation("javax.annotation.PostConstruct")) {
             return true;
         }
@@ -256,7 +252,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     }
 
     private void generateAndOpenTestClass(Project project, PsiMethod method) {
-        com.intellij.openapi.module.@Nullable Module module = ModuleUtilCore.findModuleForPsiElement(method);
+        Module module = ModuleUtilCore.findModuleForPsiElement(method);
         if (module == null) {
             Messages.showMessageDialog(project, "Module not found for the selected method.", "Error", Messages.getErrorIcon());
             return;
@@ -287,7 +283,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         generateOrAddTestMethod(method, project, testDir);
     }
 
-    private @NotNull VirtualFile createTestRoot(com.intellij.openapi.module.@NotNull Module module) throws IOException {
+    private VirtualFile createTestRoot(Module module) throws IOException {
         return ApplicationManager.getApplication().runWriteAction(new Computable<VirtualFile>() {
             @Override
             public VirtualFile compute() {
@@ -317,7 +313,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
     }
 
-    private VirtualFile getTestSourceRoot(com.intellij.openapi.module.@Nullable Module module) {
+    private VirtualFile getTestSourceRoot(Module module) {
         ModuleRootManager rootManager = ModuleRootManager.getInstance(module);
         for (VirtualFile sourceRoot : rootManager.getSourceRoots(true)) {
             if (sourceRoot.getPath().endsWith("/src/test/java")) {
@@ -366,7 +362,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
                     "$_1_$%s;\n" +
                     "}\n";
 
-    public String generateTestClassContent(@NotNull PsiMethod psiMethod, @NotNull String packageName, String fieldName) {
+    public String generateTestClassContent(PsiMethod psiMethod, String packageName, String fieldName) {
         PsiClass containingClass = psiMethod.getContainingClass();
         String className = containingClass.getName();
         String fullyQualifiedClassName = containingClass.getQualifiedName();
@@ -393,7 +389,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         }
     }
 
-    public void generateOrAddTestMethod(@NotNull PsiMethod psiMethod, @NotNull Project project, @NotNull PsiDirectory testSourceRoot) {
+    public void generateOrAddTestMethod(PsiMethod psiMethod,Project project,PsiDirectory testSourceRoot) {
         String packageName = LocalStorageHelper.getFlexibleTestPackage(project);
         String methodName = psiMethod.getName();
         PsiClass containingClass = psiMethod.getContainingClass();

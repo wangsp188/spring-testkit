@@ -76,24 +76,24 @@ public class MybatisSqlTool extends BasePluginTool {
         // Add the radio button
         replaceParamsButton = new JToggleButton(REPLACE_DISABLE_ICON,false);
         replaceParamsButton.setPreferredSize(new Dimension(32,32));
-        replaceParamsButton.setToolTipText("build PreparedSql");
+        replaceParamsButton.setToolTipText("Build preparedSql");
         replaceParamsButton.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (replaceParamsButton.isSelected()) {
                     replaceParamsButton.setIcon(REPLACE_ICON);
-                    replaceParamsButton.setToolTipText("build FinalSql");
+                    replaceParamsButton.setToolTipText("Build finalSql");
 
                 } else {
                     replaceParamsButton.setIcon(REPLACE_DISABLE_ICON);
-                    replaceParamsButton.setToolTipText("build PreparedSql");
+                    replaceParamsButton.setToolTipText("Build preparedSql");
                 }
             }
         });
         topPanel.add(replaceParamsButton,gbc);
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
-        runButton.setToolTipText("build sql");
+        runButton.setToolTipText("Build sql");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
         runButton.setPreferredSize(buttonSize);
@@ -199,6 +199,7 @@ public class MybatisSqlTool extends BasePluginTool {
             inputEditorTextField.setText(xmlTagAction.getArgs());
             return;
         }
+        String oldText = inputEditorTextField.getText();
         inputEditorTextField.setText("init params ...");
         String xmlContent = xmlTagAction.getXmlTag().getParent().getContainingFile().getText();
         String statementId = xmlTagAction.getXmlTag().getAttributeValue("id");
@@ -215,7 +216,7 @@ public class MybatisSqlTool extends BasePluginTool {
                     JSONObject initParams = get();
 
                     try {
-                        JSONObject jsonObject = JSONObject.parseObject(inputEditorTextField.getText());
+                        JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
                         ToolHelper.migration(jsonObject, initParams);
                     } catch (Throwable e) {
                     }

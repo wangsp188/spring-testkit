@@ -3,20 +3,19 @@ package com.fling.tools;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.util.JsonUtil;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
+import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class ToolHelper {
 
@@ -89,10 +88,10 @@ public class ToolHelper {
 
 
     public static JSONArray adapterParams(PsiMethod psiMethod, JSONObject args) {
-        if (psiMethod == null || args == null) {
+        if (psiMethod == null) {
             return new JSONArray();
         }
-
+        args = args == null ? new JSONObject() : args;
         JSONArray jsonArray = new JSONArray();
         for (PsiParameter parameter : psiMethod.getParameterList().getParameters()) {
             String paramName = parameter.getName();
@@ -102,23 +101,56 @@ public class ToolHelper {
         return jsonArray;
     }
 
+    public static List<String> fetchNames(PsiMethod psiMethod) {
+        if (psiMethod == null) {
+            return new ArrayList<>();
+        }
+        List<String> jsonArray = new ArrayList<>();
+        for (PsiParameter parameter : psiMethod.getParameterList().getParameters()) {
+            String paramName = parameter.getName();
+            jsonArray.add(paramName);
+        }
+        return jsonArray;
+    }
+
+    public static JSONArray adapterParams(List<String> names, JSONObject args) {
+        if (CollectionUtils.isEmpty(names)) {
+            return new JSONArray();
+        }
+
+        args = args == null ? new JSONObject() : args;
+
+        JSONArray jsonArray = new JSONArray();
+        for (String name : names) {
+            // 如果参数不在args中，填充null
+            jsonArray.add(args.getOrDefault(name, null));
+        }
+        return jsonArray;
+    }
+
     public static void initParamsTextField(EditorTextField editorTextField, MethodAction method) {
         if (method.getArgs() != null) {
             editorTextField.setText(method.getArgs());
             return;
         }
-        editorTextField.setText("init params ...");
-        // 在这里执行耗时操作
-        JSONObject initParams = doInitParams(method.getMethod());
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                String oldText = editorTextField.getText();
+                editorTextField.setText("init params ...");
+                // 在这里执行耗时操作
+                JSONObject initParams = doInitParams(method.getMethod());
 
-        try {
-            JSONObject jsonObject = JSONObject.parseObject(editorTextField.getText());
-            migration(jsonObject, initParams);
-        } catch (Throwable e) {
-        }
-        String jsonString = JsonUtil.formatObj(initParams);
-        editorTextField.setText(jsonString);
-        method.setArgs(jsonString);
+                try {
+                    JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
+                    migration(jsonObject, initParams);
+                } catch (Throwable e) {
+                }
+                String jsonString = JsonUtil.formatObj(initParams);
+                editorTextField.setText(jsonString);
+                method.setArgs(jsonString);
+            }
+        });
     }
 
     private static JSONObject doInitParams(PsiMethod method) {
@@ -466,7 +498,7 @@ public class ToolHelper {
 
     // 处理 PsiArrayInitializerMemberValue 和常量引用
     public static String getAnnotationValueText(PsiAnnotationMemberValue value) {
-        if (value==null) {
+        if (value == null) {
             return null;
         }
         if (value instanceof PsiArrayInitializerMemberValue arrayValue) {
@@ -502,40 +534,40 @@ public class ToolHelper {
         return null;
     }
 
-    public static void migration(JSONObject from, JSONObject to){
-        if (to==null || from ==null) {
+    public static void migration(JSONObject from, JSONObject to) {
+        if (to == null || from == null) {
             return;
         }
         for (Map.Entry<String, Object> entry : to.entrySet()) {
             Object value = entry.getValue();
-            if (value==null) {
+            if (value == null) {
                 Object object = from.get(entry.getKey());
-                if (object!=null) {
+                if (object != null) {
                     entry.setValue(object);
                 }
-            }else if(value instanceof JSONObject){
+            } else if (value instanceof JSONObject) {
                 Object object = from.get(entry.getKey());
-                if(object instanceof JSONObject){
-                    migration((JSONObject) value, (JSONObject) object);
+                if (object instanceof JSONObject) {
+                    migration((JSONObject) object, (JSONObject) value);
                 }
-            }else if(value instanceof String && value.equals("")){
+            } else if (value instanceof String && value.equals("")) {
                 Object object = from.get(entry.getKey());
-                if(object instanceof String){
+                if (object instanceof String) {
                     entry.setValue(object);
                 }
-            }else if(value instanceof Integer && value.equals(0)){
+            } else if (value instanceof Integer && value.equals(0)) {
                 Object object = from.get(entry.getKey());
-                if(object instanceof Integer){
+                if (object instanceof Integer) {
                     entry.setValue(object);
                 }
-            }else if (value instanceof Long && value.equals(0L)){
+            } else if (value instanceof Long && value.equals(0L)) {
                 Object object = from.get(entry.getKey());
-                if(object instanceof Long){
+                if (object instanceof Long) {
                     entry.setValue(object);
                 }
-            }else if(value instanceof Double && value.equals(0.0)){
+            } else if (value instanceof Double && value.equals(0.0)) {
                 Object object = from.get(entry.getKey());
-                if(object instanceof Double){
+                if (object instanceof Double) {
                     entry.setValue(object);
                 }
             }

@@ -59,11 +59,11 @@ public class SpringCacheTool extends BasePluginTool {
         gbc.gridx = 2;
         gbc.gridy = 0;
         JButton getKeyButton = new JButton(KIcon);
-        getKeyButton.setToolTipText("build keys");
+        getKeyButton.setToolTipText("Build keys");
         JButton getValButton = new JButton(AllIcons.Actions.Find);
-        getValButton.setToolTipText("build keys and get values for every key");
+        getValButton.setToolTipText("Build keys and get values for every key");
         JButton delValButton = new JButton(AllIcons.Actions.GC);
-        delValButton.setToolTipText("build keys and delete these");
+        delValButton.setToolTipText("Build keys and delete these");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(30, 30);
         getKeyButton.setPreferredSize(buttonSize);
@@ -157,12 +157,7 @@ public class SpringCacheTool extends BasePluginTool {
             return null;
         }
         selectedItem.setArgs(jsonInput);
-        JSONObject paramsJson = buildParams(selectedItem.getMethod(), jsonObject, action);
-        try {
-            return HttpUtil.sendPost("http://localhost:" + sidePort + "/", paramsJson, JSONObject.class);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return buildParams(selectedItem.getMethod(), jsonObject, action);
     }
 
     private JSONObject buildParams(PsiMethod method, JSONObject args, String action) {

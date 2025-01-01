@@ -40,7 +40,7 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
                 new Function<PsiElement, String>() {
                     @Override
                     public String fun(PsiElement element) {
-                        return "This method is cacheable";
+                        return "Build keys";
                     }
                 },
                 new GutterIconNavigationHandler(){

@@ -2,7 +2,6 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
     id("org.jetbrains.intellij.platform") version "2.2.0"
-//    id("org.jetbrains.intellij.platform.migration") version "2.2.0"
 }
 
 group = "com.fling"
@@ -25,31 +24,22 @@ dependencies {
     implementation(files("libs/spring-fling_side_server-0.0.1.jar"))
     implementation(files("libs/spring-fling_agent-0.0.1.jar"))
     intellijPlatform{
-        create("IU","2024.2")
-//        intellijIdeaUltimate("2024.2")
+        create("IU","2023.2")
 //        "Git4Idea"
         bundledPlugins(listOf("com.intellij.java","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
     }
 }
 
-
+// Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 intellijPlatform{
     pluginConfiguration{
         ideaVersion {
             sinceBuild = "231"
-            untilBuild = "253.*"
+            untilBuild = "273.*"
         }
     }
 }
 
-// Configure Gradle IntelliJ Plugin
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
-//intellij {
-//    version.set("2024.2")
-//    type.set("IU") // Target IDE Platform
-//
-//    plugins.set(listOf("com.intellij.java","Git4Idea","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
-//}
 
 
 tasks {

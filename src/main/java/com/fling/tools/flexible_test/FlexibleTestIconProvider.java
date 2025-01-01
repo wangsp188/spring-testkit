@@ -45,7 +45,7 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
                 new Function<PsiElement, String>() {
                     @Override
                     public String fun(PsiElement element) {
-                        return "call this method";
+                        return "Call this method";
                     }
                 },
                 new GutterIconNavigationHandler() {

@@ -33,6 +33,7 @@ import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.*;
 import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.searches.AnnotatedElementsSearch;
 import com.intellij.ui.LanguageTextField;
 import com.fling.FlingHelper;
 import com.fling.tools.BasePluginTool;
@@ -603,7 +604,9 @@ public class FlingToolWindow {
 
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        settingsDialog.setSize(screenSize.width / 2, screenSize.height / 2);
+        int width = (int) (screenSize.width * 0.8);
+        int height = (int) (screenSize.height * 0.8);
+        settingsDialog.setSize(width, height);
         settingsDialog.setLocationRelativeTo(null); // 居中显示
         // 添加按钮点击事件以显示设置窗口
         settingsButton.addActionListener(new AbstractAction() {
@@ -930,29 +933,20 @@ public class FlingToolWindow {
             List<PsiClass> springBootApplicationClasses = ApplicationManager.getApplication().runReadAction((Computable<List<PsiClass>>) () -> {
                 List<PsiClass> result = new ArrayList<>();
 
-                // 使用PsiManager获取项目中的所有文件
-                PsiManager psiManager = PsiManager.getInstance(project);
-                GlobalSearchScope globalSearchScope = GlobalSearchScope.projectScope(project);
+                // 使用更高效的查询方式
+                JavaPsiFacade facade = JavaPsiFacade.getInstance(project);
+                PsiClass springBootAnnotation = facade.findClass(
+                        "org.springframework.boot.autoconfigure.SpringBootApplication",
+                        GlobalSearchScope.allScope(project)
+                );
 
-                // 获取所有的Java文件
-                FileType javaFileType = StdFileTypes.JAVA;
-                Collection<VirtualFile> javaFiles = FileTypeIndex.getFiles(javaFileType, globalSearchScope);
-
-                for (VirtualFile file : javaFiles) {
-                    PsiFile psiFile = psiManager.findFile(file);
-                    if (psiFile instanceof PsiJavaFile) {
-                        PsiJavaFile javaFile = (PsiJavaFile) psiFile;
-                        for (PsiClass psiClass : javaFile.getClasses()) {
-                            // 检查每个类的注解
-                            PsiAnnotation[] annotations = psiClass.getAnnotations();
-                            for (PsiAnnotation annotation : annotations) {
-                                if ("org.springframework.boot.autoconfigure.SpringBootApplication".equals(annotation.getQualifiedName())) {
-                                    result.add(psiClass);
-                                }
-                            }
-                        }
-                    }
+                if (springBootAnnotation != null) {
+                    Collection<PsiClass> candidates = AnnotatedElementsSearch
+                            .searchPsiClasses(springBootAnnotation, GlobalSearchScope.projectScope(project))
+                            .findAll();
+                    result.addAll(candidates);
                 }
+
                 return result;
             });
 
@@ -1340,7 +1334,7 @@ public class FlingToolWindow {
             FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
             String scriptCode = scriptField.getText();
             String env = StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? "local" : controllerEnvTextField.getText().trim().split(",")[0];
-            ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Fire-Test generate function, please wait...", false) {
+            ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Fire-Test generate function, please wait ...", false) {
 
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
@@ -1627,6 +1621,10 @@ public class FlingToolWindow {
 
     public List<String> getProjectAppList() {
         return appList;
+    }
+
+    public void refreshStore(){
+        storeDialog.refresh();
     }
 
 }

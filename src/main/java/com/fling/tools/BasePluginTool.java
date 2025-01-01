@@ -8,6 +8,7 @@ import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionToolbar;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -20,6 +21,9 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.PsiElement;
@@ -29,6 +33,7 @@ import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
+import com.intellij.util.ui.JBUI;
 
 import javax.swing.*;
 import java.awt.*;
@@ -48,8 +53,8 @@ public abstract class BasePluginTool {
 
 //    protected SwingWorker lastLocalFuture;
 
-
-    protected FlingToolWindow flingWindow;
+    protected JPanel actionPanel;
+    protected FlingToolWindow toolWindow;
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
     protected EditorTextField inputEditorTextField;
@@ -58,12 +63,14 @@ public abstract class BasePluginTool {
 
     public BasePluginTool(FlingToolWindow flingToolWindow) {
         // 初始化panel
-        this.flingWindow = flingToolWindow;
+        this.toolWindow = flingToolWindow;
         this.panel = new JPanel(new GridBagLayout());
         // 设置inputPanel的边框为不可见
         this.panel.setBorder(BorderFactory.createEmptyBorder());
         initializePanel();
     }
+
+
 
 
     public PluginToolEnum getTool() {
@@ -75,19 +82,19 @@ public abstract class BasePluginTool {
     }
 
     public Project getProject() {
-        return flingWindow.getProject();
+        return toolWindow.getProject();
     }
 
     public FlingToolWindow.VisibleApp getSelectedApp() {
-        return flingWindow.getSelectedApp();
+        return toolWindow.getSelectedApp();
     }
 
     public List<String> getPorjectAppList() {
-        return flingWindow.getProjectAppList();
+        return toolWindow.getProjectAppList();
     }
 
     public String getSelectedAppName() {
-        return flingWindow.getSelectedAppName();
+        return toolWindow.getSelectedAppName();
     }
 
 
@@ -100,7 +107,7 @@ public abstract class BasePluginTool {
         gbc.weighty = 0.0; // 顶部面板不占用垂直空间
 
         // Top panel for method selection and actions
-        JPanel actionPanel = createActionPanel();
+        actionPanel = createActionPanel();
         panel.add(actionPanel, gbc);
 
         gbc.gridy = 1;
@@ -114,7 +121,7 @@ public abstract class BasePluginTool {
 
 
         if (hasActionBox()) {
-            AnAction refreshAction = new AnAction("Refresh method parameters structure", "Refresh method parameters structure", AllIcons.Actions.Refresh) {
+            AnAction refreshAction = new AnAction("Refresh parameters structure", "Refresh parameters structure", AllIcons.Actions.Refresh) {
                 @Override
                 public void actionPerformed(AnActionEvent e) {
                     SwingUtilities.invokeLater(new Runnable() {
@@ -146,13 +153,31 @@ public abstract class BasePluginTool {
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {
-                        flingWindow.openCurlDialog();
+                        toolWindow.openCurlDialog();
                     }
                 });
 
             }
         };
         actionGroup.add(curlAction);
+
+        if(canStore()){
+            fillStoreAction();
+        }
+
+
+
+
+        AnAction historyAction = new AnAction("Open Store", "Open Store", AllIcons.Vcs.History) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                // 调用复制功能
+                toolWindow.visibleStoreDialog();
+            }
+        };
+        actionGroup.add(historyAction);
+
+
 
 
         // 创建ActionToolbar
@@ -161,7 +186,6 @@ public abstract class BasePluginTool {
         JComponent toolbarComponent = actionToolbar.getComponent();
         toolbarComponent.setLayout(new BoxLayout(toolbarComponent, BoxLayout.Y_AXIS));
 
-
         // 将工具栏添加到控制面板的左侧
         inputPanel.add(toolbarComponent, BorderLayout.WEST);
 
@@ -169,6 +193,118 @@ public abstract class BasePluginTool {
         inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
         inputPanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
         panel.add(inputPanel, gbc);
+    }
+
+    protected boolean canStore(){
+        return true;
+    }
+
+    protected String verifyNowStore(){
+        return null;
+    }
+
+
+
+    protected void handleStore(String app, String group, String title) {
+    }
+
+    private void fillStoreAction() {
+        AnAction storeAction = new AnAction("Save this", "Save this", AllIcons.Actions.MenuSaveall) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                List<String> projectAppList = toolWindow.getProjectAppList();
+                if (projectAppList.isEmpty()) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Can not find app");
+                    return;
+                }
+
+                String verify = verifyNowStore();
+                if (verify != null) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), verify);
+                    return;
+                }
+
+
+                // 创建面板
+                JPanel panel = new JPanel();
+                panel.setLayout(new GridBagLayout());
+                panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+                GridBagConstraints gbc = new GridBagConstraints();
+                gbc.fill = GridBagConstraints.HORIZONTAL;
+                gbc.insets = JBUI.insets(5);
+
+                // 创建下拉框
+                String[] options = projectAppList.toArray(new String[projectAppList.size()]);
+                ComboBox<String> comboBox = new ComboBox<>(options);
+
+                // 创建两个文本框
+                JTextField groupField = new JTextField("default");
+                groupField.setEditable(true);
+                groupField.setEnabled(true);
+                groupField.setFocusable(true);
+                JTextField titleField = new JTextField("default");
+                titleField.setEditable(true);
+                titleField.setEnabled(true);
+                titleField.setFocusable(true);
+
+                // 创建提交按钮
+                JButton submitButton = new JButton("Save");
+
+                // 添加组件到面板
+                gbc.gridx = 0;
+                gbc.gridy = 0;
+                JLabel appLabel = new JLabel("App:");
+                appLabel.setToolTipText("Which app domain you want to save to");
+                panel.add(appLabel, gbc);
+                gbc.gridx = 1;
+                panel.add(comboBox, gbc);
+
+                gbc.gridx = 0;
+                gbc.gridy = 1;
+                JLabel groupLabel = new JLabel("Group:");
+                appLabel.setToolTipText("Grouping functions");
+                panel.add(groupLabel, gbc);
+                gbc.gridx = 1;
+                panel.add(groupField, gbc);
+
+                gbc.gridx = 0;
+                gbc.gridy = 2;
+                JLabel titleLabel = new JLabel("Title:");
+                titleLabel.setToolTipText("Multiple params can be stored in a function");
+                panel.add(titleLabel, gbc);
+                gbc.gridx = 1;
+                panel.add(titleField, gbc);
+
+                gbc.gridx = 0;
+                gbc.gridy = 3;
+                gbc.gridwidth = 2;
+                panel.add(submitButton, gbc);
+
+                // 创建弹出框
+                JBPopupFactory popupFactory = JBPopupFactory.getInstance();
+                JBPopup popup = popupFactory.createComponentPopupBuilder(panel, titleField)
+                        .setRequestFocus(true)
+                        .setFocusable(true)
+                        .setTitle("Save this to store")
+                        .setMovable(true)
+                        .setResizable(false)
+                        .createPopup();
+
+
+                // 添加提交按钮事件
+                submitButton.addActionListener(actionEvent -> {
+                    // 在这里处理提交的数据
+                    handleStore((String) comboBox.getSelectedItem(), groupField.getText(), titleField.getText());
+                    toolWindow.refreshStore();
+                    FlingHelper.notify(getProject(), NotificationType.INFORMATION, "Save success");
+                    popup.dispose();
+                });
+
+                // 显示弹出框
+                popup.showInBestPositionFor(e.getDataContext());
+            }
+        };
+        actionGroup.add(storeAction);
     }
 
     protected abstract boolean hasActionBox();
@@ -220,7 +356,7 @@ public abstract class BasePluginTool {
         // 发起任务请求，获取请求ID
         JSONObject response = null;
         try {
-            response = submit.get();
+            response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", submit.get(), JSONObject.class);
         } catch (Throwable e) {
             setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
             return;
@@ -237,7 +373,7 @@ public abstract class BasePluginTool {
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
         setOutputText("req is send，reqId:" + reqId, null);
 
-        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing "+getTool().getCode()+", please wait...", false) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing "+getTool().getCode()+", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
                 try {
@@ -345,13 +481,13 @@ public abstract class BasePluginTool {
 
 
     protected void setOutputText(String content) {
-        flingWindow.setOutputText(content);
-        flingWindow.setOutputProfile(null);
+        toolWindow.setOutputText(content);
+        toolWindow.setOutputProfile(null);
     }
 
     protected void setOutputText(String content, List<Map<String, String>> outputProfile) {
-        flingWindow.setOutputText(content);
-        flingWindow.setOutputProfile(outputProfile);
+        toolWindow.setOutputText(content);
+        toolWindow.setOutputProfile(outputProfile);
     }
 
 

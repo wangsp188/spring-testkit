@@ -40,7 +40,7 @@ public class MybatisSqlIconProvider implements LineMarkerProvider {
                 new Function<PsiElement, String>() {
                     @Override
                     public String fun(PsiElement element) {
-                        return "build sql";
+                        return "Build sql";
                     }
                 },
                 new GutterIconNavigationHandler() {
