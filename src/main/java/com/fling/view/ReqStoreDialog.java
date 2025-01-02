@@ -1016,6 +1016,7 @@ public class ReqStoreDialog {
                 Icon icon = getItemIcon(item.getType());
                 iconLabel.setIcon(icon);
 
+                jsonInputField.setText("");
                 // 更新标题
                 List<ReqStorageHelper.SavedReq> reqs = item.getReqs();
                 reqsComboBox.removeAllItems();
@@ -1025,7 +1026,6 @@ public class ReqStoreDialog {
                     }
                 }
 
-                jsonInputField.setText("");
 
                 // 根据条件添加script输入框
                 if (item.getType() == ReqStorageHelper.ItemType.flexible_test) {
