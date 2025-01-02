@@ -160,9 +160,9 @@ public class CurlDialog extends JDialog {
         inputTextArea = new JTextArea(5, 20);
 
         addPlaceholderToTextArea(inputTextArea, "input your curl and click right button to parse");
-        JButton parseButton = new JButton(PARSE_CURL_ICON);
-        Dimension preferredSize = new Dimension(30, 30);
-        parseButton.setPreferredSize(preferredSize);
+        JButton parseButton = new JButton("Parse");
+//        Dimension preferredSize = new Dimension(30, 30);
+//        parseButton.setPreferredSize(preferredSize);
 //        parseButton.setMaximumSize(preferredSize);
 //        parseButton.setMinimumSize(preferredSize);
         parseButton.addActionListener(new ActionListener() {

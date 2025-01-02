@@ -31,6 +31,7 @@ import com.intellij.psi.PsiMethod;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
+import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.intellij.util.ui.JBUI;
@@ -190,7 +191,7 @@ public abstract class BasePluginTool {
         inputPanel.add(toolbarComponent, BorderLayout.WEST);
 
         inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-        inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
+//        inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
         inputPanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
         panel.add(inputPanel, gbc);
     }
@@ -209,7 +210,7 @@ public abstract class BasePluginTool {
     }
 
     private void fillStoreAction() {
-        AnAction storeAction = new AnAction("Save this", "Save this", AllIcons.Actions.MenuSaveall) {
+        AnAction storeAction = new AnAction("Save this to store", "Save this to store", AllIcons.Actions.MenuSaveall) {
             @Override
             public void actionPerformed(AnActionEvent e) {
                 List<String> projectAppList = toolWindow.getProjectAppList();
@@ -295,13 +296,22 @@ public abstract class BasePluginTool {
                 submitButton.addActionListener(actionEvent -> {
                     // 在这里处理提交的数据
                     handleStore((String) comboBox.getSelectedItem(), groupField.getText(), titleField.getText());
-                    toolWindow.refreshStore();
+                    new Thread(){
+                        public void run(){
+                            try {
+                                Thread.sleep(2000);
+                            } catch (InterruptedException ex) {
+                                throw new RuntimeException(ex);
+                            }
+                            toolWindow.refreshStore();
+                        }
+                    }.start();
                     FlingHelper.notify(getProject(), NotificationType.INFORMATION, "Save success");
                     popup.dispose();
                 });
 
                 // 显示弹出框
-                popup.showInBestPositionFor(e.getDataContext());
+                popup.show(new RelativePoint(inputEditorTextField,new Point(0,0)));
             }
         };
         actionGroup.add(storeAction);
@@ -356,12 +366,13 @@ public abstract class BasePluginTool {
         // 发起任务请求，获取请求ID
         JSONObject response = null;
         try {
-            response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", submit.get(), JSONObject.class);
+            JSONObject request = submit.get();
+            if (request == null) {
+                return;
+            }
+            response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class);
         } catch (Throwable e) {
             setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
-            return;
-        }
-        if (response == null) {
             return;
         }
         if (!response.getBooleanValue("success") || response.getString("data") == null) {

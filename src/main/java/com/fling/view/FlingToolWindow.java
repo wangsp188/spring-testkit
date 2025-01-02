@@ -14,8 +14,6 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.fileTypes.StdFileTypes;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -28,10 +26,8 @@ import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.*;
-import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.AnnotatedElementsSearch;
 import com.intellij.ui.LanguageTextField;
@@ -1495,7 +1491,7 @@ public class FlingToolWindow {
                 Properties properties = new Properties();
                 properties.load(new StringReader(propertiesStr));
             } catch (Throwable ex) {
-                FlingHelper.notify(project, NotificationType.WARNING, "Properties parsed error<br/> pls check");
+                FlingHelper.notify(project, NotificationType.WARNING, "Properties parsed error<br/> please check");
                 return;
             }
             LocalStorageHelper.setAppProperties(project, selectedApp, propertiesStr);
@@ -1624,7 +1620,7 @@ public class FlingToolWindow {
     }
 
     public void refreshStore(){
-        storeDialog.refresh();
+        storeDialog.refreshTree();
     }
 
 }

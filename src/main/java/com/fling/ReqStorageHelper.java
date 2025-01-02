@@ -1,7 +1,6 @@
 package com.fling;
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
@@ -19,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class ReqStorageHelper {
 
@@ -94,7 +94,7 @@ public class ReqStorageHelper {
                     return Objects.equals(type, item.getType()) && Objects.equals(group, item.getGroup()) && Objects.equals(name, item.getName());
                 }
             });
-            if(CollectionUtils.isEmpty(items)) {
+            if (CollectionUtils.isEmpty(items)) {
                 groupList.removeIf(new Predicate<GroupItems>() {
                     @Override
                     public boolean test(GroupItems groupItems) {
@@ -102,7 +102,7 @@ public class ReqStorageHelper {
                     }
                 });
 
-                if(CollectionUtils.isEmpty(groupList)) {
+                if (CollectionUtils.isEmpty(groupList)) {
                     stringListMap.remove(app);
                 }
             }
@@ -110,7 +110,7 @@ public class ReqStorageHelper {
         saveWebReqs(project, stringListMap);
     }
 
-    public static void saveAppReq(Project project, String app, String group, ReqStorageHelper.ItemType itemType,String name,Object meta,String oldTitle, ReqStorageHelper.SavedReq req) {
+    public static void saveAppReq(Project project, String app, String group, ReqStorageHelper.ItemType itemType, String name, Object meta, String oldTitle, ReqStorageHelper.SavedReq req) {
         Map<String, List<GroupItems>> stringListMap = loadWebReqs(project);
         if (stringListMap == null) {
             stringListMap = new HashMap<>();
@@ -193,8 +193,102 @@ public class ReqStorageHelper {
         saveWebReqs(project, stringListMap);
     }
 
+    public static void saveAppGroupItems(Project project, String app, GroupItems importGroup) {
+        if (importGroup == null) {
+            return;
+        }
+        if (StringUtils.isBlank(importGroup.getGroup())) {
+            throw new IllegalArgumentException("group cannot be empty");
+        }
+        if (CollectionUtils.isEmpty(importGroup.getItems())) {
+            return;
+        }
+        List<Item> items = importGroup.getItems().stream().filter(new Predicate<Item>() {
+            @Override
+            public boolean test(Item item) {
+                return CollectionUtils.isNotEmpty(item.getReqs()) && item.getType() != null && item.getGroup() != null && item.getMeta() != null && StringUtils.isNotBlank(item.getName());
+            }
+        }).collect(Collectors.toList());
+        importGroup.setItems(items);
 
-    public static Map<String, List<GroupItems>> loadWebReqs(Project project) {
+        for (Item item : items) {
+            List<SavedReq> list = item.getReqs().stream()
+                    .filter(new Predicate<SavedReq>() {
+                        @Override
+                        public boolean test(SavedReq savedReq) {
+                            return StringUtils.isNotBlank(savedReq.getTitle());
+                        }
+                    }).collect(Collectors.toList());
+            item.setReqs(list);
+        }
+
+        Map<String, List<GroupItems>> stringListMap = loadWebReqs(project);
+        if (stringListMap == null) {
+            stringListMap = new HashMap<>();
+        }
+        List<GroupItems> itemsList = stringListMap.get(app);
+        if (itemsList == null || itemsList.isEmpty()) {
+            itemsList = new ArrayList<>();
+            itemsList.add(importGroup);
+            stringListMap.put(app, itemsList);
+            saveWebReqs(project, stringListMap);
+            return;
+        }
+        Optional<GroupItems> groupOptional = itemsList.stream().filter(new Predicate<GroupItems>() {
+            @Override
+            public boolean test(GroupItems groups) {
+                return Objects.equals(importGroup.getGroup(), groups.getGroup());
+            }
+        }).findFirst();
+
+        if (groupOptional.isEmpty() || CollectionUtils.isEmpty(groupOptional.get().getItems())) {
+            itemsList.add(importGroup);
+            saveWebReqs(project, stringListMap);
+            return;
+        }
+        List<Item> existItems = groupOptional.get().getItems();
+
+        for (Item item : items) {
+            item.setGroup(importGroup.getGroup());
+            Optional<Item> pointItemOptional = existItems.stream().filter(new Predicate<Item>() {
+                @Override
+                public boolean test(Item i2) {
+                    return Objects.equals(i2.getName(), item.getName()) && Objects.equals(i2.getType(), item.getType());
+                }
+            }).findFirst();
+            if (pointItemOptional.isEmpty()) {
+                existItems.add(item);
+                continue;
+            }
+            //reqs
+            Item pointItem = pointItemOptional.get();
+            List<SavedReq> pointReqs = pointItem.getReqs();
+            List<SavedReq> reqs = item.getReqs();
+            if (CollectionUtils.isEmpty(pointReqs)) {
+                pointItem.setReqs(reqs);
+                continue;
+            }
+
+            //migration reqs
+            for (SavedReq req : reqs) {
+                Optional<SavedReq> pointReqOptional = pointReqs.stream().filter(new Predicate<SavedReq>() {
+                    @Override
+                    public boolean test(SavedReq i3) {
+                        return Objects.equals(i3.getTitle(), req.getTitle());
+                    }
+                }).findFirst();
+                if (pointReqOptional.isEmpty()) {
+                    pointReqs.add(req);
+                } else {
+                    pointReqOptional.get().setArgs(req.getArgs());
+                }
+            }
+        }
+        saveWebReqs(project, stringListMap);
+    }
+
+
+    private static Map<String, List<GroupItems>> loadWebReqs(Project project) {
         File configFile = getStoreFile(project);
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
@@ -211,7 +305,7 @@ public class ReqStorageHelper {
     private synchronized static void saveWebReqs(Project project, Map<String, List<GroupItems>> groupItems) {
         File configFile = getStoreFile(project);
         try (FileWriter writer = new FileWriter(configFile)) {
-            JSON.writeJSONString(writer, groupItems,SerializerFeature.WriteMapNullValue);
+            JSON.writeJSONString(writer, groupItems, SerializerFeature.WriteMapNullValue);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -281,8 +375,8 @@ public class ReqStorageHelper {
             return JSON.parseObject(meta.toJSONString(), type);
         }
 
-        public SubItemType fetchSubType(){
-            if (type!= ItemType.call_method) {
+        public SubItemType fetchSubType() {
+            if (type != ItemType.call_method) {
                 return null;
             }
             return metaObj(CallMethodMeta.class).getSubType();
@@ -358,7 +452,6 @@ public class ReqStorageHelper {
         }
 
 
-
         public String toString() {
             return title;
         }
@@ -367,7 +460,6 @@ public class ReqStorageHelper {
 
     public static class CallMethodMeta {
 
-        private SubItemType subType;
         private String typeClass;
         private String beanName;
         private String methodName;
@@ -375,6 +467,8 @@ public class ReqStorageHelper {
         private String argTypes;
         private List<String> argNames;
 
+        private SubItemType subType;
+        private ControllerCommandMeta controllerMeta;
 
 
         public String getTypeClass() {
@@ -432,6 +526,63 @@ public class ReqStorageHelper {
 
         public void setSubType(SubItemType subType) {
             this.subType = subType;
+        }
+
+        public ControllerCommandMeta getControllerMeta() {
+            return controllerMeta;
+        }
+
+        public void setControllerMeta(ControllerCommandMeta controllerMeta) {
+            this.controllerMeta = controllerMeta;
+        }
+    }
+
+    public static class ControllerCommandMeta {
+        private String httpMethod;
+        private String path;
+        private String jsonBodyKey;
+        private Map<String, String> aliasmap;
+        private List<String> pathKeys;
+
+
+        public String getHttpMethod() {
+            return httpMethod;
+        }
+
+        public void setHttpMethod(String httpMethod) {
+            this.httpMethod = httpMethod;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public void setPath(String path) {
+            this.path = path;
+        }
+
+        public String getJsonBodyKey() {
+            return jsonBodyKey;
+        }
+
+        public void setJsonBodyKey(String jsonBodyKey) {
+            this.jsonBodyKey = jsonBodyKey;
+        }
+
+        public Map<String, String> getAliasmap() {
+            return aliasmap;
+        }
+
+        public void setAliasmap(Map<String, String> aliasmap) {
+            this.aliasmap = aliasmap;
+        }
+
+        public List<String> getPathKeys() {
+            return pathKeys;
+        }
+
+        public void setPathKeys(List<String> pathKeys) {
+            this.pathKeys = pathKeys;
         }
     }
 

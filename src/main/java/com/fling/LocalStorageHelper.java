@@ -116,7 +116,7 @@ public class LocalStorageHelper {
                 " * buildCurl：构建curl函数\n" +
                 " * http：发起http请求函数\n" +
                 " *\n" +
-                " * @param env        环境，非空\n" +
+                " * @param env        环境，可能为空\n" +
                 " * @param httpMethod GET/POST 等等http方法，非空\n" +
                 " * @param path       /uri 非空\n" +
                 " * @param params     传递的参数，k和v都是string，非空\n" +

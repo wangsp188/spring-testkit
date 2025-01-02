@@ -117,7 +117,7 @@ public class MybatisSqlTool extends BasePluginTool {
                         }
                         ToolHelper.XmlTagAction selectedItem = (ToolHelper.XmlTagAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
-                            return "pls select tag";
+                            return "please select tag";
                         }
                         selectedItem.setArgs(jsonInput);
                         String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();

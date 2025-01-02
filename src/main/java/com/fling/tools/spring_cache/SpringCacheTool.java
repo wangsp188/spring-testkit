@@ -1,6 +1,7 @@
 package com.fling.tools.spring_cache;
 
 import com.alibaba.fastjson.JSONObject;
+import com.fling.FlingHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.intellij.icons.AllIcons;
@@ -153,7 +154,7 @@ public class SpringCacheTool extends BasePluginTool {
         }
         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
         if (selectedItem==null) {
-            setOutputText("pls select method");
+            FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
             return null;
         }
         selectedItem.setArgs(jsonInput);

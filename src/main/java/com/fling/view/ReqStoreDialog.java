@@ -1,6 +1,7 @@
 package com.fling.view;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
@@ -12,43 +13,60 @@ import com.fling.tools.ToolHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.tools.call_method.CallMethodTool;
 import com.fling.tools.flexible_test.FlexibleTestIconProvider;
+import com.fling.util.Container;
 import com.fling.util.HttpUtil;
 import com.fling.util.JsonUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
-import com.intellij.lang.java.JavaLanguage;
 import com.intellij.notification.NotificationType;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.refactoring.changeClassSignature.New;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.groovy.control.CompilationFailedException;
+import org.codehaus.groovy.runtime.InvokerHelper;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
+import java.awt.event.*;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ReqStoreDialog {
 
     public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", ReqStoreDialog.class);
+    public static final Icon EXPORT_ICON = IconLoader.getIcon("/icons/export.svg", ReqStoreDialog.class);
+    public static final Icon IMPORT_ICON = IconLoader.getIcon("/icons/import.svg", ReqStoreDialog.class);
+
 
     private JDialog dialog;
 
@@ -71,6 +89,7 @@ public class ReqStoreDialog {
     private JPanel actionPanel;
 
     private JComboBox<String> visibleAppComboBox;
+    private JButton copyRetButton;
     private JToggleButton useProxyButton;
     private JButton executeButton;
     private JButton controllerCommandButton;
@@ -79,7 +98,7 @@ public class ReqStoreDialog {
 
     private LanguageTextField jsonInputField;
 
-    private LanguageTextField metaInputField;
+    private JTextPane metaTextPane;
 
     private JTextPane outputTextPane;
 
@@ -137,7 +156,6 @@ public class ReqStoreDialog {
     }
 
 
-
     private void initializeTree() {
         root = new DefaultMutableTreeNode("Root");
         treeModel = new DefaultTreeModel(root);
@@ -153,10 +171,7 @@ public class ReqStoreDialog {
 
         // 添加选择监听器
         tree.addTreeSelectionListener(e -> {
-            DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
-            if (node != null) {
-                updateRightPanel(node.getUserObject());
-            }
+            updateRightPanel();
         });
     }
 
@@ -173,7 +188,7 @@ public class ReqStoreDialog {
         }
     }
 
-    public void refresh() {
+    public void refreshTree() {
         SwingUtilities.invokeLater(() -> {
             // 保存当前选中的节点信息
             DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
@@ -197,7 +212,7 @@ public class ReqStoreDialog {
 
             String app = (String) appBox.getSelectedItem();
             List<ReqStorageHelper.GroupItems> groups = app == null ? null : ReqStorageHelper.getAppReqs(toolWindow.getProject(), app);
-            updateRightPanel(null);
+            updateRightPanel();
 
             root.removeAllChildren();
             if (CollectionUtils.isNotEmpty(groups)) {
@@ -305,7 +320,7 @@ public class ReqStoreDialog {
         appBox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                refresh();
+                refreshTree();
             }
         });
 
@@ -335,16 +350,154 @@ public class ReqStoreDialog {
         refreshButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                refresh();
-                FlingHelper.notify(getToolWindow().getProject(), NotificationType.INFORMATION, "Refresh success");
+                refreshTree();
+                FlingHelper.notify(getToolWindow().getProject(), NotificationType.INFORMATION, "Reload success");
             }
         });
         panel.add(refreshButton);
 
+        JButton importButton = new JButton(IMPORT_ICON);
+        importButton.setPreferredSize(new Dimension(32, 32));
+        importButton.setToolTipText("Import/Update item to the selected app");
+        importButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String app = (String) appBox.getSelectedItem();
+                if (app == null) {
+                    FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
+                    return;
+                }
+                //常见一个弹出层
+//              标题是 import reqs
+//              一个大面积的json输入框
+//                最下面是个import按钮，点击按钮后触发一个动作
+
+                // 创建弹出对话框
+                JDialog dialog = new JDialog();
+                dialog.setTitle("Import/Update item to the selected app");
+                dialog.setModal(true);
+                dialog.setSize(500, 400);
+                dialog.setLocationRelativeTo(null);
+
+                // 创建说明文本标签
+                JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here,<br>usually json content exported from somewhere else...</html>");
+// 启用自动换行
+                instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 创建JSON输入框
+                JTextArea jsonInput = new JTextArea();
+                jsonInput.setLineWrap(true);
+                jsonInput.setWrapStyleWord(true);
+                JScrollPane scrollPane = new JScrollPane(jsonInput);
+
+                // 创建导入按钮
+                JButton importConfirmButton = new JButton("Import");
+                importConfirmButton.addActionListener(e1 -> {
+                    ReqStorageHelper.GroupItems groupItems = null;
+                    try {
+                        groupItems = JSON.parseObject(jsonInput.getText().trim(), ReqStorageHelper.GroupItems.class);
+                    } catch (Exception ex) {
+                        FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import item must be group items");
+                        return;
+                    }
+                    try {
+                        ReqStorageHelper.saveAppGroupItems(toolWindow.getProject(), app, groupItems);
+                        FlingHelper.notify(getToolWindow().getProject(), NotificationType.INFORMATION, "Import success");
+                        refreshTree();
+                        dialog.dispose();
+                    } catch (Exception ex) {
+                        FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import error," + ex.getMessage());
+                    }
+                });
+
+                // 布局
+                dialog.setLayout(new BorderLayout());
+                dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 将组件添加到面板
+                dialog.add(instructionLabel, BorderLayout.NORTH);
+                dialog.add(scrollPane, BorderLayout.CENTER);
+                dialog.add(importConfirmButton, BorderLayout.SOUTH);
+                dialog.setVisible(true);
+            }
+        });
+        panel.add(importButton);
+
+        JButton exportButton = new JButton(EXPORT_ICON);
+        exportButton.setPreferredSize(new Dimension(32, 32));
+        exportButton.setToolTipText("Export the selected group or item");
+        exportButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String app = (String) appBox.getSelectedItem();
+                if (app == null) {
+                    FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
+                    return;
+                }
+
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
+                if (node == null) {
+                    FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a group or item");
+                    return;
+                }
+                ReqStorageHelper.GroupItems exportObj = exportReqs(app, node);
+                FlingHelper.copyToClipboard(toolWindow.getProject(), JSON.toJSONString(exportObj, SerializerFeature.WriteMapNullValue), (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
+            }
+        });
+        panel.add(exportButton);
+
         // 创建文本标签
-        JLabel textLabel = new JLabel("Hello " + FlingHelper.getPluginName() + ", store is developing");
-        panel.add(textLabel);
+//        JLabel textLabel = new JLabel("Good luck");
+//        panel.add(textLabel);
         return panel;
+    }
+
+    private ReqStorageHelper.GroupItems exportReqs(String app, DefaultMutableTreeNode node) {
+        ReqStorageHelper.GroupItems exportObj = null;
+        List<ReqStorageHelper.GroupItems> groups = ReqStorageHelper.getAppReqs(toolWindow.getProject(), app);
+        Object userObject = node.getUserObject();
+        if (userObject instanceof ReqStorageHelper.GroupItems) {
+            Optional<ReqStorageHelper.GroupItems> groupItems = Optional.ofNullable(groups)
+                    .orElse(new ArrayList<>())
+                    .stream().filter(new Predicate<ReqStorageHelper.GroupItems>() {
+                        @Override
+                        public boolean test(ReqStorageHelper.GroupItems groupItems) {
+                            return groupItems != null && Objects.equals(((ReqStorageHelper.GroupItems) userObject).getGroup(), groupItems.getGroup());
+                        }
+                    }).findFirst();
+            exportObj = (ReqStorageHelper.GroupItems) groupItems.orElseGet(new Supplier<ReqStorageHelper.GroupItems>() {
+                @Override
+                public ReqStorageHelper.GroupItems get() {
+                    ReqStorageHelper.GroupItems items = new ReqStorageHelper.GroupItems();
+                    items.setGroup(((ReqStorageHelper.GroupItems) userObject).getGroup());
+                    return items;
+                }
+            });
+        } else if (userObject instanceof ReqStorageHelper.Item) {
+            Optional<ReqStorageHelper.GroupItems> groupItems = Optional.ofNullable(groups)
+                    .orElse(new ArrayList<>())
+                    .stream().filter(new Predicate<ReqStorageHelper.GroupItems>() {
+                        @Override
+                        public boolean test(ReqStorageHelper.GroupItems groupItems) {
+                            return groupItems != null && Objects.equals(((ReqStorageHelper.Item) userObject).getGroup(), groupItems.getGroup());
+                        }
+                    }).findFirst();
+            exportObj = new ReqStorageHelper.GroupItems();
+            exportObj.setGroup(((ReqStorageHelper.Item) userObject).getGroup());
+            if (groupItems.isPresent()) {
+                Optional<ReqStorageHelper.Item> first = Optional.ofNullable(groupItems.get().getItems())
+                        .orElse(new ArrayList<>())
+                        .stream()
+                        .filter(new Predicate<ReqStorageHelper.Item>() {
+                            @Override
+                            public boolean test(ReqStorageHelper.Item item) {
+                                return item != null && Objects.equals(item.getName(), ((ReqStorageHelper.Item) userObject).getName()) && Objects.equals(item.getType(), ((ReqStorageHelper.Item) userObject).getType());
+                            }
+                        }).findFirst();
+                if (first.isPresent()) {
+                    exportObj.getItems().add(first.get());
+                }
+            }
+        }
+        return exportObj;
     }
 
 
@@ -373,7 +526,7 @@ public class ReqStoreDialog {
                 String app = (String) appBox.getSelectedItem();
                 ReqStorageHelper.SavedReq selectedReq = (ReqStorageHelper.SavedReq) reqsComboBox.getSelectedItem();
                 if (selectedReq == null || selectedItem == null) {
-                    FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please refresh this page");
+                    FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a item");
                     return;
                 }
 
@@ -390,7 +543,7 @@ public class ReqStoreDialog {
                 switch (selectedItem.getType()) {
                     case call_method -> {
                         try {
-                            meta = JSON.parseObject(metaInputField.getText().trim());
+                            meta = JSON.parseObject(metaTextPane.getText().trim());
                         } catch (Throwable ex) {
                             FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
                             return;
@@ -398,7 +551,7 @@ public class ReqStoreDialog {
                     }
                     case flexible_test -> {
                         ReqStorageHelper.FlexibleTestMeta metaObj = selectedItem.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                        metaObj.setCode(metaInputField.getText().trim());
+                        metaObj.setCode(metaTextPane.getText().trim());
                         meta = JSON.parseObject(JSON.toJSONString(metaObj, SerializerFeature.WriteMapNullValue));
                     }
                     default -> {
@@ -462,7 +615,7 @@ public class ReqStoreDialog {
         gbc.gridy = 0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
-        gbc.insets = JBUI.insets(0, 0, 10, 0);
+//        gbc.insets = JBUI.insets(0, 0, 5, 0);
 
         contentPanel.add(firstRow, gbc);
 
@@ -474,7 +627,7 @@ public class ReqStoreDialog {
         inputPanel = buildInputPanel(toolWindow);
 
         gbc.gridy = 2;
-        gbc.weighty = 0.4;
+        gbc.weighty = 0;
 //        gbc.insets = JBUI.insets(0, 0, 10, 0);
         gbc.fill = GridBagConstraints.BOTH;
         contentPanel.add(inputPanel, gbc);
@@ -490,7 +643,7 @@ public class ReqStoreDialog {
 
         // 将内容面板添加到主面板
         gbc.gridy = 3;
-        gbc.weighty = 0.6;
+        gbc.weighty = 1;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.insets = JBUI.insets(0);
         contentPanel.add(outputScrollPane, gbc);
@@ -506,21 +659,25 @@ public class ReqStoreDialog {
         panelResults.setLayout(gridbag);
 
         JPanel panelParamsHeadersBody = new JPanel(new GridLayout(1, 2));
+        panelParamsHeadersBody.setPreferredSize(new Dimension(0, 300));
+
+
+        jsonInputField = new LanguageTextField(JsonLanguage.INSTANCE, null, "", false);
+        JPanel paramsPanel = createLabelTextFieldPanel(window, "Params", jsonInputField);
+        metaTextPane = new JTextPane();
+        metaTextPane.setEditable(false);
+        JPanel metaPanel = createLabelTextFieldPanel(window, "Meta", metaTextPane);
+
+
+        panelParamsHeadersBody.add(paramsPanel);
+        panelParamsHeadersBody.add(metaPanel);
+
         c.fill = GridBagConstraints.BOTH;
         c.weightx = 1;
         c.weighty = 1;
         c.gridx = 0;
         c.gridy = 0;
         panelResults.add(panelParamsHeadersBody, c);
-
-        jsonInputField = new LanguageTextField(JsonLanguage.INSTANCE, null, "", false);
-        JPanel paramsPanel = createLabelTextFieldPanel(window, "Params", jsonInputField);
-        metaInputField = new LanguageTextField(JavaLanguage.INSTANCE, null, "", false);
-        JPanel metaPanel = createLabelTextFieldPanel(window, "Meta", metaInputField);
-
-
-        panelParamsHeadersBody.add(paramsPanel);
-        panelParamsHeadersBody.add(metaPanel);
 
         actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         c.fill = GridBagConstraints.HORIZONTAL;
@@ -546,6 +703,15 @@ public class ReqStoreDialog {
         }).start();
 
 
+        copyRetButton = new JButton(AllIcons.Actions.Copy);
+        copyRetButton.setPreferredSize(new Dimension(32, 32));
+        copyRetButton.setToolTipText("Copy the text below");
+        copyRetButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                FlingHelper.copyToClipboard(toolWindow.getProject(), outputTextPane.getText(), null);
+            }
+        });
 
 
         useProxyButton = new JToggleButton(CallMethodTool.PROXY_ICON, true);
@@ -568,15 +734,186 @@ public class ReqStoreDialog {
         executeButton.setPreferredSize(new Dimension(32, 32));
         executeButton.addActionListener(e -> executeAction());
         controllerCommandButton = new JButton(CallMethodTool.CONTROLLER_ICON);
+        controllerCommandButton.setToolTipText("Generate controller command");
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
         controllerCommandButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingHelper.alert(toolWindow.getProject(),Messages.getErrorIcon(),"developing");
+                if (selectedItem == null || appBox.getSelectedItem() == null) {
+                    FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a app and item");
+                    return;
+                }
+                ReqStorageHelper.CallMethodMeta callMethodMeta = selectedItem.metaObj(ReqStorageHelper.CallMethodMeta.class);
+                if (callMethodMeta.getSubType() != ReqStorageHelper.SubItemType.controller || callMethodMeta.getControllerMeta() == null) {
+                    FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
+                    return;
+                }
+
+                String app = (String) appBox.getSelectedItem();
+                DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
+                LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(toolWindow.getProject(), app);
+                String script = controllerCommand.getScript();
+                List<String> envs = controllerCommand.getEnvs();
+                if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
+                    if (CollectionUtils.isEmpty(envs)) {
+                        envs = new ArrayList<>();
+                        envs.add(null);
+                    }
+                    for (String env : envs) {
+                        //显示的一个图标加上标题
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, CallMethodTool.GENERATE_ICON) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                Application application = ApplicationManager.getApplication();
+                                ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+
+                                    @Override
+                                    public void run(@NotNull ProgressIndicator indicator) {
+                                        application.runReadAction(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                handleControllerCommand(env, script, callMethodMeta.getControllerMeta());
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        controllerActionGroup.add(documentation); // 将动作添加到动作组中
+                    }
+                }
+
+
+                if (controllerActionGroup.getChildrenCount() == 0) {
+                    //没有自定义逻辑，则直接处理
+
+                    Application application = ApplicationManager.getApplication();
+                    ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+
+                        @Override
+                        public void run(@NotNull ProgressIndicator indicator) {
+                            application.runReadAction(new Runnable() {
+                                @Override
+                                public void run() {
+                                    handleControllerCommand(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), callMethodMeta.getControllerMeta());
+                                }
+                            });
+                        }
+                    });
+
+                    return;
+                }
+
+                JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerCommandPopup", controllerActionGroup).getComponent();
+                popupMenu.show(controllerCommandButton, 32, 0);
             }
         });
         return panelResults;
     }
+
+
+    private void handleControllerCommand(String env, String script, ReqStorageHelper.ControllerCommandMeta commandMeta) {
+        String jsonParams = jsonInputField.getText();
+        JSONObject inputParams = null;
+        try {
+            inputParams = JSONObject.parseObject(jsonParams);
+        } catch (Exception e) {
+            setOutputText("Input parameter must be json object", null);
+            return;
+        }
+        String httpMethod = commandMeta.getHttpMethod();
+        String path1 = commandMeta.getPath();
+        Map<String, String> aliasmap = commandMeta.getAliasmap();
+        List<String> pathKeys = commandMeta.getPathKeys();
+        String jsonBodyKey = commandMeta.getJsonBodyKey();
+
+
+        String jsonBody = null;
+        if (jsonBodyKey != null) {
+            if (inputParams.get(jsonBodyKey) != null) {
+                jsonBody = JSONObject.toJSONString(inputParams.get(jsonBodyKey), SerializerFeature.WriteMapNullValue);
+            } else {
+                jsonBody = "{}";
+            }
+            inputParams.remove(jsonBodyKey);
+        }
+
+
+//               parse是个双层 map 参数
+//                我想让双层key展开平铺
+        JSONObject flattenedParse = new JSONObject();
+        CallMethodTool.flattenJson(inputParams, flattenedParse);
+//                @requestParam Set<String> ids 这种是需要支持的
+        Iterator<Map.Entry<String, Object>> iterator = inputParams.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Object> entry = iterator.next();
+            if (entry.getValue() instanceof JSONArray) {
+                flattenedParse.put(entry.getKey(), StringUtils.join((JSONArray) entry.getValue(), ","));
+                iterator.remove();
+            }
+        }
+
+        if (!pathKeys.isEmpty()) {
+            for (String path : pathKeys) {
+                String val = null;
+                try {
+                    val = URLEncoder.encode(String.valueOf(flattenedParse.get(path)), "UTF-8");
+                } catch (UnsupportedEncodingException ex) {
+                }
+                flattenedParse.remove(path);
+
+                if (aliasmap.containsKey(path)) {
+                    path = aliasmap.get(path);
+                }
+                path1 = path1.replace("{" + path + "}", val);
+//                        path 支持写类似正则的内容,类似/{userId1}/orders/{orderId:\\d+}
+//                        请手动在 path1 中找{+path:的内容再找到下一个}进行补充替换
+                // 处理带有正则的路径变量，例如：/{userId1}/orders/{orderId:\\d+}
+                Pattern pattern = Pattern.compile("\\{" + Pattern.quote(path) + ":.*?\\}");
+                Matcher matcher = pattern.matcher(path1);
+                if (matcher.find()) {
+                    path1 = matcher.replaceFirst(val);
+                }
+            }
+        }
+
+        Map<String, String> urlParams = new HashMap<>();
+        if (!flattenedParse.isEmpty()) {
+            com.fling.util.Container<Boolean> first = new Container<>();
+            first.set(true);
+            flattenedParse.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
+                @Override
+                public void accept(Map.Entry<String, Object> stringObjectEntry) {
+                    String s = aliasmap.get(stringObjectEntry.getKey());
+                    if (s != null && StringUtils.isBlank(s)) {
+                        return;
+                    }
+                    s = s == null ? stringObjectEntry.getKey() : s;
+                    urlParams.put(s, String.valueOf(stringObjectEntry.getValue()));
+                }
+            });
+        }
+        setOutputText("Generate controller command ...", null);
+        try {
+            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
+            setOutputText(ret, null);
+        } catch (CompilationFailedException ex) {
+            ex.printStackTrace();
+            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+        }
+    }
+
+    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+        FlingToolWindow.VisibleApp selectedApp = parseApp((String) visibleAppComboBox.getSelectedItem());
+        GroovyShell groovyShell = new GroovyShell();
+        Script script = groovyShell.parse(code);
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
+        return build == null ? "" : String.valueOf(build);
+    }
+
 
     private void refreshVisibleApp() {
         List<FlingToolWindow.VisibleApp> visibleApps = toolWindow.getVisibleApps();
@@ -618,7 +955,7 @@ public class ReqStoreDialog {
     }
 
 
-    private JPanel createLabelTextFieldPanel(FlingToolWindow window, String labelText, EditorTextField field) {
+    private JPanel createLabelTextFieldPanel(FlingToolWindow window, String labelText, Component field) {
         JPanel panel = new JPanel(new BorderLayout());
         JLabel label = new JLabel(labelText);
         JButton copyButton = new JButton(AllIcons.Actions.Copy);
@@ -630,7 +967,7 @@ public class ReqStoreDialog {
         copyButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingHelper.copyToClipboard(window.getProject(), field.getText(), labelText + " was Copied");
+                FlingHelper.copyToClipboard(window.getProject(), field instanceof TextAccessor ? ((TextAccessor) field).getText() : ((JTextComponent) field).getText(), labelText + " was Copied");
             }
         });
 
@@ -653,7 +990,9 @@ public class ReqStoreDialog {
     }
 
     // 更新右侧面板的方法
-    public void updateRightPanel(Object nowItem) {
+    public void updateRightPanel() {
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
+        Object nowItem = node == null ? null : node.getUserObject();
         if (nowItem == selectedItem) {
             return;
         }
@@ -662,7 +1001,7 @@ public class ReqStoreDialog {
             iconLabel.setIcon(null);
             reqsComboBox.removeAllItems();
             jsonInputField.setText("");
-            metaInputField.setText("");
+            metaTextPane.setText("");
             setOutputText("", null);
             actionPanel.removeAll();
             return;
@@ -677,34 +1016,6 @@ public class ReqStoreDialog {
                 Icon icon = getItemIcon(item.getType());
                 iconLabel.setIcon(icon);
 
-                jsonInputField.setText("");
-
-                // 根据条件添加script输入框
-                if (item.getType() == ReqStorageHelper.ItemType.flexible_test) {
-                    ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                    metaInputField.setText(meta.getCode() == null ? "" : meta.getCode());
-                    metaInputField.setEnabled(false);
-                } else if (item.getType() == ReqStorageHelper.ItemType.call_method) {
-                    metaInputField.setText(item.getMeta() == null ? "" : JSON.toJSONString(item.getMeta(), SerializerFeature.WriteMapNullValue, SerializerFeature.PrettyFormat));
-                    metaInputField.setEnabled(false);
-                } else {
-                    FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support type, please contact developer");
-                    return;
-                }
-
-                JLabel instanceLabel = new JLabel();
-                instanceLabel.setText("RuntimeApp:");
-
-                actionPanel.removeAll();
-                // 创建底部面板使用FlowLayout
-                actionPanel.add(instanceLabel);
-                actionPanel.add(visibleAppComboBox);
-                actionPanel.add(useProxyButton);
-                actionPanel.add(executeButton);
-                if (item.fetchSubType() == ReqStorageHelper.SubItemType.controller) {
-                    actionPanel.add(controllerCommandButton);
-                }
-
                 // 更新标题
                 List<ReqStorageHelper.SavedReq> reqs = item.getReqs();
                 reqsComboBox.removeAllItems();
@@ -713,6 +1024,38 @@ public class ReqStoreDialog {
                         reqsComboBox.addItem(req);
                     }
                 }
+
+                jsonInputField.setText("");
+
+                // 根据条件添加script输入框
+                if (item.getType() == ReqStorageHelper.ItemType.flexible_test) {
+                    ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
+                    metaTextPane.setText(meta.getCode() == null ? "" : meta.getCode());
+                    metaTextPane.setEnabled(false);
+                } else if (item.getType() == ReqStorageHelper.ItemType.call_method) {
+                    metaTextPane.setText(item.getMeta() == null ? "" : JsonUtil.formatObj(item.getMeta()));
+                    metaTextPane.setEnabled(false);
+                } else {
+                    FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support type, please contact developer");
+                    return;
+                }
+
+                actionPanel.removeAll();
+
+                JLabel instanceLabel = new JLabel();
+                instanceLabel.setText("RuntimeApp:");
+                actionPanel.add(copyRetButton);
+                // 创建底部面板使用FlowLayout
+                actionPanel.add(instanceLabel);
+                actionPanel.add(visibleAppComboBox);
+                actionPanel.add(useProxyButton);
+                actionPanel.add(executeButton);
+                if (item.fetchSubType() == ReqStorageHelper.SubItemType.controller) {
+                    actionPanel.add(controllerCommandButton);
+                }
+                // 刷新面板
+                actionPanel.revalidate();
+                actionPanel.repaint();
             }
         });
     }
@@ -747,12 +1090,12 @@ public class ReqStoreDialog {
                     }
                     ReqStorageHelper.CallMethodMeta meta = null;
                     try {
-                        meta = JSON.parseObject(metaInputField.getText(), ReqStorageHelper.CallMethodMeta.class);
+                        meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
                     } catch (Throwable e) {
                         throw new RuntimeException("Meta must be json object");
                     }
-                    return buildCallMethodParams(meta,visibleApp, args);
-                }else if(item.getType() == ReqStorageHelper.ItemType.flexible_test){
+                    return buildCallMethodParams(meta, visibleApp, args);
+                } else if (item.getType() == ReqStorageHelper.ItemType.flexible_test) {
                     JSONObject args = new JSONObject();
                     if (StringUtils.isNotBlank(jsonInput)) {
                         try {
@@ -762,8 +1105,8 @@ public class ReqStoreDialog {
                         }
                     }
                     ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                    meta.setCode(metaInputField.getText().trim());
-                    return buildFlexibleParams(meta,visibleApp, args);
+                    meta.setCode(metaTextPane.getText().trim());
+                    return buildFlexibleParams(meta, visibleApp, args);
                 }
 
                 return null;
@@ -885,6 +1228,9 @@ public class ReqStoreDialog {
     }
 
     private FlingToolWindow.VisibleApp parseApp(String selectedItem) {
+        if (selectedItem == null) {
+            return null;
+        }
         String[] split = selectedItem.split(":");
         if (split.length == 2) {
             FlingToolWindow.VisibleApp visibleApp = new FlingToolWindow.VisibleApp();

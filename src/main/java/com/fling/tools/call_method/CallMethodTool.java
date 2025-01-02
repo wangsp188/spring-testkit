@@ -9,27 +9,19 @@ import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
-import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
-import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.ui.popup.ComponentPopupBuilder;
-import com.intellij.openapi.ui.popup.JBPopup;
-import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
-import com.intellij.ui.components.JBTextField;
-import com.intellij.util.ui.JBUI;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -83,6 +75,7 @@ public class CallMethodTool extends BasePluginTool {
         controllerCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
+                FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select a method");
                 return;
             }
             List<String> porjectAppList = getPorjectAppList();
@@ -93,13 +86,14 @@ public class CallMethodTool extends BasePluginTool {
                     LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
                     String script = controllerCommand.getScript();
                     List<String> envs = controllerCommand.getEnvs();
-                    if (CollectionUtils.isEmpty(envs)) {
+                    if (CollectionUtils.isEmpty(envs) && Objects.equals(script,LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
                         continue;
                     }
+                    if(CollectionUtils.isEmpty(envs)){
+                        envs = new ArrayList<>();
+                        envs.add(null);
+                    }
                     for (String env : envs) {
-                        if (env == null) {
-                            continue;
-                        }
                         //显示的一个图标加上标题
                         AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, GENERATE_ICON) {
                             @Override
@@ -112,7 +106,7 @@ public class CallMethodTool extends BasePluginTool {
                                         application.runReadAction(new Runnable() {
                                             @Override
                                             public void run() {
-                                                handleControllerAdapter(env, script, selectedItem.getMethod());
+                                                handleControllerCommand(env, script, selectedItem.getMethod());
                                             }
                                         });
                                     }
@@ -136,7 +130,7 @@ public class CallMethodTool extends BasePluginTool {
                         application.runReadAction(new Runnable() {
                             @Override
                             public void run() {
-                                handleControllerAdapter(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
+                                handleControllerCommand(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
                             }
                         });
                     }
@@ -205,13 +199,17 @@ public class CallMethodTool extends BasePluginTool {
         ReqStorageHelper.SubItemType subItemType = null;
         if (Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.controller;
+            methodMeta.setControllerMeta(parseControllerMeta(method));
         }
         methodMeta.setSubType(subItemType);
         ReqStorageHelper.saveAppReq(getProject(), app, StringUtils.isBlank(group) ? "undefined" : group, ReqStorageHelper.ItemType.call_method, ToolHelper.buildMethodKey(method), methodMeta, savedReq.getTitle(), savedReq);
     }
 
-    private void handleControllerAdapter(String env, String script, PsiMethod method) {
-        String jsonParams = inputEditorTextField.getText();
+
+
+    public ReqStorageHelper.ControllerCommandMeta parseControllerMeta(PsiMethod method) {
+        ReqStorageHelper.ControllerCommandMeta commandMeta = new ReqStorageHelper.ControllerCommandMeta();
+
         String httpMethod = "GET"; // Default to GET
         String path1 = "/";
 
@@ -294,23 +292,16 @@ public class CallMethodTool extends BasePluginTool {
         // Process parameters
         // Get the parameters
         PsiParameter[] parameters = method.getParameterList().getParameters();
-        JSONObject parse = null;
-        try {
-            parse = JSONObject.parseObject(jsonParams);
-        } catch (Exception e) {
-            setOutputText("Input parameter must be json object");
-            return;
-        }
         ArrayList<String> paths = new ArrayList<>();
         Map<String, String> aliasmap = new HashMap<>();
-        String requestBodyKey = null;
+        String jsonBodyKey = null;
         for (PsiParameter parameter : parameters) {
             PsiAnnotation requestBodyAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestBody");
             if (requestBodyAnnotation != null) {
                 if (httpMethod.equals("GET")) {
                     httpMethod = "POST";
                 }
-                requestBodyKey = parameter.getName();
+                jsonBodyKey = parameter.getName();
                 continue;
             }
             //判断是否含有 requestParam注解,如果有,则将别名注册到 aliasmap 中,key 是形参名,val 是 requestparam 的配置
@@ -342,23 +333,48 @@ public class CallMethodTool extends BasePluginTool {
             }
         }
 
+        commandMeta.setHttpMethod(httpMethod);
+        commandMeta.setPath(path1);
+        commandMeta.setAliasmap(aliasmap);
+        commandMeta.setJsonBodyKey(jsonBodyKey);
+        commandMeta.setPathKeys(paths);
+        return commandMeta;
+    }
+
+    private void handleControllerCommand(String env, String script, PsiMethod method) {
+        String jsonParams = inputEditorTextField.getText();
+        JSONObject inputParams = null;
+        try {
+            inputParams = JSONObject.parseObject(jsonParams);
+        } catch (Exception e) {
+            setOutputText("Input parameter must be json object");
+            return;
+        }
+        ReqStorageHelper.ControllerCommandMeta commandMeta = parseControllerMeta(method);
+        String httpMethod = commandMeta.getHttpMethod();
+        String path1 = commandMeta.getPath();
+        Map<String, String> aliasmap = commandMeta.getAliasmap();
+        List<String> pathKeys = commandMeta.getPathKeys();
+        String jsonBodyKey = commandMeta.getJsonBodyKey();
+
+
         String jsonBody = null;
-        if (requestBodyKey != null) {
-            if (parse.get(requestBodyKey) != null) {
-                jsonBody = JSONObject.toJSONString(parse.get(requestBodyKey), SerializerFeature.WriteMapNullValue);
+        if (jsonBodyKey != null) {
+            if (inputParams.get(jsonBodyKey) != null) {
+                jsonBody = JSONObject.toJSONString(inputParams.get(jsonBodyKey), SerializerFeature.WriteMapNullValue);
             } else {
                 jsonBody = "{}";
             }
-            parse.remove(requestBodyKey);
+            inputParams.remove(jsonBodyKey);
         }
 
 
 //               parse是个双层 map 参数
 //                我想让双层key展开平铺
         JSONObject flattenedParse = new JSONObject();
-        flattenJson(parse, flattenedParse);
+        flattenJson(inputParams, flattenedParse);
 //                @requestParam Set<String> ids 这种是需要支持的
-        Iterator<Map.Entry<String, Object>> iterator = parse.entrySet().iterator();
+        Iterator<Map.Entry<String, Object>> iterator = inputParams.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<String, Object> entry = iterator.next();
             if (entry.getValue() instanceof JSONArray) {
@@ -367,8 +383,8 @@ public class CallMethodTool extends BasePluginTool {
             }
         }
 
-        if (!paths.isEmpty()) {
-            for (String path : paths) {
+        if (!pathKeys.isEmpty()) {
+            for (String path : pathKeys) {
                 String val = null;
                 try {
                     val = URLEncoder.encode(String.valueOf(flattenedParse.get(path)), "UTF-8");
@@ -505,7 +521,7 @@ public class CallMethodTool extends BasePluginTool {
                         }
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
-                            setOutputText("pls select method");
+                            FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);

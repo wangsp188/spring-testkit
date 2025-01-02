@@ -143,7 +143,7 @@ public class FlexibleTestTool extends BasePluginTool {
                         }
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
-                            setOutputText("pls select method");
+                            FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);
