@@ -380,7 +380,7 @@ public class ReqStoreDialog {
                 dialog.setLocationRelativeTo(null);
 
                 // 创建说明文本标签
-                JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here,<br>usually json content exported from somewhere else...</html>");
+                JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here<br>Usually json content exported from other device or project</html>");
 // 启用自动换行
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 创建JSON输入框
@@ -439,7 +439,40 @@ public class ReqStoreDialog {
                     return;
                 }
                 ReqStorageHelper.GroupItems exportObj = exportReqs(app, node);
-                FlingHelper.copyToClipboard(toolWindow.getProject(), JSON.toJSONString(exportObj, SerializerFeature.WriteMapNullValue), (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
+
+                // 创建弹出对话框
+                JDialog dialog = new JDialog();
+                dialog.setTitle("Export the selected group or item");
+                dialog.setModal(true);
+                dialog.setSize(500, 400);
+                dialog.setLocationRelativeTo(null);
+
+                // 创建说明文本标签
+                JLabel instructionLabel = new JLabel("<html>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
+// 启用自动换行
+                instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 创建JSON输入框
+                JTextArea jsonInput = new JTextArea();
+                jsonInput.setEditable(false);
+                jsonInput.setLineWrap(true);
+                jsonInput.setWrapStyleWord(true);
+                JScrollPane scrollPane = new JScrollPane(jsonInput);
+                jsonInput.setText(JsonUtil.formatObj(exportObj));
+                // 创建导入按钮
+                JButton importConfirmButton = new JButton("Copy");
+                importConfirmButton.addActionListener(e1 -> {
+                    FlingHelper.copyToClipboard(toolWindow.getProject(),jsonInput.getText() , (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
+                    dialog.dispose();
+                });
+
+                // 布局
+                dialog.setLayout(new BorderLayout());
+                dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 将组件添加到面板
+                dialog.add(instructionLabel, BorderLayout.NORTH);
+                dialog.add(scrollPane, BorderLayout.CENTER);
+                dialog.add(importConfirmButton, BorderLayout.SOUTH);
+                dialog.setVisible(true);
             }
         });
         panel.add(exportButton);
