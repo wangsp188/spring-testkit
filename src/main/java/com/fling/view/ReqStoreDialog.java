@@ -459,8 +459,8 @@ public class ReqStoreDialog {
                 JScrollPane scrollPane = new JScrollPane(jsonInput);
                 jsonInput.setText(JsonUtil.formatObj(exportObj));
                 // 创建导入按钮
-                JButton importConfirmButton = new JButton("Copy");
-                importConfirmButton.addActionListener(e1 -> {
+                JButton copyConfirmButton = new JButton("Copy");
+                copyConfirmButton.addActionListener(e1 -> {
                     FlingHelper.copyToClipboard(toolWindow.getProject(),jsonInput.getText() , (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
                     dialog.dispose();
                 });
@@ -471,7 +471,7 @@ public class ReqStoreDialog {
                 // 将组件添加到面板
                 dialog.add(instructionLabel, BorderLayout.NORTH);
                 dialog.add(scrollPane, BorderLayout.CENTER);
-                dialog.add(importConfirmButton, BorderLayout.SOUTH);
+                dialog.add(copyConfirmButton, BorderLayout.SOUTH);
                 dialog.setVisible(true);
             }
         });
