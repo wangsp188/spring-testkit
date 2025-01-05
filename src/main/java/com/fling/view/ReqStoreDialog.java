@@ -41,7 +41,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
@@ -56,10 +55,12 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ReqStoreDialog {
 
@@ -282,7 +283,12 @@ public class ReqStoreDialog {
         if (appBox.getItemCount() > 0) {
             String selectedItem = (String) appBox.getSelectedItem();
             String selectedApp = toolWindow.getSelectedAppName();
-            List<String> projectAppList = toolWindow.getProjectAppList();
+            List<String> projectAppList = toolWindow.getProjectAppList().stream().map(new Function<FlingToolWindow.AppMeta, String>() {
+                @Override
+                public String apply(FlingToolWindow.AppMeta appMeta) {
+                    return appMeta.getApp();
+                }
+            }).collect(Collectors.toCollection(ArrayList::new));
             if (selectedApp != null && projectAppList.contains(selectedApp) && !Objects.equals(selectedItem, selectedApp)) {
                 appBox.setSelectedItem(selectedApp);
             }
@@ -447,8 +453,14 @@ public class ReqStoreDialog {
                 dialog.setSize(500, 400);
                 dialog.setLocationRelativeTo(null);
 
+                String title = "";
+                if(node.getUserObject() instanceof ReqStorageHelper.GroupItems){
+                    title = ((ReqStorageHelper.GroupItems) node.getUserObject()).getGroup();
+                }else if(node.getUserObject() instanceof ReqStorageHelper.Item){
+                    title = ((ReqStorageHelper.Item) node.getUserObject()).getGroup()+"."+((ReqStorageHelper.Item) node.getUserObject()).getName();
+                }
                 // 创建说明文本标签
-                JLabel instructionLabel = new JLabel("<html>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
+                JLabel instructionLabel = new JLabel("<html>"+title+" exported content is already below<br/>You can copy it and import it on another device or project</html>");
 // 启用自动换行
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 创建JSON输入框

@@ -4,6 +4,10 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.util.JsonUtil;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtil;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
@@ -572,6 +576,21 @@ public class ToolHelper {
                 }
             }
         }
+    }
+
+    public static boolean isDependency(PsiElement psiElement, Project project, Module targetModule) {
+        if (psiElement == null || !psiElement.isValid() || project == null || targetModule == null) {
+            return false;
+        }
+        Module sourceModule = ModuleUtil.findModuleForPsiElement(psiElement);
+        if (sourceModule == null) {
+            return false;
+        }
+        if (sourceModule.equals(targetModule)) {
+            return true;
+        }
+
+        return ModuleRootManager.getInstance(targetModule).isDependsOn(sourceModule);
     }
 
     public static class MethodAction {

@@ -43,6 +43,8 @@ import java.net.URLEncoder;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,11 +80,22 @@ public class CallMethodTool extends BasePluginTool {
                 FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select a method");
                 return;
             }
-            List<String> porjectAppList = getPorjectAppList();
+            List<String> projectAppList = toolWindow.getProjectAppList().stream().filter(new Predicate<FlingToolWindow.AppMeta>() {
+                        @Override
+                        public boolean test(FlingToolWindow.AppMeta appMeta) {
+                            return ToolHelper.isDependency(selectedItem.getMethod(),getProject(),appMeta.getModule());
+                        }
+                    }).map(new Function<FlingToolWindow.AppMeta, String>() {
+                        @Override
+                        public String apply(FlingToolWindow.AppMeta appMeta) {
+                            return appMeta.getApp();
+                        }
+                    })
+                    .toList();
 
             DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-            if (CollectionUtils.isNotEmpty(porjectAppList)) {
-                for (String app : porjectAppList) {
+            if (CollectionUtils.isNotEmpty(projectAppList)) {
+                for (String app : projectAppList) {
                     LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
                     String script = controllerCommand.getScript();
                     List<String> envs = controllerCommand.getEnvs();
@@ -149,17 +162,30 @@ public class CallMethodTool extends BasePluginTool {
         return true;
     }
 
-    protected String verifyNowStore() {
+    protected List<String> verifyNowStore() {
         ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
         if (methodAction == null || !methodAction.getMethod().isValid()) {
-            return "Please select a valid method";
+            throw new RuntimeException("Please select a valid method");
         }
         try {
             JSONObject.parseObject(inputEditorTextField.getText().trim());
         } catch (Exception e) {
-            return "Input parameter must be json object";
+            throw new RuntimeException("Input parameter must be json object");
         }
-        return null;
+        List<FlingToolWindow.AppMeta> projectAppList = toolWindow.getProjectAppList();
+
+        return projectAppList.stream().filter(new Predicate<FlingToolWindow.AppMeta>() {
+            @Override
+            public boolean test(FlingToolWindow.AppMeta appMeta) {
+                return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
+            }
+        }).map(new Function<FlingToolWindow.AppMeta, String>() {
+                    @Override
+                    public String apply(FlingToolWindow.AppMeta appMeta) {
+                        return appMeta.getApp();
+                    }
+                })
+                .toList();
     }
 
 

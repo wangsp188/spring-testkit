@@ -21,6 +21,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public class FlexibleTestTool extends BasePluginTool {
@@ -45,17 +47,30 @@ public class FlexibleTestTool extends BasePluginTool {
     }
 
     @Override
-    protected String verifyNowStore() {
+    protected List<String> verifyNowStore() {
         ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
         if (methodAction == null || !methodAction.getMethod().isValid()) {
-            return "Please select a valid method";
+            throw new RuntimeException("Please select a valid method");
         }
         try {
             JSONObject.parseObject(inputEditorTextField.getText().trim());
         } catch (Exception e) {
-            return "Input parameter must be json object";
+            throw new RuntimeException("Input parameter must be json object");
         }
-        return null;
+        List<FlingToolWindow.AppMeta> projectAppList = toolWindow.getProjectAppList();
+
+        return projectAppList.stream().filter(new Predicate<FlingToolWindow.AppMeta>() {
+                    @Override
+                    public boolean test(FlingToolWindow.AppMeta appMeta) {
+                        return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
+                    }
+                }).map(new Function<FlingToolWindow.AppMeta, String>() {
+                    @Override
+                    public String apply(FlingToolWindow.AppMeta appMeta) {
+                        return appMeta.getApp();
+                    }
+                })
+                .toList();
     }
 
     @Override

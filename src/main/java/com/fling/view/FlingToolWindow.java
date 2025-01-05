@@ -14,6 +14,8 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -70,6 +72,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -97,7 +100,7 @@ public class FlingToolWindow {
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
-    private List<String> appList = new ArrayList<>();
+    private Map<String,AppMeta> appMetas = new HashMap<>();
     private JComboBox<String> scriptAppBox;
     private JComboBox<String> controllerScriptAppBox;
     private JTextField controllerEnvTextField;
@@ -609,15 +612,29 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
-                if (scriptAppBox.getItemCount() > 0) {
-                    scriptAppBox.setSelectedIndex(0);
-                }
-                if (controllerScriptAppBox.getItemCount() > 0) {
-                    controllerScriptAppBox.setSelectedIndex(0);
-                }
-                if (propertiesAppBox.getItemCount() > 0) {
-                    // 选择第一个选项
-                    propertiesAppBox.setSelectedIndex(0);
+                String selectedAppName = getSelectedAppName();
+                if(selectedAppName==null){
+                    if (scriptAppBox.getItemCount() > 0) {
+                        scriptAppBox.setSelectedIndex(0);
+                    }
+                    if (controllerScriptAppBox.getItemCount() > 0) {
+                        controllerScriptAppBox.setSelectedIndex(0);
+                    }
+                    if (propertiesAppBox.getItemCount() > 0) {
+                        // 选择第一个选项
+                        propertiesAppBox.setSelectedIndex(0);
+                    }
+                }else{
+                    if (scriptAppBox.getItemCount() > 0) {
+                        scriptAppBox.setSelectedItem(selectedAppName);
+                    }
+                    if (controllerScriptAppBox.getItemCount() > 0) {
+                        controllerScriptAppBox.setSelectedItem(selectedAppName);
+                    }
+                    if (propertiesAppBox.getItemCount() > 0) {
+                        // 选择第一个选项
+                        propertiesAppBox.setSelectedItem(selectedAppName);
+                    }
                 }
                 settingsDialog.setVisible(true);
             }
@@ -951,16 +968,21 @@ public class FlingToolWindow {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
-                    List<String> apps = springBootApplicationClasses.stream().map(new Function<PsiClass, String>() {
-                        @Override
-                        public String apply(PsiClass psiClass) {
-                            return psiClass.getName();
-                        }
-                    }).distinct().toList();
 
-                    storeDialog.initApps(apps);
-                    for (String app : apps) {
-                        appList.add(app);
+                    springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
+                        @Override
+                        public void accept(PsiClass psiClass) {
+                            AppMeta appMeta = new AppMeta();
+                            appMeta.setApp(psiClass.getName());
+                            appMeta.setFullName(psiClass.getQualifiedName());
+
+                            appMeta.setModule(ModuleUtil.findModuleForPsiElement(psiClass));
+                            appMetas.put(psiClass.getName(), appMeta);
+                        }
+                    });
+
+                    storeDialog.initApps(new ArrayList<>(appMetas.keySet()));
+                    for (String app : appMetas.keySet()) {
                         scriptAppBox.addItem(app);
                         controllerScriptAppBox.addItem(app);
                         propertiesAppBox.addItem(app);
@@ -1338,8 +1360,8 @@ public class FlingToolWindow {
                         GroovyShell groovyShell = new GroovyShell();
                         Script script = groovyShell.parse(scriptCode);
                         HashMap<String, String> params = new HashMap<>();
-                        params.put("param1", "1");
-                        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/re_test", params, "{}"});
+                        params.put("param1", "v1");
+                        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, "{}"});
                         String ret = build == null ? "" : String.valueOf(build);
                         FlingHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
                     } catch (Throwable ex) {
@@ -1615,12 +1637,52 @@ public class FlingToolWindow {
         return app.getAppName();
     }
 
-    public List<String> getProjectAppList() {
-        return appList;
+    public List<AppMeta> getProjectAppList() {
+        return new ArrayList<>(appMetas.values());
     }
 
     public void refreshStore(){
         storeDialog.refreshTree();
+    }
+
+
+    public static class AppMeta{
+        private String app;
+        private String fullName;
+        private Module module;
+
+        public String getApp() {
+            return app;
+        }
+
+        public void setApp(String app) {
+            this.app = app;
+        }
+
+        public String getFullName() {
+            return fullName;
+        }
+
+        public void setFullName(String fullName) {
+            this.fullName = fullName;
+        }
+
+        public Module getModule() {
+            return module;
+        }
+
+        public void setModule(Module module) {
+            this.module = module;
+        }
+
+        @Override
+        public String toString() {
+            return "AppMeta{" +
+                    "app='" + app + '\'' +
+                    ", fullName='" + fullName + '\'' +
+                    ", module='" + module + '\'' +
+                    '}';
+        }
     }
 
 }

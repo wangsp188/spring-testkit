@@ -35,6 +35,7 @@ import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.intellij.util.ui.JBUI;
+import org.apache.commons.collections.CollectionUtils;
 
 import javax.swing.*;
 import java.awt.*;
@@ -42,6 +43,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
@@ -90,7 +92,7 @@ public abstract class BasePluginTool {
         return toolWindow.getSelectedApp();
     }
 
-    public List<String> getPorjectAppList() {
+    public List<FlingToolWindow.AppMeta> getPorjectAppList() {
         return toolWindow.getProjectAppList();
     }
 
@@ -200,7 +202,7 @@ public abstract class BasePluginTool {
         return true;
     }
 
-    protected String verifyNowStore(){
+    protected List<String> verifyNowStore() throws Throwable{
         return null;
     }
 
@@ -213,15 +215,15 @@ public abstract class BasePluginTool {
         AnAction storeAction = new AnAction("Save this to store", "Save this to store", AllIcons.Actions.MenuSaveall) {
             @Override
             public void actionPerformed(AnActionEvent e) {
-                List<String> projectAppList = toolWindow.getProjectAppList();
-                if (projectAppList.isEmpty()) {
-                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Can not find app");
+                List<String> apps = null;
+                try {
+                    apps = verifyNowStore();
+                } catch (Throwable ex) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), ex.getMessage());
                     return;
                 }
-
-                String verify = verifyNowStore();
-                if (verify != null) {
-                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), verify);
+                if (CollectionUtils.isEmpty(apps)) {
+                    FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Failed to find adapter app");
                     return;
                 }
 
@@ -235,7 +237,7 @@ public abstract class BasePluginTool {
                 gbc.insets = JBUI.insets(5);
 
                 // 创建下拉框
-                String[] options = projectAppList.toArray(new String[projectAppList.size()]);
+                String[] options = apps.toArray(new String[apps.size()]);
                 ComboBox<String> comboBox = new ComboBox<>(options);
 
                 // 创建两个文本框
