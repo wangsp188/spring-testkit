@@ -7,50 +7,70 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.CommandProcessor;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.SelectionModel;
-import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.module.ModuleUtil;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.roots.ModuleRootManager;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.openapi.module.Module;
 import com.intellij.psi.util.PsiTreeUtil;
-import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+
+import javax.swing.*;
 
 // action类实现
 public class GenerateFlexibleTestAction extends AnAction {
 
     @Override
-    public void update(@NotNull AnActionEvent e) {
+    public void update(AnActionEvent e) {
         // 1. 判断是否是java文件，控制右键菜单的显示
         PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
         boolean isJavaFile = psiFile instanceof PsiJavaFile;
+        if (!isJavaFile) {
+            e.getPresentation().setVisible(false);
+            return;
+        }
+        // 5. 必须不在Java的test模块下
+        VirtualFile virtualFile = psiFile.getVirtualFile();
+        if (virtualFile == null) {
+            e.getPresentation().setVisible(false);
+            return;
+        }
+        // 获取文件的完整路径
+        String filePath = virtualFile.getPath();
+        // 检查路径是否以 src/test/java 结尾
+        if (filePath.contains("/src/test/java/")) {
+            e.getPresentation().setVisible(false);
+            return;
+        }
 
         // 检查是否有选中的文本
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         boolean hasSelection = editor != null && editor.getSelectionModel().hasSelection();
-
-        e.getPresentation().setVisible(isJavaFile && hasSelection);
+        e.getPresentation().setVisible(hasSelection);
     }
 
     @Override
     public void actionPerformed(AnActionEvent e) {
         Project project = e.getProject();
-        if (project == null) return;
+        if (project == null) {
+            return;
+        }
 
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
-        if (editor == null || !(psiFile instanceof PsiJavaFile)) return;
+        if (editor == null || !(psiFile instanceof PsiJavaFile)) {
+            return;
+        }
 
         // 获取选中的代码
         String selectedText = editor.getSelectionModel().getSelectedText();
-        if (selectedText == null || selectedText.isEmpty()) return;
+        if (selectedText == null || selectedText.isEmpty()) {
+            return;
+        }
 
         // 获取当前类名
         String className = ((PsiJavaFile) psiFile).getClasses()[0].getName();
