@@ -13,6 +13,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
+import com.intellij.util.ui.JBUI;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
@@ -118,10 +119,10 @@ public class FlexibleTestTool extends BasePluginTool {
         });
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0.0;
-        gbc.gridx = 2;
+        gbc.gridx = 3;
         gbc.gridy = 0;
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);

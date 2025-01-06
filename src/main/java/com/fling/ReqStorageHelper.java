@@ -262,6 +262,7 @@ public class ReqStorageHelper {
             }
             //reqs
             Item pointItem = pointItemOptional.get();
+            pointItem.setMeta(item.getMeta());
             List<SavedReq> pointReqs = pointItem.getReqs();
             List<SavedReq> reqs = item.getReqs();
             if (CollectionUtils.isEmpty(pointReqs)) {

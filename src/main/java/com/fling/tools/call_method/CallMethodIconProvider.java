@@ -271,19 +271,19 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
         PsiClass containingClass = method.getContainingClass();
         if (containingClass == null) {
-            FlingHelper.notify(project, NotificationType.WARNING, "Containing class not found for the " + method.getName() + " method.");
+            FlingHelper.notify(project, NotificationType.ERROR, "Containing class not found for the " + method.getName() + " method.");
             return;
         }
         PsiDirectory testDir = PsiManager.getInstance(project).findDirectory(testSourceRoot);
         if (testDir == null) {
-            FlingHelper.notify(project, NotificationType.WARNING, "Test source root not found for the " + module.getName() + " module.");
+            FlingHelper.notify(project, NotificationType.ERROR, "Test source root not found for the " + module.getName() + " module.");
             return;
         }
 
         generateOrAddTestMethod(method, project, testDir);
     }
 
-    private VirtualFile createTestRoot(Module module) throws IOException {
+    public static VirtualFile createTestRoot(Module module) throws IOException {
         return ApplicationManager.getApplication().runWriteAction(new Computable<VirtualFile>() {
             @Override
             public VirtualFile compute() {
@@ -313,7 +313,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
 
     }
 
-    private VirtualFile getTestSourceRoot(Module module) {
+    public static VirtualFile getTestSourceRoot(Module module) {
         ModuleRootManager rootManager = ModuleRootManager.getInstance(module);
         for (VirtualFile sourceRoot : rootManager.getSourceRoots(true)) {
             if (sourceRoot.getPath().endsWith("/src/test/java")) {
@@ -323,7 +323,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         return null;
     }
 
-    private PsiDirectory createPackageDirectory(Project project, PsiDirectory testDir) {
+    public static PsiDirectory createPackageDirectory(Project project, PsiDirectory testDir) {
         String flexibleTestPackage = LocalStorageHelper.getFlexibleTestPackage(project);
         String[] packageParts = flexibleTestPackage.split("\\.");
 
@@ -362,7 +362,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
                     "$_1_$%s;\n" +
                     "}\n";
 
-    public String generateTestClassContent(PsiMethod psiMethod, String packageName, String fieldName) {
+    private static String generateTestClassContent(PsiMethod psiMethod, String packageName, String fieldName) {
         PsiClass containingClass = psiMethod.getContainingClass();
         String className = containingClass.getName();
         String fullyQualifiedClassName = containingClass.getQualifiedName();
@@ -405,6 +405,10 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             PsiDirectory packageDir = createPackageDirectory(project, testSourceRoot);
             PsiJavaFile testFile = createTestFile(packageDir, testClassName, content);
             testClass = PsiTreeUtil.findChildOfType(testFile, PsiClass.class);
+            if (testClass == null) {
+                FlingHelper.notify(project, NotificationType.ERROR, "Test class not found");
+                return;
+            }
         }
 
         // 查找已存在的测试方法
@@ -423,7 +427,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         }
     }
 
-    private PsiClass findTestClass(String testClassName, String packageName, Project project) {
+    public static PsiClass findTestClass(String testClassName, String packageName, Project project) {
         GlobalSearchScope scope = GlobalSearchScope.allScope(project);
         return JavaPsiFacade.getInstance(project).findClass(packageName + "." + testClassName, scope);
     }
@@ -441,7 +445,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         return null;
     }
 
-    private PsiJavaFile createTestFile(PsiDirectory packageDir, String className, String content) {
+    public static PsiJavaFile createTestFile(PsiDirectory packageDir, String className, String content) {
         return ApplicationManager.getApplication().runWriteAction(new Computable<PsiJavaFile>() {
 
                                                                       @Override

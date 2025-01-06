@@ -7,6 +7,7 @@ import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.util.PsiNavigationSupport;
 import com.intellij.json.JsonLanguage;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionToolbar;
@@ -74,8 +75,6 @@ public abstract class BasePluginTool {
     }
 
 
-
-
     public PluginToolEnum getTool() {
         return tool;
     }
@@ -103,6 +102,7 @@ public abstract class BasePluginTool {
 
     protected void initializePanel() {
         GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -164,11 +164,9 @@ public abstract class BasePluginTool {
         };
         actionGroup.add(curlAction);
 
-        if(canStore()){
+        if (canStore()) {
             fillStoreAction();
         }
-
-
 
 
         AnAction historyAction = new AnAction("Open Store", "Open Store", AllIcons.Vcs.History) {
@@ -179,8 +177,6 @@ public abstract class BasePluginTool {
             }
         };
         actionGroup.add(historyAction);
-
-
 
 
         // 创建ActionToolbar
@@ -198,14 +194,13 @@ public abstract class BasePluginTool {
         panel.add(inputPanel, gbc);
     }
 
-    protected boolean canStore(){
+    protected boolean canStore() {
         return true;
     }
 
-    protected List<String> verifyNowStore() throws Throwable{
+    protected List<String> verifyNowStore() throws Throwable {
         return null;
     }
-
 
 
     protected void handleStore(String app, String group, String title) {
@@ -298,8 +293,8 @@ public abstract class BasePluginTool {
                 submitButton.addActionListener(actionEvent -> {
                     // 在这里处理提交的数据
                     handleStore((String) comboBox.getSelectedItem(), groupField.getText(), titleField.getText());
-                    new Thread(){
-                        public void run(){
+                    new Thread() {
+                        public void run() {
                             try {
                                 Thread.sleep(2000);
                             } catch (InterruptedException ex) {
@@ -313,7 +308,7 @@ public abstract class BasePluginTool {
                 });
 
                 // 显示弹出框
-                popup.show(new RelativePoint(inputEditorTextField,new Point(0,0)));
+                popup.show(new RelativePoint(inputEditorTextField, new Point(0, 0)));
             }
         };
         actionGroup.add(storeAction);
@@ -386,7 +381,7 @@ public abstract class BasePluginTool {
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
         setOutputText("req is send，reqId:" + reqId, null);
 
-        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing "+getTool().getCode()+", please wait ...", false) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing " + getTool().getCode() + ", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
                 try {
@@ -506,7 +501,7 @@ public abstract class BasePluginTool {
 
     protected ComboBox addActionComboBox(Icon icon, Icon disableIcon, String tooltips, JPanel topPanel, ActionListener actionListener) {
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.0;
         gbc.gridx = 0;
@@ -526,12 +521,14 @@ public abstract class BasePluginTool {
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>脚本已关闭</strong><br>\n" + tooltips + "\n</html>");
+                        FlingHelper.notify(getProject(),NotificationType.INFORMATION,"Tool-script is disable in "+getTool().getCode());
                     } else {
                         useScript = true;
                         testBtn.setIcon(icon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>脚本已打开</strong><br>\n" + tooltips + "\n</html>");
+                        FlingHelper.notify(getProject(),NotificationType.INFORMATION,"Tool-script is enable in "+getTool().getCode());
                     }
                 }
             });
@@ -540,48 +537,98 @@ public abstract class BasePluginTool {
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
                     "<strong>不支持脚本</strong><br>\n" + tooltips + "\n</html>");
+            testBtn.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    FlingHelper.notify(getProject(),NotificationType.INFORMATION,getTool().getCode()+" don't support Tool-script");
+                }
+            });
         }
 
         testBtn.setPreferredSize(new Dimension(32, 32));
         topPanel.add(testBtn, gbc);
+
+        JButton pointButton = new JButton(AllIcons.General.Locate);
         ComboBox actionComboBox = new ComboBox<>();
         actionComboBox.setPreferredSize(new Dimension(200, 32));
+
+        pointButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Object selectedItem = actionComboBox.getSelectedItem();
+                if(selectedItem instanceof ToolHelper.MethodAction){
+                    PsiMethod method = ((ToolHelper.MethodAction) selectedItem).getMethod();
+                    if (!method.isValid()) {
+                        FlingHelper.notify(getProject(),NotificationType.ERROR,"Current method is invalid");
+                        return;
+                    }
+                    method.navigate(true);
+                }else if(selectedItem instanceof ToolHelper.XmlTagAction xmlTagAction){
+                    XmlTag xmlTag = xmlTagAction.getXmlTag();
+                    if (!xmlTag.isValid()) {
+                        FlingHelper.notify(getProject(),NotificationType.ERROR,"Current tag is invalid");
+                        return;
+                    }
+                    PsiNavigationSupport.getInstance().createNavigatable(
+                            getProject(),
+                            xmlTag.getContainingFile().getVirtualFile(),
+                            xmlTag.getTextOffset()
+                    ).navigate(true);
+                }
+            }
+        });
+        pointButton.setToolTipText("Navigate to the selected");
+        pointButton.setPreferredSize(new Dimension(32, 32));
+        gbc.gridx = 1;
+        topPanel.add(pointButton, gbc);
+
+
         actionComboBox.addActionListener(e -> {
             Object selectedItem = actionComboBox.getSelectedItem();
             if (selectedItem instanceof ToolHelper.MethodAction) {
-                PsiMethod method = ((ToolHelper.MethodAction) selectedItem).getMethod();
-                if (!method.isValid()) {
-                    // If not, remove the current item
-                    actionComboBox.removeItem(selectedItem);
-                    // Then, select the first valid item
-                    for (int i = 0; i < actionComboBox.getItemCount(); i++) {
-                        ToolHelper.MethodAction item = (ToolHelper.MethodAction) actionComboBox.getItemAt(i);
-                        PsiMethod itemMethod = item.getMethod();
-                        if (itemMethod.isValid()) {
-                            actionComboBox.setSelectedIndex(i);
-                            break;
+                boolean currentValid = ((ToolHelper.MethodAction) selectedItem).getMethod().isValid();
+                // 收集需要删除的元素
+                List<Object> itemsToRemove = new ArrayList<>();
+                for (int i = 0; i < actionComboBox.getItemCount(); i++) {
+                    Object item = actionComboBox.getItemAt(i);
+                    if (item instanceof ToolHelper.MethodAction) {
+                        PsiMethod method = ((ToolHelper.MethodAction) item).getMethod();
+                        if (!method.isValid()) {
+                            itemsToRemove.add(item);
+                            System.err.println("节点已失效，" + method);
                         }
                     }
-                    System.err.println("节点已失效，" + method);
-                    return;
+                }
+
+                // 直接删除收集到的元素
+                itemsToRemove.forEach(actionComboBox::removeItem);
+
+                // 如果还有有效项，选择第一个
+                if (!currentValid && actionComboBox.getItemCount() > 0) {
+                    actionComboBox.setSelectedIndex(0);
                 }
             } else if (selectedItem instanceof ToolHelper.XmlTagAction) {
 
-                XmlTag xmlTag = ((ToolHelper.XmlTagAction) selectedItem).getXmlTag();
-                if (!xmlTag.isValid()) {
-                    // If not, remove the current item
-                    actionComboBox.removeItem(selectedItem);
-                    // Then, select the first valid item
-                    for (int i = 0; i < actionComboBox.getItemCount(); i++) {
-                        ToolHelper.XmlTagAction item = (ToolHelper.XmlTagAction) actionComboBox.getItemAt(i);
-                        XmlTag itemMethod = item.getXmlTag();
-                        if (itemMethod.isValid()) {
-                            actionComboBox.setSelectedIndex(i);
-                            break;
+                boolean currentValid = ((ToolHelper.XmlTagAction) selectedItem).getXmlTag().isValid();
+                // 收集需要删除的元素
+                List<Object> itemsToRemove = new ArrayList<>();
+                for (int i = 0; i < actionComboBox.getItemCount(); i++) {
+                    Object item = actionComboBox.getItemAt(i);
+                    if (item instanceof ToolHelper.XmlTagAction) {
+                        XmlTag method = ((ToolHelper.XmlTagAction) item).getXmlTag();
+                        if (!method.isValid()) {
+                            itemsToRemove.add(item);
+                            System.err.println("节点已失效，" + method);
                         }
                     }
-                    System.err.println("节点已失效，" + xmlTag);
-                    return;
+                }
+
+                // 直接删除收集到的元素
+                itemsToRemove.forEach(actionComboBox::removeItem);
+
+                // 如果还有有效项，选择第一个
+                if (!currentValid && actionComboBox.getItemCount() > 0) {
+                    actionComboBox.setSelectedIndex(0);
                 }
             }
 
@@ -593,7 +640,7 @@ public abstract class BasePluginTool {
         });
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
-        gbc.gridx = 1;
+        gbc.gridx = 2;
         gbc.gridy = 0;
         topPanel.add(actionComboBox, gbc);
         return actionComboBox;

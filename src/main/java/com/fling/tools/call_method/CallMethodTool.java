@@ -22,6 +22,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
+import com.intellij.util.ui.JBUI;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -490,24 +491,24 @@ public class CallMethodTool extends BasePluginTool {
 
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.NONE;
-        gbc.gridx = 2;
+        gbc.gridx = 3;
         gbc.gridy = 0;
 
         // Add the radio button
         useProxyButton = new JToggleButton(PROXY_ICON, true);
         useProxyButton.setPreferredSize(new Dimension(32, 32));
-        useProxyButton.setToolTipText("use proxy obj call method");
+        useProxyButton.setToolTipText("Use proxy obj call method");
         useProxyButton.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (useProxyButton.isSelected()) {
                     useProxyButton.setIcon(PROXY_ICON);
-                    useProxyButton.setToolTipText("use proxy obj call method");
+                    useProxyButton.setToolTipText("Use proxy obj call method");
                 } else {
                     useProxyButton.setIcon(PROXY_DISABLE_ICON);
-                    useProxyButton.setToolTipText("use original obj call method");
+                    useProxyButton.setToolTipText("Use original obj call method");
                 }
             }
         });
@@ -557,7 +558,7 @@ public class CallMethodTool extends BasePluginTool {
             }
         });
 
-        gbc.gridx = 3;
+        gbc.gridx = 4;
         panel.add(runButton, gbc);
 
         return panel;

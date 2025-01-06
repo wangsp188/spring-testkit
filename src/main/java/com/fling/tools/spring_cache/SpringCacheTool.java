@@ -13,6 +13,7 @@ import com.fling.tools.PluginToolEnum;
 import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.fling.view.FlingToolWindow;
+import com.intellij.util.ui.JBUI;
 
 import javax.swing.*;
 import java.awt.*;
@@ -54,10 +55,10 @@ public class SpringCacheTool extends BasePluginTool {
 
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.0;
-        gbc.gridx = 2;
+        gbc.gridx = 3;
         gbc.gridy = 0;
         JButton getKeyButton = new JButton(KIcon);
         getKeyButton.setToolTipText("Build keys");
@@ -132,9 +133,9 @@ public class SpringCacheTool extends BasePluginTool {
         });
 
         topPanel.add(getKeyButton,gbc);
-        gbc.gridx = 3;
-        topPanel.add(getValButton,gbc);
         gbc.gridx = 4;
+        topPanel.add(getValButton,gbc);
+        gbc.gridx = 5;
         topPanel.add(delValButton);
         return topPanel;
     }

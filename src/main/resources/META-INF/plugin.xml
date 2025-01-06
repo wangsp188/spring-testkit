@@ -52,9 +52,15 @@
     </extensions>
 
     <actions>
-        <action id="popup_graph_fling_profiler" class="com.fling.links.FlingLinkViewAction" text="popup_graph_fling_profiler"
+        <action icon="/icons/dagre.svg" id="popup_graph_fling_profiler" class="com.fling.links.FlingLinkViewAction" text="Popup graph fling profiler"
                 description="Processes the selected FLING_PROFILER and graph it">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
+        </action>
+        <action icon="/icons/test-code.svg" id="generate_flexible_text_code"
+                class="com.fling.tools.call_method.GenerateFlexibleTestAction"
+                text="Generate flexible test code"
+                description="Generate flexible test code from selected code">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </action>
     </actions>
 </idea-plugin>

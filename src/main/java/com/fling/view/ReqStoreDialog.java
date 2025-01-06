@@ -460,7 +460,7 @@ public class ReqStoreDialog {
                     title = ((ReqStorageHelper.Item) node.getUserObject()).getGroup()+"."+((ReqStorageHelper.Item) node.getUserObject()).getName();
                 }
                 // 创建说明文本标签
-                JLabel instructionLabel = new JLabel("<html>"+title+" exported content is already below<br/>You can copy it and import it on another device or project</html>");
+                JLabel instructionLabel = new JLabel("<html>Current export scope: "+title+"<br>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
 // 启用自动换行
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 创建JSON输入框
@@ -690,7 +690,7 @@ public class ReqStoreDialog {
         gbc.gridy = 3;
         gbc.weighty = 1;
         gbc.fill = GridBagConstraints.BOTH;
-        gbc.insets = JBUI.insets(0);
+        gbc.insets = JBUI.insets(1);
         contentPanel.add(outputScrollPane, gbc);
 
         panel.add(contentPanel, BorderLayout.CENTER);
@@ -1403,6 +1403,7 @@ public class ReqStoreDialog {
                 // 设置主标题
                 append(item.getName(),
                         new SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, ITEM_COLOR));
+                setToolTipText(item.getName());
 
                 // 可以添加额外信息（如时间戳等）
 //                append("  " + item.getType(),

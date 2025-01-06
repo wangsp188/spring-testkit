@@ -178,7 +178,7 @@ public class FlingToolWindow {
 
     private JPanel buildHeaderPanel() {
         // 创建一个新的 JPanel 用于存放第一行的组件
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5)); // 使用 FlowLayout 确保组件的水平排列和固定间距
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2)); // 使用 FlowLayout 确保组件的水平排列和固定间距
 
         // 添加 settingsButton 到 topPanel
         settingsButton = new JButton(settingsIcon);

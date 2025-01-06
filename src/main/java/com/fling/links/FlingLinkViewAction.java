@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerListener;
@@ -49,11 +50,38 @@ public class FlingLinkViewAction extends AnAction {
         }
     }
 
+
+
     @Override
     public @NotNull ActionUpdateThread getActionUpdateThread() {
         return ActionUpdateThread.BGT;
     }
 
+
+    @Override
+    public void update(@NotNull AnActionEvent e) {
+        // 获取编辑器和项目
+        Editor editor = e.getData(CommonDataKeys.EDITOR);
+        Project project = e.getProject();
+
+        // 默认隐藏action
+        e.getPresentation().setEnabledAndVisible(false);
+
+        if (editor == null || project == null) {
+            return;
+        }
+
+        // 获取选中的文本
+        SelectionModel selectionModel = editor.getSelectionModel();
+        if (!selectionModel.hasSelection()) {
+            return;
+        }
+
+        String selectedText = selectionModel.getSelectedText();
+        if (selectedText != null && selectedText.contains("FLING_PROFILER")) {
+            e.getPresentation().setEnabledAndVisible(true);
+        }
+    }
 
     @Override  
     public void actionPerformed(AnActionEvent e) {

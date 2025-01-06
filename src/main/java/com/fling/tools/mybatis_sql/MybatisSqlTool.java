@@ -20,6 +20,7 @@ import com.intellij.psi.xml.XmlTag;
 import com.intellij.sql.psi.SqlLanguage;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
+import com.intellij.util.ui.JBUI;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
@@ -68,10 +69,10 @@ public class MybatisSqlTool extends BasePluginTool {
         });
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(1, 3, 3, 3);
+        gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.0;
-        gbc.gridx = 2;
+        gbc.gridx = 3;
         gbc.gridy = 0;
         // Add the radio button
         replaceParamsButton = new JToggleButton(REPLACE_DISABLE_ICON,false);
@@ -147,7 +148,7 @@ public class MybatisSqlTool extends BasePluginTool {
             }
         });
 
-        gbc.gridx = 3;
+        gbc.gridx = 4;
         topPanel.add(runButton,gbc);
 
         return topPanel;
