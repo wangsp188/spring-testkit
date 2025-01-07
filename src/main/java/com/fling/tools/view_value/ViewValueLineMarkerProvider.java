@@ -80,7 +80,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                 })
                                 .toList();
                         if (CollectionUtils.isEmpty(projectAppList)) {
-                            FlingHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find app");
+                            FlingHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find app, please wait Index build complete");
                             return;
                         }
 
@@ -111,7 +111,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
 
                         if (controllerActionGroup.getChildrenCount() == 0) {
-                            FlingHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find app");
+                            FlingHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find runtime app");
                             return;
                         }
 
