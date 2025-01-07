@@ -42,8 +42,8 @@
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.flexible_test.FlexibleTestIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.call_method.CallMethodIconProvider"/>
         <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mybatis_sql.MybatisSqlIconProvider"/>
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.doc.DocIconProvider"/>
-
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.view_value.ViewValueLineMarkerProvider"/>
 
         <java.programPatcher implementation="com.fling.JavaProgramPatcher" />
         <toolWindow id="Fling" icon="/icons/spring-fling.svg" factoryClass="com.fling.view.FlingToolWindowFactory" anchor="right"/>

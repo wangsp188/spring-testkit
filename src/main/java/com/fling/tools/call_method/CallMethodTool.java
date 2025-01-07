@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
 import com.fling.ReqStorageHelper;
+import com.fling.RuntimeAppHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
@@ -81,14 +82,14 @@ public class CallMethodTool extends BasePluginTool {
                 FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select a method");
                 return;
             }
-            List<String> projectAppList = toolWindow.getProjectAppList().stream().filter(new Predicate<FlingToolWindow.AppMeta>() {
+            List<String> projectAppList = RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
                         @Override
-                        public boolean test(FlingToolWindow.AppMeta appMeta) {
+                        public boolean test(RuntimeAppHelper.AppMeta appMeta) {
                             return ToolHelper.isDependency(selectedItem.getMethod(),getProject(),appMeta.getModule());
                         }
-                    }).map(new Function<FlingToolWindow.AppMeta, String>() {
+                    }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
                         @Override
-                        public String apply(FlingToolWindow.AppMeta appMeta) {
+                        public String apply(RuntimeAppHelper.AppMeta appMeta) {
                             return appMeta.getApp();
                         }
                     })
@@ -173,16 +174,14 @@ public class CallMethodTool extends BasePluginTool {
         } catch (Exception e) {
             throw new RuntimeException("Input parameter must be json object");
         }
-        List<FlingToolWindow.AppMeta> projectAppList = toolWindow.getProjectAppList();
-
-        return projectAppList.stream().filter(new Predicate<FlingToolWindow.AppMeta>() {
+        return RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
             @Override
-            public boolean test(FlingToolWindow.AppMeta appMeta) {
+            public boolean test(RuntimeAppHelper.AppMeta appMeta) {
                 return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
             }
-        }).map(new Function<FlingToolWindow.AppMeta, String>() {
+        }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
                     @Override
-                    public String apply(FlingToolWindow.AppMeta appMeta) {
+                    public String apply(RuntimeAppHelper.AppMeta appMeta) {
                         return appMeta.getApp();
                     }
                 })
@@ -465,7 +464,7 @@ public class CallMethodTool extends BasePluginTool {
 
 
     public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
-        FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
+        RuntimeAppHelper.VisibleApp selectedApp = getSelectedApp();
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
@@ -523,7 +522,7 @@ public class CallMethodTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingToolWindow.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = getSelectedApp();
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",

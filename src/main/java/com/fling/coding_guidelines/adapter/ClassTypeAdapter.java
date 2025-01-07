@@ -1,29 +1,29 @@
-package com.fling.doc.adapter;
+package com.fling.coding_guidelines.adapter;
 
-import com.fling.doc.DocHelper;
+import com.fling.coding_guidelines.CodingGuidelinesHelper;
 import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import org.apache.commons.collections.MapUtils;
 
 import java.util.Map;
 
-public class ClassTypeAdapter implements ElementDocAdapter {
+public class ClassTypeAdapter implements ElementGuidelinesAdapter {
 
     private static ClassTypeAdapter adapter = new ClassTypeAdapter();
 
 
-    public static ElementDocAdapter getInstance() {
+    public static ElementGuidelinesAdapter getInstance() {
         return adapter;
     }
 
 
     @Override
-    public DocHelper.DocSource getDocSource() {
-        return DocHelper.DocSource.class_type;
+    public CodingGuidelinesHelper.DocSource getDocSource() {
+        return CodingGuidelinesHelper.DocSource.class_type;
     }
 
     @Override
-    public DocHelper.Doc find(PsiElement element, Map<String, DocHelper.Doc> docs) {
+    public CodingGuidelinesHelper.Doc find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
         if (MapUtils.isEmpty(docs)) {
             return null;
         }
@@ -40,7 +40,7 @@ public class ClassTypeAdapter implements ElementDocAdapter {
         if (psiClass == null) {
             return null;
         }
-        for (Map.Entry<String, DocHelper.Doc> entry : docs.entrySet()) {
+        for (Map.Entry<String, CodingGuidelinesHelper.Doc> entry : docs.entrySet()) {
             if (InheritanceUtil.isInheritor(psiClass, entry.getKey())) {
                 return entry.getValue();
             }

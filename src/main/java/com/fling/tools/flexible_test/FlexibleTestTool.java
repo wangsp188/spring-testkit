@@ -3,6 +3,7 @@ package com.fling.tools.flexible_test;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
 import com.fling.ReqStorageHelper;
+import com.fling.RuntimeAppHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.LocalStorageHelper;
@@ -20,7 +21,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -58,16 +58,14 @@ public class FlexibleTestTool extends BasePluginTool {
         } catch (Exception e) {
             throw new RuntimeException("Input parameter must be json object");
         }
-        List<FlingToolWindow.AppMeta> projectAppList = toolWindow.getProjectAppList();
-
-        return projectAppList.stream().filter(new Predicate<FlingToolWindow.AppMeta>() {
+        return RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
                     @Override
-                    public boolean test(FlingToolWindow.AppMeta appMeta) {
+                    public boolean test(RuntimeAppHelper.AppMeta appMeta) {
                         return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
                     }
-                }).map(new Function<FlingToolWindow.AppMeta, String>() {
+                }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
                     @Override
-                    public String apply(FlingToolWindow.AppMeta appMeta) {
+                    public String apply(RuntimeAppHelper.AppMeta appMeta) {
                         return appMeta.getApp();
                     }
                 })
@@ -134,7 +132,7 @@ public class FlexibleTestTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingToolWindow.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = getSelectedApp();
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",

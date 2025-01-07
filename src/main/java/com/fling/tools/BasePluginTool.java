@@ -3,6 +3,7 @@ package com.fling.tools;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.fling.FlingHelper;
+import com.fling.RuntimeAppHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
@@ -44,7 +45,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
@@ -87,13 +87,10 @@ public abstract class BasePluginTool {
         return toolWindow.getProject();
     }
 
-    public FlingToolWindow.VisibleApp getSelectedApp() {
+    public RuntimeAppHelper.VisibleApp getSelectedApp() {
         return toolWindow.getSelectedApp();
     }
 
-    public List<FlingToolWindow.AppMeta> getPorjectAppList() {
-        return toolWindow.getProjectAppList();
-    }
 
     public String getSelectedAppName() {
         return toolWindow.getSelectedAppName();
@@ -127,7 +124,7 @@ public abstract class BasePluginTool {
             AnAction refreshAction = new AnAction("Refresh parameters structure", "Refresh parameters structure", AllIcons.Actions.Refresh) {
                 @Override
                 public void actionPerformed(AnActionEvent e) {
-                    SwingUtilities.invokeLater(new Runnable() {
+                    WriteCommandAction.runWriteCommandAction(toolWindow.getProject(),new Runnable() {
                         @Override
                         public void run() {
                             refreshInputByActionBox();
@@ -372,7 +369,7 @@ public abstract class BasePluginTool {
             setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
             return;
         }
-        if (!response.getBooleanValue("success") || response.getString("data") == null) {
+        if (response==null || !response.getBooleanValue("success") || response.getString("data") == null) {
             setOutputText("submit req error \n" + response.getString("message"), null);
             return;
         }

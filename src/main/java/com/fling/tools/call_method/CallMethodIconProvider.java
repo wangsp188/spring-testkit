@@ -222,15 +222,15 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         PsiFile psiFile = psiMethod.getContainingFile();
         // 5. 必须不在Java的test模块下
         VirtualFile virtualFile = psiFile.getVirtualFile();
-        if (virtualFile == null) {
-            return "not_find_virtualFile";
+        if (virtualFile != null) {
+            // 获取文件的完整路径
+            String filePath = virtualFile.getPath();
+            // 检查路径是否以 src/test/java 结尾
+            if (filePath.contains("/src/test/java/")) {
+                return "is_test_module";
+            }
         }
-        // 获取文件的完整路径
-        String filePath = virtualFile.getPath();
-        // 检查路径是否以 src/test/java 结尾
-        if (filePath.contains("/src/test/java/")) {
-            return "is_test_module";
-        }
+
 
         return null;
     }
@@ -412,11 +412,13 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         }
 
         // 查找已存在的测试方法
-        PsiMethod testMethod = findTestMethod(testClass, methodName, psiMethod.getParameterList().getParameters().length);
+        String methodName1 = "test_" + methodName + "_" + psiMethod.getParameterList().getParameters().length;
+        PsiMethod testMethod = findTestMethod(testClass, methodName1);
 
         if (testMethod == null) {
             // 如果测试方法不存在，添加新的测试方法
             addTestMethod(testClass, psiMethod, fieldName, psiMethod.getParameterList().getParameters().length);
+            testMethod = findTestMethod(testClass, methodName1);
         }
 
         // 跳转到目标测试方法
@@ -433,12 +435,12 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     }
 
 
-    private PsiMethod findTestMethod(PsiClass testClass, String methodName, int length) {
+    public static PsiMethod findTestMethod(PsiClass testClass, String methodName) {
         if (testClass == null) {
             return null;
         }
         for (PsiMethod method : testClass.getMethods()) {
-            if (method.getName().equals("test_" + methodName + "_" + length)) {
+            if (method.getName().equals(methodName)) {
                 return method;
             }
         }

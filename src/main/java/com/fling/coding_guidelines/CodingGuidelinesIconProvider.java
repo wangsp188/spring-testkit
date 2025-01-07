@@ -1,4 +1,4 @@
-package com.fling.doc;
+package com.fling.coding_guidelines;
 
 import com.fling.FlingHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
@@ -31,12 +31,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
-public class DocIconProvider implements LineMarkerProvider {
+public class CodingGuidelinesIconProvider implements LineMarkerProvider {
 
-    public static final Icon DOC_ICON = IconLoader.getIcon("/icons/doc.svg", DocIconProvider.class);
+    public static final Icon DOC_ICON = IconLoader.getIcon("/icons/doc.svg", CodingGuidelinesIconProvider.class);
 
-    public static final Icon MARKDOWN_ICON = IconLoader.getIcon("/icons/markdown.svg", DocIconProvider.class);
-    public static final Icon URL_ICON = IconLoader.getIcon("/icons/url.svg", DocIconProvider.class);
+    public static final Icon MARKDOWN_ICON = IconLoader.getIcon("/icons/markdown.svg", CodingGuidelinesIconProvider.class);
+    public static final Icon URL_ICON = IconLoader.getIcon("/icons/url.svg", CodingGuidelinesIconProvider.class);
 
 
     private JDialog dialog ;
@@ -64,7 +64,7 @@ public class DocIconProvider implements LineMarkerProvider {
     @Nullable
     @Override
     public LineMarkerInfo<PsiElement> getLineMarkerInfo(@NotNull PsiElement element) {
-        if (!DocHelper.hasDoc(element)) {
+        if (!CodingGuidelinesHelper.hasDoc(element)) {
             return null;
         }
         return new LineMarkerInfo<>(
@@ -84,7 +84,7 @@ public class DocIconProvider implements LineMarkerProvider {
                             FlingHelper.notify(elt.getProject(), NotificationType.ERROR, "Cannot display UI elements in a headless environment.");
                         }
 
-                        List<DocHelper.Doc> docs = DocHelper.findDoc(elt);
+                        List<CodingGuidelinesHelper.Doc> docs = CodingGuidelinesHelper.findDoc(elt);
                         if (CollectionUtils.isEmpty(docs)) {
                             FlingHelper.notify(elt.getProject(), NotificationType.ERROR, "can not find adapter docs");
                             return;
@@ -98,9 +98,9 @@ public class DocIconProvider implements LineMarkerProvider {
                             // 创建显示文档标题和查看按钮的表格
                             // 创建显示文档标题和查看按钮的表格
                             DefaultActionGroup actionGroup = new DefaultActionGroup(); // 创建一个动作组
-                            for (DocHelper.Doc doc : docs) {
+                            for (CodingGuidelinesHelper.Doc doc : docs) {
                                 //显示的一个图标加上标题
-                                AnAction documentation = new AnAction(doc.getTitle(), doc.getTitle(), doc.getType() == DocHelper.DocType.url ? URL_ICON : MARKDOWN_ICON) {
+                                AnAction documentation = new AnAction(doc.getTitle(), doc.getTitle(), doc.getType() == CodingGuidelinesHelper.DocType.url ? URL_ICON : MARKDOWN_ICON) {
                                     @Override
                                     public void actionPerformed(@NotNull AnActionEvent e) {
                                         navigateToDocumentation(doc, elt.getProject());
@@ -118,11 +118,11 @@ public class DocIconProvider implements LineMarkerProvider {
         );
     }
 
-    private void navigateToDocumentation(DocHelper.Doc doc, @NotNull Project project) {
+    private void navigateToDocumentation(CodingGuidelinesHelper.Doc doc, @NotNull Project project) {
         if (doc == null) {
             return;
         }
-        if (doc.getType() == DocHelper.DocType.url) {
+        if (doc.getType() == CodingGuidelinesHelper.DocType.url) {
             try {
                 URI uri = new URI(doc.getHref());
                 Desktop.getDesktop().browse(uri);
@@ -132,9 +132,9 @@ public class DocIconProvider implements LineMarkerProvider {
             return;
         }
 
-        if (doc.getType() == DocHelper.DocType.markdown) {
+        if (doc.getType() == CodingGuidelinesHelper.DocType.markdown) {
             //补全代码，弹出一个小框利用content渲染
-            String markdownContent = DocHelper.loadContent(doc);
+            String markdownContent = CodingGuidelinesHelper.loadContent(doc);
             showFormattedMarkdown(doc.getTitle(), markdownContent);
         }
 

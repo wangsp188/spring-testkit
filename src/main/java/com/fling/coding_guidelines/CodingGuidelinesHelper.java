@@ -1,10 +1,10 @@
-package com.fling.doc;
+package com.fling.coding_guidelines;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
-import com.fling.doc.adapter.*;
+import com.fling.coding_guidelines.adapter.*;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
@@ -22,14 +22,14 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-public class DocHelper {
+public class CodingGuidelinesHelper {
 
-    private static final List<ElementDocAdapter> classSources = Arrays.asList(ClassAnnotationAdapter.getInstance(), ClassTypeAdapter.getInstance());
-    private static final List<ElementDocAdapter> methodSources = Arrays.asList(MethodAnnotationAdapter.getInstance(), DeclaredMethodAdapter.getInstance());
-    private static final List<ElementDocAdapter> fieldSources = Arrays.asList(ClassTypeAdapter.getInstance(), FieldAnnotationAdapter.getInstance());
+    private static final List<ElementGuidelinesAdapter> classSources = Arrays.asList(ClassAnnotationAdapter.getInstance(), ClassTypeAdapter.getInstance());
+    private static final List<ElementGuidelinesAdapter> methodSources = Arrays.asList(MethodAnnotationAdapter.getInstance(), DeclaredMethodAdapter.getInstance());
+    private static final List<ElementGuidelinesAdapter> fieldSources = Arrays.asList(ClassTypeAdapter.getInstance(), FieldAnnotationAdapter.getInstance());
     public static final String DOC_TITLE_DESC = "Doc's title , can be null. //This is used when the href attribute is a link";
     public static final String DOC_HREF_DESC = "Doc's link , can not be null. //A link to doc may either point to the local markdown document The path relative to the current directory, such as doc/hello.md, or use the web link directly to https://www.baidu.com";
-
+    public static final String CODING_GUIDELINES = "/coding-guidelines";
 
     private volatile static Map<Project, Map<DocSource, Map<String, Doc>>> projectDocs = new HashMap<>();
 
@@ -39,7 +39,7 @@ public class DocHelper {
             return false;
         }
 
-        List<ElementDocAdapter> adapters = null;
+        List<ElementGuidelinesAdapter> adapters = null;
         if (element instanceof PsiClass) {
             adapters = classSources;
         } else if (element instanceof PsiMethod) {
@@ -49,7 +49,7 @@ public class DocHelper {
         } else {
             return false;
         }
-        for (ElementDocAdapter adapter : adapters) {
+        for (ElementGuidelinesAdapter adapter : adapters) {
             Doc doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
             if (doc != null) {
                 return true;
@@ -65,7 +65,7 @@ public class DocHelper {
         if (MapUtils.isEmpty(sourceMap)) {
             return null;
         }
-        List<ElementDocAdapter> adapters = null;
+        List<ElementGuidelinesAdapter> adapters = null;
         if (element instanceof PsiClass) {
             adapters = classSources;
         } else if (element instanceof PsiMethod) {
@@ -76,7 +76,7 @@ public class DocHelper {
             return null;
         }
         ArrayList<Doc> docs = new ArrayList<>();
-        for (ElementDocAdapter adapter : adapters) {
+        for (ElementGuidelinesAdapter adapter : adapters) {
             Doc doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
             if (doc != null) {
                 docs.add(doc);
@@ -113,7 +113,7 @@ public class DocHelper {
             @Override
             public void run() {
                 // 构建 doc 目录的路径
-                String docDirectoryPath = projectPath + "/doc";
+                String docDirectoryPath = projectPath + CODING_GUIDELINES;
                 // 获取 doc 目录的 VirtualFile 对象
                 VirtualFile docDir = LocalFileSystem.getInstance().findFileByPath(docDirectoryPath);
                 if (docDir == null || !docDir.exists()) {
@@ -123,11 +123,11 @@ public class DocHelper {
                         docDir = LocalFileSystem.getInstance().refreshAndFindFileByPath(docDirectoryPath);
                         docDir.isDirectory();
                     } catch (Throwable e) {
-                        FlingHelper.notify(project, NotificationType.ERROR, "Failed to create project doc directory," + docDirectoryPath);
+                        FlingHelper.notify(project, NotificationType.ERROR, "Failed to create coding-guidelines directory," + docDirectoryPath);
                         return;
                     }
                 } else if (!docDir.isDirectory()) {
-                    FlingHelper.notify(project, NotificationType.WARNING, "Project doc directory is exist");
+                    FlingHelper.notify(project, NotificationType.WARNING, "Coding-guidelines directory is exist");
                     return;
                 }
 
@@ -143,7 +143,7 @@ public class DocHelper {
                                 writer.write(docSource.demoStr());
                             }
                         } catch (IOException e) {
-                            FlingHelper.notify(project, NotificationType.ERROR, "Failed to create doc config file: " + docSource.name());
+                            FlingHelper.notify(project, NotificationType.ERROR, "Failed to create coding-guidelines config file: " + docSource.name());
                         }
                     }
                 }
@@ -177,7 +177,7 @@ public class DocHelper {
         }
 
         // 构建 doc 目录的路径
-        String docDirectoryPath = projectPath + "/doc";
+        String docDirectoryPath = projectPath + CODING_GUIDELINES;
 
         // 获取 doc 目录的 VirtualFile 对象
         VirtualFile docDir = LocalFileSystem.getInstance().findFileByPath(docDirectoryPath);
@@ -235,7 +235,7 @@ public class DocHelper {
             }
             return boMap;  // 返回文件内容，去除末尾多余的换行
         } catch (Throwable e) {
-            FlingHelper.notify(project, NotificationType.ERROR, "Fail load project doc, source:" + strategy.name() + ".json , " + e.getClass().getSimpleName() + ", " + e.getMessage());
+            FlingHelper.notify(project, NotificationType.ERROR, "Fail load coding-guidelines, source:" + strategy.name() + ".json , " + e.getClass().getSimpleName() + ", " + e.getMessage());
             return null;
         }
     }

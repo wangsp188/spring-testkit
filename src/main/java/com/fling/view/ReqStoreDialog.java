@@ -8,6 +8,7 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
 import com.fling.LocalStorageHelper;
 import com.fling.ReqStorageHelper;
+import com.fling.RuntimeAppHelper;
 import com.fling.tools.PluginToolEnum;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
@@ -25,6 +26,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -283,9 +285,9 @@ public class ReqStoreDialog {
         if (appBox.getItemCount() > 0) {
             String selectedItem = (String) appBox.getSelectedItem();
             String selectedApp = toolWindow.getSelectedAppName();
-            List<String> projectAppList = toolWindow.getProjectAppList().stream().map(new Function<FlingToolWindow.AppMeta, String>() {
+            List<String> projectAppList = RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().map(new Function<RuntimeAppHelper.AppMeta, String>() {
                 @Override
-                public String apply(FlingToolWindow.AppMeta appMeta) {
+                public String apply(RuntimeAppHelper.AppMeta appMeta) {
                     return appMeta.getApp();
                 }
             }).collect(Collectors.toCollection(ArrayList::new));
@@ -294,13 +296,12 @@ public class ReqStoreDialog {
             }
         }
 
-        if (!EventQueue.isDispatchThread()) {
-            ApplicationManager.getApplication().invokeAndWait(() -> {
+        WriteCommandAction.runWriteCommandAction(toolWindow.getProject(), new Runnable() {
+            @Override
+            public void run() {
                 dialog.setVisible(visible);
-            });
-        } else {
-            dialog.setVisible(visible);
-        }
+            }
+        });
     }
 
 //
@@ -454,13 +455,13 @@ public class ReqStoreDialog {
                 dialog.setLocationRelativeTo(null);
 
                 String title = "";
-                if(node.getUserObject() instanceof ReqStorageHelper.GroupItems){
+                if (node.getUserObject() instanceof ReqStorageHelper.GroupItems) {
                     title = ((ReqStorageHelper.GroupItems) node.getUserObject()).getGroup();
-                }else if(node.getUserObject() instanceof ReqStorageHelper.Item){
-                    title = ((ReqStorageHelper.Item) node.getUserObject()).getGroup()+"."+((ReqStorageHelper.Item) node.getUserObject()).getName();
+                } else if (node.getUserObject() instanceof ReqStorageHelper.Item) {
+                    title = ((ReqStorageHelper.Item) node.getUserObject()).getGroup() + "." + ((ReqStorageHelper.Item) node.getUserObject()).getName();
                 }
                 // 创建说明文本标签
-                JLabel instructionLabel = new JLabel("<html>Current export scope: "+title+"<br>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
+                JLabel instructionLabel = new JLabel("<html>Current export scope: " + title + "<br>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
 // 启用自动换行
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 创建JSON输入框
@@ -473,7 +474,7 @@ public class ReqStoreDialog {
                 // 创建导入按钮
                 JButton copyConfirmButton = new JButton("Copy");
                 copyConfirmButton.addActionListener(e1 -> {
-                    FlingHelper.copyToClipboard(toolWindow.getProject(),jsonInput.getText() , (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
+                    FlingHelper.copyToClipboard(toolWindow.getProject(), jsonInput.getText(), (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
                     dialog.dispose();
                 });
 
@@ -952,7 +953,7 @@ public class ReqStoreDialog {
     }
 
     public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
-        FlingToolWindow.VisibleApp selectedApp = parseApp((String) visibleAppComboBox.getSelectedItem());
+        RuntimeAppHelper.VisibleApp selectedApp = parseApp((String) visibleAppComboBox.getSelectedItem());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
@@ -961,8 +962,7 @@ public class ReqStoreDialog {
 
 
     private void refreshVisibleApp() {
-        List<FlingToolWindow.VisibleApp> visibleApps = toolWindow.getVisibleApps();
-        List<FlingToolWindow.VisibleApp> visibleAppList = visibleApps.stream()
+        List<RuntimeAppHelper.VisibleApp> visibleAppList = RuntimeAppHelper.getVisibleApps(toolWindow.getProject().getName()).stream()
                 .filter(visibleApp -> Objects.equals(appBox.getSelectedItem(), visibleApp.getAppName()))
                 .toList();
 
@@ -987,7 +987,7 @@ public class ReqStoreDialog {
 
         // 更新列表内容
         visibleAppComboBox.removeAllItems();
-        for (FlingToolWindow.VisibleApp visibleApp : visibleAppList) {
+        for (RuntimeAppHelper.VisibleApp visibleApp : visibleAppList) {
             String item = visibleApp.getAppName() + ":" + visibleApp.getPort();
             visibleAppComboBox.addItem(item);
         }
@@ -1115,7 +1115,7 @@ public class ReqStoreDialog {
             FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
             return;
         }
-        FlingToolWindow.VisibleApp visibleApp = parseApp(selectedInstance);
+        RuntimeAppHelper.VisibleApp visibleApp = parseApp(selectedInstance);
         if (visibleApp == null) {
             FlingHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
             return;
@@ -1272,20 +1272,20 @@ public class ReqStoreDialog {
         });
     }
 
-    private FlingToolWindow.VisibleApp parseApp(String selectedItem) {
+    private RuntimeAppHelper.VisibleApp parseApp(String selectedItem) {
         if (selectedItem == null) {
             return null;
         }
         String[] split = selectedItem.split(":");
         if (split.length == 2) {
-            FlingToolWindow.VisibleApp visibleApp = new FlingToolWindow.VisibleApp();
+            RuntimeAppHelper.VisibleApp visibleApp = new RuntimeAppHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[1]) + 10000);
             return visibleApp;
 
         } else if (split.length == 3) {
-            FlingToolWindow.VisibleApp visibleApp = new FlingToolWindow.VisibleApp();
+            RuntimeAppHelper.VisibleApp visibleApp = new RuntimeAppHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[2]));
@@ -1294,7 +1294,7 @@ public class ReqStoreDialog {
         return null;
     }
 
-    private JSONObject buildCallMethodParams(ReqStorageHelper.CallMethodMeta meta, FlingToolWindow.VisibleApp visibleApp, JSONObject args) {
+    private JSONObject buildCallMethodParams(ReqStorageHelper.CallMethodMeta meta, RuntimeAppHelper.VisibleApp visibleApp, JSONObject args) {
         JSONObject params = new JSONObject();
         params.put("typeClass", meta.getTypeClass());
         params.put("beanName", meta.getBeanName());
@@ -1315,7 +1315,7 @@ public class ReqStoreDialog {
         return req;
     }
 
-    private JSONObject buildFlexibleParams(ReqStorageHelper.FlexibleTestMeta meta, FlingToolWindow.VisibleApp visibleApp, JSONObject args) {
+    private JSONObject buildFlexibleParams(ReqStorageHelper.FlexibleTestMeta meta, RuntimeAppHelper.VisibleApp visibleApp, JSONObject args) {
         JSONObject params = new JSONObject();
         params.put("code", meta.getCode());
         params.put("methodName", meta.getMethodName());

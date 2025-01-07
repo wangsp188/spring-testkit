@@ -8,7 +8,11 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.roots.OrderEnumerator;
+import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
@@ -583,14 +587,42 @@ public class ToolHelper {
             return false;
         }
         Module sourceModule = ModuleUtil.findModuleForPsiElement(psiElement);
-        if (sourceModule == null) {
-            return false;
-        }
-        if (sourceModule.equals(targetModule)) {
-            return true;
+        // 如果能找到源模块，使用原来的逻辑
+        if (sourceModule != null) {
+            if (sourceModule.equals(targetModule)) {
+                return true;
+            }
+            return ModuleRootManager.getInstance(targetModule).isDependsOn(sourceModule);
         }
 
-        return ModuleRootManager.getInstance(targetModule).isDependsOn(sourceModule);
+        // 对于jar包中的元素，尝试获取完整限定名
+        if (psiElement instanceof PsiClass) {
+            String qualifiedName = ((PsiClass) psiElement).getQualifiedName();
+            return isClassInModule(qualifiedName, targetModule);
+        } else if (psiElement instanceof PsiMember) {
+            PsiClass containingClass = ((PsiMember) psiElement).getContainingClass();
+            if (containingClass != null) {
+                String qualifiedName = containingClass.getQualifiedName();
+                return isClassInModule(qualifiedName, targetModule);
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean isClassInModule(String qualifiedName, Module module) {
+        if (qualifiedName == null || module == null) {
+            return false;
+        }
+
+        // 获取模块的类加载器范围
+        GlobalSearchScope moduleScope = module.getModuleWithDependenciesAndLibrariesScope(false);
+
+        // 在模块范围内查找类
+        PsiClass[] classes = JavaPsiFacade.getInstance(module.getProject())
+                .findClasses(qualifiedName, moduleScope);
+
+        return classes.length > 0;
     }
 
     public static class MethodAction {

@@ -2,6 +2,9 @@ package com.fling;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.intellij.openapi.module.Module;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 
 import java.io.File;
 import java.io.FileReader;
@@ -11,7 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class RuntimeAppHelper {
 
@@ -19,6 +24,68 @@ public class RuntimeAppHelper {
 
 
     private static final String APPS_DIR = ".spring-fling/apps";
+
+    private static final Map<String, Boolean> monitorMap = new HashMap<>();
+
+
+    private static final Map<String, List<AppMeta>> appMetas = new HashMap<>();
+
+    private static final Map<String, List<VisibleApp>> visibleApps = new HashMap<>();
+
+    public static void updateMonitors(Map<String, Boolean> monitors) {
+        if (monitors == null) {
+            return;
+        }
+        monitorMap.putAll(monitors);
+    }
+
+    public static boolean isMonitor(String app) {
+        if (app == null) {
+            return false;
+        }
+        Boolean monitor = monitorMap.get(app);
+        return monitor != null && monitor;
+    }
+
+    public static void updateVisibleApps(String project,List<VisibleApp> apps) {
+        if (project == null) {
+            return ;
+        }
+        if (CollectionUtils.isEmpty(apps)) {
+            visibleApps.remove(project);
+            return;
+        }
+        visibleApps.put(project, apps);
+    }
+
+    public static List<VisibleApp> getVisibleApps(String project) {
+        if (project == null) {
+            return new ArrayList<>();
+        }
+        List<VisibleApp> visibleApps1 = visibleApps.get(project);
+        return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
+    }
+
+
+
+    public static List<AppMeta> getAppMetas(String project) {
+        if (project == null) {
+            return new ArrayList<>();
+        }
+        List<AppMeta> appMetas1 = appMetas.get(project);
+        return appMetas1 == null ? new ArrayList<>() : appMetas1;
+    }
+
+    public static void updateAppMetas(String project,List<AppMeta> metas) {
+        if (project==null) {
+            return;
+        }
+        if(CollectionUtils.isEmpty(metas)){
+            appMetas.remove(project);
+            return;
+        }
+        appMetas.put(project, metas);
+    }
 
 
     public static void removeApp(String project, String appName, Integer port, Integer sidePort) {
@@ -90,4 +157,75 @@ public class RuntimeAppHelper {
         return new File(configDir, project + ".json");
     }
 
+    public static class AppMeta {
+        private String app;
+        private String fullName;
+        private com.intellij.openapi.module.Module module;
+
+        public String getApp() {
+            return app;
+        }
+
+        public void setApp(String app) {
+            this.app = app;
+        }
+
+        public String getFullName() {
+            return fullName;
+        }
+
+        public void setFullName(String fullName) {
+            this.fullName = fullName;
+        }
+
+        public com.intellij.openapi.module.Module getModule() {
+            return module;
+        }
+
+        public void setModule(Module module) {
+            this.module = module;
+        }
+
+        @Override
+        public String toString() {
+            return "AppMeta{" +
+                    "app='" + app + '\'' +
+                    ", fullName='" + fullName + '\'' +
+                    ", module='" + module + '\'' +
+                    '}';
+        }
+    }
+
+    public static class VisibleApp {
+
+        private String appName;
+
+        private int port;
+
+        private int sidePort;
+
+        public String getAppName() {
+            return appName;
+        }
+
+        public void setAppName(String appName) {
+            this.appName = appName;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
+        }
+
+        public int getSidePort() {
+            return sidePort;
+        }
+
+        public void setSidePort(int sidePort) {
+            this.sidePort = sidePort;
+        }
+    }
 }

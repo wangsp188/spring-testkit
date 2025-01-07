@@ -3,8 +3,8 @@ package com.fling.view;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.RuntimeAppHelper;
-import com.fling.doc.DocHelper;
-import com.fling.doc.DocIconProvider;
+import com.fling.coding_guidelines.CodingGuidelinesHelper;
+import com.fling.coding_guidelines.CodingGuidelinesIconProvider;
 import com.fling.tools.CurlDialog;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
@@ -14,7 +14,7 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.module.Module;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -73,7 +73,6 @@ import java.net.URL;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -93,14 +92,13 @@ public class FlingToolWindow {
 
     private JLabel appLabel;
     private JComboBox<String> appBox;
-    private Map<String, Boolean> monitorMap;
+
     private JDialog settingsDialog;
     private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
-    private Map<String,AppMeta> appMetas = new HashMap<>();
     private JComboBox<String> scriptAppBox;
     private JComboBox<String> controllerScriptAppBox;
     private JTextField controllerEnvTextField;
@@ -203,7 +201,7 @@ public class FlingToolWindow {
                         openTipsDoc();
                     }
                 });
-                actionGroup.add(new AnAction("Init project doc config file", null, DocIconProvider.DOC_ICON) {
+                actionGroup.add(new AnAction("Init coding-guidelines config file", null, CodingGuidelinesIconProvider.DOC_ICON) {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
                         // 使用 Application.runWriteAction 进行写操作
@@ -211,13 +209,13 @@ public class FlingToolWindow {
                         application.invokeLater(new Runnable() {
                             @Override
                             public void run() {
-                                DocHelper.initDocDirectory(project);
+                                CodingGuidelinesHelper.initDocDirectory(project);
                             }
                         });
 
                     }
                 });
-                actionGroup.add(new AnAction("Refresh project docs", null, DocIconProvider.DOC_ICON) {
+                actionGroup.add(new AnAction("Refresh coding-guidelines", null, CodingGuidelinesIconProvider.DOC_ICON) {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
                         Application application = ApplicationManager.getApplication();
@@ -225,12 +223,12 @@ public class FlingToolWindow {
                             @Override
                             public void run() {
                                 try {
-                                    DocHelper.refreshDoc(project);
+                                    CodingGuidelinesHelper.refreshDoc(project);
                                     FlingHelper.refresh(project);
-                                    Map<DocHelper.DocSource, Map<String, DocHelper.Doc>> docs = DocHelper.getProjectDocs(project);
-                                    FlingHelper.notify(project, NotificationType.INFORMATION, "Refresh project docs success," + JSON.toJSONString(docs));
+                                    Map<CodingGuidelinesHelper.DocSource, Map<String, CodingGuidelinesHelper.Doc>> docs = CodingGuidelinesHelper.getProjectDocs(project);
+                                    FlingHelper.notify(project, NotificationType.INFORMATION, "Refresh coding-guidelines success," + JSON.toJSONString(docs));
                                 } catch (Exception ex) {
-                                    FlingHelper.notify(project, NotificationType.ERROR, "Refresh project doc failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                                    FlingHelper.notify(project, NotificationType.ERROR, "Refresh coding-guidelines failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
                                 }
                             }
                         });
@@ -272,7 +270,7 @@ public class FlingToolWindow {
             Object selectedItem = appBox.getSelectedItem();
             appBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
 
-            if (selectedItem != null && monitorMap != null && Boolean.TRUE.equals(monitorMap.get(selectedItem.toString()))) {
+            if (selectedItem != null && RuntimeAppHelper.isMonitor(selectedItem.toString())) {
                 appBox.setBorder(new LineBorder(new Color(114, 169, 107), 1));
             } else {
                 appBox.setBorder(border);
@@ -393,7 +391,7 @@ public class FlingToolWindow {
         return outputPanel;
     }
 
-    public void visibleStoreDialog(){
+    public void visibleStoreDialog() {
         storeDialog.visible(true);
     }
 
@@ -417,7 +415,7 @@ public class FlingToolWindow {
             }
 
             // 获取 visibleApp 实例
-            VisibleApp visibleApp = parseApp(item);
+            RuntimeAppHelper.VisibleApp visibleApp = parseApp(item);
             try {
                 // 发送请求获取实时数据
                 Map response = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", requestData, Map.class);
@@ -439,7 +437,7 @@ public class FlingToolWindow {
         }
 
         // 更新 monitorMap
-        monitorMap = newMap;
+        RuntimeAppHelper.updateMonitors(newMap);
         // 比较新旧项是否有变化
         boolean hasChanges = !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
         if (!hasChanges) {
@@ -447,9 +445,12 @@ public class FlingToolWindow {
         }
         // 更新下拉框内容
         appBox.removeAllItems();
+        ArrayList<RuntimeAppHelper.VisibleApp> objects = new ArrayList<>();
         for (String item : newItems) {
             appBox.addItem(item.substring(0, item.lastIndexOf(":")));
+            objects.add(parseApp(item));
         }
+        RuntimeAppHelper.updateVisibleApps(project.getName(), objects);
 
         // 保持选中项不变
         if (selectedItem != null && appBox.getItemCount() > 0) {
@@ -492,7 +493,12 @@ public class FlingToolWindow {
     }
 
     public void openCurlDialog() {
-        curlDialog.setVisible(true);
+        WriteCommandAction.runWriteCommandAction(project, new Runnable() {
+            @Override
+            public void run() {
+                curlDialog.setVisible(true);
+            }
+        });
     }
 
 
@@ -534,17 +540,17 @@ public class FlingToolWindow {
     }
 
 
-    private @Nullable FlingToolWindow.VisibleApp parseApp(String selectedItem) {
+    private @Nullable RuntimeAppHelper.VisibleApp parseApp(String selectedItem) {
         String[] split = selectedItem.split(":");
         if (split.length == 2) {
-            VisibleApp visibleApp = new VisibleApp();
+            RuntimeAppHelper.VisibleApp visibleApp = new RuntimeAppHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[1]) + 10000);
             return visibleApp;
 
         } else if (split.length == 3) {
-            VisibleApp visibleApp = new VisibleApp();
+            RuntimeAppHelper.VisibleApp visibleApp = new RuntimeAppHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[2]));
@@ -560,7 +566,6 @@ public class FlingToolWindow {
 
     private void initSettingsDialog() {
         JTextField flexibleTestPackageNameField = new JTextField(LocalStorageHelper.getFlexibleTestPackage(project), 20);
-
         settingsDialog = new JDialog((Frame) null, FlingHelper.getPluginName() + " Settings", true);
         // 定义主面板
         JPanel contentPanel = new JPanel(new BorderLayout());
@@ -613,7 +618,7 @@ public class FlingToolWindow {
             public void actionPerformed(ActionEvent e) {
                 flexibleTestPackageNameField.setText(LocalStorageHelper.getFlexibleTestPackage(project));
                 String selectedAppName = getSelectedAppName();
-                if(selectedAppName==null){
+                if (selectedAppName == null) {
                     if (scriptAppBox.getItemCount() > 0) {
                         scriptAppBox.setSelectedIndex(0);
                     }
@@ -624,7 +629,7 @@ public class FlingToolWindow {
                         // 选择第一个选项
                         propertiesAppBox.setSelectedIndex(0);
                     }
-                }else{
+                } else {
                     if (scriptAppBox.getItemCount() > 0) {
                         scriptAppBox.setSelectedItem(selectedAppName);
                     }
@@ -969,24 +974,28 @@ public class FlingToolWindow {
                 @Override
                 public void run() {
 
+                    HashMap<String, RuntimeAppHelper.AppMeta> map = new HashMap<>();
                     springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
                         @Override
                         public void accept(PsiClass psiClass) {
-                            AppMeta appMeta = new AppMeta();
+                            RuntimeAppHelper.AppMeta appMeta = new RuntimeAppHelper.AppMeta();
                             appMeta.setApp(psiClass.getName());
                             appMeta.setFullName(psiClass.getQualifiedName());
 
                             appMeta.setModule(ModuleUtil.findModuleForPsiElement(psiClass));
-                            appMetas.put(psiClass.getName(), appMeta);
+                            map.put(psiClass.getName(), appMeta);
                         }
                     });
 
-                    storeDialog.initApps(new ArrayList<>(appMetas.keySet()));
-                    for (String app : appMetas.keySet()) {
+                    RuntimeAppHelper.updateAppMetas(project.getName(), new ArrayList<>(map.values()));
+
+                    storeDialog.initApps(new ArrayList<>(map.keySet()));
+                    for (String app : map.keySet()) {
                         scriptAppBox.addItem(app);
                         controllerScriptAppBox.addItem(app);
                         propertiesAppBox.addItem(app);
                     }
+                    FlingHelper.refresh(project);
                 }
             });
         });
@@ -1079,19 +1088,12 @@ public class FlingToolWindow {
             String script = scriptField.getText();
 
 
-            VisibleApp visibleApp = Optional.ofNullable(monitorMap)
-                    .orElse(new HashMap<>())
-                    .keySet()
+            RuntimeAppHelper.VisibleApp visibleApp = Optional.ofNullable(RuntimeAppHelper.getVisibleApps(project.getName()))
+                    .orElse(new ArrayList<>())
                     .stream()
-                    .map(new Function<String, VisibleApp>() {
+                    .filter(new Predicate<RuntimeAppHelper.VisibleApp>() {
                         @Override
-                        public VisibleApp apply(String s) {
-                            return parseApp(s);
-                        }
-                    })
-                    .filter(new Predicate<VisibleApp>() {
-                        @Override
-                        public boolean test(VisibleApp visibleApp) {
+                        public boolean test(RuntimeAppHelper.VisibleApp visibleApp) {
                             return Objects.equals(visibleApp.getAppName(), selectedItem);
                         }
                     })
@@ -1349,7 +1351,7 @@ public class FlingToolWindow {
         testButton.setPreferredSize(new Dimension(20, 20));
         testButton.setToolTipText("Fire-Test generate function use simple params");
         ActionListener testListener = e -> {
-            FlingToolWindow.VisibleApp selectedApp = getSelectedApp();
+            RuntimeAppHelper.VisibleApp selectedApp = getSelectedApp();
             String scriptCode = scriptField.getText();
             String env = StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? "local" : controllerEnvTextField.getText().trim().split(",")[0];
             ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Fire-Test generate function, please wait ...", false) {
@@ -1549,39 +1551,6 @@ public class FlingToolWindow {
         return panel;
     }
 
-    public static class VisibleApp {
-
-        private String appName;
-
-        private int port;
-
-        private int sidePort;
-
-        public String getAppName() {
-            return appName;
-        }
-
-        public void setAppName(String appName) {
-            this.appName = appName;
-        }
-
-        public int getPort() {
-            return port;
-        }
-
-        public void setPort(int port) {
-            this.port = port;
-        }
-
-        public int getSidePort() {
-            return sidePort;
-        }
-
-        public void setSidePort(int sidePort) {
-            this.sidePort = sidePort;
-        }
-    }
-
 
     public JPanel getContent() {
         return windowContent;
@@ -1612,16 +1581,8 @@ public class FlingToolWindow {
         }
     }
 
-    public List<VisibleApp> getVisibleApps() {
-        ArrayList<VisibleApp> objects = new ArrayList<>();
-        for (int i = 0; i < appBox.getItemCount(); i++) {
-            String itemAt = appBox.getItemAt(i);
-            objects.add(parseApp(itemAt));
-        }
-        return objects;
-    }
 
-    public VisibleApp getSelectedApp() {
+    public RuntimeAppHelper.VisibleApp getSelectedApp() {
         String selectedItem = (String) appBox.getSelectedItem();
         if (selectedItem == null) {
             return null;
@@ -1630,60 +1591,17 @@ public class FlingToolWindow {
     }
 
     public String getSelectedAppName() {
-        VisibleApp app = getSelectedApp();
+        RuntimeAppHelper.VisibleApp app = getSelectedApp();
         if (app == null) {
             return null;
         }
         return app.getAppName();
     }
 
-    public List<AppMeta> getProjectAppList() {
-        return new ArrayList<>(appMetas.values());
-    }
-
-    public void refreshStore(){
+    public void refreshStore() {
         storeDialog.refreshTree();
     }
 
-
-    public static class AppMeta{
-        private String app;
-        private String fullName;
-        private Module module;
-
-        public String getApp() {
-            return app;
-        }
-
-        public void setApp(String app) {
-            this.app = app;
-        }
-
-        public String getFullName() {
-            return fullName;
-        }
-
-        public void setFullName(String fullName) {
-            this.fullName = fullName;
-        }
-
-        public Module getModule() {
-            return module;
-        }
-
-        public void setModule(Module module) {
-            this.module = module;
-        }
-
-        @Override
-        public String toString() {
-            return "AppMeta{" +
-                    "app='" + app + '\'' +
-                    ", fullName='" + fullName + '\'' +
-                    ", module='" + module + '\'' +
-                    '}';
-        }
-    }
 
 }
 

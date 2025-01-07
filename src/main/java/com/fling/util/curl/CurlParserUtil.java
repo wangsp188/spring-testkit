@@ -15,7 +15,10 @@ public class CurlParserUtil {
         }
         curl = curl.trim();
         if (curl.startsWith("http")) {
+//            localhost://
             curl = "curl '" + curl + "'";
+        }else if(curl.startsWith("/")) {
+            curl = "curl 'http://unknowndomain" + curl + "'";
         }
 
 

@@ -1,6 +1,6 @@
-package com.fling.doc.adapter;
+package com.fling.coding_guidelines.adapter;
 
-import com.fling.doc.DocHelper;
+import com.fling.coding_guidelines.CodingGuidelinesHelper;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import org.apache.commons.collections.MapUtils;
@@ -8,24 +8,24 @@ import org.apache.commons.collections.MapUtils;
 import java.util.Map;
 import java.util.Set;
 
-public class DeclaredMethodAdapter implements ElementDocAdapter {
+public class DeclaredMethodAdapter implements ElementGuidelinesAdapter {
 
     private static DeclaredMethodAdapter adapter = new DeclaredMethodAdapter();
 
 
-    public static ElementDocAdapter getInstance(){
+    public static ElementGuidelinesAdapter getInstance(){
         return adapter;
     }
 
 
 
     @Override
-    public DocHelper.DocSource getDocSource() {
-        return DocHelper.DocSource.declared_method;
+    public CodingGuidelinesHelper.DocSource getDocSource() {
+        return CodingGuidelinesHelper.DocSource.declared_method;
     }
 
     @Override
-    public DocHelper.Doc find(PsiElement element, Map<String, DocHelper.Doc> docs) {
+    public CodingGuidelinesHelper.Doc find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
         if(!(element instanceof PsiMethod)){
             return null;
         }

@@ -2,15 +2,14 @@ package com.fling.tools.spring_cache;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
+import com.fling.RuntimeAppHelper;
 import com.fling.tools.ToolHelper;
-import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
-import com.fling.util.HttpUtil;
 import com.fling.LocalStorageHelper;
 import com.fling.view.FlingToolWindow;
 import com.intellij.util.ui.JBUI;
@@ -75,7 +74,7 @@ public class SpringCacheTool extends BasePluginTool {
         getKeyButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingToolWindow.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = getSelectedApp();
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -95,7 +94,7 @@ public class SpringCacheTool extends BasePluginTool {
         getValButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingToolWindow.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = getSelectedApp();
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -115,7 +114,7 @@ public class SpringCacheTool extends BasePluginTool {
         delValButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                FlingToolWindow.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = getSelectedApp();
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
