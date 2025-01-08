@@ -87,14 +87,6 @@ public abstract class BasePluginTool {
         return toolWindow.getProject();
     }
 
-    public RuntimeAppHelper.VisibleApp getSelectedApp() {
-        return toolWindow.getSelectedApp();
-    }
-
-
-    public String getSelectedAppName() {
-        return toolWindow.getSelectedAppName();
-    }
 
 
     protected void initializePanel() {

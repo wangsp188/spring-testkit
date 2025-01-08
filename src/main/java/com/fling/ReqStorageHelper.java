@@ -360,7 +360,7 @@ public class ReqStorageHelper {
     public static class Item {
 
         /**
-         * call-method
+         * method-call
          * flexible-test
          */
         private ItemType type;

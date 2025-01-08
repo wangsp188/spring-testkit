@@ -23,6 +23,7 @@
     No-Bug
     No-Bug
   ]]></description>
+<!--  开发F&Q  https://intellij-support.jetbrains.com/hc/en-us/search?utf8=%E2%9C%93-->
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
@@ -41,7 +42,7 @@
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.spring_cache.SpringCacheIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.flexible_test.FlexibleTestIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.call_method.CallMethodIconProvider"/>
-        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mybatis_sql.MybatisSqlIconProvider"/>
+        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mapper_sql.MapperSqlIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.view_value.ViewValueLineMarkerProvider"/>
 

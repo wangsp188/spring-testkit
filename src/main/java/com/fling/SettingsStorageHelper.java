@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.FileReader;
@@ -23,7 +24,7 @@ import java.util.function.Function;
  * 每个project一个文件
  * 每个文件的内容是个json，结构是ProjectConfig这样的
  */
-public class LocalStorageHelper {
+public class SettingsStorageHelper {
 
     private static final String CONFIG_DIR = ".spring-fling/config";
 
@@ -272,6 +273,19 @@ public class LocalStorageHelper {
         defMonitorConfig.setWhites("");
     }
 
+    public static boolean isEnableSideServer(Project project) {
+        return getConfig(project).isEnableSideServer();
+    }
+
+
+    public static void setEnableSideServer(Project project, boolean enable) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        projectConfig.setEnableSideServer(enable);
+        saveProjectConfig(project, projectConfig);
+    }
 
     public static String getFlexibleTestPackage(Project project) {
         return getConfig(project).getFlexibleTestPackage();
@@ -284,6 +298,10 @@ public class LocalStorageHelper {
 
     public static String getAppScript(Project project, String app) {
         return getAppConfig(project, app).getScript();
+    }
+
+    public static DatasourceConfig getAppDatasourceConfig(Project project, String app) {
+        return getAppConfig(project, app).getDatasourceConfig();
     }
 
     public static ControllerCommand getAppControllerCommand(Project project, String app) {
@@ -371,6 +389,25 @@ public class LocalStorageHelper {
         saveProjectConfig(project, projectConfig);
     }
 
+    public static void setAppDatasourceConfig(Project project, String app, DatasourceConfig config) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        if (projectConfig.getAppConfigs() == null) {
+            projectConfig.setAppConfigs(new HashMap<>());
+        }
+
+
+        projectConfig.getAppConfigs().computeIfAbsent(app, new Function<String, Config>() {
+            @Override
+            public Config apply(String s) {
+                return new Config();
+            }
+        }).setDatasourceConfig(config);
+        saveProjectConfig(project, projectConfig);
+    }
+
     public static void setAppControllerCommand(Project project, String app, ControllerCommand adapter) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
@@ -396,13 +433,29 @@ public class LocalStorageHelper {
         if (projectConfig == null) {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
-            config.setMonitorConfig(defMonitorConfig);
+            config.setMonitorConfig(copyDefMonitorConfig());
+            config.setEnableSideServer(true);
             return config;
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
-        config.setMonitorConfig(projectConfig.getMonitorConfig() == null ? defMonitorConfig : projectConfig.getMonitorConfig());
+        config.setMonitorConfig(projectConfig.getMonitorConfig() == null ? copyDefMonitorConfig() : projectConfig.getMonitorConfig());
+        config.setEnableSideServer(projectConfig.isEnableSideServer());
         return config;
+    }
+
+    private static MonitorConfig copyDefMonitorConfig() {
+        MonitorConfig copyConfig = new MonitorConfig();
+        copyConfig.setMonitorPrivate(defMonitorConfig.isMonitorPrivate());
+        copyConfig.setPackages(defMonitorConfig.getPackages());
+        copyConfig.setClsSuffix(defMonitorConfig.getClsSuffix());
+        copyConfig.setWhites(defMonitorConfig.getWhites());
+        copyConfig.setBlacks(defMonitorConfig.getBlacks());
+        copyConfig.setEnable(defMonitorConfig.isEnable());
+        copyConfig.setMonitorWeb(defMonitorConfig.isMonitorWeb());
+        copyConfig.setMonitorMybatis(defMonitorConfig.isMonitorMybatis());
+        copyConfig.setLogMybatis(defMonitorConfig.isLogMybatis());
+        return copyConfig;
     }
 
 
@@ -479,6 +532,7 @@ public class LocalStorageHelper {
 
     public static class ProjectConfig {
 
+        private boolean enableSideServer = true;
         private String flexibleTestPackage;
         private String script;
         private ControllerCommand controllerCommand;
@@ -524,15 +578,25 @@ public class LocalStorageHelper {
         public void setControllerCommand(ControllerCommand controllerCommand) {
             this.controllerCommand = controllerCommand;
         }
+
+        public boolean isEnableSideServer() {
+            return enableSideServer;
+        }
+
+        public void setEnableSideServer(boolean enableSideServer) {
+            this.enableSideServer = enableSideServer;
+        }
     }
 
     public static class Config {
 
+        private boolean enableSideServer = true;
         private String flexibleTestPackage;
         private String script;
         private ControllerCommand controllerCommand;
         private String properties;
         private MonitorConfig monitorConfig;
+        private DatasourceConfig datasourceConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -572,6 +636,22 @@ public class LocalStorageHelper {
 
         public void setControllerCommand(ControllerCommand controllerCommand) {
             this.controllerCommand = controllerCommand;
+        }
+
+        public boolean isEnableSideServer() {
+            return enableSideServer;
+        }
+
+        public void setEnableSideServer(boolean enableSideServer) {
+            this.enableSideServer = enableSideServer;
+        }
+
+        public DatasourceConfig getDatasourceConfig() {
+            return datasourceConfig;
+        }
+
+        public void setDatasourceConfig(DatasourceConfig datasourceConfig) {
+            this.datasourceConfig = datasourceConfig;
         }
     }
 
@@ -688,6 +768,39 @@ public class LocalStorageHelper {
 
         public void setLogMybatis(boolean logMybatis) {
             this.logMybatis = logMybatis;
+        }
+    }
+
+
+
+    public static class DatasourceConfig {
+
+        private String url;
+        private String username;
+        private String password;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
         }
     }
 

@@ -5,7 +5,7 @@
 
 核心理念：<font style="color:rgb(230, 69, 147);">BAAS </font><font style="color:rgb(34, 33, 36);">(Bean as a Service)+ Runtime Test</font>
 
-# Quick start(<font style="color:rgb(230, 69, 147);">call-method</font>)
+# Quick start(<font style="color:rgb(230, 69, 147);">method-call</font>)
 > <font style="color:rgb(230, 69, 147);">Bean as a Service </font>
 >
 
@@ -31,7 +31,7 @@ IDEA版本：`2023.2.6+`
 >
 [spring-cache.mp4](./file/spring-cache.mp4)
 
-# <font style="color:rgb(230, 69, 147);">mybatis-sql</font>
+# <font style="color:rgb(230, 69, 147);">mapper-sql</font>
 > <font style="color:rgb(230, 69, 147);">不依赖本地服务启动</font>
 >
 > 市面上有构建mybatis-sql的插件，貌似都收费。  

@@ -1,4 +1,4 @@
-package com.fling.tools.mybatis_sql;
+package com.fling.tools.mapper_sql;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.tools.ToolHelper;
@@ -31,9 +31,9 @@ import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.function.Supplier;
 
-public class MybatisSqlTool extends BasePluginTool {
+public class MapperSqlTool extends BasePluginTool {
 
-    public static final Icon FLING_SQL_DISABLE_ICON = IconLoader.getIcon("/icons/fling-sql-disable.svg", MybatisSqlIconProvider.class);
+    public static final Icon FLING_SQL_DISABLE_ICON = IconLoader.getIcon("/icons/fling-sql-disable.svg", MapperSqlIconProvider.class);
 
 
     public static final Icon REPLACE_DISABLE_ICON = IconLoader.getIcon("/icons/replace-disable.svg", CallMethodIconProvider.class);
@@ -49,14 +49,14 @@ public class MybatisSqlTool extends BasePluginTool {
         this.tool = PluginToolEnum.FLEXIBLE_TEST;
     }
 
-    public MybatisSqlTool(FlingToolWindow flingToolWindow) {
+    public MapperSqlTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
     }
 
     @Override
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new GridBagLayout());
-        actionComboBox = addActionComboBox(FLING_SQL_DISABLE_ICON,FLING_SQL_DISABLE_ICON, "<strong>mybatis-sql</strong><br>\n" +
+        actionComboBox = addActionComboBox(FLING_SQL_DISABLE_ICON,FLING_SQL_DISABLE_ICON, "<strong>mapper-sql</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>mapper的xml文件内 sql标签</li>\n" +
                 "    <li>select/insert/update/delete</li>\n" +
@@ -125,7 +125,7 @@ public class MybatisSqlTool extends BasePluginTool {
                         String statementId = selectedItem.getXmlTag().getAttributeValue("id");
                         System.err.println("xml: " + xmlContent + ", statementId: " + statementId + ", params:" + jsonObject.toJSONString());
                         try {
-                            String sql = MybatisGenerator.generateSql(xmlContent, statementId, !replaceParamsButton.isSelected(), jsonObject);
+                            String sql = MapperGenerator.generateSql(xmlContent, statementId, !replaceParamsButton.isSelected(), jsonObject);
                             if (StringUtils.isBlank(sql)) {
                                 return sql;
                             }
@@ -208,7 +208,7 @@ public class MybatisSqlTool extends BasePluginTool {
         new SwingWorker<JSONObject, Void>() {
             @Override
             protected JSONObject doInBackground() throws Exception {
-                return MybatisGenerator.buildParamTemplate(xmlContent, statementId);
+                return MapperGenerator.buildParamTemplate(xmlContent, statementId);
             }
 
             @Override

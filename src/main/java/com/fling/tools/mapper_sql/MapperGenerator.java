@@ -1,4 +1,4 @@
-package com.fling.tools.mybatis_sql;
+package com.fling.tools.mapper_sql;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -35,7 +35,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class MybatisGenerator {
+public class MapperGenerator {
 
     /**
      * 构建sql

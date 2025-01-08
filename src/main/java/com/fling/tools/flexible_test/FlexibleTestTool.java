@@ -4,9 +4,9 @@ import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
 import com.fling.ReqStorageHelper;
 import com.fling.RuntimeAppHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
-import com.fling.LocalStorageHelper;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.Messages;
@@ -132,7 +132,7 @@ public class FlexibleTestTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -190,9 +190,10 @@ public class FlexibleTestTool extends BasePluginTool {
         req.put("method", action);
         req.put("params", params);
         if(useScript){
-            req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+            RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
+            req.put("script", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
-        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
+        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         return req;

@@ -6,11 +6,11 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
 import com.fling.ReqStorageHelper;
 import com.fling.RuntimeAppHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
-import com.fling.LocalStorageHelper;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
@@ -51,14 +51,14 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class CallMethodTool extends BasePluginTool {
+public class MethodCallTool extends BasePluginTool {
 
-    public static final Icon CALL_METHOD_DISABLE_ICON = IconLoader.getIcon("/icons/spring-fling-disable.svg", CallMethodTool.class);
+    public static final Icon CALL_METHOD_DISABLE_ICON = IconLoader.getIcon("/icons/spring-fling-disable.svg", MethodCallTool.class);
 
-    public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", CallMethodTool.class);
-    public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", CallMethodTool.class);
-    public static final Icon CONTROLLER_ICON = IconLoader.getIcon("/icons/controller.svg", CallMethodTool.class);
-    public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", CallMethodTool.class);
+    public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", MethodCallTool.class);
+    public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", MethodCallTool.class);
+    public static final Icon CONTROLLER_ICON = IconLoader.getIcon("/icons/controller.svg", MethodCallTool.class);
+    public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", MethodCallTool.class);
 
 
     private JButton controllerCommandButton;
@@ -67,10 +67,10 @@ public class CallMethodTool extends BasePluginTool {
     private JToggleButton useProxyButton;
 
     {
-        this.tool = PluginToolEnum.CALL_METHOD;
+        this.tool = PluginToolEnum.METHOD_CALL;
     }
 
-    public CallMethodTool(FlingToolWindow flingToolWindow) {
+    public MethodCallTool(FlingToolWindow flingToolWindow) {
         super(flingToolWindow);
 
         controllerCommandButton = new JButton(CONTROLLER_ICON);
@@ -98,10 +98,10 @@ public class CallMethodTool extends BasePluginTool {
             DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
             if (CollectionUtils.isNotEmpty(projectAppList)) {
                 for (String app : projectAppList) {
-                    LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
+                    SettingsStorageHelper.ControllerCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(flingToolWindow.getProject(), app);
                     String script = controllerCommand.getScript();
                     List<String> envs = controllerCommand.getEnvs();
-                    if (CollectionUtils.isEmpty(envs) && Objects.equals(script,LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
+                    if (CollectionUtils.isEmpty(envs) && Objects.equals(script, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
                         continue;
                     }
                     if(CollectionUtils.isEmpty(envs)){
@@ -145,7 +145,7 @@ public class CallMethodTool extends BasePluginTool {
                         application.runReadAction(new Runnable() {
                             @Override
                             public void run() {
-                                handleControllerCommand(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
+                                handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
                             }
                         });
                     }
@@ -464,7 +464,7 @@ public class CallMethodTool extends BasePluginTool {
 
 
     public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
-        RuntimeAppHelper.VisibleApp selectedApp = getSelectedApp();
+        RuntimeAppHelper.VisibleApp selectedApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
@@ -475,7 +475,7 @@ public class CallMethodTool extends BasePluginTool {
     protected JPanel createActionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON, CALL_METHOD_DISABLE_ICON,
-                "<strong>call-method</strong>\n<ul>\n" +
+                "<strong>method-call</strong>\n<ul>\n" +
                         "    <li>spring bean 的 public 函数</li>\n" +
                         "    <li>非init/main</li>\n" +
                         "    <li>非test source</li>\n" +
@@ -522,7 +522,7 @@ public class CallMethodTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = getSelectedApp();
+                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -551,7 +551,7 @@ public class CallMethodTool extends BasePluginTool {
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);
-                        return buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.CALL_METHOD.getCode());
+                        return buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.METHOD_CALL.getCode());
                     }
                 });
             }
@@ -585,11 +585,12 @@ public class CallMethodTool extends BasePluginTool {
         req.put("method", action);
         req.put("params", params);
 
-        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(getProject());
+        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         if (useScript) {
-            req.put("script", LocalStorageHelper.getAppScript(getProject(), getSelectedAppName()));
+            RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
+            req.put("script", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         return req;
     }

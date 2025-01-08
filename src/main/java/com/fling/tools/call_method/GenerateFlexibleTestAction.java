@@ -1,30 +1,21 @@
 package com.fling.tools.call_method;
 
 import com.fling.FlingHelper;
-import com.fling.LocalStorageHelper;
+import com.fling.SettingsStorageHelper;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.module.ModuleUtil;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.openapi.module.Module;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.refactoring.changeClassSignature.New;
 import org.jetbrains.annotations.NotNull;
-
-import javax.swing.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 // action类实现
 public class GenerateFlexibleTestAction extends AnAction {
@@ -117,7 +108,7 @@ public class GenerateFlexibleTestAction extends AnAction {
     }
 
     public void generateOrAddTestMethod(Project project, PsiDirectory testSourceRoot, String className, String content) {
-        String packageName = LocalStorageHelper.getFlexibleTestPackage(project);
+        String packageName = SettingsStorageHelper.getFlexibleTestPackage(project);
         String methodName = "test_" + System.currentTimeMillis();
         String testClassName = className + "_SelectionTest";
 

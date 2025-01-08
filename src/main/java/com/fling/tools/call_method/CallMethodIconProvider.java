@@ -17,7 +17,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.fling.tools.PluginToolEnum;
-import com.fling.LocalStorageHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.FlingHelper;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -102,7 +102,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
                                 throw new HeadlessException("Cannot display UI elements in a headless environment.");
                             }
                             Project project = elt.getProject();
-                            FlingToolWindowFactory.switch2Tool(project, PluginToolEnum.CALL_METHOD, elt);
+                            FlingToolWindowFactory.switch2Tool(project, PluginToolEnum.METHOD_CALL, elt);
                         }
                     },
                     GutterIconRenderer.Alignment.RIGHT
@@ -150,6 +150,9 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         Module module = ModuleUtilCore.findModuleForPsiElement(psiMethod);
         if (module == null) {
             return "not_find_module";
+        }
+        if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
+            return "disable_side_server";
         }
 
 //        VirtualFile testSourceRoot = getTestSourceRoot(module);
@@ -324,7 +327,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     }
 
     public static PsiDirectory createPackageDirectory(Project project, PsiDirectory testDir) {
-        String flexibleTestPackage = LocalStorageHelper.getFlexibleTestPackage(project);
+        String flexibleTestPackage = SettingsStorageHelper.getFlexibleTestPackage(project);
         String[] packageParts = flexibleTestPackage.split("\\.");
 
 
@@ -390,7 +393,7 @@ public class CallMethodIconProvider implements LineMarkerProvider {
     }
 
     public void generateOrAddTestMethod(PsiMethod psiMethod,Project project,PsiDirectory testSourceRoot) {
-        String packageName = LocalStorageHelper.getFlexibleTestPackage(project);
+        String packageName = SettingsStorageHelper.getFlexibleTestPackage(project);
         String methodName = psiMethod.getName();
         PsiClass containingClass = psiMethod.getContainingClass();
         String className = containingClass.getName();

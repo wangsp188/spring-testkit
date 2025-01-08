@@ -1,4 +1,4 @@
-package com.fling.tools.mybatis_sql;
+package com.fling.tools.mapper_sql;
 
 import com.fling.view.FlingToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
@@ -18,9 +18,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 
-public class MybatisSqlIconProvider implements LineMarkerProvider {
+public class MapperSqlIconProvider implements LineMarkerProvider {
 
-    public static final Icon FLING_SQL_ICON = IconLoader.getIcon("/icons/fling-sql.svg", MybatisSqlIconProvider.class);
+    public static final Icon FLING_SQL_ICON = IconLoader.getIcon("/icons/fling-sql.svg", MapperSqlIconProvider.class);
 
 
     @Nullable
@@ -50,7 +50,7 @@ public class MybatisSqlIconProvider implements LineMarkerProvider {
                             throw new HeadlessException("Cannot display UI elements in a headless environment.");
                         }
                         Project project = elt.getProject();
-                        FlingToolWindowFactory.switch2Tool(project, PluginToolEnum.MYBATIS_SQL, elt);
+                        FlingToolWindowFactory.switch2Tool(project, PluginToolEnum.MAPPER_SQL, elt);
                     }
                 },
                 GutterIconRenderer.Alignment.RIGHT

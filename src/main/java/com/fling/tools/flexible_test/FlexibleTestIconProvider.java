@@ -1,7 +1,7 @@
 package com.fling.tools.flexible_test;
 
+import com.fling.SettingsStorageHelper;
 import com.fling.tools.PluginToolEnum;
-import com.fling.LocalStorageHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
 import com.fling.view.FlingToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
@@ -98,6 +98,10 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
         if (virtualFile == null) {
             return "not_find_virtualFile";
         }
+
+        if (!SettingsStorageHelper.isEnableSideServer(modifierList.getProject())) {
+            return "disable_side_server";
+        }
         // 获取文件的完整路径
         String filePath = virtualFile.getPath();
         String packageName = ((PsiJavaFile) psiFile).getPackageName();
@@ -109,7 +113,7 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return "not_test_source";
         }
 
-        String flexibleTestPackage = LocalStorageHelper.getFlexibleTestPackage(modifierList.getProject());
+        String flexibleTestPackage = SettingsStorageHelper.getFlexibleTestPackage(modifierList.getProject());
         // 4. 必须在指定的包下
         return packageName.contains(flexibleTestPackage) ? null : "not_flexible_package";
     }

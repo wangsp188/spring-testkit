@@ -2,11 +2,9 @@ package com.fling;
 
 import com.alibaba.fastjson.JSON;
 import com.intellij.execution.Executor;
-import com.intellij.execution.JavaRunConfigurationBase;
 import com.intellij.execution.application.ApplicationConfiguration;
 import com.intellij.execution.configurations.JavaParameters;
 import com.intellij.execution.configurations.ParametersList;
-import com.intellij.execution.configurations.RunConfigurationBase;
 import com.intellij.execution.configurations.RunProfile;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
@@ -15,9 +13,7 @@ import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.spring.boot.run.SpringBootApplicationRunConfigurationBase;
 
-import javax.swing.*;
 import java.io.File;
 import java.io.StringReader;
 import java.net.URLEncoder;
@@ -63,23 +59,30 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 
             // 获取插件安装目录
             String pluginPath = PathManager.getPluginsPath();
-            // 相对路径到你的 JAR 包
-            String relativeJarPath = "spring-fling" + File.separator + "lib" + File.separator + "spring-fling_side_server-0.0.1.jar";
-            String springStarterJarPath = pluginPath + File.separator + relativeJarPath;
-            // 添加 Jar 到 classpath
-            javaParameters.getClassPath().add(springStarterJarPath);
+
+            boolean show = false;
+
+            if (SettingsStorageHelper.isEnableSideServer(project)) {
+                // 相对路径到你的 JAR 包
+                String relativeJarPath = "spring-fling" + File.separator + "lib" + File.separator + "spring-fling_side_server-0.0.1.jar";
+                String springStarterJarPath = pluginPath + File.separator + relativeJarPath;
+                // 添加 Jar 到 classpath
+                javaParameters.getClassPath().add(springStarterJarPath);
+                show = true;
+            }
+
 
             String linkJarPath = "spring-fling" + File.separator + "lib" + File.separator + "spring-fling_link-0.0.1.jar";
 //            增加ajar到
             javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
 
 
-            LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(project);
+            SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(project);
             if (monitorConfig.isEnable()) {
                 //            增加参数 -javaagent:/Users/dexwang/sourcecode/java/spring-fling_side_server/agent/target/agent-1.0-SNAPSHOT.jar
                 String agentPath = "spring-fling" + File.separator + "lib" + File.separator + "spring-fling_agent-0.0.1.jar";
 
-                monitorConfig = JSON.parseObject(JSON.toJSONString(monitorConfig),LocalStorageHelper.MonitorConfig.class);
+                monitorConfig = JSON.parseObject(JSON.toJSONString(monitorConfig), SettingsStorageHelper.MonitorConfig.class);
                 if (monitorConfig.judgeIsAppSthreePackage()) {
                     String runClass = configurationBase.getRunClass();
                     String[] parts = runClass.split("\\.");
@@ -95,6 +98,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 String encodedJson = URLEncoder.encode(base64Json, "UTF-8");
                 javaParameters.getVMParametersList().add("-javaagent:" + pluginPath + File.separator + agentPath+"="+encodedJson);
                 vmParametersList.addProperty("fling.monitor.enable", "true");
+                show = true;
             }
 
 
@@ -102,9 +106,8 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             vmParametersList.addProperty("fling.app.name", runProfile.getName());
 
             String appName = configurationBase.getName();
-            String propertiesStr = LocalStorageHelper.getAppProperties(project, appName);
+            String propertiesStr = SettingsStorageHelper.getAppProperties(project, appName);
 
-            FlingHelper.notify(project,NotificationType.INFORMATION,"Buddha bless, Never Bug");
 
             Properties properties = new Properties();
             properties.load(new StringReader(propertiesStr));
@@ -113,6 +116,11 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 String propertyValue = properties.getProperty(propertyName);
                 vmParametersList.addProperty(propertyName, propertyValue);
                 System.err.println("Fling addProperty:" + propertyName + "=" + propertyValue);
+                show = true;
+            }
+
+            if(show){
+                FlingHelper.notify(project,NotificationType.INFORMATION,"Buddha bless, Never Bug");
             }
         } catch (Exception e) {
             e.printStackTrace();

@@ -2,9 +2,9 @@ package com.fling.tools;
 
 public enum PluginToolEnum {
     SPRING_CACHE("spring-cache"),
-    CALL_METHOD("call-method"),
+    METHOD_CALL("method-call"),
     FLEXIBLE_TEST("flexible-test"),
-    MYBATIS_SQL("mybatis-sql")
+    MAPPER_SQL("mapper-sql")
     ;
 
     private String code;

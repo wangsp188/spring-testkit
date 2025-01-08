@@ -6,13 +6,13 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
-import com.fling.LocalStorageHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.ReqStorageHelper;
 import com.fling.RuntimeAppHelper;
 import com.fling.tools.PluginToolEnum;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.call_method.CallMethodIconProvider;
-import com.fling.tools.call_method.CallMethodTool;
+import com.fling.tools.call_method.MethodCallTool;
 import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.util.Container;
 import com.fling.util.HttpUtil;
@@ -26,7 +26,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -284,7 +283,8 @@ public class ReqStoreDialog {
     public void visible(boolean visible) {
         if (appBox.getItemCount() > 0) {
             String selectedItem = (String) appBox.getSelectedItem();
-            String selectedApp = toolWindow.getSelectedAppName();
+            RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(toolWindow.getProject().getName());
+            String selectedApp = visibleApp==null?null:visibleApp.getAppName();
             List<String> projectAppList = RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().map(new Function<RuntimeAppHelper.AppMeta, String>() {
                 @Override
                 public String apply(RuntimeAppHelper.AppMeta appMeta) {
@@ -296,12 +296,7 @@ public class ReqStoreDialog {
             }
         }
 
-        WriteCommandAction.runWriteCommandAction(toolWindow.getProject(), new Runnable() {
-            @Override
-            public void run() {
-                dialog.setVisible(visible);
-            }
-        });
+        dialog.setVisible(visible);
     }
 
 //
@@ -760,17 +755,17 @@ public class ReqStoreDialog {
         });
 
 
-        useProxyButton = new JToggleButton(CallMethodTool.PROXY_ICON, true);
+        useProxyButton = new JToggleButton(MethodCallTool.PROXY_ICON, true);
         useProxyButton.setPreferredSize(new Dimension(32, 32));
         useProxyButton.setToolTipText("Use proxy obj call method");
         useProxyButton.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (useProxyButton.isSelected()) {
-                    useProxyButton.setIcon(CallMethodTool.PROXY_ICON);
+                    useProxyButton.setIcon(MethodCallTool.PROXY_ICON);
                     useProxyButton.setToolTipText("Use proxy obj call method");
                 } else {
-                    useProxyButton.setIcon(CallMethodTool.PROXY_DISABLE_ICON);
+                    useProxyButton.setIcon(MethodCallTool.PROXY_DISABLE_ICON);
                     useProxyButton.setToolTipText("Use original obj call method");
                 }
             }
@@ -779,7 +774,7 @@ public class ReqStoreDialog {
         executeButton.setToolTipText("Execute this");
         executeButton.setPreferredSize(new Dimension(32, 32));
         executeButton.addActionListener(e -> executeAction());
-        controllerCommandButton = new JButton(CallMethodTool.CONTROLLER_ICON);
+        controllerCommandButton = new JButton(MethodCallTool.CONTROLLER_ICON);
         controllerCommandButton.setToolTipText("Generate controller command");
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
         controllerCommandButton.addActionListener(new ActionListener() {
@@ -797,17 +792,17 @@ public class ReqStoreDialog {
 
                 String app = (String) appBox.getSelectedItem();
                 DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-                LocalStorageHelper.ControllerCommand controllerCommand = LocalStorageHelper.getAppControllerCommand(toolWindow.getProject(), app);
+                SettingsStorageHelper.ControllerCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(toolWindow.getProject(), app);
                 String script = controllerCommand.getScript();
                 List<String> envs = controllerCommand.getEnvs();
-                if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
+                if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
                     if (CollectionUtils.isEmpty(envs)) {
                         envs = new ArrayList<>();
                         envs.add(null);
                     }
                     for (String env : envs) {
                         //显示的一个图标加上标题
-                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, CallMethodTool.GENERATE_ICON) {
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, MethodCallTool.GENERATE_ICON) {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 Application application = ApplicationManager.getApplication();
@@ -841,7 +836,7 @@ public class ReqStoreDialog {
                             application.runReadAction(new Runnable() {
                                 @Override
                                 public void run() {
-                                    handleControllerCommand(null, LocalStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), callMethodMeta.getControllerMeta());
+                                    handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), callMethodMeta.getControllerMeta());
                                 }
                             });
                         }
@@ -888,7 +883,7 @@ public class ReqStoreDialog {
 //               parse是个双层 map 参数
 //                我想让双层key展开平铺
         JSONObject flattenedParse = new JSONObject();
-        CallMethodTool.flattenJson(inputParams, flattenedParse);
+        MethodCallTool.flattenJson(inputParams, flattenedParse);
 //                @requestParam Set<String> ids 这种是需要支持的
         Iterator<Map.Entry<String, Object>> iterator = inputParams.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -1303,14 +1298,14 @@ public class ReqStoreDialog {
         params.put("args", ToolHelper.adapterParams(meta.getArgNames(), args).toJSONString());
         params.put("original", !useProxyButton.isSelected());
         JSONObject req = new JSONObject();
-        req.put("method", PluginToolEnum.CALL_METHOD.getCode());
+        req.put("method", PluginToolEnum.METHOD_CALL.getCode());
         req.put("params", params);
 
-        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(toolWindow.getProject());
+        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         if (meta.isUseScript()) {
-            req.put("script", LocalStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("script", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }
@@ -1325,11 +1320,11 @@ public class ReqStoreDialog {
         req.put("method", PluginToolEnum.FLEXIBLE_TEST.getCode());
         req.put("params", params);
 
-        LocalStorageHelper.MonitorConfig monitorConfig = LocalStorageHelper.getMonitorConfig(toolWindow.getProject());
+        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         if (meta.isUseScript()) {
-            req.put("script", LocalStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("script", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }

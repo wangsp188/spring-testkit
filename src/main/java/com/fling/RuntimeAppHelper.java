@@ -27,10 +27,31 @@ public class RuntimeAppHelper {
 
     private static final Map<String, Boolean> monitorMap = new HashMap<>();
 
+    private static final Map<String,VisibleApp> selectedApps = new HashMap<>();
 
     private static final Map<String, List<AppMeta>> appMetas = new HashMap<>();
 
     private static final Map<String, List<VisibleApp>> visibleApps = new HashMap<>();
+
+
+    public static VisibleApp getSelectedApp(String project) {
+        if (project == null) {
+            return null;
+        }
+        return selectedApps.get(project);
+    }
+
+    public static void updateSelectedApp(String project,VisibleApp app) {
+        if (project == null) {
+            return ;
+        }
+        if (app==null) {
+            selectedApps.remove(project);
+        }else{
+            selectedApps.put(project, app);
+        }
+    }
+
 
     public static void updateMonitors(Map<String, Boolean> monitors) {
         if (monitors == null) {
