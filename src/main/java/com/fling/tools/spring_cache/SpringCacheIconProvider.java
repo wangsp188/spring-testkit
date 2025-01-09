@@ -1,5 +1,7 @@
 package com.fling.tools.spring_cache;
 
+import com.fling.RuntimeAppHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.tools.PluginToolEnum;
 import com.fling.tools.ToolHelper;
 import com.fling.view.FlingToolWindowFactory;
@@ -73,6 +75,11 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
         if (containingClass == null) {
             return false;
         }
+
+        if(!RuntimeAppHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
+            return false;
+        }
+
         // 4. 检查类是否含有 Spring 可注册 Bean 的注解
         if (!ToolHelper.isSpringBean(containingClass)) {
             return false;

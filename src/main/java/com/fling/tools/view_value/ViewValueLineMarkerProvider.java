@@ -3,6 +3,7 @@ package com.fling.tools.view_value;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
 import com.fling.RuntimeAppHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.HttpUtil;
 import com.fling.util.JsonUtil;
@@ -129,6 +130,25 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
             return "containingClassNull";
         }
 
+        // 获取字段的类型的简单名称
+        PsiType fieldType = field.getType();
+        String fieldTypeName = fieldType.getPresentableText(); // 获取类型的简单名称
+
+        // 判断字段类型是否为 Logger
+        if ("Logger".equals(fieldTypeName)) {
+            return "log";
+        }
+
+        // 判断字段名称是否为 serialVersionUID
+        String fieldName = field.getName();
+        if ("serialVersionUID".equals(fieldName)) {
+            return "ser";
+        }
+//        如果是Logger则返回log
+//        如果是serialVersionUID 返回 ser
+
+
+
         PsiFile psiFile = field.getContainingFile();
         // 5. 必须不在Java的test模块下
         VirtualFile virtualFile = psiFile.getVirtualFile();
@@ -139,6 +159,10 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
             if (filePath.contains("/src/test/java/")) {
                 return "is_test_module";
             }
+        }
+
+        if(!RuntimeAppHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())){
+            return "no_side_server";
         }
 
         // 2. 必须是非静态方法

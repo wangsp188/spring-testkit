@@ -6,7 +6,7 @@ import com.fling.ReqStorageHelper;
 import com.fling.RuntimeAppHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
-import com.fling.tools.call_method.CallMethodIconProvider;
+import com.fling.tools.method_call.MethodCallIconProvider;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.Messages;
@@ -28,7 +28,7 @@ import java.util.function.Supplier;
 
 public class FlexibleTestTool extends BasePluginTool {
 
-    public static final Icon FLEXIBLE_TEST_DISABLE_ICON = IconLoader.getIcon("/icons/test-code-disable.svg", CallMethodIconProvider.class);
+    public static final Icon FLEXIBLE_TEST_DISABLE_ICON = IconLoader.getIcon("/icons/test-code-disable.svg", MethodCallIconProvider.class);
 
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
@@ -191,7 +191,7 @@ public class FlexibleTestTool extends BasePluginTool {
         req.put("params", params);
         if(useScript){
             RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
-            req.put("script", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(getProject());
         req.put("monitor", monitorConfig.isEnable());

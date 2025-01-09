@@ -11,8 +11,8 @@ import com.fling.ReqStorageHelper;
 import com.fling.RuntimeAppHelper;
 import com.fling.tools.PluginToolEnum;
 import com.fling.tools.ToolHelper;
-import com.fling.tools.call_method.CallMethodIconProvider;
-import com.fling.tools.call_method.MethodCallTool;
+import com.fling.tools.method_call.MethodCallIconProvider;
+import com.fling.tools.method_call.MethodCallTool;
 import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.util.Container;
 import com.fling.util.HttpUtil;
@@ -296,7 +296,9 @@ public class ReqStoreDialog {
             }
         }
 
-        dialog.setVisible(visible);
+        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            dialog.setVisible(true);
+        }
     }
 
 //
@@ -553,7 +555,7 @@ public class ReqStoreDialog {
 
         // 第一行：图标和标题
         JPanel firstRow = new JPanel(new BorderLayout(5, 0));
-        iconLabel = new JLabel(CallMethodIconProvider.CALL_METHOD_ICON);
+        iconLabel = new JLabel(MethodCallIconProvider.CALL_METHOD_ICON);
         reqsComboBox = new JComboBox<>();
         firstRow.add(iconLabel, BorderLayout.WEST);
         firstRow.add(reqsComboBox, BorderLayout.CENTER);
@@ -1305,7 +1307,7 @@ public class ReqStoreDialog {
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         if (meta.isUseScript()) {
-            req.put("script", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }
@@ -1324,7 +1326,7 @@ public class ReqStoreDialog {
         req.put("monitor", monitorConfig.isEnable());
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         if (meta.isUseScript()) {
-            req.put("script", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }
@@ -1341,7 +1343,7 @@ public class ReqStoreDialog {
         // 根据不同的类型返回不同的图标
         switch (type) {
             case call_method:
-                return CallMethodIconProvider.CALL_METHOD_ICON;
+                return MethodCallIconProvider.CALL_METHOD_ICON;
             case flexible_test:
                 return FlexibleTestIconProvider.FLEXIBLE_TEST_ICON;
             default:

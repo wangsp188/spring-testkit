@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.FileReader;
@@ -34,7 +33,7 @@ public class SettingsStorageHelper {
             + "#You can write some configurations for local startup use, like log level\n"
             + "logging.level.com.fling=INFO";
 
-    public static final String defScript =
+    public static final String defInterceptor =
             "import org.springframework.beans.factory.annotation.Autowired;\n" +
                     "import org.springframework.context.ApplicationContext;\n" +
                     "\n" +
@@ -42,7 +41,7 @@ public class SettingsStorageHelper {
                     "\n" +
                     "\n" +
                     "/**\n" +
-                    " * 拦截tool执行的脚本类\n" +
+                    " * tool执行的拦截类\n" +
                     " * 一定要有一个无参构造\n" +
                     " * tool执行前后分别会执行invokeBefore和invokeAfter函数\n" +
                     " * 可执行业务逻辑\n" +
@@ -51,7 +50,7 @@ public class SettingsStorageHelper {
                     " * 登录态模拟\n" +
                     " * 支持使用@Autowired注入项目中存在的bean\n" +
                     " */\n" +
-                    "class MyScript {\n" +
+                    "class MyInterceptor {\n" +
                     "\n" +
                     "    @Autowired\n" +
                     "    private ApplicationContext ctx;\n" +

@@ -1,4 +1,4 @@
-package com.fling.tools.call_method;
+package com.fling.tools.method_call;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -474,7 +474,7 @@ public class MethodCallTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        actionComboBox = addActionComboBox(CallMethodIconProvider.CALL_METHOD_ICON, CALL_METHOD_DISABLE_ICON,
+        actionComboBox = addActionComboBox(MethodCallIconProvider.CALL_METHOD_ICON, CALL_METHOD_DISABLE_ICON,
                 "<strong>method-call</strong>\n<ul>\n" +
                         "    <li>spring bean 的 public 函数</li>\n" +
                         "    <li>非init/main</li>\n" +
@@ -590,7 +590,7 @@ public class MethodCallTool extends BasePluginTool {
         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
         if (useScript) {
             RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
-            req.put("script", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         return req;
     }
@@ -637,7 +637,7 @@ public class MethodCallTool extends BasePluginTool {
         }
 
         PsiMethod method = methodAction.getMethod();
-        boolean requestMethod = isRequestMethod(method);
+        boolean requestMethod = MethodCallIconProvider.isRequestMethod(method);
         //判断panel1是否存在button1
         if (requestMethod && !Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
             actionPanel.add(controllerCommandButton);
@@ -648,40 +648,7 @@ public class MethodCallTool extends BasePluginTool {
     }
 
 
-    private boolean isRequestMethod(PsiMethod method) {
-        if (method == null) {
-            return false;
-        }
 
-        // Check if the method has any of the request mapping annotations
-        String[] requestMethodAnnotations = new String[]{
-                "org.springframework.web.bind.annotation.RequestMapping",
-                "org.springframework.web.bind.annotation.GetMapping",
-                "org.springframework.web.bind.annotation.PostMapping",
-                "org.springframework.web.bind.annotation.PutMapping",
-                "org.springframework.web.bind.annotation.DeleteMapping",
-                "org.springframework.web.bind.annotation.PatchMapping"
-        };
-
-        for (String annotationFqn : requestMethodAnnotations) {
-            if (method.getModifierList().findAnnotation(annotationFqn) != null) {
-                return true;
-            }
-        }
-
-        // Check if the class has @RestController or @Controller annotation
-        PsiClass containingClass = method.getContainingClass();
-        if (containingClass != null) {
-            PsiAnnotation restControllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RestController");
-            PsiAnnotation controllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.stereotype.Controller");
-
-            if (restControllerAnnotation != null || controllerAnnotation != null) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     public static void flattenJson(JSONObject parse, JSONObject flattenedParse) {
         for (String key : parse.keySet()) {

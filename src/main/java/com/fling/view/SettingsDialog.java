@@ -52,7 +52,7 @@ public class SettingsDialog {
 
     private JTextField flexibleTestPackageNameField;
 
-    private ComboBox<String> scriptAppBox;
+    private ComboBox<String> interceptorAppBox;
 
     private ComboBox<String> controllerScriptAppBox;
 
@@ -70,7 +70,9 @@ public class SettingsDialog {
 
     public void visible(){
         refreshSettings();
-        dialog.setVisible(true);
+        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            dialog.setVisible(true);
+        }
     }
 
     public void initApps(List<String> apps) {
@@ -80,7 +82,7 @@ public class SettingsDialog {
         apps.stream().forEach(new Consumer<String>() {
             @Override
             public void accept(String app) {
-                scriptAppBox.addItem(app);
+                interceptorAppBox.addItem(app);
                 controllerScriptAppBox.addItem(app);
                 propertiesAppBox.addItem(app);
                 sqlAppBox.addItem(app);
@@ -93,8 +95,8 @@ public class SettingsDialog {
         RuntimeAppHelper.VisibleApp selectedApp = RuntimeAppHelper.getSelectedApp(toolWindow.getProject().getName());
         String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
         if (selectedAppName == null) {
-            if (scriptAppBox.getItemCount() > 0) {
-                scriptAppBox.setSelectedIndex(0);
+            if (interceptorAppBox.getItemCount() > 0) {
+                interceptorAppBox.setSelectedIndex(0);
             }
             if (controllerScriptAppBox.getItemCount() > 0) {
                 controllerScriptAppBox.setSelectedIndex(0);
@@ -104,8 +106,8 @@ public class SettingsDialog {
                 propertiesAppBox.setSelectedIndex(0);
             }
         } else {
-            if (scriptAppBox.getItemCount() > 0) {
-                scriptAppBox.setSelectedItem(selectedAppName);
+            if (interceptorAppBox.getItemCount() > 0) {
+                interceptorAppBox.setSelectedItem(selectedAppName);
             }
             if (controllerScriptAppBox.getItemCount() > 0) {
                 controllerScriptAppBox.setSelectedItem(selectedAppName);
@@ -123,7 +125,7 @@ public class SettingsDialog {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"fling","trace", "tool-script", "spring-properties","controller-command","sql-analysis"};
+        String[] options = {"fling","trace", "tool-interceptor", "spring-properties","controller-command","sql-optimization"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
@@ -132,8 +134,8 @@ public class SettingsDialog {
         JPanel rightContent = new JPanel(new CardLayout());
         rightContent.add(createBasicOptionPanel(), "fling");
         rightContent.add(createTraceOptionPanel(), "trace");
-        rightContent.add(createSqlPanel(), "sql-analysis");
-        rightContent.add(createScriptOptionPanel(), "tool-script");
+        rightContent.add(createSqlPanel(), "sql-optimization");
+        rightContent.add(createInterceptorOptionPanel(), "tool-interceptor");
         rightContent.add(createPropertiesOptionPanel(), "spring-properties");
         rightContent.add(createControllerOptionPanel(), "controller-command");
         // 监听选项改变，更新右侧内容
@@ -208,21 +210,27 @@ public class SettingsDialog {
 
 
         // Method Call Label
-        JLabel methodCallLabel = new JLabel("Method-call");
-        JLabel methodCallDetailLabel = new JLabel("Method-call and flexible-test need enable this");
+        JLabel methodCallLabel = new JLabel("Spring enhancement");
+        JLabel methodCallDetailLabel = new JLabel("Method-call, flexible-test and so on require turned on this");
 
         // Button
         OnOffButton methodCallButton = new OnOffButton();
         methodCallButton.addActionListener(e -> {
+            boolean enableSideServer = SettingsStorageHelper.isEnableSideServer(toolWindow.getProject());
             if (methodCallButton.isSelected()) {
-                SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), true);
-                methodCallDetailLabel.setText("We will start a side server to provide method-call and flexible-test");
+                if(!enableSideServer){
+                    SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), true);
+                    FlingHelper.refresh(toolWindow.getProject());
+                }
+                methodCallDetailLabel.setText("We will start a side server to support method-call, flexible-test and so on");
             } else {
-                SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), false);
-                methodCallDetailLabel.setText("Method-call and flexible-test need enable this");
+                if(enableSideServer){
+                    SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), false);
+                    FlingHelper.refresh(toolWindow.getProject());
+                }
+                methodCallDetailLabel.setText("Method-call, flexible-test and so on require turned on this");
             }
-            FlingHelper.refresh(toolWindow.getProject());
-            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Method-call is " + (methodCallButton.isSelected() ? "enable" : "disable"));
+            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Spring enhancement is " + (methodCallButton.isSelected() ? "enable" : "disable"));
         });
 
         if (SettingsStorageHelper.isEnableSideServer(toolWindow.getProject())) {
@@ -311,12 +319,12 @@ public class SettingsDialog {
     }
 
 
-    private JPanel createScriptOptionPanel() {
+    private JPanel createInterceptorOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        LanguageTextField scriptField = new LanguageTextField(JavaLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.defScript, false);
+        LanguageTextField interceptorField = new LanguageTextField(JavaLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.defInterceptor, false);
 
         // 布局输入框
         gbc.gridx = 0;
@@ -326,13 +334,13 @@ public class SettingsDialog {
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.NORTHWEST;
-        panel.add(new JBScrollPane(scriptField), gbc);
+        panel.add(new JBScrollPane(interceptorField), gbc);
 
         String[] apps = new String[]{};
 
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("App:");
-        scriptAppBox = new ComboBox<>(apps);
+        interceptorAppBox = new ComboBox<>(apps);
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -349,28 +357,28 @@ public class SettingsDialog {
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(scriptAppBox, gbc);
+        panel.add(interceptorAppBox, gbc);
 
-        scriptAppBox.addActionListener(new AbstractAction() {
+        interceptorAppBox.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String selectedApp = (String) scriptAppBox.getSelectedItem();
+                String selectedApp = (String) interceptorAppBox.getSelectedItem();
                 if (selectedApp == null) {
-                    scriptField.setText(SettingsStorageHelper.defScript);
+                    interceptorField.setText(SettingsStorageHelper.defInterceptor);
                 } else {
-                    String appScript = SettingsStorageHelper.getAppScript(toolWindow.getProject(), selectedApp);
-                    scriptField.setText(appScript == null ? SettingsStorageHelper.defScript : appScript);
+                    String appInterceptor = SettingsStorageHelper.getAppScript(toolWindow.getProject(), selectedApp);
+                    interceptorField.setText(appInterceptor == null ? SettingsStorageHelper.defInterceptor : appInterceptor);
                 }
             }
         });
 
         // 添加新按钮到组合框右边
         JButton newButton = new JButton(AllIcons.Actions.Rollback);
-        newButton.setToolTipText("Use default script");
+        newButton.setToolTipText("Use default interceptor");
         newButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                scriptField.setText(SettingsStorageHelper.defScript);
+                interceptorField.setText(SettingsStorageHelper.defInterceptor);
             }
         });
         gbc.gridx = 2;  // 放在同一行的尾部
@@ -388,14 +396,14 @@ public class SettingsDialog {
         //测试按钮
         JButton testButton = new JButton(FIRE_TEST_ICON);
         testButton.setPreferredSize(new Dimension(20, 20));
-        testButton.setToolTipText("Fire-Test tool-script use hello world code");
+        testButton.setToolTipText("Fire-Test tool-interceptor use hello world code");
         ActionListener testListener = e -> {
-            Object selectedItem = scriptAppBox.getSelectedItem();
+            Object selectedItem = interceptorAppBox.getSelectedItem();
             if (selectedItem == null) {
                 FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
                 return;
             }
-            String script = scriptField.getText();
+            String interceptor = interceptorField.getText();
 
 
             RuntimeAppHelper.VisibleApp visibleApp = Optional.ofNullable(RuntimeAppHelper.getVisibleApps(toolWindow.getProject().getName()))
@@ -413,7 +421,7 @@ public class SettingsDialog {
                 FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please start Application named " + selectedItem);
                 return;
             }
-            ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Fire-Test tool-script, please wait ...", false) {
+            ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Fire-Test tool-interceptor, please wait ...", false) {
 
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
@@ -434,7 +442,7 @@ public class SettingsDialog {
                         JSONObject req = new JSONObject();
                         req.put("method", "flexible-test");
                         req.put("params", params);
-                        req.put("script", script);
+                        req.put("interceptor", interceptor);
                         SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(getProject());
                         req.put("monitor", monitorConfig.isEnable());
                         req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
@@ -442,16 +450,16 @@ public class SettingsDialog {
                         try {
                             JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", req, JSONObject.class);
                             if (submitRes == null) {
-                                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\nFailed to submit req\nsubmitRes is null");
+                                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\nFailed to submit req\nsubmitRes is null");
                                 return;
                             }
                             if (!submitRes.getBooleanValue("success") || submitRes.getString("data") == null) {
-                                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\nFailed to submit req\n" + submitRes.getString("message"));
+                                FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\nFailed to submit req\n" + submitRes.getString("message"));
                                 return;
                             }
                             reqId = submitRes.getString("data");
                         } catch (Exception ex) {
-                            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\nFailed to submit req\n" + ex.getClass().getSimpleName() + "," + ex.getMessage());
+                            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\nFailed to submit req\n" + ex.getClass().getSimpleName() + "," + ex.getMessage());
                             return;
                         }
 
@@ -463,12 +471,12 @@ public class SettingsDialog {
 
                         JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", getRetReq, JSONObject.class);
                         if (result == null || !result.getBooleanValue("success")) {
-                            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\n" + (result == null ? "result is null" : result.getString("message")));
+                            FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\n" + (result == null ? "result is null" : result.getString("message")));
                             return;
                         }
-                        FlingHelper.alert(getProject(), Messages.getInformationIcon(), "Test tool-script success\n" + result.get("data"));
+                        FlingHelper.alert(getProject(), Messages.getInformationIcon(), "Test tool-interceptor success\n" + result.get("data"));
                     } catch (Throwable ex) {
-                        FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-script error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                        FlingHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
                     }
                 }
             });
@@ -479,18 +487,18 @@ public class SettingsDialog {
         // 保存按钮
         JButton saveButton = new JButton("Apply");
         ActionListener saveListener = e -> {
-            String script = scriptField.getText();
-            String selectedApp = (String) scriptAppBox.getSelectedItem();
+            String interceptor = interceptorField.getText();
+            String selectedApp = (String) interceptorAppBox.getSelectedItem();
             if (selectedApp == null) {
                 return;
             }
-            if (StringUtils.isBlank(script)) {
+            if (StringUtils.isBlank(interceptor)) {
                 SettingsStorageHelper.setAppScript(toolWindow.getProject(), selectedApp, null);
-                FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Script is blank");
+                FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Tool-interceptor is blank");
                 return;
             }
-            SettingsStorageHelper.setAppScript(toolWindow.getProject(), selectedApp, script);
-            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Script is saved");
+            SettingsStorageHelper.setAppScript(toolWindow.getProject(), selectedApp, interceptor);
+            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Tool-interceptor is saved");
         };
         saveButton.addActionListener(saveListener);
 
@@ -636,7 +644,7 @@ public class SettingsDialog {
 
         // 添加新按钮到组合框右边
         JButton newButton = new JButton(AllIcons.Actions.Rollback);
-        newButton.setToolTipText("Use default script");
+        newButton.setToolTipText("Use default Tool-interceptor");
         newButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -808,10 +816,11 @@ public class SettingsDialog {
                 traceDetailLabel.setText("Enabling trace helps you analyze system links");
             }
             SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            nowConfig.setEnable(traceToggleButton.isSelected());
-            SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            if(!Objects.equals(nowConfig.isEnable(),traceToggleButton.isSelected())){
+                nowConfig.setEnable(traceToggleButton.isSelected());
+                SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace is " + (traceToggleButton.isSelected() ? "enable" : "disable"));
-            FlingHelper.refresh(toolWindow.getProject());
         });
 
         if (monitorConfig.isEnable()) {
@@ -850,10 +859,11 @@ public class SettingsDialog {
                 traceWebDetailLabel.setText("Trace Web can intercept the DispatcherServlet for spring-web");
             }
             SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            nowConfig.setMonitorWeb(traceWebToggleButton.isSelected());
-            SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            if(!Objects.equals(nowConfig.isMonitorWeb(),traceWebToggleButton.isSelected())){
+                nowConfig.setMonitorWeb(traceWebToggleButton.isSelected());
+                SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace Web is " + (traceWebToggleButton.isSelected() ? "enable" : "disable"));
-            FlingHelper.refresh(toolWindow.getProject());
         });
 
         if (monitorConfig.isMonitorWeb()) {
@@ -889,10 +899,11 @@ public class SettingsDialog {
                 traceMybatisDetailLabel.setText("Trace Mybatis can intercept the mapper");
             }
             SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            nowConfig.setMonitorMybatis(traceMybatisToggleButton.isSelected());
-            SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            if(!Objects.equals(nowConfig.isMonitorMybatis(),traceMybatisToggleButton.isSelected())){
+                nowConfig.setMonitorMybatis(traceMybatisToggleButton.isSelected());
+                SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace Mybatis is " + (traceMybatisToggleButton.isSelected() ? "enable" : "disable"));
-            FlingHelper.refresh(toolWindow.getProject());
         });
 
         if (monitorConfig.isMonitorMybatis()) {
@@ -928,10 +939,11 @@ public class SettingsDialog {
                 logMybatisDetailLabel.setText("We can output sql in mybatis format");
             }
             SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            nowConfig.setLogMybatis(logMybatisToggleButton.isSelected());
-            SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            if(!Objects.equals(nowConfig.isLogMybatis(),logMybatisToggleButton.isSelected())){
+                nowConfig.setLogMybatis(logMybatisToggleButton.isSelected());
+                SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
+            }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Log Mybatis is " + (logMybatisToggleButton.isSelected() ? "enable" : "disable"));
-            FlingHelper.refresh(toolWindow.getProject());
         });
 
         if (monitorConfig.isLogMybatis()) {
@@ -1051,7 +1063,6 @@ public class SettingsDialog {
                 nowConfig.setBlacks(blackListField.getText().trim());
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
                 FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace config was saved");
-                FlingHelper.refresh(toolWindow.getProject());
             }
         };
         saveButton.addActionListener(saveListener);

@@ -41,7 +41,7 @@
         <!-- Register LineMarkerProvider -->
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.spring_cache.SpringCacheIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.flexible_test.FlexibleTestIconProvider"/>
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.call_method.CallMethodIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.method_call.MethodCallIconProvider"/>
         <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mapper_sql.MapperSqlIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.view_value.ViewValueLineMarkerProvider"/>
@@ -58,7 +58,7 @@
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
         <action icon="/icons/test-code.svg" id="generate_flexible_text_code"
-                class="com.fling.tools.call_method.GenerateFlexibleTestAction"
+                class="com.fling.tools.method_call.GenerateFlexibleTestAction"
                 text="Generate flexible test code"
                 description="Generate flexible test code from selected code">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>

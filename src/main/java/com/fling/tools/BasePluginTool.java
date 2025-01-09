@@ -3,8 +3,7 @@ package com.fling.tools;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.fling.FlingHelper;
-import com.fling.RuntimeAppHelper;
-import com.fling.tools.call_method.CallMethodIconProvider;
+import com.fling.tools.method_call.MethodCallIconProvider;
 import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
@@ -49,7 +48,7 @@ import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
 
-    public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", CallMethodIconProvider.class);
+    public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", MethodCallIconProvider.class);
 
 
     protected Set<String> cancelReqs = new HashSet<>(128);

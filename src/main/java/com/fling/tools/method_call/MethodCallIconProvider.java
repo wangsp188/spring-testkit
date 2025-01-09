@@ -1,5 +1,6 @@
-package com.fling.tools.call_method;
+package com.fling.tools.method_call;
 
+import com.fling.RuntimeAppHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.view.FlingToolWindowFactory;
@@ -38,9 +39,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-public class CallMethodIconProvider implements LineMarkerProvider {
+public class MethodCallIconProvider implements LineMarkerProvider {
 
-    public static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/spring-fling.svg", CallMethodIconProvider.class);
+    public static final Icon CALL_METHOD_ICON = IconLoader.getIcon("/icons/spring-fling.svg", MethodCallIconProvider.class);
 
     @Override
     public LineMarkerInfo<?> getLineMarkerInfo( PsiElement element) {
@@ -211,6 +212,13 @@ public class CallMethodIconProvider implements LineMarkerProvider {
         // 4. 检查类是否含有 Spring 可注册 Bean 的注解
         if (!ToolHelper.isSpringBean(containingClass)) {
             return "not_spring_bean";
+        }
+
+
+        if(!RuntimeAppHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
+            if (!MethodCallIconProvider.isRequestMethod(psiMethod)) {
+                return "no_side_server";
+            }
         }
 
         if (containsSpringInitializationMethod(containingClass, psiMethod)) {
@@ -589,5 +597,40 @@ public class CallMethodIconProvider implements LineMarkerProvider {
             System.err.println("Failed to create method: " + e.getMessage());
             FlingHelper.notify(project, NotificationType.WARNING, "copy this code to test class<br/>" + testMethodContent);
         }
+    }
+
+    public static boolean isRequestMethod(PsiMethod method) {
+        if (method == null) {
+            return false;
+        }
+
+        // Check if the method has any of the request mapping annotations
+        String[] requestMethodAnnotations = new String[]{
+                "org.springframework.web.bind.annotation.RequestMapping",
+                "org.springframework.web.bind.annotation.GetMapping",
+                "org.springframework.web.bind.annotation.PostMapping",
+                "org.springframework.web.bind.annotation.PutMapping",
+                "org.springframework.web.bind.annotation.DeleteMapping",
+                "org.springframework.web.bind.annotation.PatchMapping"
+        };
+
+        for (String annotationFqn : requestMethodAnnotations) {
+            if (method.getModifierList().findAnnotation(annotationFqn) != null) {
+                return true;
+            }
+        }
+
+        // Check if the class has @RestController or @Controller annotation
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass != null) {
+            PsiAnnotation restControllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RestController");
+            PsiAnnotation controllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.stereotype.Controller");
+
+            if (restControllerAnnotation != null || controllerAnnotation != null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

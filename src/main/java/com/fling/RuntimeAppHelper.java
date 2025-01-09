@@ -27,7 +27,7 @@ public class RuntimeAppHelper {
 
     private static final Map<String, Boolean> monitorMap = new HashMap<>();
 
-    private static final Map<String,VisibleApp> selectedApps = new HashMap<>();
+    private static final Map<String, VisibleApp> selectedApps = new HashMap<>();
 
     private static final Map<String, List<AppMeta>> appMetas = new HashMap<>();
 
@@ -41,13 +41,13 @@ public class RuntimeAppHelper {
         return selectedApps.get(project);
     }
 
-    public static void updateSelectedApp(String project,VisibleApp app) {
+    public static void updateSelectedApp(String project, VisibleApp app) {
         if (project == null) {
-            return ;
+            return;
         }
-        if (app==null) {
+        if (app == null) {
             selectedApps.remove(project);
-        }else{
+        } else {
             selectedApps.put(project, app);
         }
     }
@@ -68,9 +68,9 @@ public class RuntimeAppHelper {
         return monitor != null && monitor;
     }
 
-    public static void updateVisibleApps(String project,List<VisibleApp> apps) {
+    public static void updateVisibleApps(String project, List<VisibleApp> apps) {
         if (project == null) {
-            return ;
+            return;
         }
         if (CollectionUtils.isEmpty(apps)) {
             visibleApps.remove(project);
@@ -88,6 +88,13 @@ public class RuntimeAppHelper {
     }
 
 
+    public static boolean hasAppMeta(String project) {
+        if (project == null) {
+            return false;
+        }
+        return appMetas.containsKey(project);
+    }
+
 
     public static List<AppMeta> getAppMetas(String project) {
         if (project == null) {
@@ -97,11 +104,11 @@ public class RuntimeAppHelper {
         return appMetas1 == null ? new ArrayList<>() : appMetas1;
     }
 
-    public static void updateAppMetas(String project,List<AppMeta> metas) {
-        if (project==null) {
+    public static void updateAppMetas(String project, List<AppMeta> metas) {
+        if (project == null) {
             return;
         }
-        if(CollectionUtils.isEmpty(metas)){
+        if (CollectionUtils.isEmpty(metas)) {
             appMetas.remove(project);
             return;
         }

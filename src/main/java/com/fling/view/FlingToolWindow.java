@@ -30,7 +30,7 @@ import com.intellij.psi.search.searches.AnnotatedElementsSearch;
 import com.fling.FlingHelper;
 import com.fling.tools.BasePluginTool;
 import com.fling.tools.PluginToolEnum;
-import com.fling.tools.call_method.MethodCallTool;
+import com.fling.tools.method_call.MethodCallTool;
 import com.fling.tools.flexible_test.FlexibleTestTool;
 import com.fling.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBScrollPane;
@@ -478,12 +478,9 @@ public class FlingToolWindow {
     }
 
     public void openCurlDialog() {
-        WriteCommandAction.runWriteCommandAction(project, new Runnable() {
-            @Override
-            public void run() {
-                curlDialog.setVisible(true);
-            }
-        });
+        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            curlDialog.setVisible(true);
+        }
     }
 
 

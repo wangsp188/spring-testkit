@@ -1,8 +1,9 @@
 package com.fling.tools.flexible_test;
 
+import com.fling.RuntimeAppHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.PluginToolEnum;
-import com.fling.tools.call_method.CallMethodIconProvider;
+import com.fling.tools.method_call.MethodCallIconProvider;
 import com.fling.view.FlingToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -22,7 +23,7 @@ import java.awt.event.MouseEvent;
 
 public class FlexibleTestIconProvider implements LineMarkerProvider {
 
-    public static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/test-code.svg", CallMethodIconProvider.class);
+    public static final Icon FLEXIBLE_TEST_ICON = IconLoader.getIcon("/icons/test-code.svg", MethodCallIconProvider.class);
 
 
     @Nullable
@@ -99,7 +100,7 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return "not_find_virtualFile";
         }
 
-        if (!SettingsStorageHelper.isEnableSideServer(modifierList.getProject())) {
+        if(!RuntimeAppHelper.hasAppMeta(modifierList.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(modifierList.getProject())){
             return "disable_side_server";
         }
         // 获取文件的完整路径

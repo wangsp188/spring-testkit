@@ -2,7 +2,7 @@ package com.fling.tools.mapper_sql;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.tools.ToolHelper;
-import com.fling.tools.call_method.CallMethodIconProvider;
+import com.fling.tools.method_call.MethodCallIconProvider;
 import com.fling.util.Container;
 import com.fling.util.JsonUtil;
 import com.fling.view.FlingToolWindow;
@@ -36,8 +36,8 @@ public class MapperSqlTool extends BasePluginTool {
     public static final Icon FLING_SQL_DISABLE_ICON = IconLoader.getIcon("/icons/fling-sql-disable.svg", MapperSqlIconProvider.class);
 
 
-    public static final Icon REPLACE_DISABLE_ICON = IconLoader.getIcon("/icons/replace-disable.svg", CallMethodIconProvider.class);
-    public static final Icon REPLACE_ICON = IconLoader.getIcon("/icons/replace.svg", CallMethodIconProvider.class);
+    public static final Icon REPLACE_DISABLE_ICON = IconLoader.getIcon("/icons/replace-disable.svg", MethodCallIconProvider.class);
+    public static final Icon REPLACE_ICON = IconLoader.getIcon("/icons/replace.svg", MethodCallIconProvider.class);
 
 
     private JComboBox<ToolHelper.XmlTagAction> actionComboBox;

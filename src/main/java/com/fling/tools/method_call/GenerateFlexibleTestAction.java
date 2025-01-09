@@ -1,4 +1,4 @@
-package com.fling.tools.call_method;
+package com.fling.tools.method_call;
 
 import com.fling.FlingHelper;
 import com.fling.SettingsStorageHelper;
@@ -87,11 +87,11 @@ public class GenerateFlexibleTestAction extends AnAction {
 
     private void generateAndOpenTestClass(Project project, Module module, String className, String content) {
 
-        VirtualFile testSourceRoot = CallMethodIconProvider.getTestSourceRoot(module);
+        VirtualFile testSourceRoot = MethodCallIconProvider.getTestSourceRoot(module);
         if (testSourceRoot == null) {
             // 如果没有找到，尝试创建目录
             try {
-                testSourceRoot = CallMethodIconProvider.createTestRoot(module);
+                testSourceRoot = MethodCallIconProvider.createTestRoot(module);
             } catch (Throwable e) {
                 FlingHelper.notify(module.getProject(), NotificationType.ERROR, "Failed to create test source root: " + e.getMessage());
                 return;
@@ -116,11 +116,11 @@ public class GenerateFlexibleTestAction extends AnAction {
         WriteCommandAction.runWriteCommandAction(project, new Runnable() {
             @Override
             public void run() {
-                PsiClass testClass = CallMethodIconProvider.findTestClass(testClassName, packageName, project);
+                PsiClass testClass = MethodCallIconProvider.findTestClass(testClassName, packageName, project);
                 if (testClass == null) {
                     String classContent = generateTestClassContent(packageName, className);
-                    PsiDirectory packageDir = CallMethodIconProvider.createPackageDirectory(project, testSourceRoot);
-                    PsiJavaFile testFile = CallMethodIconProvider.createTestFile(packageDir, testClassName, classContent);
+                    PsiDirectory packageDir = MethodCallIconProvider.createPackageDirectory(project, testSourceRoot);
+                    PsiJavaFile testFile = MethodCallIconProvider.createTestFile(packageDir, testClassName, classContent);
                     testClass = PsiTreeUtil.findChildOfType(testFile, PsiClass.class);
                     if (testClass == null) {
                         FlingHelper.notify(project, NotificationType.ERROR, "Test class not found");
@@ -130,7 +130,7 @@ public class GenerateFlexibleTestAction extends AnAction {
                 PsiElementFactory factory = PsiElementFactory.getInstance(project);
                 PsiMethod method = factory.createMethodFromText(TEST_METHOD_TEMPLATE.formatted(methodName), testClass);
                 testClass.add(method);
-                PsiMethod testMethod = CallMethodIconProvider.findTestMethod(testClass, methodName);
+                PsiMethod testMethod = MethodCallIconProvider.findTestMethod(testClass, methodName);
                 if (testMethod == null) {
                     testClass.navigate(true);
                 } else {
