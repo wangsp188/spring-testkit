@@ -16,6 +16,7 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBRadioButton;
@@ -125,16 +126,16 @@ public class SettingsDialog {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"fling","trace", "tool-interceptor", "spring-properties","controller-command","sql-optimization"};
+        String[] options = {"basic","trace", "tool-interceptor", "spring-properties","controller-command","sql-analysis"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
         optionList.setSelectedIndex(0);
         // 右侧内容显示区域
         JPanel rightContent = new JPanel(new CardLayout());
-        rightContent.add(createBasicOptionPanel(), "fling");
+        rightContent.add(createBasicOptionPanel(), "basic");
         rightContent.add(createTraceOptionPanel(), "trace");
-        rightContent.add(createSqlPanel(), "sql-optimization");
+        rightContent.add(createSqlPanel(), "sql-analysis");
         rightContent.add(createInterceptorOptionPanel(), "tool-interceptor");
         rightContent.add(createPropertiesOptionPanel(), "spring-properties");
         rightContent.add(createControllerOptionPanel(), "controller-command");
@@ -168,11 +169,74 @@ public class SettingsDialog {
 
 
     private JPanel createBasicOptionPanel() {
-        flexibleTestPackageNameField = new JTextField(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()), 20);
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
         Dimension labelDimension = new Dimension(100, 20);
+
+        // Method Call Label
+        JLabel springLabel = new JLabel("Spring enhancement");
+        JLabel springDetailLabel = new JLabel("Method-call, flexible-test and so on require turned on this");
+        springDetailLabel.setForeground(new Color(0x72A96B));
+        springDetailLabel.setFont(new Font("Arial", Font.BOLD, 13));
+
+
+
+        JPanel springOptionsPanel = new JPanel(new GridBagLayout());
+        springOptionsPanel.setVisible(false);
+        // Button
+        OnOffButton springButton = new OnOffButton();
+        springButton.addActionListener(e -> {
+            springOptionsPanel.setVisible(springButton.isSelected());
+            boolean enableSideServer = SettingsStorageHelper.isEnableSideServer(toolWindow.getProject());
+            if (springButton.isSelected()) {
+                if(!enableSideServer){
+                    SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), true);
+                    FlingHelper.refresh(toolWindow.getProject());
+                }
+                springDetailLabel.setText("We will start a side server to support method-call, flexible-test and so on");
+            } else {
+                if(enableSideServer){
+                    SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), false);
+                    FlingHelper.refresh(toolWindow.getProject());
+                }
+                springDetailLabel.setText("Method-call, flexible-test and so on require turned on this");
+            }
+            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Spring enhancement is " + (springButton.isSelected() ? "enable" : "disable"));
+        });
+
+        if (SettingsStorageHelper.isEnableSideServer(toolWindow.getProject())) {
+            springOptionsPanel.setVisible(true);
+            springButton.setSelected(true); // 示例中默认启用
+            // 设置初始文本
+            springDetailLabel.setText("We will start a side server to support method-call, flexible-test and so on");
+        }
+
+        // 嵌套 Panel，用于将 Label 和 Button 合并到一起
+        JPanel labelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
+        labelButtonPanel.add(springLabel, BorderLayout.WEST);
+        labelButtonPanel.add(springButton, BorderLayout.EAST);
+
+        // 添加到主面板中
+        gbc.gridx = 0; // 第一列
+        gbc.gridy = 0; // 第二行
+        gbc.weightx = 0; // 不占用多余水平空间
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
+        panel.add(labelButtonPanel, gbc);
+
+        // 第二列
+        gbc.gridx = 1; // 第二列
+        gbc.weightx = 1; // 占据剩余水平空间
+        gbc.gridy = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
+        panel.add(springDetailLabel, gbc);
+
+
+
+
+        flexibleTestPackageNameField = new JTextField(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()), 20);
+
 
         // 输入框
         JLabel packageNameLabel = new JLabel("Test Package:");
@@ -182,14 +246,16 @@ public class SettingsDialog {
 
         // 布局输入框和标签
         gbc.gridx = 0;
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.anchor = GridBagConstraints.WEST;
-        panel.add(packageNameLabel, gbc);
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        springOptionsPanel.add(packageNameLabel, gbc);
 
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0; // 让输入框占据剩余空间
-        panel.add(flexibleTestPackageNameField, gbc);
+        springOptionsPanel.add(flexibleTestPackageNameField, gbc);
 
         // 添加新按钮到组合框右边
         JButton newButton = new JButton(AllIcons.Actions.Rollback);
@@ -201,63 +267,21 @@ public class SettingsDialog {
             }
         });
         gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
         gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
-        panel.add(newButton, gbc);
+        springOptionsPanel.add(newButton, gbc);
 
-
-        // Method Call Label
-        JLabel methodCallLabel = new JLabel("Spring enhancement");
-        JLabel methodCallDetailLabel = new JLabel("Method-call, flexible-test and so on require turned on this");
-
-        // Button
-        OnOffButton methodCallButton = new OnOffButton();
-        methodCallButton.addActionListener(e -> {
-            boolean enableSideServer = SettingsStorageHelper.isEnableSideServer(toolWindow.getProject());
-            if (methodCallButton.isSelected()) {
-                if(!enableSideServer){
-                    SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), true);
-                    FlingHelper.refresh(toolWindow.getProject());
-                }
-                methodCallDetailLabel.setText("We will start a side server to support method-call, flexible-test and so on");
-            } else {
-                if(enableSideServer){
-                    SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), false);
-                    FlingHelper.refresh(toolWindow.getProject());
-                }
-                methodCallDetailLabel.setText("Method-call, flexible-test and so on require turned on this");
-            }
-            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Spring enhancement is " + (methodCallButton.isSelected() ? "enable" : "disable"));
-        });
-
-        if (SettingsStorageHelper.isEnableSideServer(toolWindow.getProject())) {
-            methodCallButton.setSelected(true); // 示例中默认启用
-            // 设置初始文本
-            methodCallDetailLabel.setText("We will start a side server to provide method-call and flexible-test");
-        }
-
-        // 嵌套 Panel，用于将 Label 和 Button 合并到一起
-        JPanel labelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
-        labelButtonPanel.add(methodCallLabel, BorderLayout.WEST);
-        labelButtonPanel.add(methodCallButton, BorderLayout.EAST);
-
-        // 添加到主面板中
-        gbc.gridx = 0; // 第一列
-        gbc.gridy = 1; // 第二行
-        gbc.weightx = 0; // 不占用多余水平空间
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 3;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;  // 不强制按钮填满可用空间
         gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
-        panel.add(labelButtonPanel, gbc);
-
-        // 第二列
-        gbc.gridx = 1; // 第二列
-        gbc.weightx = 1; // 占据剩余水平空间
-        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
-        panel.add(methodCallDetailLabel, gbc);
-
+        panel.add(springOptionsPanel, gbc);
 
 
         // 新增一行值得占用
@@ -276,6 +300,11 @@ public class SettingsDialog {
         ActionListener saveListener = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                if (!springOptionsPanel.isVisible()) {
+                    FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "No config need to save");
+                    return;
+                }
+
                 String packageName = flexibleTestPackageNameField.getText();
                 if (StringUtils.isBlank(packageName)) {
                     SettingsStorageHelper.setFlexibleTestPackage(toolWindow.getProject(), null);
@@ -318,17 +347,38 @@ public class SettingsDialog {
         return panel;
     }
 
+    private JTextArea createTips(String content){
+        JTextArea tipArea = new JTextArea(content);
+        tipArea.setToolTipText(content);
+        tipArea.setEditable(false); // 不可编辑
+        tipArea.setOpaque(false);
+        tipArea.setForeground(new Color(0x72A96B));
+        tipArea.setFont(new Font("Arial", Font.BOLD, 13)); // 设置字体
+        return tipArea;
+    }
+
 
     private JPanel createInterceptorOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
+        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nMethod-call, flexible-test, spring-cache support interceptor");
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 3;
+        gbc.weightx = 1;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(tipArea, gbc);
+
         LanguageTextField interceptorField = new LanguageTextField(JavaLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.defInterceptor, false);
 
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 3; // 占据3列
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
@@ -341,9 +391,10 @@ public class SettingsDialog {
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("App:");
         interceptorAppBox = new ComboBox<>(apps);
+        comboBoxLabel.setLabelFor(interceptorAppBox);
         // 添加标签到新行
         gbc.gridx = 0;
-        gbc.gridy = 0; // 新的一行
+        gbc.gridy = 1; // 新的一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.weighty = 0.0;
@@ -353,7 +404,7 @@ public class SettingsDialog {
 
         // 添加组合框到标签右边
         gbc.gridx = 1;
-        gbc.gridy = 0; // 同一行
+        gbc.gridy = 1; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -382,7 +433,7 @@ public class SettingsDialog {
             }
         });
         gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
@@ -520,7 +571,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 2; // 新的一行
+        gbc.gridy = 3; // 新的一行
         gbc.gridwidth = 3; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
@@ -535,10 +586,26 @@ public class SettingsDialog {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+
+        JTextArea tipArea = createTips("When the method is spring-web requestMapping, we can generate the controller-command using the following script\nCurl is recommended");
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 5;
+        gbc.weightx = 1;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(tipArea, gbc);
+
+
+
+
+
         LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), false);
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 5; // 占据3列
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
@@ -550,7 +617,7 @@ public class SettingsDialog {
 
         // 添加标签到新行
         gbc.gridx = 0;
-        gbc.gridy = 0; // 新的一行
+        gbc.gridy = 1; // 新的一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.weighty = 0.0;
@@ -592,10 +659,10 @@ public class SettingsDialog {
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("App:");
         controllerScriptAppBox = new ComboBox<>(apps);
-
+        comboBoxLabel.setLabelFor(controllerScriptAppBox);
 
         gbc.gridx = 0;
-        gbc.gridy = 0; // 同一行
+        gbc.gridy = 1; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;
@@ -603,7 +670,7 @@ public class SettingsDialog {
 
         // 添加组合框到标签右边
         gbc.gridx = 1;
-        gbc.gridy = 0; // 同一行
+        gbc.gridy = 1; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -611,7 +678,7 @@ public class SettingsDialog {
 
 
         gbc.gridx = 2;
-        gbc.gridy = 0; // 第一行
+        gbc.gridy = 1; // 第一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;
@@ -620,7 +687,7 @@ public class SettingsDialog {
 
         // 添加环境文本框
         gbc.gridx = 3;
-        gbc.gridy = 0; // 同一行
+        gbc.gridy = 1; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -653,7 +720,7 @@ public class SettingsDialog {
             }
         });
         gbc.gridx = 4;  // 放在同一行的尾部
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
@@ -728,7 +795,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 2; // 新的一行
+        gbc.gridy = 3; // 新的一行
         gbc.gridwidth = 5; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
@@ -739,21 +806,46 @@ public class SettingsDialog {
         return panel;
     }
 
-    private JPanel createSqlPanel(){
+    private JPanel createSqlPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+
+        JTextArea tipArea = createTips("After configuring the database information, you can use an SQL analysis tool");
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 3;
+        gbc.weightx = 1;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(tipArea, gbc);
+
+
+//        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
+
+        LanguageTextField datasourceField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.datasourceTemplateProperties, false);
+        // 布局输入框
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 3; // 占据3列
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        panel.add(new JBScrollPane(datasourceField), gbc);
 
         String[] apps = new String[]{};
 
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("App:");
         sqlAppBox = new ComboBox<>(apps);
-
+        comboBoxLabel.setLabelFor(sqlAppBox);
 
         // 添加标签到新行
         gbc.gridx = 0;
-        gbc.gridy = 0; // 新的一行
+        gbc.gridy = 1; // 新的一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.weighty = 0.0;
@@ -763,7 +855,7 @@ public class SettingsDialog {
 
         // 添加组合框到标签右边
         gbc.gridx = 1;
-        gbc.gridy = 0; // 同一行
+        gbc.gridy = 1; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -776,6 +868,81 @@ public class SettingsDialog {
 
             }
         });
+
+        // 添加新按钮到组合框右边
+        JButton newButton = new JButton(AllIcons.Actions.Rollback);
+        newButton.setToolTipText("Reset config template");
+        newButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                datasourceField.setText(SettingsStorageHelper.datasourceTemplateProperties);
+            }
+        });
+        gbc.gridx = 2;  // 放在同一行的尾部
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        panel.add(newButton, gbc);
+
+
+        // 创建按钮面板，使用FlowLayout以右对齐
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+
+        JButton testButton = new JButton(FIRE_TEST_ICON);
+        testButton.setPreferredSize(new Dimension(20, 20));
+        testButton.setToolTipText("Test connection");
+        ActionListener testListener = e -> {
+            String selectedApp =(String) sqlAppBox.getSelectedItem();
+            if (selectedApp == null) {
+                FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
+                return;
+            }
+            String datasourceProperties = datasourceField.getText();
+
+        };
+        testButton.addActionListener(testListener);
+
+        // 保存按钮
+        JButton saveButton = new JButton("Apply");
+        ActionListener saveListener = e -> {
+            String propertiesStr = datasourceField.getText();
+            String selectedApp = (String) sqlAppBox.getSelectedItem();
+            if (selectedApp == null) {
+                return;
+            }
+
+        };
+        saveButton.addActionListener(saveListener);
+
+        // 关闭按钮
+        JButton closeButton = new JButton("OK");
+        closeButton.addActionListener(e -> {
+            saveListener.actionPerformed(e);
+            // 关闭当前窗口
+            Window window = SwingUtilities.getWindowAncestor(panel);
+            if (window != null) {
+                window.dispose();
+            }
+        });
+
+        // 将按钮添加到按钮面板
+        buttonPanel.add(testButton);
+        buttonPanel.add(saveButton);
+        buttonPanel.add(closeButton);
+
+        // 将按钮面板添加到主面板的底部
+        gbc.gridx = 0;
+        gbc.gridy = 3; // 新的一行
+        gbc.gridwidth = 3; // 占据三列
+        gbc.weightx = 0.0; // 重置权重
+        gbc.weighty = 0.0; // 重置权重
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
+        gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
+        panel.add(buttonPanel, gbc);
+
         return panel;
     }
 
@@ -801,6 +968,8 @@ public class SettingsDialog {
         panel.add(labelButtonPanel, gbc);
 
         JLabel traceDetailLabel = new JLabel("Enabling trace helps you analyze system links");
+        traceDetailLabel.setForeground(new Color(0x72A96B));
+        traceDetailLabel.setFont(new Font("Arial", Font.BOLD, 13));
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -926,7 +1095,7 @@ public class SettingsDialog {
         gbc.anchor = GridBagConstraints.WEST;
         monitorOptionsPanel.add(logMybatisLabelButtonPanel, gbc);
 
-        JLabel logMybatisDetailLabel = new JLabel("We can output sql in mybatis format");
+        JLabel logMybatisDetailLabel = new JLabel("Sql output in mybatis format is easy to understand");
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -936,7 +1105,7 @@ public class SettingsDialog {
             if (logMybatisToggleButton.isSelected()) {
                 logMybatisDetailLabel.setText("We will output sql in mybatis format");
             } else {
-                logMybatisDetailLabel.setText("We can output sql in mybatis format");
+                logMybatisDetailLabel.setText("Sql output in mybatis format is easy to understand");
             }
             SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
             if(!Objects.equals(nowConfig.isLogMybatis(),logMybatisToggleButton.isSelected())){
@@ -1056,6 +1225,11 @@ public class SettingsDialog {
         ActionListener saveListener = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                if (!monitorOptionsPanel.isVisible()) {
+                    FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "No config need to save");
+                    return;
+                }
+
                 SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
                 nowConfig.setPackages(packagesField.getText().trim());
                 nowConfig.setClsSuffix(classSuffixField.getText().trim());
@@ -1103,12 +1277,24 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
+        JTextArea tipArea = createTips("Here properties takes precedence over spring.properties, you can custom some configurations for local startup use\nFor example: customize the log level locally");
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 3;
+        gbc.weightx = 1;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(tipArea, gbc);
+
+
 //        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
 
         LanguageTextField propertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.getAppProperties(toolWindow.getProject(), ""), false);
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 3; // 占据3列
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
@@ -1121,11 +1307,11 @@ public class SettingsDialog {
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("App:");
         propertiesAppBox = new ComboBox<>(apps);
-
+        comboBoxLabel.setLabelFor(propertiesAppBox);
 
         // 添加标签到新行
         gbc.gridx = 0;
-        gbc.gridy = 0; // 新的一行
+        gbc.gridy = 1; // 新的一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.weighty = 0.0;
@@ -1135,7 +1321,7 @@ public class SettingsDialog {
 
         // 添加组合框到标签右边
         gbc.gridx = 1;
-        gbc.gridy = 0; // 同一行
+        gbc.gridy = 1; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -1163,7 +1349,7 @@ public class SettingsDialog {
             }
         });
         gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
@@ -1216,7 +1402,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 2; // 新的一行
+        gbc.gridy = 3; // 新的一行
         gbc.gridwidth = 3; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重

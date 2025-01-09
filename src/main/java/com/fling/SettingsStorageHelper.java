@@ -29,9 +29,8 @@ public class SettingsStorageHelper {
 
     public static final String defFlexibleTestPackage = "flexibletest";
 
-    public static final String defProperties = "#Here properties takes precedence over spring.properties\n"
-            + "#You can write some configurations for local startup use, like log level\n"
-            + "logging.level.com.fling=INFO";
+    public static final String defProperties = "logging.level.com.fling=INFO";
+    public static final String datasourceTemplateProperties = "#datasource.template.properties";
 
     public static final String defInterceptor =
             "import org.springframework.beans.factory.annotation.Autowired;\n" +

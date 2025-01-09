@@ -240,6 +240,7 @@ public abstract class BasePluginTool {
                 gbc.gridx = 0;
                 gbc.gridy = 0;
                 JLabel appLabel = new JLabel("App:");
+                appLabel.setLabelFor(comboBox);
                 appLabel.setToolTipText("Which app domain you want to save to");
                 panel.add(appLabel, gbc);
                 gbc.gridx = 1;

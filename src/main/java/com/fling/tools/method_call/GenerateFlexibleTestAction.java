@@ -1,6 +1,7 @@
 package com.fling.tools.method_call;
 
 import com.fling.FlingHelper;
+import com.fling.RuntimeAppHelper;
 import com.fling.SettingsStorageHelper;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
@@ -35,6 +36,12 @@ public class GenerateFlexibleTestAction extends AnAction {
             e.getPresentation().setVisible(false);
             return;
         }
+
+        if (!RuntimeAppHelper.hasAppMeta(psiFile.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiFile.getProject())) {
+            e.getPresentation().setVisible(false);
+            return;
+        }
+
         // 5. 必须不在Java的test模块下
         VirtualFile virtualFile = psiFile.getVirtualFile();
         if (virtualFile == null) {

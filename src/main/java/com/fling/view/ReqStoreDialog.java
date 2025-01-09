@@ -327,7 +327,9 @@ public class ReqStoreDialog {
                 refreshTree();
             }
         });
-
+        JLabel appLabel = new JLabel("App:");
+        appLabel.setLabelFor(appBox);
+        panel.add(appLabel);
         panel.add(appBox);
 
         JButton expandToggleButton = new JButton(AllIcons.Actions.Collapseall);
