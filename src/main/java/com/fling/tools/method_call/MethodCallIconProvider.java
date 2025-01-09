@@ -74,9 +74,10 @@ public class MethodCallIconProvider implements LineMarkerProvider {
             "java.util.LinkedHashSet",
             "java.util.TreeSet",
             "java.util.HashMap",
-            "java.util.LinkedHashMcap",
+            "java.util.LinkedHashMap",
             "java.util.TreeMap",
-            "java.util.Collection"
+            "java.util.Collection",
+            "java.util.Map"
     );
 
     private ArrayList<LineMarkerInfo<?>> createLineMarkers(PsiMethod psiMethod) {
