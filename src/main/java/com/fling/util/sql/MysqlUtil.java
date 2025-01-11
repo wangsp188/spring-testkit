@@ -1,21 +1,18 @@
 package com.fling.util.sql;
 
-import com.alibaba.druid.pool.DruidDataSource;
 import com.fling.SettingsStorageHelper;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.DriverManager;
 
 public class MysqlUtil {
 
 
-    public static String testConnectionAndClose(DruidDataSource datasource) {
+    public static String testConnectionAndClose(SettingsStorageHelper.DatasourceConfig datasource) {
         Connection connection = null;
-
         try {
             // 尝试从 DataSource 获取连接
-            connection = datasource.getConnection();
-
+            connection = getDatabaseConnection(datasource);
             // 如果获取成功，返回 null 表示连接成功
             return null;
         } catch (Exception e) {
@@ -30,27 +27,25 @@ public class MysqlUtil {
                     // 忽略关闭连接的异常
                 }
             }
-            datasource.close();
         }
     }
 
-
-
-
-    public static DruidDataSource getDruidDataSource(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
-        if (datasourceConfig==null) {
-            return null;
+    public static Connection getDatabaseConnection(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
+        if (datasourceConfig == null) {
+            throw new IllegalArgumentException("Datasource config cannot be null");
         }
-        DruidDataSource dataSource = new DruidDataSource();
-        dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        dataSource.setInitialSize(0); // 初始化连接数
-        dataSource.setMinIdle(0);     // 最小空闲连接数
-        dataSource.setMaxActive(1);
-        dataSource.setMaxWait(10000);
-        dataSource.setUrl(datasourceConfig.getUrl());
-        dataSource.setUsername(datasourceConfig.getUsername());
-        dataSource.setPassword(datasourceConfig.getPassword());
-        return dataSource;
+        // 加载驱动（如果未自动注册）
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            // 直接通过 DriverManager 获取连接
+            return DriverManager.getConnection(
+                    datasourceConfig.getUrl(),
+                    datasourceConfig.getUsername(),
+                    datasourceConfig.getPassword()
+            );
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to connect", e);
+        }
     }
 
 }

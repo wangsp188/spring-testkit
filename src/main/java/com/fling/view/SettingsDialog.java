@@ -1,6 +1,5 @@
 package com.fling.view;
 
-import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
@@ -882,10 +881,8 @@ public class SettingsDialog {
 
             // 遍历每个数据源配置，逐个验证连接
             for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
-                // 创建 Druid 数据源
-                DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
                 // 测试连接
-                String result = MysqlUtil.testConnectionAndClose(dataSource);
+                String result = MysqlUtil.testConnectionAndClose(config);
                 // 存储结果
                 results.put(config.getName(), result == null ? "connect success" : result);
             }
@@ -907,10 +904,8 @@ public class SettingsDialog {
 
             List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
             for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
-                // 创建 Druid 数据源
-                DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
                 // 测试连接
-                String result = MysqlUtil.testConnectionAndClose(dataSource);
+                String result = MysqlUtil.testConnectionAndClose(config);
                 if (result == null) {
                     valids.add(config);
                 }

@@ -1,21 +1,17 @@
 package com.fling.view;
 
-import com.alibaba.druid.pool.DruidDataSource;
-import com.fling.FlingHelper;
 import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.method_call.MethodCallIconProvider;
 import com.fling.util.sql.MysqlUtil;
-import com.google.protobuf.Message;
-import com.intellij.notification.NotificationType;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.sql.psi.SqlLanguage;
 import com.intellij.ui.LanguageTextField;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -39,7 +35,7 @@ public class SqlDialog extends JDialog {
     private FlingToolWindow toolWindow;
     private LanguageTextField inputSqlField;
     private JComboBox<String> dataSourceComboBox;
-    private JBTable explainTable;
+    private JPanel panelResults;
 
 
     public SqlDialog(FlingToolWindow flingWindow) {
@@ -122,12 +118,12 @@ public class SqlDialog extends JDialog {
         button.addActionListener(e -> {
             String sqlText = inputSqlField.getText();
             if (StringUtils.isBlank(sqlText)) {
-                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please input your SQL");
+                setMsg("Please input your SQL");
                 return;
             }
             String selectedData = (String) dataSourceComboBox.getSelectedItem();
             if (selectedData == null) {
-                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please select a datasource, if there is no option, configure the database link in settings-SQL tool");
+                setMsg("Please select a datasource, if there is no option, configure the database link in settings-SQL tool");
                 return;
             }
 
@@ -142,18 +138,16 @@ public class SqlDialog extends JDialog {
                     })
                     .findFirst();
             if (!first.isPresent()) {
-                FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Can not find valid datasource");
+                setMsg("Can not find valid datasource");
                 return;
             }
-            SettingsStorageHelper.DatasourceConfig config = first.get();
-            DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
             //执行explain，并刷新结果
 // 执行 EXPLAIN 逻辑部分
             ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Analysis sql, please wait ...", false) {
 
                                                   @Override
                                                   public void run(@NotNull ProgressIndicator progressIndicator) {
-                                                      analysisSql(dataSource, sqlText);
+                                                      analysisSql(first.get(), sqlText);
                                                   }
                                               }
             );
@@ -171,8 +165,8 @@ public class SqlDialog extends JDialog {
         return panelResults;
     }
 
-    private void analysisSql(DruidDataSource dataSource, String sqlText) {
-        try (DruidDataSource dataSource1 = dataSource; Connection connection = dataSource1.getConnection();
+    private void analysisSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
+        try (Connection connection = MysqlUtil.getDatabaseConnection(datasourceConfig);
              PreparedStatement statement = connection.prepareStatement("EXPLAIN " + sqlText);
              ResultSet resultSet = statement.executeQuery()) {
 
@@ -191,21 +185,38 @@ public class SqlDialog extends JDialog {
             }
 
             // 使用加载数据的 API 刷新表格
-            SwingUtilities.invokeLater(() -> loadDataToTable(resultData));
+            SwingUtilities.invokeLater(() -> loadAnalysis(resultData.toArray(new Object[0][])));
         } catch (Throwable ex) {
-            FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Error executing EXPLAIN: " + ex.getMessage());
+            setMsg("Error executing EXPLAIN: " + ex.getMessage());
         }
     }
 
     private JPanel buildResultPanel(FlingToolWindow window) {
-        JPanel panelResults = new JPanel(new BorderLayout());
+        panelResults = new JPanel(new BorderLayout());
+        setMsg("");
+        return panelResults;
+    }
+
+    private void setMsg(String msg){
+        panelResults.removeAll();
+        JTextArea jsonInput = new JTextArea();
+        jsonInput.setText(msg);
+        jsonInput.setLineWrap(true);
+        jsonInput.setWrapStyleWord(true);
+        JBScrollPane scrollPane = new JBScrollPane(jsonInput);
+        panelResults.add(scrollPane, BorderLayout.CENTER);
+        panelResults.revalidate();
+        panelResults.repaint();
+    }
+
+
+    // 加载数据的 API
+    private void loadAnalysis(Object[][] data) {
 
         // 创建表格结构
         String[] columnNames = {"Id", "Select Type", "Table", "Type", "Possible Keys", "Key", "Key Length", "Ref", "Rows", "Extra"};
-        Object[][] data = {}; // 初始数据为空
-
         // 使用 JBTable
-        explainTable = new JBTable(new DefaultTableModel(data, columnNames));
+        JBTable explainTable = new JBTable(new DefaultTableModel(data, columnNames));
 
         // 表格效果设置
         explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS); // 自动调整列宽
@@ -234,20 +245,20 @@ public class SqlDialog extends JDialog {
         });
 
         // 垂直滚动条，禁止横向滚动条
-        JScrollPane scrollPane = new JScrollPane(explainTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        JBScrollPane scrollPane = new JBScrollPane(explainTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+//
+//        DefaultTableModel model = (DefaultTableModel) explainTable.getModel();
+//        model.setRowCount(0); // 清空现有数据
+//        for (Object[] row : data) {
+//            model.addRow(row); // 添加新行
+//        }
+        panelResults.removeAll();
         panelResults.add(scrollPane, BorderLayout.CENTER);
-
-        return panelResults;
+        panelResults.revalidate();
+        panelResults.repaint();
     }
 
-    // 加载数据的 API
-    private void loadDataToTable(List<Object[]> data) {
-        DefaultTableModel model = (DefaultTableModel) explainTable.getModel();
-        model.setRowCount(0); // 清空现有数据
-        for (Object[] row : data) {
-            model.addRow(row); // 添加新行
-        }
-    }
 
 
     private @NotNull JPanel buildCmdPanel(FlingToolWindow window) {

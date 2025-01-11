@@ -1,6 +1,5 @@
 package com.fling.view;
 
-import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.fastjson.JSON;
 import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
@@ -627,10 +626,8 @@ public class FlingToolWindow {
 
         List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
         for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
-            // 创建 Druid 数据源
-            DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
             // 测试连接
-            String result = MysqlUtil.testConnectionAndClose(dataSource);
+            String result = MysqlUtil.testConnectionAndClose(config);
             if (result == null) {
                 valids.add(config);
             }
