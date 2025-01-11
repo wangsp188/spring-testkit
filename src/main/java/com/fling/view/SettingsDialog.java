@@ -1,11 +1,13 @@
 package com.fling.view;
 
+import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
-import com.fling.RuntimeAppHelper;
 import com.fling.util.HttpUtil;
+import com.fling.util.sql.MysqlUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
@@ -37,6 +39,7 @@ import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class SettingsDialog {
 
@@ -55,9 +58,16 @@ public class SettingsDialog {
 
     private ComboBox<String> propertiesAppBox;
 
-    private ComboBox<String> sqlAppBox;
-
     private JBTextField controllerEnvTextField;
+
+    private LanguageTextField datasourcePropertiesField;
+
+    private JBTextField tracePackagesField;
+
+    private JBTextField traceClassSuffixField;
+    private JBTextField traceWhiteListField;
+    private JBTextField traceBlackListField;
+    private JBTextField traceSingleClsDepthField;
 
 
     public SettingsDialog(FlingToolWindow toolWindow) {
@@ -82,14 +92,13 @@ public class SettingsDialog {
                 interceptorAppBox.addItem(app);
                 controllerScriptAppBox.addItem(app);
                 propertiesAppBox.addItem(app);
-                sqlAppBox.addItem(app);
             }
         });
     }
 
     private void refreshSettings() {
         flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
-        RuntimeAppHelper.VisibleApp selectedApp = RuntimeAppHelper.getSelectedApp(toolWindow.getProject().getName());
+        RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
         String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
         if (selectedAppName == null) {
             if (interceptorAppBox.getItemCount() > 0) {
@@ -114,6 +123,17 @@ public class SettingsDialog {
                 propertiesAppBox.setSelectedItem(selectedAppName);
             }
         }
+
+//        trace
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        tracePackagesField.setText(traceConfig.getPackages());
+        traceClassSuffixField.setText(traceConfig.getClsSuffix());
+        traceBlackListField.setText(traceConfig.getBlacks());
+        traceWhiteListField.setText(traceConfig.getWhites());
+        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
+
+        SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+        datasourcePropertiesField.setText(sqlConfig.getProperties());
     }
 
     private void init() {
@@ -450,12 +470,12 @@ public class SettingsDialog {
             String interceptor = interceptorField.getText();
 
 
-            RuntimeAppHelper.VisibleApp visibleApp = Optional.ofNullable(RuntimeAppHelper.getVisibleApps(toolWindow.getProject().getName()))
+            RuntimeHelper.VisibleApp visibleApp = Optional.ofNullable(RuntimeHelper.getVisibleApps(toolWindow.getProject().getName()))
                     .orElse(new ArrayList<>())
                     .stream()
-                    .filter(new Predicate<RuntimeAppHelper.VisibleApp>() {
+                    .filter(new Predicate<RuntimeHelper.VisibleApp>() {
                         @Override
-                        public boolean test(RuntimeAppHelper.VisibleApp visibleApp) {
+                        public boolean test(RuntimeHelper.VisibleApp visibleApp) {
                             return Objects.equals(visibleApp.getAppName(), selectedItem);
                         }
                     })
@@ -592,7 +612,7 @@ public class SettingsDialog {
         panel.add(tipArea, gbc);
 
 
-        LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), false);
+        LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), false);
         // 布局输入框
         gbc.gridx = 0;
         gbc.gridy = 2;
@@ -727,7 +747,7 @@ public class SettingsDialog {
         testButton.setPreferredSize(new Dimension(20, 20));
         testButton.setToolTipText("Fire-Test generate function use simple params");
         ActionListener testListener = e -> {
-            RuntimeAppHelper.VisibleApp selectedApp = RuntimeAppHelper.getSelectedApp(toolWindow.getProject().getName());
+            RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
             String scriptCode = scriptField.getText();
             String env = StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? "local" : controllerEnvTextField.getText().trim().split(",")[0];
             ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Fire-Test generate function, please wait ...", false) {
@@ -802,7 +822,12 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool");
+        JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool\n" +
+                "Configuration desc\n" +
+                "#Multiple database are supported, blew is nam1's config\n" +
+                "datasource.nam1.url=jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC\n" +
+                "datasource.nam1.username=root\n" +
+                "datasource.nam1.password=you\n");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -815,68 +840,16 @@ public class SettingsDialog {
 
 
 //        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
-
-        LanguageTextField datasourceField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.datasourceTemplateProperties, false);
+        datasourcePropertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.getSqlConfig(toolWindow.getProject()).getProperties(), false);
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 2;
-        gbc.gridwidth = 3; // 占据3列
+        gbc.gridy = 1;
+        gbc.gridwidth = 1; // 占据1
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.NORTHWEST;
-        panel.add(new JBScrollPane(datasourceField), gbc);
-
-        String[] apps = new String[]{};
-
-        // 添加标签和组合框
-        JLabel comboBoxLabel = new JLabel("App:");
-        sqlAppBox = new ComboBox<>(apps);
-        comboBoxLabel.setLabelFor(sqlAppBox);
-
-        // 添加标签到新行
-        gbc.gridx = 0;
-        gbc.gridy = 1; // 新的一行
-        gbc.gridwidth = 1;
-        gbc.weightx = 0.0;
-        gbc.weighty = 0.0;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.anchor = GridBagConstraints.WEST;
-        panel.add(comboBoxLabel, gbc);
-
-        // 添加组合框到标签右边
-        gbc.gridx = 1;
-        gbc.gridy = 1; // 同一行
-        gbc.gridwidth = 1;
-        gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(sqlAppBox, gbc);
-
-        sqlAppBox.addActionListener(new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String selectedApp = (String) sqlAppBox.getSelectedItem();
-
-            }
-        });
-
-        // 添加新按钮到组合框右边
-        JButton newButton = new JButton(AllIcons.Actions.Rollback);
-        newButton.setToolTipText("Reset config template");
-        newButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                datasourceField.setText(SettingsStorageHelper.datasourceTemplateProperties);
-            }
-        });
-        gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 1;
-        gbc.gridwidth = 1;
-        gbc.weightx = 0.0;
-        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
-        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
-        panel.add(newButton, gbc);
-
+        panel.add(new JBScrollPane(datasourcePropertiesField), gbc);
 
         // 创建按钮面板，使用FlowLayout以右对齐
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -886,25 +859,71 @@ public class SettingsDialog {
         testButton.setPreferredSize(new Dimension(20, 20));
         testButton.setToolTipText("Test connection");
         ActionListener testListener = e -> {
-            String selectedApp = (String) sqlAppBox.getSelectedItem();
-            if (selectedApp == null) {
-                FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
+            String datasourceProperties = datasourcePropertiesField.getText();
+            List<SettingsStorageHelper.DatasourceConfig> datasourceConfigs = null;
+            try {
+                datasourceConfigs = SettingsStorageHelper.SqlConfig.parseDatasources(datasourceProperties);
+            } catch (Throwable ex) {
+                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Config must be properties model");
                 return;
             }
-            String datasourceProperties = datasourceField.getText();
+//            properties文件格式
+//            datasource.name1.url=
+//            datasource.name1.username=
+//            datasource.name1.password=
+            //            datasource.name2.url
+//            datasource.name2.username
+//            datasource.name2.password
+//            我现在需要找出datasource开头的内容，并且根据参数挨个验证数据库连接的连通性
+//            name是为每个链接取的名字
 
+            // 存储测试结果
+            Map<String, String> results = new HashMap<>();
+
+            // 遍历每个数据源配置，逐个验证连接
+            for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
+                // 创建 Druid 数据源
+                DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
+                // 测试连接
+                String result = MysqlUtil.testConnectionAndClose(dataSource);
+                // 存储结果
+                results.put(config.getName(), result == null ? "connect success" : result);
+            }
+            FlingHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), "Test result is " + JSON.toJSONString(results));
         };
         testButton.addActionListener(testListener);
 
         // 保存按钮
         JButton saveButton = new JButton("Apply");
         ActionListener saveListener = e -> {
-            String propertiesStr = datasourceField.getText();
-            String selectedApp = (String) sqlAppBox.getSelectedItem();
-            if (selectedApp == null) {
+            String propertiesStr = datasourcePropertiesField.getText();
+            List<SettingsStorageHelper.DatasourceConfig> datasourceConfigs = null;
+            try {
+                datasourceConfigs = SettingsStorageHelper.SqlConfig.parseDatasources(propertiesStr);
+            } catch (Throwable ex) {
+                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Config must be properties model");
                 return;
             }
 
+            List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
+            for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
+                // 创建 Druid 数据源
+                DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
+                // 测试连接
+                String result = MysqlUtil.testConnectionAndClose(dataSource);
+                if (result == null) {
+                    valids.add(config);
+                }
+            }
+
+            SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+            if (!Objects.equals(sqlConfig.getProperties(), propertiesStr)) {
+                sqlConfig.setProperties(propertiesStr.trim());
+                SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
+            }
+
+            RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids);
+            FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, valid datasources is " + valids.stream().map(SettingsStorageHelper.DatasourceConfig::getName).toList());
         };
         saveButton.addActionListener(saveListener);
 
@@ -935,6 +954,49 @@ public class SettingsDialog {
         panel.add(buttonPanel, gbc);
 
         return panel;
+    }
+
+
+    /**
+     * 解析 properties 格式的字符串，提取所有数据源配置
+     *
+     * @param propertiesText properties 文件格式的字符串
+     * @return 数据源名称到配置的映射
+     */
+    public static List<SettingsStorageHelper.DatasourceConfig> parseDatasourceConfigs(String propertiesText) {
+        Properties properties = new Properties();
+        try {
+            // 加载字符串为 properties 对象
+            properties.load(new java.io.StringReader(propertiesText));
+        } catch (Exception e) {
+            throw new RuntimeException("parse properties error", e);
+        }
+
+        // 提取所有以 "datasource" 开头的配置
+        Map<String, Map<String, String>> groupedConfigs = properties.stringPropertyNames().stream()
+                .filter(key -> key.startsWith("datasource."))
+                .collect(Collectors.groupingBy(
+                        key -> key.split("\\.")[1], // 按数据源名称分组
+                        Collectors.toMap(
+                                key -> key.split("\\.")[2], // 提取属性名（url, username, password）
+                                properties::getProperty // 提取属性值
+                        )
+                ));
+
+        // 转换为 DatasourceConfig 对象
+        List<SettingsStorageHelper.DatasourceConfig> datasourceConfigs = new ArrayList<>();
+        for (Map.Entry<String, Map<String, String>> entry : groupedConfigs.entrySet()) {
+            String name = entry.getKey();
+            Map<String, String> configMap = entry.getValue();
+            SettingsStorageHelper.DatasourceConfig config = new SettingsStorageHelper.DatasourceConfig();
+            config.setUrl(configMap.get("url"));
+            config.setUsername(configMap.get("username"));
+            config.setPassword(configMap.get("password"));
+            config.setName(name);
+            datasourceConfigs.add(config);
+        }
+
+        return datasourceConfigs;
     }
 
     private JPanel createTraceOptionPanel() {
@@ -1114,8 +1176,8 @@ public class SettingsDialog {
         JLabel packageLabel = new JLabel("Package:");
         packageLabel.setToolTipText("In the package's class you want to trace, multiple use,split;\napp.three.package means that the first three packages of the startup class are automatically intercepted");
         packageLabel.setPreferredSize(labelDimension);
-        JBTextField packagesField = new JBTextField(traceConfig.getPackages(), 20);
-        packagesField.getEmptyText().setText("In the package's class you want to trace, multiple use,split; Default:app.three.package means that the first three packages of the startup class");
+        tracePackagesField = new JBTextField(traceConfig.getPackages(), 20);
+        tracePackagesField.getEmptyText().setText("In the package's class you want to trace, multiple use,split; Default:app.three.package means that the first three packages of the startup class");
 
         gbc.gridx = 0;
         gbc.gridy = 4;
@@ -1124,13 +1186,13 @@ public class SettingsDialog {
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(packagesField, gbc);
+        traceOptionsPanel.add(tracePackagesField, gbc);
 
         JLabel classSuffixLabel = new JLabel("Class Suffix:");
         classSuffixLabel.setToolTipText("Class with the suffix you want to trace, multiple use,split");
         classSuffixLabel.setPreferredSize(labelDimension);
-        JBTextField classSuffixField = new JBTextField(traceConfig.getClsSuffix(), 20);
-        classSuffixField.getEmptyText().setText("Class with the suffix you want to trace, multiple use,split;");
+        traceClassSuffixField = new JBTextField(traceConfig.getClsSuffix(), 20);
+        traceClassSuffixField.getEmptyText().setText("Class with the suffix you want to trace, multiple use,split;");
 
         gbc.gridx = 0;
         gbc.gridy = 5;
@@ -1139,14 +1201,14 @@ public class SettingsDialog {
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(classSuffixField, gbc);
+        traceOptionsPanel.add(traceClassSuffixField, gbc);
 
 
         JLabel whiteClassLabel = new JLabel("Allow Class:");
         whiteClassLabel.setToolTipText("Tracing class allow list, multiple use,split");
         whiteClassLabel.setPreferredSize(labelDimension);
-        JBTextField whiteListField = new JBTextField(traceConfig.getWhites(), 20);
-        whiteListField.getEmptyText().setText("Tracing class allow list, multiple use,split");
+        traceWhiteListField = new JBTextField(traceConfig.getWhites(), 20);
+        traceWhiteListField.getEmptyText().setText("Tracing class allow list, multiple use,split");
 
         gbc.gridx = 0;
         gbc.gridy = 6;
@@ -1155,13 +1217,13 @@ public class SettingsDialog {
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(whiteListField, gbc);
+        traceOptionsPanel.add(traceWhiteListField, gbc);
 
         JLabel blackClassLabel = new JLabel("Deny Class:");
         blackClassLabel.setToolTipText("Tracing class deny list, multiple use,split");
         blackClassLabel.setPreferredSize(labelDimension);
-        JBTextField blackListField = new JBTextField(traceConfig.getBlacks(), 20);
-        blackListField.getEmptyText().setText("Tracing class deny list, multiple use,split");
+        traceBlackListField = new JBTextField(traceConfig.getBlacks(), 20);
+        traceBlackListField.getEmptyText().setText("Tracing class deny list, multiple use,split");
 
         gbc.gridx = 0;
         gbc.gridy = 7;
@@ -1170,15 +1232,15 @@ public class SettingsDialog {
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(blackListField, gbc);
+        traceOptionsPanel.add(traceBlackListField, gbc);
 
 
         JLabel monitorPrivateLabel = new JLabel("Single Class Depth:");
         monitorPrivateLabel.setToolTipText("Maximum tracking depth for a single class");
         monitorPrivateLabel.setPreferredSize(labelDimension);
 
-        JBTextField singleClsDepthField = new JBTextField(String.valueOf(traceConfig.getSingleClsDepth()), 10);
-        singleClsDepthField.getEmptyText().setText("Maximum tracking depth for a single class, Default: 2");
+        traceSingleClsDepthField = new JBTextField(String.valueOf(traceConfig.getSingleClsDepth()), 10);
+        traceSingleClsDepthField.getEmptyText().setText("Maximum tracking depth for a single class, Default: 2");
         gbc.gridx = 0;
         gbc.gridy = 8;
         gbc.weightx = 0.0;
@@ -1186,7 +1248,7 @@ public class SettingsDialog {
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(singleClsDepthField, gbc);
+        traceOptionsPanel.add(traceSingleClsDepthField, gbc);
 
 
         gbc.gridx = 0;
@@ -1216,12 +1278,12 @@ public class SettingsDialog {
                     FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "No config need to save");
                     return;
                 }
-                String text = singleClsDepthField.getText();
+                String text = traceSingleClsDepthField.getText();
                 if (StringUtils.isNotBlank(text) && !StringUtils.isNumeric(text.trim())) {
                     FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth must be integer");
                     return;
                 }
-                int singleClsDepth = Integer.parseInt(singleClsDepthField.getText().trim());
+                int singleClsDepth = Integer.parseInt(traceSingleClsDepthField.getText().trim());
                 if (singleClsDepth > 100) {
                     FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth max num is 100");
                     return;
@@ -1229,10 +1291,10 @@ public class SettingsDialog {
 
 
                 SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
-                nowConfig.setPackages(packagesField.getText().trim());
-                nowConfig.setClsSuffix(classSuffixField.getText().trim());
-                nowConfig.setWhites(whiteListField.getText().trim());
-                nowConfig.setBlacks(blackListField.getText().trim());
+                nowConfig.setPackages(tracePackagesField.getText().trim());
+                nowConfig.setClsSuffix(traceClassSuffixField.getText().trim());
+                nowConfig.setWhites(traceWhiteListField.getText().trim());
+                nowConfig.setBlacks(traceBlackListField.getText().trim());
                 nowConfig.setSingleClsDepth(singleClsDepth);
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
                 FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace config was saved");

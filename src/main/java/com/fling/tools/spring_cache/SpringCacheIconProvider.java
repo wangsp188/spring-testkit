@@ -1,6 +1,6 @@
 package com.fling.tools.spring_cache;
 
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.PluginToolEnum;
 import com.fling.tools.ToolHelper;
@@ -76,7 +76,7 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
             return false;
         }
 
-        if(!RuntimeAppHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
+        if(!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
             return false;
         }
 

@@ -2,7 +2,7 @@ package com.fling.tools.view_value;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.HttpUtil;
@@ -68,14 +68,14 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             return;
                         }
                         String projectName = element.getProject().getName();
-                        List<String> projectAppList = RuntimeAppHelper.getAppMetas(projectName).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
+                        List<String> projectAppList = RuntimeHelper.getAppMetas(projectName).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                                     @Override
-                                    public boolean test(RuntimeAppHelper.AppMeta appMeta) {
+                                    public boolean test(RuntimeHelper.AppMeta appMeta) {
                                         return ToolHelper.isDependency(element, element.getProject(), appMeta.getModule());
                                     }
-                                }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
+                                }).map(new Function<RuntimeHelper.AppMeta, String>() {
                                     @Override
-                                    public String apply(RuntimeAppHelper.AppMeta appMeta) {
+                                    public String apply(RuntimeHelper.AppMeta appMeta) {
                                         return appMeta.getApp();
                                     }
                                 })
@@ -87,18 +87,18 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
 
                         DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-                        List<RuntimeAppHelper.VisibleApp> visibleApps = RuntimeAppHelper.getVisibleApps(projectName);
+                        List<RuntimeHelper.VisibleApp> visibleApps = RuntimeHelper.getVisibleApps(projectName);
                         for (String app : projectAppList) {
-                            List<RuntimeAppHelper.VisibleApp> list = visibleApps.stream().filter(new Predicate<RuntimeAppHelper.VisibleApp>() {
+                            List<RuntimeHelper.VisibleApp> list = visibleApps.stream().filter(new Predicate<RuntimeHelper.VisibleApp>() {
                                 @Override
-                                public boolean test(RuntimeAppHelper.VisibleApp visibleApp) {
+                                public boolean test(RuntimeHelper.VisibleApp visibleApp) {
                                     return Objects.equals(app, visibleApp.getAppName());
                                 }
                             }).toList();
                             if (CollectionUtils.isEmpty(list)) {
                                 continue;
                             }
-                            for (RuntimeAppHelper.VisibleApp visibleApp : list) {
+                            for (RuntimeHelper.VisibleApp visibleApp : list) {
                                 //显示的一个图标加上标题
                                 AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getPort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getPort(), null) {
                                     @Override
@@ -161,7 +161,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
             }
         }
 
-        if(!RuntimeAppHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())){
+        if(!RuntimeHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())){
             return "no_side_server";
         }
 
@@ -179,14 +179,14 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
 
         String projectName = field.getProject().getName();
-        List<String> projectAppList = RuntimeAppHelper.getAppMetas(projectName).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
+        List<String> projectAppList = RuntimeHelper.getAppMetas(projectName).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                     @Override
-                    public boolean test(RuntimeAppHelper.AppMeta appMeta) {
+                    public boolean test(RuntimeHelper.AppMeta appMeta) {
                         return ToolHelper.isDependency(field, field.getProject(), appMeta.getModule());
                     }
-                }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
+                }).map(new Function<RuntimeHelper.AppMeta, String>() {
                     @Override
-                    public String apply(RuntimeAppHelper.AppMeta appMeta) {
+                    public String apply(RuntimeHelper.AppMeta appMeta) {
                         return appMeta.getApp();
                     }
                 })
@@ -197,7 +197,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
         return null;
     }
 
-    private static void handleClick(PsiElement element, PsiClass containingClass, PsiElement psiElement, RuntimeAppHelper.VisibleApp visibleApp) {
+    private static void handleClick(PsiElement element, PsiClass containingClass, PsiElement psiElement, RuntimeHelper.VisibleApp visibleApp) {
         ProgressManager.getInstance().run(new Task.Backgroundable(element.getProject(), "Processing view-value, please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {

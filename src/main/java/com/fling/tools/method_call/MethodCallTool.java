@@ -5,7 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.fling.FlingHelper;
 import com.fling.ReqStorageHelper;
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.util.Container;
@@ -82,14 +82,14 @@ public class MethodCallTool extends BasePluginTool {
                 FlingHelper.alert(getProject(),Messages.getErrorIcon(),"Please select a method");
                 return;
             }
-            List<String> projectAppList = RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
+            List<String> projectAppList = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                         @Override
-                        public boolean test(RuntimeAppHelper.AppMeta appMeta) {
+                        public boolean test(RuntimeHelper.AppMeta appMeta) {
                             return ToolHelper.isDependency(selectedItem.getMethod(),getProject(),appMeta.getModule());
                         }
-                    }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
+                    }).map(new Function<RuntimeHelper.AppMeta, String>() {
                         @Override
-                        public String apply(RuntimeAppHelper.AppMeta appMeta) {
+                        public String apply(RuntimeHelper.AppMeta appMeta) {
                             return appMeta.getApp();
                         }
                     })
@@ -174,14 +174,14 @@ public class MethodCallTool extends BasePluginTool {
         } catch (Exception e) {
             throw new RuntimeException("Input parameter must be json object");
         }
-        return RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
+        return RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
             @Override
-            public boolean test(RuntimeAppHelper.AppMeta appMeta) {
+            public boolean test(RuntimeHelper.AppMeta appMeta) {
                 return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
             }
-        }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
+        }).map(new Function<RuntimeHelper.AppMeta, String>() {
                     @Override
-                    public String apply(RuntimeAppHelper.AppMeta appMeta) {
+                    public String apply(RuntimeHelper.AppMeta appMeta) {
                         return appMeta.getApp();
                     }
                 })
@@ -464,7 +464,7 @@ public class MethodCallTool extends BasePluginTool {
 
 
     public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
-        RuntimeAppHelper.VisibleApp selectedApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
+        RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(getProject().getName());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
@@ -522,7 +522,7 @@ public class MethodCallTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -589,7 +589,7 @@ public class MethodCallTool extends BasePluginTool {
         req.put("trace", traceConfig.isEnable());
         req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (useScript) {
-            RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         return req;

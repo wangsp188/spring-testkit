@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intellij.openapi.module.Module;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
 
 import java.io.File;
 import java.io.FileReader;
@@ -18,7 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class RuntimeAppHelper {
+public class RuntimeHelper {
 
     private static ObjectMapper MAPPER = new ObjectMapper();
 
@@ -32,6 +31,8 @@ public class RuntimeAppHelper {
     private static final Map<String, List<AppMeta>> appMetas = new HashMap<>();
 
     private static final Map<String, List<VisibleApp>> visibleApps = new HashMap<>();
+
+    private static final Map<String,List<SettingsStorageHelper.DatasourceConfig>> validDatasources = new HashMap<>();
 
 
     public static VisibleApp getSelectedApp(String project) {
@@ -66,6 +67,25 @@ public class RuntimeAppHelper {
         }
         Boolean monitor = monitorMap.get(app);
         return monitor != null && monitor;
+    }
+
+    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources) {
+        if (project == null) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(datasources)) {
+            validDatasources.remove(project);
+            return;
+        }
+        validDatasources.put(project, datasources);
+    }
+
+    public static List<SettingsStorageHelper.DatasourceConfig> getValidDatasources(String project) {
+        if (project == null) {
+            return new ArrayList<>();
+        }
+        List<SettingsStorageHelper.DatasourceConfig> visibleApps1 = validDatasources.get(project);
+        return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
     }
 
     public static void updateVisibleApps(String project, List<VisibleApp> apps) {

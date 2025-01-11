@@ -2,6 +2,7 @@ package com.fling;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
+import com.fling.view.SettingsDialog;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang3.StringUtils;
 
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +32,10 @@ public class SettingsStorageHelper {
     public static final String defFlexibleTestPackage = "flexibletest";
 
     public static final String defProperties = "logging.level.com.fling=INFO";
-    public static final String datasourceTemplateProperties = "#datasource.template.properties";
+    public static final String datasourceTemplateProperties ="#local datasource\n"+
+            "datasource.local.url=jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC\n" +
+            "datasource.local.username=xx\n" +
+            "datasource.local.password=xx";
 
     public static final String defInterceptor =
             "import org.springframework.beans.factory.annotation.Autowired;\n" +
@@ -273,6 +278,12 @@ public class SettingsStorageHelper {
         DEF_TRACE_CONFIG.setSingleClsDepth(2);
     }
 
+    public static final SqlConfig DEF_SQL_CONFIG = new SqlConfig();
+    {
+
+    }
+
+
     public static boolean isEnableSideServer(Project project) {
         return getConfig(project).isEnableSideServer();
     }
@@ -284,6 +295,21 @@ public class SettingsStorageHelper {
             projectConfig = new ProjectConfig();
         }
         projectConfig.setEnableSideServer(enable);
+        saveProjectConfig(project, projectConfig);
+    }
+
+
+    public static SqlConfig getSqlConfig(Project project) {
+        return getConfig(project).getSqlConfig();
+    }
+
+
+    public static void setSqlConfig(Project project, SqlConfig config) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        projectConfig.setSqlConfig(config);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -300,9 +326,6 @@ public class SettingsStorageHelper {
         return getAppConfig(project, app).getScript();
     }
 
-    public static DatasourceConfig getAppDatasourceConfig(Project project, String app) {
-        return getAppConfig(project, app).getDatasourceConfig();
-    }
 
     public static ControllerCommand getAppControllerCommand(Project project, String app) {
         return getAppConfig(project, app).getControllerCommand();
@@ -345,7 +368,7 @@ public class SettingsStorageHelper {
                 traceConfig.setBlacks("");
             }
         }
-        projectConfig.setMonitorConfig(traceConfig);
+        projectConfig.setTraceConfig(traceConfig);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -389,24 +412,6 @@ public class SettingsStorageHelper {
         saveProjectConfig(project, projectConfig);
     }
 
-    public static void setAppDatasourceConfig(Project project, String app, DatasourceConfig config) {
-        ProjectConfig projectConfig = loadProjectConfig(project);
-        if (projectConfig == null) {
-            projectConfig = new ProjectConfig();
-        }
-        if (projectConfig.getAppConfigs() == null) {
-            projectConfig.setAppConfigs(new HashMap<>());
-        }
-
-
-        projectConfig.getAppConfigs().computeIfAbsent(app, new Function<String, Config>() {
-            @Override
-            public Config apply(String s) {
-                return new Config();
-            }
-        }).setDatasourceConfig(config);
-        saveProjectConfig(project, projectConfig);
-    }
 
     public static void setAppControllerCommand(Project project, String app, ControllerCommand adapter) {
         ProjectConfig projectConfig = loadProjectConfig(project);
@@ -434,12 +439,14 @@ public class SettingsStorageHelper {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
             config.setTraceConfig(copyDefMonitorConfig());
+            config.setSqlConfig(copyDefSqlConfig());
             config.setEnableSideServer(true);
             return config;
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
-        config.setTraceConfig(projectConfig.getMonitorConfig() == null ? copyDefMonitorConfig() : projectConfig.getMonitorConfig());
+        config.setTraceConfig(projectConfig.getTraceConfig() == null ? copyDefMonitorConfig() : projectConfig.getTraceConfig());
+        config.setSqlConfig(projectConfig.getSqlConfig() == null ? copyDefSqlConfig() : projectConfig.getSqlConfig());
         config.setEnableSideServer(projectConfig.isEnableSideServer());
         return config;
     }
@@ -456,6 +463,11 @@ public class SettingsStorageHelper {
         copyConfig.setTraceMybatis(DEF_TRACE_CONFIG.isTraceMybatis());
         copyConfig.setLogMybatis(DEF_TRACE_CONFIG.isLogMybatis());
         return copyConfig;
+    }
+
+    private static SqlConfig copyDefSqlConfig() {
+        SqlConfig sqlConfig = new SqlConfig();
+        return sqlConfig;
     }
 
 
@@ -538,7 +550,7 @@ public class SettingsStorageHelper {
         private ControllerCommand controllerCommand;
         private Map<String, Config> appConfigs;
         private TraceConfig traceConfig;
-
+        private SqlConfig sqlConfig;
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
         }
@@ -563,11 +575,11 @@ public class SettingsStorageHelper {
             this.appConfigs = appConfigs;
         }
 
-        public TraceConfig getMonitorConfig() {
+        public TraceConfig getTraceConfig() {
             return traceConfig;
         }
 
-        public void setMonitorConfig(TraceConfig traceConfig) {
+        public void setTraceConfig(TraceConfig traceConfig) {
             this.traceConfig = traceConfig;
         }
 
@@ -586,6 +598,14 @@ public class SettingsStorageHelper {
         public void setEnableSideServer(boolean enableSideServer) {
             this.enableSideServer = enableSideServer;
         }
+
+        public SqlConfig getSqlConfig() {
+            return sqlConfig;
+        }
+
+        public void setSqlConfig(SqlConfig sqlConfig) {
+            this.sqlConfig = sqlConfig;
+        }
     }
 
     public static class Config {
@@ -596,7 +616,7 @@ public class SettingsStorageHelper {
         private ControllerCommand controllerCommand;
         private String properties;
         private TraceConfig traceConfig;
-        private DatasourceConfig datasourceConfig;
+        private SqlConfig sqlConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -646,12 +666,12 @@ public class SettingsStorageHelper {
             this.enableSideServer = enableSideServer;
         }
 
-        public DatasourceConfig getDatasourceConfig() {
-            return datasourceConfig;
+        public SqlConfig getSqlConfig() {
+            return sqlConfig;
         }
 
-        public void setDatasourceConfig(DatasourceConfig datasourceConfig) {
-            this.datasourceConfig = datasourceConfig;
+        public void setSqlConfig(SqlConfig sqlConfig) {
+            this.sqlConfig = sqlConfig;
         }
     }
 
@@ -676,6 +696,7 @@ public class SettingsStorageHelper {
         public void setEnvs(List<String> envs) {
             this.envs = envs;
         }
+
     }
 
 
@@ -777,6 +798,7 @@ public class SettingsStorageHelper {
 
     public static class DatasourceConfig {
 
+        private String name;
         private String url;
         private String username;
         private String password;
@@ -803,6 +825,37 @@ public class SettingsStorageHelper {
 
         public void setPassword(String password) {
             this.password = password;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+
+
+    public static class SqlConfig {
+
+        private String properties;
+
+
+        public static List<DatasourceConfig> parseDatasources(String propertiesStr){
+            if (StringUtils.isBlank(propertiesStr)) {
+                return new ArrayList<>();
+            }
+            return SettingsDialog.parseDatasourceConfigs(propertiesStr);
+        }
+
+
+        public String getProperties() {
+            return properties;
+        }
+
+        public void setProperties(String properties) {
+            this.properties = properties;
         }
     }
 

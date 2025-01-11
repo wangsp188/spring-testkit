@@ -1,7 +1,7 @@
 package com.fling.tools.method_call;
 
 import com.fling.FlingHelper;
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
@@ -37,7 +37,7 @@ public class GenerateFlexibleTestAction extends AnAction {
             return;
         }
 
-        if (!RuntimeAppHelper.hasAppMeta(psiFile.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiFile.getProject())) {
+        if (!RuntimeHelper.hasAppMeta(psiFile.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiFile.getProject())) {
             e.getPresentation().setVisible(false);
             return;
         }

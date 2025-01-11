@@ -1,46 +1,57 @@
 package com.fling.view;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.TypeReference;
+import com.alibaba.druid.pool.DruidDataSource;
 import com.fling.FlingHelper;
-import com.fling.tools.BasePluginTool;
-import com.fling.util.JsonUtil;
-import com.fling.util.curl.CurlEntity;
-import com.fling.util.curl.CurlParserUtil;
-import com.intellij.icons.AllIcons;
+import com.fling.RuntimeHelper;
+import com.fling.SettingsStorageHelper;
+import com.fling.tools.method_call.MethodCallIconProvider;
+import com.fling.util.sql.MysqlUtil;
+import com.google.protobuf.Message;
 import com.intellij.notification.NotificationType;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTextArea;
+import com.intellij.sql.psi.SqlLanguage;
+import com.intellij.ui.LanguageTextField;
+import com.intellij.ui.table.JBTable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Map;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 public class SqlDialog extends JDialog {
 
-    public static final Icon ADAPTER_INPUT_ICON = IconLoader.getIcon("/icons/adapter-input.svg", SqlDialog.class);
+    public static final Icon SQL_ANALYSIS_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", MethodCallIconProvider.class);
 
+    private FlingToolWindow toolWindow;
+    private LanguageTextField inputSqlField;
+    private JComboBox<String> dataSourceComboBox;
+    private JBTable explainTable;
 
-    private JBTextArea inputTextArea;
-    private JTextField urlField, methodField;
-    private JTextArea paramsField, headersField, bodyField;
 
     public SqlDialog(FlingToolWindow flingWindow) {
         super((Frame) null, "SQL tool", true);
-
+        this.toolWindow = flingWindow;
         JPanel panelMain = new JPanel(new GridBagLayout());
         GridBagConstraints c1 = new GridBagConstraints();
 
         // 设置 panelCmd
         JPanel panelCmd = buildCmdPanel(flingWindow);
-        c1.fill = GridBagConstraints.BOTH;  // 使组件在水平方向和垂直方向都拉伸
+        c1.fill = GridBagConstraints.BOTH;
+        c1.anchor = GridBagConstraints.NORTH;// 使组件在水平方向和垂直方向都拉伸
         c1.weightx = 1;   // 水平方向占满
         c1.weighty = 0.2; // 垂直方向占30%
         c1.gridx = 0;
@@ -48,11 +59,22 @@ public class SqlDialog extends JDialog {
         c1.gridwidth = 2; // 横跨两列
         panelMain.add(panelCmd, c1);
 
+        JPanel panelAction = buildActionPanel(flingWindow);
+        c1.gridy = 1;
+        c1.weightx = 1;
+        c1.weighty = 0;
+        c1.gridwidth = 2; // 不再跨列
+        c1.fill = GridBagConstraints.NONE;
+        c1.anchor = GridBagConstraints.WEST;
+        panelMain.add(panelAction, c1);
+
         // 设置 panelResults
         JPanel panelResults = buildResultPanel(flingWindow);
         c1.weighty = 0.8; // 垂直方向占70%
-        c1.gridy = 1;
+        c1.gridy = 2;
         c1.gridwidth = 2; // 不再跨列
+        c1.fill = GridBagConstraints.BOTH;
+        c1.anchor = GridBagConstraints.SOUTH;
         panelMain.add(panelResults, c1);
 
         // 设置 closePanel
@@ -72,81 +94,161 @@ public class SqlDialog extends JDialog {
         c1.weightx = 0;  // 不占据额外空间
         c1.weighty = 0;
         c1.gridx = 1;    // 放在第二列
-        c1.gridy = 2;    // 放在第三行
+        c1.gridy = 3;    // 放在第三行
         panelMain.add(closePanel, c1);
 
         add(panelMain);
         pack();
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setSize((int) (screenSize.width*0.7), (int) (screenSize.height*0.7));
+        setSize((int) (screenSize.width * 0.7), (int) (screenSize.height * 0.7));
         setLocationRelativeTo(null);
     }
 
-    private JPanel buildResultPanel(FlingToolWindow window) {
+    private JPanel buildActionPanel(FlingToolWindow window) {
         JPanel panelResults = new JPanel();
-        GridBagLayout gridbag = new GridBagLayout();
-        GridBagConstraints c = new GridBagConstraints();
-        panelResults.setLayout(gridbag);
+        panelResults.setLayout(new BoxLayout(panelResults, BoxLayout.X_AXIS)); // 顺序排列（水平）
 
-        JPanel panelRequestTypeUrl = buildRetUrlPanel();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1;
-        c.weighty = 0;
-        c.gridx = 0;
-        c.gridy = 0;
-        panelResults.add(panelRequestTypeUrl, c);
+        // 一个Label，代表datasource
+        JLabel dataSourceLabel = new JLabel("Datasource:");
 
-        JPanel panelParamsHeadersBody = new JPanel(new GridLayout(1, 3));
-        c.fill = GridBagConstraints.BOTH;
-        c.weightx = 1;
-        c.weighty = 1;
-        c.gridx = 0;
-        c.gridy = 1;
-        panelResults.add(panelParamsHeadersBody, c);
+        // 一个下拉框
+        dataSourceComboBox = new ComboBox<>();
 
-        paramsField = new JTextArea();
-        paramsField.setEditable(false);
-        JPanel panelParams = createLabelTextFieldPanel(window, "Params", paramsField);
-        headersField = new JTextArea();
-        headersField.setEditable(false);
-        JPanel panelHeaders = createLabelTextFieldPanel(window, "Headers", headersField);
-        bodyField = new JTextArea();
-        bodyField.setEditable(false);
-        JPanel panelBody = createLabelTextFieldPanel(window, "Body", bodyField);
+        // 一个按钮
+        JButton button = new JButton(SQL_ANALYSIS_ICON);
+        button.setToolTipText("Analysis SQL");
+        button.setPreferredSize(new Dimension(32, 32));
+        button.addActionListener(e -> {
+            String selectedData = (String) dataSourceComboBox.getSelectedItem();
+            if (selectedData == null) {
+                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please select a datasource");
+                return;
+            }
+            String sqlText = inputSqlField.getText();
+            if (StringUtils.isBlank(sqlText)) {
+                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please input your SQL");
+                return;
+            }
 
-        panelParamsHeadersBody.add(panelHeaders);
-        panelParamsHeadersBody.add(panelParams);
-        panelParamsHeadersBody.add(panelBody);
+
+            Optional<SettingsStorageHelper.DatasourceConfig> first = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName())
+                    .stream()
+                    .filter(new Predicate<SettingsStorageHelper.DatasourceConfig>() {
+                        @Override
+                        public boolean test(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
+                            return selectedData.equals(datasourceConfig.getName());
+                        }
+                    })
+                    .findFirst();
+            if (!first.isPresent()) {
+                FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Can not find valid datasource");
+                return;
+            }
+            SettingsStorageHelper.DatasourceConfig config = first.get();
+            DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
+            //执行explain，并刷新结果
+// 执行 EXPLAIN 逻辑部分
+            ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Analysis sql, please wait ...", false) {
+
+                                                  @Override
+                                                  public void run(@NotNull ProgressIndicator progressIndicator) {
+                                                      analysisSql(dataSource, sqlText);
+                                                  }
+                                              }
+            );
+
+
+        });
+
+        // 添加组件到panel
+        panelResults.add(dataSourceLabel);
+        panelResults.add(Box.createHorizontalStrut(10)); // 添加间隔
+        panelResults.add(dataSourceComboBox);
+        panelResults.add(Box.createHorizontalStrut(10)); // 添加间隔
+        panelResults.add(button);
+
         return panelResults;
     }
 
-    private @NotNull JPanel buildRetUrlPanel() {
-        JPanel panelRequestTypeUrl = new JPanel();
-        GridBagLayout gridbag = new GridBagLayout();
-        GridBagConstraints c = new GridBagConstraints();
-        panelRequestTypeUrl.setLayout(gridbag);
+    private void analysisSql(DruidDataSource dataSource, String sqlText) {
+        try (DruidDataSource dataSource1 = dataSource; Connection connection = dataSource1.getConnection();
+             PreparedStatement statement = connection.prepareStatement("EXPLAIN " + sqlText);
+             ResultSet resultSet = statement.executeQuery()) {
 
-        methodField = new JTextField(5);
-        methodField.setEditable(false);
-        urlField = new JTextField(20);
-        urlField.setEditable(false);
+            // 解析结果并刷新表格
+            List<Object[]> resultData = new ArrayList<>();
+            ResultSetMetaData metaData = resultSet.getMetaData();
+            int columnCount = metaData.getColumnCount();
 
-// Add methodField
-        c.fill = GridBagConstraints.NONE;
-        c.weightx = 0;
-        c.gridx = 0;
-        c.gridy = 0;
-        panelRequestTypeUrl.add(methodField, c);
+            // 读取 ResultSet 数据
+            while (resultSet.next()) {
+                Object[] row = new Object[columnCount];
+                for (int i = 1; i <= columnCount; i++) {
+                    row[i - 1] = resultSet.getObject(i);
+                }
+                resultData.add(row);
+            }
 
-// Add urlField
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1;
-        c.gridx = 1;
-        c.gridy = 0;
-        panelRequestTypeUrl.add(urlField, c);
-        return panelRequestTypeUrl;
+            // 使用加载数据的 API 刷新表格
+            SwingUtilities.invokeLater(() -> loadDataToTable(resultData));
+        } catch (Throwable ex) {
+            FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Error executing EXPLAIN: " + ex.getMessage());
+        }
     }
+
+    private JPanel buildResultPanel(FlingToolWindow window) {
+        JPanel panelResults = new JPanel(new BorderLayout());
+
+        // 创建表格结构
+        String[] columnNames = {"Id", "Select Type", "Table", "Type", "Possible Keys", "Key", "Key Length", "Ref", "Rows", "Extra"};
+        Object[][] data = {}; // 初始数据为空
+
+        // 使用 JBTable
+        explainTable = new JBTable(new DefaultTableModel(data, columnNames));
+
+        // 表格效果设置
+        explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS); // 自动调整列宽
+        explainTable.setFillsViewportHeight(true); // 填满视图高度
+        explainTable.getTableHeader().setReorderingAllowed(false); // 禁止列拖动
+
+        // 自定义渲染器实现自动换行
+        explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JTextArea textArea = new JTextArea();
+                textArea.setText(value == null ? "" : value.toString());
+                textArea.setWrapStyleWord(true); // 单词换行
+                textArea.setLineWrap(true); // 自动换行
+                textArea.setOpaque(true); // 确保颜色背景一致
+                textArea.setFont(table.getFont()); // 保持表格的字体一致
+                if (isSelected) {
+                    textArea.setBackground(table.getSelectionBackground());
+                    textArea.setForeground(table.getSelectionForeground());
+                } else {
+                    textArea.setBackground(table.getBackground());
+                    textArea.setForeground(table.getForeground());
+                }
+                return textArea;
+            }
+        });
+
+        // 垂直滚动条，禁止横向滚动条
+        JScrollPane scrollPane = new JScrollPane(explainTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        panelResults.add(scrollPane, BorderLayout.CENTER);
+
+        return panelResults;
+    }
+
+    // 加载数据的 API
+    private void loadDataToTable(List<Object[]> data) {
+        DefaultTableModel model = (DefaultTableModel) explainTable.getModel();
+        model.setRowCount(0); // 清空现有数据
+        for (Object[] row : data) {
+            model.addRow(row); // 添加新行
+        }
+    }
+
 
     private @NotNull JPanel buildCmdPanel(FlingToolWindow window) {
         JPanel panelCmd = new JPanel();
@@ -155,8 +257,8 @@ public class SqlDialog extends JDialog {
         panelCmd.setLayout(gridbag);
 
         JLabel curlLabel = new JLabel("Sql:");
-        inputTextArea = new JBTextArea(5, 20);
-        inputTextArea.getEmptyText().setText("input your sql");
+        inputSqlField = new LanguageTextField(SqlLanguage.INSTANCE, toolWindow.getProject(), "", false);
+//        inputTextArea.getEmptyText().setText("input your sql");
 
         // Add label
         c.fill = GridBagConstraints.NONE;
@@ -166,141 +268,24 @@ public class SqlDialog extends JDialog {
         panelCmd.add(curlLabel, c);
 
         // Add textarea
-        c.fill = GridBagConstraints.HORIZONTAL;
+        c.fill = GridBagConstraints.BOTH;
         c.weightx = 1;
+        c.weighty = 1;
         c.gridx = 1;
         c.gridy = 0;
-        panelCmd.add(new JScrollPane(inputTextArea), c);
+        panelCmd.add(inputSqlField, c);
         return panelCmd;
     }
 
-    private JPanel createLabelTextFieldPanel(FlingToolWindow window, String labelText, JTextArea field) {
-        JPanel panel = new JPanel(new BorderLayout());
-        JLabel label = new JLabel(labelText);
-        JButton copyButton = new JButton(AllIcons.Actions.Copy);
-        copyButton.setToolTipText("Copy this");
-        Dimension preferredSize = new Dimension(30, 30);
-        copyButton.setPreferredSize(preferredSize);
-        copyButton.setMaximumSize(preferredSize);
-        copyButton.setMinimumSize(preferredSize);
-        copyButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                FlingHelper.copyToClipboard(window.getProject(), field.getText(), labelText + " was Copied");
-            }
-        });
-
-
-        // 配置 JTextComponent（如 JTextArea）
-        field.setLineWrap(false);
-//        ((JTextArea) field).setLineWrap(true); // 启用自动换行
-        field.setWrapStyleWord(false); // 按单词换行
-
-        // 将 JTextComponent 放入 JScrollPane
-        JScrollPane scrollPane = new JBScrollPane(field);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); // 允许横向滚动
-
-        // 顶部面板
-        JPanel northPanel = new JPanel();
-        northPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
-        northPanel.add(label);
-        northPanel.add(copyButton);
-        if ("Params".equals(labelText) || "Body".equals(labelText)) {
-            JButton adapterButton = new JButton(ADAPTER_INPUT_ICON);
-            adapterButton.setToolTipText("use " + labelText + " adapter to input params");
-            adapterButton.setPreferredSize(preferredSize);
-            adapterButton.setMaximumSize(preferredSize);
-            adapterButton.setMinimumSize(preferredSize);
-            northPanel.add(adapterButton);
-            adapterButton.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-
-                    SwingUtilities.invokeLater(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            if (StringUtils.isBlank(field.getText())) {
-                                return;
-                            }
-                            Map<String, String> parse;
-                            try {
-                                parse = JSON.parseObject(field.getText(), new TypeReference<Map<String, String>>() {
-                                });
-                            } catch (Exception ex) {
-                                FlingHelper.notify(window.getProject(), NotificationType.ERROR, "the " + labelText + " is not json");
-                                return;
-                            }
-
-
-                            BasePluginTool nowTool = window.getNowTool();
-                            if (nowTool == null) {
-                                FlingHelper.notify(window.getProject(), NotificationType.WARNING, "not find selected tool");
-                                return;
-                            }
-                            String templateText = nowTool.getInputEditorTextField().getText();
-                            JSONObject template;
-                            try {
-                                template = JSON.parseObject(templateText);
-                            } catch (Exception ex) {
-                                FlingHelper.notify(window.getProject(), NotificationType.ERROR, "input is not json, pls check");
-                                return;
-                            }
-
-                            if (template == null) {
-                                FlingHelper.notify(window.getProject(), NotificationType.WARNING, "input is empty, pls init first");
-                                return;
-                            }
-                            updateTemplate(template, parse);
-                            nowTool.getInputEditorTextField().setText(JsonUtil.formatObj(template));
-                            FlingHelper.notify(window.getProject(), NotificationType.INFORMATION, "use " + labelText + " adapter to input params success");
-                        }
-                    });
-
-                }
-            });
+    public void refreshDatasources() {
+        String selectedData = (String) dataSourceComboBox.getSelectedItem();
+        dataSourceComboBox.removeAllItems();
+        List<SettingsStorageHelper.DatasourceConfig> validDatasources = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName());
+        for (SettingsStorageHelper.DatasourceConfig validDatasource : validDatasources) {
+            dataSourceComboBox.addItem(validDatasource.getName());
         }
-
-        // 添加到主面板
-        panel.add(northPanel, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        return panel;
-    }
-
-
-    public static void updateTemplate(JSONObject template, Map<String, String> params) {
-        if (template == null || template.isEmpty()) {
-            return;
-        }
-        for (String key : params.keySet()) {
-            updateJsonObject(template, key, params.get(key));
-        }
-    }
-
-    private static void updateJsonObject(Object json, String keyToUpdate, String newValue) {
-        if (json instanceof JSONObject) {
-            JSONObject jsonObject = (JSONObject) json;
-            for (String key : jsonObject.keySet()) {
-                Object value = jsonObject.get(key);
-                if (value instanceof JSONObject) {
-                    // 递归处理嵌套的 JSONObject
-                    updateJsonObject(value, keyToUpdate, newValue);
-                } else if (value instanceof JSONArray) {
-                    // 处理 JSONArray
-                    updateJsonObject(value, keyToUpdate, newValue);
-                } else if (key.equals(keyToUpdate) && value == null) {
-                    // 如果键匹配，则更新值
-                    jsonObject.put(key, newValue);
-                }
-            }
-        } else if (json instanceof JSONArray) {
-            JSONArray jsonArray = (JSONArray) json;
-            for (int i = 0; i < jsonArray.size(); i++) {
-                // 对数组中的每个元素递归处理
-                updateJsonObject(jsonArray.get(i), keyToUpdate, newValue);
-            }
+        if (selectedData != null) {
+            dataSourceComboBox.setSelectedItem(selectedData);
         }
     }
 }

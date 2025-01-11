@@ -1,6 +1,6 @@
 package com.fling.tools.flexible_test;
 
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.PluginToolEnum;
 import com.fling.tools.method_call.MethodCallIconProvider;
@@ -100,7 +100,7 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return "not_find_virtualFile";
         }
 
-        if(!RuntimeAppHelper.hasAppMeta(modifierList.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(modifierList.getProject())){
+        if(!RuntimeHelper.hasAppMeta(modifierList.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(modifierList.getProject())){
             return "disable_side_server";
         }
         // 获取文件的完整路径

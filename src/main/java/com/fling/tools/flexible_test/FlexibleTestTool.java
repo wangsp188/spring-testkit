@@ -3,7 +3,7 @@ package com.fling.tools.flexible_test;
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
 import com.fling.ReqStorageHelper;
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.method_call.MethodCallIconProvider;
@@ -58,14 +58,14 @@ public class FlexibleTestTool extends BasePluginTool {
         } catch (Exception e) {
             throw new RuntimeException("Input parameter must be json object");
         }
-        return RuntimeAppHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeAppHelper.AppMeta>() {
+        return RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                     @Override
-                    public boolean test(RuntimeAppHelper.AppMeta appMeta) {
+                    public boolean test(RuntimeHelper.AppMeta appMeta) {
                         return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
                     }
-                }).map(new Function<RuntimeAppHelper.AppMeta, String>() {
+                }).map(new Function<RuntimeHelper.AppMeta, String>() {
                     @Override
-                    public String apply(RuntimeAppHelper.AppMeta appMeta) {
+                    public String apply(RuntimeHelper.AppMeta appMeta) {
                         return appMeta.getApp();
                     }
                 })
@@ -132,7 +132,7 @@ public class FlexibleTestTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
                 if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -190,7 +190,7 @@ public class FlexibleTestTool extends BasePluginTool {
         req.put("method", action);
         req.put("params", params);
         if(useScript){
-            RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());

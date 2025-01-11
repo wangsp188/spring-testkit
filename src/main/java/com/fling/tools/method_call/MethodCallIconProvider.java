@@ -1,6 +1,6 @@
 package com.fling.tools.method_call;
 
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.tools.ToolHelper;
 import com.fling.tools.flexible_test.FlexibleTestIconProvider;
 import com.fling.view.FlingToolWindowFactory;
@@ -216,7 +216,7 @@ public class MethodCallIconProvider implements LineMarkerProvider {
         }
 
 
-        if(!RuntimeAppHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
+        if(!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
             if (!MethodCallIconProvider.isRequestMethod(psiMethod)) {
                 return "no_side_server";
             }

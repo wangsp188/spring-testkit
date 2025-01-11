@@ -23,6 +23,8 @@ dependencies {
     implementation(files("libs/spring-fling_link-0.0.1.jar"))
     implementation(files("libs/spring-fling_side_server-0.0.1.jar"))
     implementation(files("libs/spring-fling_agent-0.0.1.jar"))
+    implementation("com.alibaba:druid:1.2.18")
+    implementation("mysql:mysql-connector-java:8.0.33")
     intellijPlatform{
         create("IU","2023.2")
 //        "Git4Idea"

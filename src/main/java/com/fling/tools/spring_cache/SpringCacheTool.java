@@ -2,7 +2,7 @@ package com.fling.tools.spring_cache;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fling.FlingHelper;
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
 import com.fling.SettingsStorageHelper;
 import com.fling.tools.ToolHelper;
 import com.intellij.icons.AllIcons;
@@ -74,7 +74,7 @@ public class SpringCacheTool extends BasePluginTool {
         getKeyButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -94,7 +94,7 @@ public class SpringCacheTool extends BasePluginTool {
         getValButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -114,7 +114,7 @@ public class SpringCacheTool extends BasePluginTool {
         delValButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RuntimeAppHelper.VisibleApp app = RuntimeAppHelper.getSelectedApp(getProject().getName());
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
                 if(app==null){
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
@@ -183,7 +183,7 @@ public class SpringCacheTool extends BasePluginTool {
         req.put("method", PluginToolEnum.SPRING_CACHE.getCode());
         req.put("params", params);
         if(useScript){
-            RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());

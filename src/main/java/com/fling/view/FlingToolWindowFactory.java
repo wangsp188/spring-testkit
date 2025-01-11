@@ -25,7 +25,7 @@ public class FlingToolWindowFactory implements ToolWindowFactory {
 
     public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", MethodCallIconProvider.class);
 
-    public static final Icon SQL_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", MethodCallIconProvider.class);
+    public static final Icon SQL_TOOL_ICON = IconLoader.getIcon("/icons/sql-tool.svg", MethodCallIconProvider.class);
 
 
 
@@ -117,7 +117,7 @@ public class FlingToolWindowFactory implements ToolWindowFactory {
         };
 
         // 添加第二个按钮
-        AnAction sql = new AnAction("SQL tool", "SQL tool", SQL_ICON) {
+        AnAction sql = new AnAction("SQL tool", "SQL tool", SQL_TOOL_ICON) {
             @Override
             public void actionPerformed( AnActionEvent e) {
                 SwingUtilities.invokeLater(new Runnable() {

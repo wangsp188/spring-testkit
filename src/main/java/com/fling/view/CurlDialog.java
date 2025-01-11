@@ -12,6 +12,8 @@ import com.fling.util.curl.CurlParserUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.util.IconLoader;
+import com.intellij.sql.psi.SqlLanguage;
+import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import org.apache.commons.lang3.StringUtils;
@@ -40,6 +42,7 @@ public class CurlDialog extends JDialog {
 
         // 设置 panelCmd
         JPanel panelCmd = buildCmdPanel(flingWindow);
+        c1.anchor = GridBagConstraints.NORTH;
         c1.fill = GridBagConstraints.BOTH;  // 使组件在水平方向和垂直方向都拉伸
         c1.weightx = 1;   // 水平方向占满
         c1.weighty = 0.2; // 垂直方向占30%
@@ -50,6 +53,8 @@ public class CurlDialog extends JDialog {
 
         // 设置 panelResults
         JPanel panelResults = buildResultPanel(flingWindow);
+        c1.anchor = GridBagConstraints.CENTER;
+        c1.fill = GridBagConstraints.BOTH;
         c1.weighty = 0.8; // 垂直方向占70%
         c1.gridy = 1;
         c1.gridwidth = 2; // 不再跨列
@@ -156,6 +161,7 @@ public class CurlDialog extends JDialog {
 
         JLabel curlLabel = new JLabel("Curl:");
         inputTextArea = new JBTextArea(5, 20);
+//        new LanguageTextField(SqlLanguage.INSTANCE, null, "", false)
         inputTextArea.getEmptyText().setText("input your curl and click right button to parse");
 
 //        addPlaceholderToTextArea(inputTextArea, );

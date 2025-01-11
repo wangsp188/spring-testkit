@@ -1,10 +1,13 @@
 package com.fling.view;
 
+import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.fastjson.JSON;
-import com.fling.RuntimeAppHelper;
+import com.fling.RuntimeHelper;
+import com.fling.SettingsStorageHelper;
 import com.fling.coding_guidelines.CodingGuidelinesHelper;
 import com.fling.coding_guidelines.CodingGuidelinesIconProvider;
 import com.fling.tools.mapper_sql.MapperSqlTool;
+import com.fling.util.sql.MysqlUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.*;
@@ -244,10 +247,10 @@ public class FlingToolWindow {
         Border border = appBox.getBorder();
         appBox.addItemListener(e -> {
             String selectedItem = (String) appBox.getSelectedItem();
-            RuntimeAppHelper.updateSelectedApp(getProject().getName(),selectedItem==null?null:parseApp(selectedItem));
+            RuntimeHelper.updateSelectedApp(getProject().getName(),selectedItem==null?null:parseApp(selectedItem));
             appBox.setToolTipText(selectedItem == null ? "" : selectedItem); // 动态更新 ToolTipText
 
-            if (selectedItem != null && RuntimeAppHelper.isMonitor(selectedItem)) {
+            if (selectedItem != null && RuntimeHelper.isMonitor(selectedItem)) {
                 appBox.setBorder(new LineBorder(new Color(114, 169, 107), 1));
             } else {
                 appBox.setBorder(border);
@@ -377,7 +380,7 @@ public class FlingToolWindow {
     }
 
     private void refreshVisibleApp() {
-        List<String> newItems = RuntimeAppHelper.loadProjectRuntimes(project.getName());
+        List<String> newItems = RuntimeHelper.loadProjectRuntimes(project.getName());
         if (newItems == null) {
             return;
         }
@@ -396,7 +399,7 @@ public class FlingToolWindow {
             }
 
             // 获取 visibleApp 实例
-            RuntimeAppHelper.VisibleApp visibleApp = parseApp(item);
+            RuntimeHelper.VisibleApp visibleApp = parseApp(item);
             try {
                 // 发送请求获取实时数据
                 Map response = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", requestData, Map.class);
@@ -404,7 +407,7 @@ public class FlingToolWindow {
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
-                RuntimeAppHelper.removeApp(project.getName(), visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
+                RuntimeHelper.removeApp(project.getName(), visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
             }
         }
 
@@ -418,7 +421,7 @@ public class FlingToolWindow {
         }
 
         // 更新 monitorMap
-        RuntimeAppHelper.updateMonitors(newMap);
+        RuntimeHelper.updateMonitors(newMap);
         // 比较新旧项是否有变化
         boolean hasChanges = !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
         if (!hasChanges) {
@@ -426,12 +429,12 @@ public class FlingToolWindow {
         }
         // 更新下拉框内容
         appBox.removeAllItems();
-        ArrayList<RuntimeAppHelper.VisibleApp> objects = new ArrayList<>();
+        ArrayList<RuntimeHelper.VisibleApp> objects = new ArrayList<>();
         for (String item : newItems) {
             appBox.addItem(item.substring(0, item.lastIndexOf(":")));
             objects.add(parseApp(item));
         }
-        RuntimeAppHelper.updateVisibleApps(project.getName(), objects);
+        RuntimeHelper.updateVisibleApps(project.getName(), objects);
 
         // 保持选中项不变
         if (selectedItem != null && appBox.getItemCount() > 0) {
@@ -481,6 +484,7 @@ public class FlingToolWindow {
 
     public void openSqlDialog() {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            sqlDialog.refreshDatasources();
             sqlDialog.setVisible(true);
         }
     }
@@ -524,17 +528,17 @@ public class FlingToolWindow {
     }
 
 
-    private @Nullable RuntimeAppHelper.VisibleApp parseApp(String selectedItem) {
+    private @Nullable RuntimeHelper.VisibleApp parseApp(String selectedItem) {
         String[] split = selectedItem.split(":");
         if (split.length == 2) {
-            RuntimeAppHelper.VisibleApp visibleApp = new RuntimeAppHelper.VisibleApp();
+            RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[1]) + 10000);
             return visibleApp;
 
         } else if (split.length == 3) {
-            RuntimeAppHelper.VisibleApp visibleApp = new RuntimeAppHelper.VisibleApp();
+            RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
             visibleApp.setAppName(split[0]);
             visibleApp.setPort(Integer.parseInt(split[1]));
             visibleApp.setSidePort(Integer.parseInt(split[2]));
@@ -588,11 +592,11 @@ public class FlingToolWindow {
                 @Override
                 public void run() {
 
-                    HashMap<String, RuntimeAppHelper.AppMeta> map = new HashMap<>();
+                    HashMap<String, RuntimeHelper.AppMeta> map = new HashMap<>();
                     springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
                         @Override
                         public void accept(PsiClass psiClass) {
-                            RuntimeAppHelper.AppMeta appMeta = new RuntimeAppHelper.AppMeta();
+                            RuntimeHelper.AppMeta appMeta = new RuntimeHelper.AppMeta();
                             appMeta.setApp(psiClass.getName());
                             appMeta.setFullName(psiClass.getQualifiedName());
 
@@ -601,15 +605,38 @@ public class FlingToolWindow {
                         }
                     });
 
-                    RuntimeAppHelper.updateAppMetas(project.getName(), new ArrayList<>(map.values()));
+                    RuntimeHelper.updateAppMetas(project.getName(), new ArrayList<>(map.values()));
                     storeDialog.initApps(new ArrayList<>(map.keySet()));
                     settingsDialog.initApps(new ArrayList<>(map.keySet()));
+
+//                    更新datasources
+                    updateDatasources();
                     FlingHelper.refresh(project);
                 }
             });
         });
     }
 
+    private void updateDatasources() {
+        List<SettingsStorageHelper.DatasourceConfig> datasourceConfigs = null;
+        try {
+            datasourceConfigs = SettingsStorageHelper.SqlConfig.parseDatasources(SettingsStorageHelper.getSqlConfig(toolWindow.getProject()).getProperties());
+        } catch (Throwable ex) {
+            return ;
+        }
+
+        List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
+        for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
+            // 创建 Druid 数据源
+            DruidDataSource dataSource = MysqlUtil.getDruidDataSource(config);
+            // 测试连接
+            String result = MysqlUtil.testConnectionAndClose(dataSource);
+            if (result == null) {
+                valids.add(config);
+            }
+        }
+        RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids);
+    }
 
 
     public JPanel getContent() {
