@@ -186,9 +186,9 @@ public class SpringCacheTool extends BasePluginTool {
             RuntimeAppHelper.VisibleApp visibleApp = RuntimeAppHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
-        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(getProject());
-        req.put("monitor", monitorConfig.isEnable());
-        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
+        req.put("monitor", traceConfig.isEnable());
+        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         return req;
     }
 

@@ -53,7 +53,7 @@
     </extensions>
 
     <actions>
-        <action icon="/icons/dagre.svg" id="popup_graph_fling_profiler" class="com.fling.links.FlingLinkViewAction" text="Popup graph fling profiler"
+        <action icon="/icons/dagre.svg" id="popup_graph_fling_profiler" class="com.fling.trace.FlingTraceViewAction" text="Popup graph fling profiler"
                 description="Processes the selected FLING_PROFILER and graph it">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>

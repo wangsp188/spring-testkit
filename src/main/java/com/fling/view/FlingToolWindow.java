@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.fling.RuntimeAppHelper;
 import com.fling.coding_guidelines.CodingGuidelinesHelper;
 import com.fling.coding_guidelines.CodingGuidelinesIconProvider;
-import com.fling.tools.CurlDialog;
 import com.fling.tools.mapper_sql.MapperSqlTool;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
@@ -12,7 +11,6 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
@@ -76,13 +74,10 @@ public class FlingToolWindow {
     private SettingsDialog settingsDialog;
     private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
+    private SqlDialog sqlDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
-//    private JComboBox<String> scriptAppBox;
-//    private JComboBox<String> controllerScriptAppBox;
-//    private JTextField controllerEnvTextField;
-//    private JComboBox<String> propertiesAppBox;
 
     protected JTextPane outputTextPane;
 
@@ -222,6 +217,7 @@ public class FlingToolWindow {
         topPanel.add(tipsButton);
 
         curlDialog = new CurlDialog(this);
+        sqlDialog = new SqlDialog(this);
 
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
@@ -480,6 +476,12 @@ public class FlingToolWindow {
     public void openCurlDialog() {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             curlDialog.setVisible(true);
+        }
+    }
+
+    public void openSqlDialog() {
+        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            sqlDialog.setVisible(true);
         }
     }
 

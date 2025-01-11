@@ -1,8 +1,12 @@
 package com.fling.view;
 
 import com.fling.tools.PluginToolEnum;
+import com.fling.tools.method_call.MethodCallIconProvider;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.openapi.wm.ToolWindowManager;
@@ -12,11 +16,18 @@ import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
 
 import javax.swing.*;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
 public class FlingToolWindowFactory implements ToolWindowFactory {
+
+    public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", MethodCallIconProvider.class);
+
+    public static final Icon SQL_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", MethodCallIconProvider.class);
+
+
 
     private static final Map<Project, FlingToolWindow> windows = new HashMap<>();
 
@@ -85,7 +96,40 @@ public class FlingToolWindowFactory implements ToolWindowFactory {
 
             ContentManager contentManager = toolWindow.getContentManager();
             contentManager.addContent(content);
+            addHeaderActions(toolWindow, project,flingToolWindow);
         }
 
+    }
+
+    private void addHeaderActions(ToolWindow toolWindow, Project project,FlingToolWindow flingToolWindow) {
+        // 添加第一个按钮
+        AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        flingToolWindow.openCurlDialog();
+                    }
+                });
+
+            }
+        };
+
+        // 添加第二个按钮
+        AnAction sql = new AnAction("SQL tool", "SQL tool", SQL_ICON) {
+            @Override
+            public void actionPerformed( AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        flingToolWindow.openSqlDialog();
+                    }
+                });
+            }
+        };
+
+        // 将按钮添加到工具窗口标题栏
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql));
     }
 }

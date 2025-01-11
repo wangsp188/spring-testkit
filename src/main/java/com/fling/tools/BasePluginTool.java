@@ -35,6 +35,7 @@ import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import org.apache.commons.collections.CollectionUtils;
 
@@ -47,8 +48,6 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
-
-    public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", MethodCallIconProvider.class);
 
 
     protected Set<String> cancelReqs = new HashSet<>(128);
@@ -137,21 +136,6 @@ public abstract class BasePluginTool {
         };
         actionGroup.add(copyAction);
 
-        // 添加复制按钮的动作
-        AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        toolWindow.openCurlDialog();
-                    }
-                });
-
-            }
-        };
-        actionGroup.add(curlAction);
-
         if (canStore()) {
             fillStoreAction();
         }
@@ -224,11 +208,13 @@ public abstract class BasePluginTool {
                 ComboBox<String> comboBox = new ComboBox<>(options);
 
                 // 创建两个文本框
-                JTextField groupField = new JTextField("default");
+                JBTextField groupField = new JBTextField("default");
+                groupField.getEmptyText().setText("Which group to save to");
                 groupField.setEditable(true);
                 groupField.setEnabled(true);
                 groupField.setFocusable(true);
-                JTextField titleField = new JTextField("default");
+                JBTextField titleField = new JBTextField("default");
+                titleField.getEmptyText().setText("Give this parameter a name");
                 titleField.setEditable(true);
                 titleField.setEnabled(true);
                 titleField.setFocusable(true);
@@ -666,4 +652,7 @@ public abstract class BasePluginTool {
         }
     }
 
+    public EditorTextField getInputEditorTextField() {
+        return inputEditorTextField;
+    }
 }

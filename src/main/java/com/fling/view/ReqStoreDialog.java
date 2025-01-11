@@ -1305,9 +1305,9 @@ public class ReqStoreDialog {
         req.put("method", PluginToolEnum.METHOD_CALL.getCode());
         req.put("params", params);
 
-        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-        req.put("monitor", monitorConfig.isEnable());
-        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        req.put("trace", traceConfig.isEnable());
+        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseScript()) {
             req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
@@ -1324,9 +1324,9 @@ public class ReqStoreDialog {
         req.put("method", PluginToolEnum.FLEXIBLE_TEST.getCode());
         req.put("params", params);
 
-        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-        req.put("monitor", monitorConfig.isEnable());
-        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        req.put("trace", traceConfig.isEnable());
+        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseScript()) {
             req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }

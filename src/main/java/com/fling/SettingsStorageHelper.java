@@ -259,16 +259,18 @@ public class SettingsStorageHelper {
                 "\n");
     }
 
-    public static final MonitorConfig defMonitorConfig = new MonitorConfig();
+    public static final TraceConfig DEF_TRACE_CONFIG = new TraceConfig();
 
     static {
-        defMonitorConfig.setEnable(false);
-        defMonitorConfig.setMonitorPrivate(false);
-        defMonitorConfig.setLogMybatis(true);
-        defMonitorConfig.setPackages("app.three.package");
-        defMonitorConfig.setClsSuffix("Controller,Service,Impl,Repository");
-        defMonitorConfig.setBlacks("");
-        defMonitorConfig.setWhites("");
+        DEF_TRACE_CONFIG.setEnable(false);
+        DEF_TRACE_CONFIG.setTraceWeb(true);
+        DEF_TRACE_CONFIG.setTraceMybatis(true);
+        DEF_TRACE_CONFIG.setLogMybatis(true);
+        DEF_TRACE_CONFIG.setPackages("app.three.package");
+        DEF_TRACE_CONFIG.setClsSuffix("Controller,Service,Impl,Repository");
+        DEF_TRACE_CONFIG.setBlacks("");
+        DEF_TRACE_CONFIG.setWhites("");
+        DEF_TRACE_CONFIG.setSingleClsDepth(2);
     }
 
     public static boolean isEnableSideServer(Project project) {
@@ -289,8 +291,8 @@ public class SettingsStorageHelper {
         return getConfig(project).getFlexibleTestPackage();
     }
 
-    public static MonitorConfig getMonitorConfig(Project project) {
-        return getConfig(project).getMonitorConfig();
+    public static TraceConfig getTraceConfig(Project project) {
+        return getConfig(project).getTraceConfig();
     }
 
 
@@ -321,29 +323,29 @@ public class SettingsStorageHelper {
         saveProjectConfig(project, projectConfig);
     }
 
-    public static void setMonitorConfig(Project project, MonitorConfig monitorConfig) {
+    public static void setMonitorConfig(Project project, TraceConfig traceConfig) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
             projectConfig = new ProjectConfig();
         }
-        if (monitorConfig != null) {
-            if (StringUtils.isBlank(monitorConfig.getPackages())) {
-                monitorConfig.setPackages("app.three.package");
+        if (traceConfig != null) {
+            if (StringUtils.isBlank(traceConfig.getPackages())) {
+                traceConfig.setPackages("app.three.package");
             }
 
-            if (StringUtils.isBlank(monitorConfig.getClsSuffix())) {
-                monitorConfig.setClsSuffix("Controller,Service,Impl,Repository");
+            if (StringUtils.isBlank(traceConfig.getClsSuffix())) {
+                traceConfig.setClsSuffix("Controller,Service,Impl,Repository");
             }
 
-            if (StringUtils.isBlank(monitorConfig.getWhites())) {
-                monitorConfig.setWhites("");
+            if (StringUtils.isBlank(traceConfig.getWhites())) {
+                traceConfig.setWhites("");
             }
 
-            if (StringUtils.isBlank(monitorConfig.getBlacks())) {
-                monitorConfig.setBlacks("");
+            if (StringUtils.isBlank(traceConfig.getBlacks())) {
+                traceConfig.setBlacks("");
             }
         }
-        projectConfig.setMonitorConfig(monitorConfig);
+        projectConfig.setMonitorConfig(traceConfig);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -431,28 +433,28 @@ public class SettingsStorageHelper {
         if (projectConfig == null) {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
-            config.setMonitorConfig(copyDefMonitorConfig());
+            config.setTraceConfig(copyDefMonitorConfig());
             config.setEnableSideServer(true);
             return config;
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
-        config.setMonitorConfig(projectConfig.getMonitorConfig() == null ? copyDefMonitorConfig() : projectConfig.getMonitorConfig());
+        config.setTraceConfig(projectConfig.getMonitorConfig() == null ? copyDefMonitorConfig() : projectConfig.getMonitorConfig());
         config.setEnableSideServer(projectConfig.isEnableSideServer());
         return config;
     }
 
-    private static MonitorConfig copyDefMonitorConfig() {
-        MonitorConfig copyConfig = new MonitorConfig();
-        copyConfig.setMonitorPrivate(defMonitorConfig.isMonitorPrivate());
-        copyConfig.setPackages(defMonitorConfig.getPackages());
-        copyConfig.setClsSuffix(defMonitorConfig.getClsSuffix());
-        copyConfig.setWhites(defMonitorConfig.getWhites());
-        copyConfig.setBlacks(defMonitorConfig.getBlacks());
-        copyConfig.setEnable(defMonitorConfig.isEnable());
-        copyConfig.setMonitorWeb(defMonitorConfig.isMonitorWeb());
-        copyConfig.setMonitorMybatis(defMonitorConfig.isMonitorMybatis());
-        copyConfig.setLogMybatis(defMonitorConfig.isLogMybatis());
+    private static TraceConfig copyDefMonitorConfig() {
+        TraceConfig copyConfig = new TraceConfig();
+        copyConfig.setSingleClsDepth(DEF_TRACE_CONFIG.getSingleClsDepth());
+        copyConfig.setPackages(DEF_TRACE_CONFIG.getPackages());
+        copyConfig.setClsSuffix(DEF_TRACE_CONFIG.getClsSuffix());
+        copyConfig.setWhites(DEF_TRACE_CONFIG.getWhites());
+        copyConfig.setBlacks(DEF_TRACE_CONFIG.getBlacks());
+        copyConfig.setEnable(DEF_TRACE_CONFIG.isEnable());
+        copyConfig.setTraceWeb(DEF_TRACE_CONFIG.isTraceWeb());
+        copyConfig.setTraceMybatis(DEF_TRACE_CONFIG.isTraceMybatis());
+        copyConfig.setLogMybatis(DEF_TRACE_CONFIG.isLogMybatis());
         return copyConfig;
     }
 
@@ -535,7 +537,7 @@ public class SettingsStorageHelper {
         private String script;
         private ControllerCommand controllerCommand;
         private Map<String, Config> appConfigs;
-        private MonitorConfig monitorConfig;
+        private TraceConfig traceConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -561,12 +563,12 @@ public class SettingsStorageHelper {
             this.appConfigs = appConfigs;
         }
 
-        public MonitorConfig getMonitorConfig() {
-            return monitorConfig;
+        public TraceConfig getMonitorConfig() {
+            return traceConfig;
         }
 
-        public void setMonitorConfig(MonitorConfig monitorConfig) {
-            this.monitorConfig = monitorConfig;
+        public void setMonitorConfig(TraceConfig traceConfig) {
+            this.traceConfig = traceConfig;
         }
 
         public ControllerCommand getControllerCommand() {
@@ -593,7 +595,7 @@ public class SettingsStorageHelper {
         private String script;
         private ControllerCommand controllerCommand;
         private String properties;
-        private MonitorConfig monitorConfig;
+        private TraceConfig traceConfig;
         private DatasourceConfig datasourceConfig;
 
         public String getFlexibleTestPackage() {
@@ -620,12 +622,12 @@ public class SettingsStorageHelper {
             this.properties = properties;
         }
 
-        public MonitorConfig getMonitorConfig() {
-            return monitorConfig;
+        public TraceConfig getTraceConfig() {
+            return traceConfig;
         }
 
-        public void setMonitorConfig(MonitorConfig monitorConfig) {
-            this.monitorConfig = monitorConfig;
+        public void setTraceConfig(TraceConfig traceConfig) {
+            this.traceConfig = traceConfig;
         }
 
         public ControllerCommand getControllerCommand() {
@@ -677,12 +679,11 @@ public class SettingsStorageHelper {
     }
 
 
-    public static class MonitorConfig {
+    public static class TraceConfig {
 
         private boolean enable;
-        private boolean monitorPrivate;
-        private boolean monitorWeb = true;
-        private boolean monitorMybatis = true;
+        private boolean traceWeb = true;
+        private boolean traceMybatis = true;
         private boolean logMybatis = false;
         private String packages;
 
@@ -692,17 +693,12 @@ public class SettingsStorageHelper {
 
         private String blacks;
 
-        public boolean judgeIsAppSthreePackage() {
+        private int singleClsDepth = 2;
+
+        public boolean judgeIsAppThreePackage() {
             return "app.three.package".equals(packages);
         }
 
-        public boolean isMonitorPrivate() {
-            return monitorPrivate;
-        }
-
-        public void setMonitorPrivate(boolean monitorPrivate) {
-            this.monitorPrivate = monitorPrivate;
-        }
 
         public String getPackages() {
             return packages;
@@ -744,20 +740,20 @@ public class SettingsStorageHelper {
             this.enable = enable;
         }
 
-        public boolean isMonitorWeb() {
-            return monitorWeb;
+        public boolean isTraceWeb() {
+            return traceWeb;
         }
 
-        public void setMonitorWeb(boolean monitorWeb) {
-            this.monitorWeb = monitorWeb;
+        public void setTraceWeb(boolean traceWeb) {
+            this.traceWeb = traceWeb;
         }
 
-        public boolean isMonitorMybatis() {
-            return monitorMybatis;
+        public boolean isTraceMybatis() {
+            return traceMybatis;
         }
 
-        public void setMonitorMybatis(boolean monitorMybatis) {
-            this.monitorMybatis = monitorMybatis;
+        public void setTraceMybatis(boolean traceMybatis) {
+            this.traceMybatis = traceMybatis;
         }
 
         public boolean isLogMybatis() {
@@ -766,6 +762,14 @@ public class SettingsStorageHelper {
 
         public void setLogMybatis(boolean logMybatis) {
             this.logMybatis = logMybatis;
+        }
+
+        public int getSingleClsDepth() {
+            return singleClsDepth;
+        }
+
+        public void setSingleClsDepth(int singleClsDepth) {
+            this.singleClsDepth = singleClsDepth;
         }
     }
 

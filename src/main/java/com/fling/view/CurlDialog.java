@@ -1,18 +1,19 @@
-package com.fling.tools;
+package com.fling.view;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.fling.FlingHelper;
+import com.fling.tools.BasePluginTool;
 import com.fling.util.JsonUtil;
 import com.fling.util.curl.CurlEntity;
 import com.fling.util.curl.CurlParserUtil;
-import com.fling.view.FlingToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextArea;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,17 +21,14 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
 import java.util.Map;
 
 public class CurlDialog extends JDialog {
 
-    public static final Icon PARSE_CURL_ICON = IconLoader.getIcon("/icons/curl.svg", CurlDialog.class);
     public static final Icon ADAPTER_INPUT_ICON = IconLoader.getIcon("/icons/adapter-input.svg", CurlDialog.class);
 
 
-    private JTextArea inputTextArea;
+    private JBTextArea inputTextArea;
     private JTextField urlField, methodField;
     private JTextArea paramsField, headersField, bodyField;
 
@@ -157,9 +155,10 @@ public class CurlDialog extends JDialog {
         panelCmd.setLayout(gridbag);
 
         JLabel curlLabel = new JLabel("Curl:");
-        inputTextArea = new JTextArea(5, 20);
+        inputTextArea = new JBTextArea(5, 20);
+        inputTextArea.getEmptyText().setText("input your curl and click right button to parse");
 
-        addPlaceholderToTextArea(inputTextArea, "input your curl and click right button to parse");
+//        addPlaceholderToTextArea(inputTextArea, );
         JButton parseButton = new JButton("Parse");
 //        Dimension preferredSize = new Dimension(30, 30);
 //        parseButton.setPreferredSize(preferredSize);
@@ -175,7 +174,7 @@ public class CurlDialog extends JDialog {
                         curlEntity = CurlParserUtil.parse(text.trim());
                     }
                 } catch (Throwable ex) {
-                    FlingHelper.notify(window.getProject(), NotificationType.ERROR, "parse curl error");
+                    FlingHelper.notify(window.getProject(), NotificationType.ERROR, "Parse curl error");
                 }
                 urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
                 methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
@@ -206,34 +205,6 @@ public class CurlDialog extends JDialog {
         c.gridy = 0;
         panelCmd.add(parseButton, c);
         return panelCmd;
-    }
-
-    private static void addPlaceholderToTextArea(JTextArea textArea, String placeholder) {
-        // Set initial placeholder text
-        textArea.setText(placeholder);
-        textArea.setForeground(Color.GRAY);
-
-        Color old = textArea.getForeground();
-
-        textArea.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                // Clear the placeholder text when the text area gains focus
-                if (textArea.getText().equals(placeholder)) {
-                    textArea.setText("");
-                    textArea.setForeground(old);
-                }
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-                // Restore the placeholder text if the text area is empty
-                if (textArea.getText().isEmpty()) {
-                    textArea.setText(placeholder);
-                    textArea.setForeground(Color.GRAY);
-                }
-            }
-        });
     }
 
     private JPanel createLabelTextFieldPanel(FlingToolWindow window, String labelText, JTextArea field) {
@@ -301,7 +272,7 @@ public class CurlDialog extends JDialog {
                                 FlingHelper.notify(window.getProject(), NotificationType.WARNING, "not find selected tool");
                                 return;
                             }
-                            String templateText = nowTool.inputEditorTextField.getText();
+                            String templateText = nowTool.getInputEditorTextField().getText();
                             JSONObject template;
                             try {
                                 template = JSON.parseObject(templateText);
@@ -315,7 +286,7 @@ public class CurlDialog extends JDialog {
                                 return;
                             }
                             updateTemplate(template, parse);
-                            nowTool.inputEditorTextField.setText(JsonUtil.formatObj(template));
+                            nowTool.getInputEditorTextField().setText(JsonUtil.formatObj(template));
                             FlingHelper.notify(window.getProject(), NotificationType.INFORMATION, "use " + labelText + " adapter to input params success");
                         }
                     });

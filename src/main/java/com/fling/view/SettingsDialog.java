@@ -16,12 +16,8 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.ui.JBColor;
 import com.intellij.ui.LanguageTextField;
-import com.intellij.ui.components.JBList;
-import com.intellij.ui.components.JBRadioButton;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.OnOffButton;
+import com.intellij.ui.components.*;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -51,7 +47,7 @@ public class SettingsDialog {
 
     private JDialog dialog;
 
-    private JTextField flexibleTestPackageNameField;
+    private JBTextField flexibleTestPackageNameField;
 
     private ComboBox<String> interceptorAppBox;
 
@@ -61,7 +57,7 @@ public class SettingsDialog {
 
     private ComboBox<String> sqlAppBox;
 
-    private JTextField controllerEnvTextField;
+    private JBTextField controllerEnvTextField;
 
 
     public SettingsDialog(FlingToolWindow toolWindow) {
@@ -69,7 +65,7 @@ public class SettingsDialog {
         init();
     }
 
-    public void visible(){
+    public void visible() {
         refreshSettings();
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             dialog.setVisible(true);
@@ -91,7 +87,7 @@ public class SettingsDialog {
         });
     }
 
-    private void refreshSettings(){
+    private void refreshSettings() {
         flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
         RuntimeAppHelper.VisibleApp selectedApp = RuntimeAppHelper.getSelectedApp(toolWindow.getProject().getName());
         String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
@@ -120,25 +116,25 @@ public class SettingsDialog {
         }
     }
 
-    private void init(){
+    private void init() {
         dialog = new JDialog((Frame) null, FlingHelper.getPluginName() + " Settings", true);
         // 定义主面板
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {"basic","trace", "tool-interceptor", "spring-properties","controller-command","sql-analysis"};
+        String[] options = {FlingHelper.getPluginName(), "Trace", "Tool interceptor", "Spring properties", "Controller command", "SQL tool"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
         optionList.setSelectedIndex(0);
         // 右侧内容显示区域
         JPanel rightContent = new JPanel(new CardLayout());
-        rightContent.add(createBasicOptionPanel(), "basic");
-        rightContent.add(createTraceOptionPanel(), "trace");
-        rightContent.add(createSqlPanel(), "sql-analysis");
-        rightContent.add(createInterceptorOptionPanel(), "tool-interceptor");
-        rightContent.add(createPropertiesOptionPanel(), "spring-properties");
-        rightContent.add(createControllerOptionPanel(), "controller-command");
+        rightContent.add(createBasicOptionPanel(), FlingHelper.getPluginName());
+        rightContent.add(createTraceOptionPanel(), "Trace");
+        rightContent.add(createSqlPanel(), "SQL tool");
+        rightContent.add(createInterceptorOptionPanel(), "Tool interceptor");
+        rightContent.add(createPropertiesOptionPanel(), "Spring properties");
+        rightContent.add(createControllerOptionPanel(), "Controller command");
         // 监听选项改变，更新右侧内容
         optionList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -161,8 +157,8 @@ public class SettingsDialog {
 
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int width = (int) (screenSize.width * 0.8);
-        int height = (int) (screenSize.height * 0.8);
+        int width = (int) (screenSize.width * 0.7);
+        int height = (int) (screenSize.height * 0.7);
         dialog.setSize(width, height);
         dialog.setLocationRelativeTo(null); // 居中显示
     }
@@ -181,7 +177,6 @@ public class SettingsDialog {
         springDetailLabel.setFont(new Font("Arial", Font.BOLD, 13));
 
 
-
         JPanel springOptionsPanel = new JPanel(new GridBagLayout());
         springOptionsPanel.setVisible(false);
         // Button
@@ -190,13 +185,13 @@ public class SettingsDialog {
             springOptionsPanel.setVisible(springButton.isSelected());
             boolean enableSideServer = SettingsStorageHelper.isEnableSideServer(toolWindow.getProject());
             if (springButton.isSelected()) {
-                if(!enableSideServer){
+                if (!enableSideServer) {
                     SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), true);
                     FlingHelper.refresh(toolWindow.getProject());
                 }
                 springDetailLabel.setText("We will start a side server to support method-call, flexible-test and so on");
             } else {
-                if(enableSideServer){
+                if (enableSideServer) {
                     SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), false);
                     FlingHelper.refresh(toolWindow.getProject());
                 }
@@ -233,10 +228,8 @@ public class SettingsDialog {
         panel.add(springDetailLabel, gbc);
 
 
-
-
-        flexibleTestPackageNameField = new JTextField(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()), 20);
-
+        flexibleTestPackageNameField = new JBTextField(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()), 20);
+        flexibleTestPackageNameField.getEmptyText().setText("Which package do you want to enable flexible test? Default: flexibletest");
 
         // 输入框
         JLabel packageNameLabel = new JLabel("Test Package:");
@@ -347,7 +340,7 @@ public class SettingsDialog {
         return panel;
     }
 
-    private JTextArea createTips(String content){
+    private JTextArea createTips(String content) {
         JTextArea tipArea = new JTextArea(content);
         tipArea.setToolTipText(content);
         tipArea.setEditable(false); // 不可编辑
@@ -494,9 +487,9 @@ public class SettingsDialog {
                         req.put("method", "flexible-test");
                         req.put("params", params);
                         req.put("interceptor", interceptor);
-                        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(getProject());
-                        req.put("monitor", monitorConfig.isEnable());
-                        req.put("monitorPrivate", monitorConfig.isMonitorPrivate());
+                        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
+                        req.put("trace", traceConfig.isEnable());
+                        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
                         String reqId;
                         try {
                             JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", req, JSONObject.class);
@@ -599,9 +592,6 @@ public class SettingsDialog {
         panel.add(tipArea, gbc);
 
 
-
-
-
         LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), false);
         // 布局输入框
         gbc.gridx = 0;
@@ -624,7 +614,8 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.NONE;
         gbc.anchor = GridBagConstraints.WEST;
 
-        controllerEnvTextField = new JTextField(10); // 设定文本框的列数
+        controllerEnvTextField = new JBTextField(10); // 设定文本框的列数
+        controllerEnvTextField.getEmptyText().setText("Optional environment list; multiple use,split");
         controllerEnvTextField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -654,7 +645,7 @@ public class SettingsDialog {
 
         JLabel envLabel = new JLabel("Env:");
         envLabel.setLabelFor(controllerEnvTextField);
-        envLabel.setToolTipText("Optional environment list; multiple use , split");
+        envLabel.setToolTipText("Optional environment list; multiple use,split");
 
         // 添加标签和组合框
         JLabel comboBoxLabel = new JLabel("App:");
@@ -811,7 +802,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("After configuring the database information, you can use an SQL analysis tool");
+        JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -895,7 +886,7 @@ public class SettingsDialog {
         testButton.setPreferredSize(new Dimension(20, 20));
         testButton.setToolTipText("Test connection");
         ActionListener testListener = e -> {
-            String selectedApp =(String) sqlAppBox.getSelectedItem();
+            String selectedApp = (String) sqlAppBox.getSelectedItem();
             if (selectedApp == null) {
                 FlingHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
                 return;
@@ -950,7 +941,7 @@ public class SettingsDialog {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         Dimension labelDimension = new Dimension(100, 20);
-        SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
 
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
         JLabel traceLabel = new JLabel("Trace");
@@ -975,30 +966,29 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(traceDetailLabel, gbc);
 
-        JPanel monitorOptionsPanel = new JPanel(new GridBagLayout());
-        monitorOptionsPanel.setVisible(false);
+        JPanel traceOptionsPanel = new JPanel(new GridBagLayout());
+        traceOptionsPanel.setVisible(false);
         traceToggleButton.addActionListener(e -> {
-            monitorOptionsPanel.setVisible(traceToggleButton.isSelected());
+            traceOptionsPanel.setVisible(traceToggleButton.isSelected());
             if (traceToggleButton.isSelected()) {
                 traceDetailLabel.setText("We will use bytecode staking to enhance the classes to support link trace");
             } else {
                 traceDetailLabel.setText("Enabling trace helps you analyze system links");
             }
-            SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            if(!Objects.equals(nowConfig.isEnable(),traceToggleButton.isSelected())){
+            SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+            if (!Objects.equals(nowConfig.isEnable(), traceToggleButton.isSelected())) {
                 nowConfig.setEnable(traceToggleButton.isSelected());
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
             }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace is " + (traceToggleButton.isSelected() ? "enable" : "disable"));
         });
 
-        if (monitorConfig.isEnable()) {
+        if (traceConfig.isEnable()) {
             traceToggleButton.setSelected(true);
-            monitorOptionsPanel.setVisible(true);
+            traceOptionsPanel.setVisible(true);
             traceDetailLabel.setText("We will use bytecode staking to enhance the classes to support link trace");
         }
         gbc.gridwidth = 1; // Reset gridwidth
-
 
 
         JLabel traceWebLabel = new JLabel("Trace Web");
@@ -1013,13 +1003,13 @@ public class SettingsDialog {
         gbc.weightx = 0.0; // Reset weightx
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
-        monitorOptionsPanel.add(traceWebLabelButtonPanel, gbc);
+        traceOptionsPanel.add(traceWebLabelButtonPanel, gbc);
 
         JLabel traceWebDetailLabel = new JLabel("Trace Web can intercept the DispatcherServlet for spring-web");
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        monitorOptionsPanel.add(traceWebDetailLabel, gbc);
+        traceOptionsPanel.add(traceWebDetailLabel, gbc);
 
         traceWebToggleButton.addActionListener(e -> {
             if (traceWebToggleButton.isSelected()) {
@@ -1027,15 +1017,15 @@ public class SettingsDialog {
             } else {
                 traceWebDetailLabel.setText("Trace Web can intercept the DispatcherServlet for spring-web");
             }
-            SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            if(!Objects.equals(nowConfig.isMonitorWeb(),traceWebToggleButton.isSelected())){
-                nowConfig.setMonitorWeb(traceWebToggleButton.isSelected());
+            SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+            if (!Objects.equals(nowConfig.isTraceWeb(), traceWebToggleButton.isSelected())) {
+                nowConfig.setTraceWeb(traceWebToggleButton.isSelected());
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
             }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace Web is " + (traceWebToggleButton.isSelected() ? "enable" : "disable"));
         });
 
-        if (monitorConfig.isMonitorWeb()) {
+        if (traceConfig.isTraceWeb()) {
             traceWebToggleButton.setSelected(true);
             traceWebDetailLabel.setText("We will trace the DispatcherServlet for spring-web");
         }
@@ -1053,13 +1043,13 @@ public class SettingsDialog {
         gbc.weightx = 0.0; // Reset weightx
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
-        monitorOptionsPanel.add(traceMybatisLabelButtonPanel, gbc);
+        traceOptionsPanel.add(traceMybatisLabelButtonPanel, gbc);
 
         JLabel traceMybatisDetailLabel = new JLabel("Trace Mybatis can intercept the mapper");
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        monitorOptionsPanel.add(traceMybatisDetailLabel, gbc);
+        traceOptionsPanel.add(traceMybatisDetailLabel, gbc);
 
         traceMybatisToggleButton.addActionListener(e -> {
             if (traceMybatisToggleButton.isSelected()) {
@@ -1067,15 +1057,15 @@ public class SettingsDialog {
             } else {
                 traceMybatisDetailLabel.setText("Trace Mybatis can intercept the mapper");
             }
-            SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            if(!Objects.equals(nowConfig.isMonitorMybatis(),traceMybatisToggleButton.isSelected())){
-                nowConfig.setMonitorMybatis(traceMybatisToggleButton.isSelected());
+            SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+            if (!Objects.equals(nowConfig.isTraceMybatis(), traceMybatisToggleButton.isSelected())) {
+                nowConfig.setTraceMybatis(traceMybatisToggleButton.isSelected());
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
             }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace Mybatis is " + (traceMybatisToggleButton.isSelected() ? "enable" : "disable"));
         });
 
-        if (monitorConfig.isMonitorMybatis()) {
+        if (traceConfig.isTraceMybatis()) {
             traceMybatisToggleButton.setSelected(true);
             traceMybatisDetailLabel.setText("We will use the mybatis Interceptor mechanism to trace Executor");
         }
@@ -1093,13 +1083,13 @@ public class SettingsDialog {
         gbc.weightx = 0.0; // Reset weightx
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
-        monitorOptionsPanel.add(logMybatisLabelButtonPanel, gbc);
+        traceOptionsPanel.add(logMybatisLabelButtonPanel, gbc);
 
         JLabel logMybatisDetailLabel = new JLabel("Sql output in mybatis format is easy to understand");
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        monitorOptionsPanel.add(logMybatisDetailLabel, gbc);
+        traceOptionsPanel.add(logMybatisDetailLabel, gbc);
 
         logMybatisToggleButton.addActionListener(e -> {
             if (logMybatisToggleButton.isSelected()) {
@@ -1107,106 +1097,103 @@ public class SettingsDialog {
             } else {
                 logMybatisDetailLabel.setText("Sql output in mybatis format is easy to understand");
             }
-            SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
-            if(!Objects.equals(nowConfig.isLogMybatis(),logMybatisToggleButton.isSelected())){
+            SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+            if (!Objects.equals(nowConfig.isLogMybatis(), logMybatisToggleButton.isSelected())) {
                 nowConfig.setLogMybatis(logMybatisToggleButton.isSelected());
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
             }
             FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Log Mybatis is " + (logMybatisToggleButton.isSelected() ? "enable" : "disable"));
         });
 
-        if (monitorConfig.isLogMybatis()) {
+        if (traceConfig.isLogMybatis()) {
             logMybatisToggleButton.setSelected(true);
             logMybatisDetailLabel.setText("We will output sql in mybatis format");
         }
 
 
         JLabel packageLabel = new JLabel("Package:");
-        packageLabel.setToolTipText("Please fill in the package name of the class you want to trace, multiple use, split;\napp.three.package means that the first three packages of the startup class are automatically intercepted");
+        packageLabel.setToolTipText("In the package's class you want to trace, multiple use,split;\napp.three.package means that the first three packages of the startup class are automatically intercepted");
         packageLabel.setPreferredSize(labelDimension);
-        JTextField packagesField = new JTextField(monitorConfig.getPackages(), 20);
+        JBTextField packagesField = new JBTextField(traceConfig.getPackages(), 20);
+        packagesField.getEmptyText().setText("In the package's class you want to trace, multiple use,split; Default:app.three.package means that the first three packages of the startup class");
+
         gbc.gridx = 0;
         gbc.gridy = 4;
         gbc.weightx = 0.0;
-        monitorOptionsPanel.add(packageLabel, gbc);
+        traceOptionsPanel.add(packageLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        monitorOptionsPanel.add(packagesField, gbc);
+        traceOptionsPanel.add(packagesField, gbc);
 
         JLabel classSuffixLabel = new JLabel("Class Suffix:");
-        classSuffixLabel.setToolTipText("Please fill in the class suffix of the class you want to trace, multiple use, split");
+        classSuffixLabel.setToolTipText("Class with the suffix you want to trace, multiple use,split");
         classSuffixLabel.setPreferredSize(labelDimension);
-        JTextField classSuffixField = new JTextField(monitorConfig.getClsSuffix(), 20);
+        JBTextField classSuffixField = new JBTextField(traceConfig.getClsSuffix(), 20);
+        classSuffixField.getEmptyText().setText("Class with the suffix you want to trace, multiple use,split;");
+
         gbc.gridx = 0;
         gbc.gridy = 5;
         gbc.weightx = 0.0;
-        monitorOptionsPanel.add(classSuffixLabel, gbc);
+        traceOptionsPanel.add(classSuffixLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        monitorOptionsPanel.add(classSuffixField, gbc);
+        traceOptionsPanel.add(classSuffixField, gbc);
 
 
         JLabel whiteClassLabel = new JLabel("Allow Class:");
-        whiteClassLabel.setToolTipText("Tracing class allow list, multiple use, split");
+        whiteClassLabel.setToolTipText("Tracing class allow list, multiple use,split");
         whiteClassLabel.setPreferredSize(labelDimension);
-        JTextField whiteListField = new JTextField(monitorConfig.getWhites(), 20);
+        JBTextField whiteListField = new JBTextField(traceConfig.getWhites(), 20);
+        whiteListField.getEmptyText().setText("Tracing class allow list, multiple use,split");
+
         gbc.gridx = 0;
         gbc.gridy = 6;
         gbc.weightx = 0.0;
-        monitorOptionsPanel.add(whiteClassLabel, gbc);
+        traceOptionsPanel.add(whiteClassLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        monitorOptionsPanel.add(whiteListField, gbc);
+        traceOptionsPanel.add(whiteListField, gbc);
 
         JLabel blackClassLabel = new JLabel("Deny Class:");
-        blackClassLabel.setToolTipText("Tracing class deny list, multiple use, split");
+        blackClassLabel.setToolTipText("Tracing class deny list, multiple use,split");
         blackClassLabel.setPreferredSize(labelDimension);
-        JTextField blackListField = new JTextField(monitorConfig.getBlacks(), 20);
+        JBTextField blackListField = new JBTextField(traceConfig.getBlacks(), 20);
+        blackListField.getEmptyText().setText("Tracing class deny list, multiple use,split");
+
         gbc.gridx = 0;
         gbc.gridy = 7;
         gbc.weightx = 0.0;
-        monitorOptionsPanel.add(blackClassLabel, gbc);
+        traceOptionsPanel.add(blackClassLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        monitorOptionsPanel.add(blackListField, gbc);
+        traceOptionsPanel.add(blackListField, gbc);
 
 
-        JLabel monitorPrivateLabel = new JLabel("Method Type:");
-        monitorPrivateLabel.setToolTipText("You can choose which methods of the class to trace, this config support hot reload");
+        JLabel monitorPrivateLabel = new JLabel("Single Class Depth:");
+        monitorPrivateLabel.setToolTipText("Maximum tracking depth for a single class");
         monitorPrivateLabel.setPreferredSize(labelDimension);
-        JRadioButton monitorPrivate = new JBRadioButton("We will trace the public and protected methods of the selected class", false);
-        monitorPrivate.addActionListener(e -> {
-            if (monitorPrivate.isSelected()) {
-                monitorPrivate.setText("We will trace the all methods of the selected class");
-            } else {
-                monitorPrivate.setText("We will trace the public and protected methods of the selected class");
-            }
-        });
-        if (monitorConfig.isMonitorPrivate()) {
-            monitorPrivate.setSelected(true);
-            monitorPrivate.setText("We will trace the all methods of the selected class");
-        }
-//        monitorPrivate.setSelected(monitorConfig.isMonitorPrivate());
-//        JTextField functionTypeField = new JTextField("private,public,protected", 20);
+
+        JBTextField singleClsDepthField = new JBTextField(String.valueOf(traceConfig.getSingleClsDepth()), 10);
+        singleClsDepthField.getEmptyText().setText("Maximum tracking depth for a single class, Default: 2");
         gbc.gridx = 0;
         gbc.gridy = 8;
         gbc.weightx = 0.0;
-        monitorOptionsPanel.add(monitorPrivateLabel, gbc);
+        traceOptionsPanel.add(monitorPrivateLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        monitorOptionsPanel.add(monitorPrivate, gbc);
+        traceOptionsPanel.add(singleClsDepthField, gbc);
 
 
         gbc.gridx = 0;
         gbc.gridy = 9;
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
-        panel.add(monitorOptionsPanel, gbc);
+        panel.add(traceOptionsPanel, gbc);
 
 
         // 新增一行值得占用
@@ -1225,16 +1212,28 @@ public class SettingsDialog {
         ActionListener saveListener = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (!monitorOptionsPanel.isVisible()) {
+                if (!traceOptionsPanel.isVisible()) {
                     FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "No config need to save");
                     return;
                 }
+                String text = singleClsDepthField.getText();
+                if (StringUtils.isNotBlank(text) && !StringUtils.isNumeric(text.trim())) {
+                    FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth must be integer");
+                    return;
+                }
+                int singleClsDepth = Integer.parseInt(singleClsDepthField.getText().trim());
+                if (singleClsDepth > 100) {
+                    FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth max num is 100");
+                    return;
+                }
 
-                SettingsStorageHelper.MonitorConfig nowConfig = SettingsStorageHelper.getMonitorConfig(toolWindow.getProject());
+
+                SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
                 nowConfig.setPackages(packagesField.getText().trim());
                 nowConfig.setClsSuffix(classSuffixField.getText().trim());
                 nowConfig.setWhites(whiteListField.getText().trim());
                 nowConfig.setBlacks(blackListField.getText().trim());
+                nowConfig.setSingleClsDepth(singleClsDepth);
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
                 FlingHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace config was saved");
             }
@@ -1277,7 +1276,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("Here properties takes precedence over spring.properties, you can custom some configurations for local startup use\nFor example: customize the log level locally");
+        JTextArea tipArea = createTips("Here properties takes precedence over spring.properties, you can customize some configurations for local startup\nFor example: customize the log level locally");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行

@@ -1,6 +1,7 @@
-package com.fling.links;
+package com.fling.trace;
 
 import com.alibaba.fastjson.JSON;
+import com.fling.FlingHelper;
 import com.fling.util.LinkParser;
 import com.fling.view.FlingToolWindow;
 import com.intellij.notification.Notification;
@@ -32,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class FlingLinkViewAction extends AnAction {
+public class FlingTraceViewAction extends AnAction {
 
     private static String renderHtml;
 
@@ -111,8 +112,7 @@ public class FlingLinkViewAction extends AnAction {
         List<Map<String, String>> processedText = LinkParser.parseFlingLogs(selectedText);
         if (processedText == null || processedText.isEmpty()) {
             // 在右下角显示提示
-            Notification notification = new Notification("Console Text Processor", "Empty", "don't find valid link", NotificationType.INFORMATION);
-            Notifications.Bus.notify(notification, project);
+            FlingHelper.notify(project,NotificationType.WARNING,"don't find valid link");
             return;
         }
 

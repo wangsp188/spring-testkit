@@ -77,24 +77,24 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
 
 
-            SettingsStorageHelper.MonitorConfig monitorConfig = SettingsStorageHelper.getMonitorConfig(project);
-            if (monitorConfig.isEnable()) {
+            SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
+            if (traceConfig.isEnable()) {
                 //            增加参数 -javaagent:/Users/dexwang/sourcecode/java/spring-fling_side_server/agent/target/agent-1.0-SNAPSHOT.jar
                 String agentPath = "spring-fling" + File.separator + "lib" + File.separator + "spring-fling_agent-0.0.1.jar";
 
-                monitorConfig = JSON.parseObject(JSON.toJSONString(monitorConfig), SettingsStorageHelper.MonitorConfig.class);
-                if (monitorConfig.judgeIsAppSthreePackage()) {
+                traceConfig = JSON.parseObject(JSON.toJSONString(traceConfig), SettingsStorageHelper.TraceConfig.class);
+                if (traceConfig.judgeIsAppThreePackage()) {
                     String runClass = configurationBase.getRunClass();
                     String[] parts = runClass.split("\\.");
                     if (parts.length > 3) {
                         String packagePrefix = String.join(".", Arrays.copyOfRange(parts, 0, 3));
-                        monitorConfig.setPackages(packagePrefix);
+                        traceConfig.setPackages(packagePrefix);
                     } else {
                         // 如果包名不足三段，可以根据需求选择适当的处理方式
-                        monitorConfig.setPackages(runClass.substring(0,runClass.lastIndexOf("."))); // 或者其他逻辑
+                        traceConfig.setPackages(runClass.substring(0,runClass.lastIndexOf("."))); // 或者其他逻辑
                     }
                 }
-                String base64Json = Base64.getEncoder().encodeToString(JSON.toJSONString(monitorConfig).getBytes("UTF-8"));
+                String base64Json = Base64.getEncoder().encodeToString(JSON.toJSONString(traceConfig).getBytes("UTF-8"));
                 String encodedJson = URLEncoder.encode(base64Json, "UTF-8");
                 javaParameters.getVMParametersList().add("-javaagent:" + pluginPath + File.separator + agentPath+"="+encodedJson);
                 vmParametersList.addProperty("fling.monitor.enable", "true");
