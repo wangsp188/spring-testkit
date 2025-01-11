@@ -120,14 +120,14 @@ public class SqlDialog extends JDialog {
         button.setToolTipText("Analysis SQL");
         button.setPreferredSize(new Dimension(32, 32));
         button.addActionListener(e -> {
-            String selectedData = (String) dataSourceComboBox.getSelectedItem();
-            if (selectedData == null) {
-                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please select a datasource");
-                return;
-            }
             String sqlText = inputSqlField.getText();
             if (StringUtils.isBlank(sqlText)) {
                 FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please input your SQL");
+                return;
+            }
+            String selectedData = (String) dataSourceComboBox.getSelectedItem();
+            if (selectedData == null) {
+                FlingHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Please select a datasource, if there is no option, configure the database link in settings-SQL tool");
                 return;
             }
 

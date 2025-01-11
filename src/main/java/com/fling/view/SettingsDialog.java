@@ -827,7 +827,7 @@ public class SettingsDialog {
                 "#Multiple database are supported, blew is nam1's config\n" +
                 "datasource.nam1.url=jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC\n" +
                 "datasource.nam1.username=root\n" +
-                "datasource.nam1.password=you\n");
+                "datasource.nam1.password=you");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
