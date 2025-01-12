@@ -57,7 +57,7 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
         );
     }
 
-    private boolean isSqlTag(XmlTag tag) {
+    public static boolean isSqlTag(XmlTag tag) {
         if ("select".equals(tag.getName()) || "insert".equals(tag.getName()) || "update".equals(tag.getName()) || "delete".equals(tag.getName())){
             return true;
         }

@@ -85,7 +85,7 @@ public class SpringCacheTool extends BasePluginTool {
                 triggerHttpTask(getKeyButton, KIcon, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        return handleAction(app.getSidePort(),"build_cache_key");
+                        return handleAction("build_cache_key");
                     }
                 });
             }
@@ -105,7 +105,7 @@ public class SpringCacheTool extends BasePluginTool {
                 triggerHttpTask(getValButton, AllIcons.Actions.Find, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        return handleAction(app.getSidePort(),"get_cache");
+                        return handleAction("get_cache");
                     }
                 });
             }
@@ -125,7 +125,7 @@ public class SpringCacheTool extends BasePluginTool {
                 triggerHttpTask(delValButton, AllIcons.Actions.GC, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        return handleAction(app.getSidePort(),"delete_cache");
+                        return handleAction("delete_cache");
                     }
                 });
             }
@@ -139,7 +139,7 @@ public class SpringCacheTool extends BasePluginTool {
         return topPanel;
     }
 
-    private JSONObject handleAction(int sidePort,String action) {
+    private JSONObject handleAction(String action) {
         String jsonInput = inputEditorTextField.getDocument().getText();
         if (jsonInput == null || jsonInput.isBlank()) {
             setOutputText("input parameter is blank");
@@ -187,7 +187,7 @@ public class SpringCacheTool extends BasePluginTool {
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
-        req.put("monitor", traceConfig.isEnable());
+        req.put("trace", traceConfig.isEnable());
         req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         return req;
     }

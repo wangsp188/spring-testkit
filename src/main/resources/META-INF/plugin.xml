@@ -43,6 +43,7 @@
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.flexible_test.FlexibleTestIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.method_call.MethodCallIconProvider"/>
         <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mapper_sql.MapperSqlIconProvider"/>
+        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
         <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.view_value.ViewValueLineMarkerProvider"/>
 

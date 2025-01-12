@@ -130,6 +130,10 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
             return "containingClassNull";
         }
 
+        if (containingClass.isEnum()) { // PsiClass 提供 isEnum 方法进行检测
+            return "is_enum";
+        }
+
         // 获取字段的类型的简单名称
         PsiType fieldType = field.getType();
         String fieldTypeName = fieldType.getPresentableText(); // 获取类型的简单名称
@@ -207,11 +211,10 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                         try {
                             JSONObject submitRequest = new JSONObject();
                             submitRequest.put("method", "view-value");
-                            submitRequest.put("monitor", false);
+                            submitRequest.put("trace", false);
                             JSONObject value = new JSONObject();
                             value.put("typeClass", containingClass.getQualifiedName());
                             value.put("beanName", ToolHelper.getBeanNameFromClass(containingClass));
-                            ;
                             value.put("fieldName", ((PsiField) psiElement).getName());
 
                             submitRequest.put("params", value);

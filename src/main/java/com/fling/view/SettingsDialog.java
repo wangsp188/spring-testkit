@@ -599,7 +599,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("When the method is spring-web requestMapping, we can generate the controller-command using the following script\nCurl is recommended");
+        JTextArea tipArea = createTips("When the method is spring-web requestMapping, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行

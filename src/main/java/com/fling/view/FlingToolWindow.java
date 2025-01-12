@@ -36,6 +36,7 @@ import com.fling.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBScrollPane;
 import com.fling.util.HttpUtil;
 import com.intellij.ui.jcef.JBCefBrowser;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -171,6 +172,7 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 DefaultActionGroup actionGroup = new DefaultActionGroup();
+                actionGroup.setSearchable(true);
                 // 创建一个动作组
                 actionGroup.add(new AnAction("How to use " + FlingHelper.getPluginName() + " ?", null, AllIcons.General.Information) {
                     @Override
@@ -202,8 +204,7 @@ public class FlingToolWindow {
                                 try {
                                     CodingGuidelinesHelper.refreshDoc(project);
                                     FlingHelper.refresh(project);
-                                    Map<CodingGuidelinesHelper.DocSource, Map<String, CodingGuidelinesHelper.Doc>> docs = CodingGuidelinesHelper.getProjectDocs(project);
-                                    FlingHelper.notify(project, NotificationType.INFORMATION, "Refresh coding-guidelines success," + JSON.toJSONString(docs));
+                                    FlingHelper.notify(project, NotificationType.INFORMATION, "Refresh coding-guidelines success");
                                 } catch (Exception ex) {
                                     FlingHelper.notify(project, NotificationType.ERROR, "Refresh coding-guidelines failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
                                 }
@@ -211,7 +212,7 @@ public class FlingToolWindow {
                         });
                     }
                 });
-
+                fillDynamicDoc(actionGroup);
                 JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("TipsPopup", actionGroup).getComponent();
                 popupMenu.show(tipsButton, 0, tipsButton.getHeight());
             }
@@ -246,7 +247,7 @@ public class FlingToolWindow {
         Border border = appBox.getBorder();
         appBox.addItemListener(e -> {
             String selectedItem = (String) appBox.getSelectedItem();
-            RuntimeHelper.updateSelectedApp(getProject().getName(),selectedItem==null?null:parseApp(selectedItem));
+            RuntimeHelper.updateSelectedApp(getProject().getName(), selectedItem == null ? null : parseApp(selectedItem));
             appBox.setToolTipText(selectedItem == null ? "" : selectedItem); // 动态更新 ToolTipText
 
             if (selectedItem != null && RuntimeHelper.isMonitor(selectedItem)) {
@@ -274,6 +275,67 @@ public class FlingToolWindow {
             findSpringBootApplicationClasses();
         });
         return topPanel;
+    }
+
+    private void fillDynamicDoc(DefaultActionGroup actionGroup) {
+
+        //home
+        Set<CodingGuidelinesHelper.Doc> homeDocs = new LinkedHashSet<>();
+        Collection<CodingGuidelinesHelper.Doc> scopeDocs = CodingGuidelinesHelper.getScopeDocs(project);
+        if (CollectionUtils.isNotEmpty(scopeDocs)) {
+            homeDocs.addAll(scopeDocs);
+        }
+        List<CodingGuidelinesHelper.Doc> preSetDocs = CodingGuidelinesHelper.getHomeDocs(toolWindow.getProject());
+        if (CollectionUtils.isNotEmpty(preSetDocs)) {
+            homeDocs.addAll(preSetDocs);
+        }
+        if (!homeDocs.isEmpty()) {
+            //pre-set
+            DefaultActionGroup subActionGroup = new DefaultActionGroup("pre-set", true);
+            for (CodingGuidelinesHelper.Doc value : homeDocs) {
+                fillSubDoc(value, subActionGroup);
+            }
+            // 将二级菜单添加到主菜单
+            actionGroup.add(subActionGroup);
+        }
+
+        //各个sources
+        Map<CodingGuidelinesHelper.DocSource, Map<String, CodingGuidelinesHelper.Doc>> projectDocs = CodingGuidelinesHelper.getProjectDocs(project);
+        if (projectDocs == null) {
+            return;
+        }
+        for (CodingGuidelinesHelper.DocSource docSource : CodingGuidelinesHelper.DocSource.values()) {
+            Map<String, CodingGuidelinesHelper.Doc> values = projectDocs.get(docSource);
+            if (values == null || values.isEmpty()) {
+                continue;
+            }
+            Collection<CodingGuidelinesHelper.Doc> values1 = values.values();
+            DefaultActionGroup subActionGroup = new DefaultActionGroup(docSource.name().replace("_", "-"), true);
+            for (CodingGuidelinesHelper.Doc doc : values1) {
+                if (doc == null) {
+                    continue;
+                }
+                fillSubDoc(doc, subActionGroup);
+
+            }
+            if (subActionGroup.getChildrenCount() > 0) {
+                actionGroup.add(subActionGroup);
+            }
+        }
+    }
+
+    private static void fillSubDoc(CodingGuidelinesHelper.Doc preSetDoc, DefaultActionGroup subActionGroup) {
+        if (preSetDoc == null) {
+            return;
+        }
+        Icon icon = preSetDoc.getType() == CodingGuidelinesHelper.DocType.markdown ? CodingGuidelinesIconProvider.MARKDOWN_ICON : CodingGuidelinesIconProvider.URL_ICON;
+        subActionGroup.add(new AnAction(preSetDoc.getTitle() == null ? "unknown" : preSetDoc.getTitle(), null, icon) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                Application application = ApplicationManager.getApplication();
+                application.invokeLater(() -> CodingGuidelinesHelper.navigateToDocumentation(preSetDoc));
+            }
+        });
     }
 
 
@@ -562,7 +624,6 @@ public class FlingToolWindow {
     }
 
 
-
     public void findSpringBootApplicationClasses() {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             List<PsiClass> springBootApplicationClasses = ApplicationManager.getApplication().runReadAction((Computable<List<PsiClass>>) () -> {
@@ -621,7 +682,7 @@ public class FlingToolWindow {
         try {
             datasourceConfigs = SettingsStorageHelper.SqlConfig.parseDatasources(SettingsStorageHelper.getSqlConfig(toolWindow.getProject()).getProperties());
         } catch (Throwable ex) {
-            return ;
+            return;
         }
 
         List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
