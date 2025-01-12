@@ -23,9 +23,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.*;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Predicate;
 
 public class SqlDialog extends JDialog {
@@ -49,7 +48,7 @@ public class SqlDialog extends JDialog {
         c1.fill = GridBagConstraints.BOTH;
         c1.anchor = GridBagConstraints.NORTH;// 使组件在水平方向和垂直方向都拉伸
         c1.weightx = 1;   // 水平方向占满
-        c1.weighty = 0.2; // 垂直方向占30%
+        c1.weighty = 0.3; // 垂直方向占30%
         c1.gridx = 0;
         c1.gridy = 0;
         c1.gridwidth = 2; // 横跨两列
@@ -66,7 +65,7 @@ public class SqlDialog extends JDialog {
 
         // 设置 panelResults
         JPanel panelResults = buildResultPanel(flingWindow);
-        c1.weighty = 0.8; // 垂直方向占70%
+        c1.weighty = 0.7; // 垂直方向占70%
         c1.gridy = 2;
         c1.gridwidth = 2; // 不再跨列
         c1.fill = GridBagConstraints.BOTH;
@@ -165,57 +164,84 @@ public class SqlDialog extends JDialog {
         return panelResults;
     }
 
+//    private void analysisSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
+//        try (Connection connection = MysqlUtil.getDatabaseConnection(datasourceConfig);
+//             PreparedStatement statement = connection.prepareStatement("EXPLAIN " + sqlText);
+//             ResultSet resultSet = statement.executeQuery()) {
+//
+//            // 解析结果并刷新表格
+//            List<Object[]> resultData = new ArrayList<>();
+//            ResultSetMetaData metaData = resultSet.getMetaData();
+//            int columnCount = metaData.getColumnCount();
+//
+//            // 读取 ResultSet 数据
+//            while (resultSet.next()) {
+//                Object[] row = new Object[columnCount];
+//                for (int i = 1; i <= columnCount; i++) {
+//                    row[i - 1] = resultSet.getObject(i);
+//                }
+//                resultData.add(row);
+//            }
+//
+//            // 使用加载数据的 API 刷新表格
+//            SwingUtilities.invokeLater(() -> loadAnalysis(resultData.toArray(new Object[0][])));
+//        } catch (Throwable ex) {
+//            setMsg("Error executing EXPLAIN: " + ex.getMessage());
+//        }
+//    }
+
     private void analysisSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
         try (Connection connection = MysqlUtil.getDatabaseConnection(datasourceConfig);
              PreparedStatement statement = connection.prepareStatement("EXPLAIN " + sqlText);
              ResultSet resultSet = statement.executeQuery()) {
 
-            // 解析结果并刷新表格
-            List<Object[]> resultData = new ArrayList<>();
+            // 动态解析 ResultSet 列和数据
+            List<String> requiredColumns = List.of("id", "select_type", "table", "type",
+                    "possible_keys", "key", "key_len",
+                    "ref", "rows", "filtered", "Extra"); // 所需列
+            Map<String, Integer> columnIndexMapping = new HashMap<>(); // 存放列名 -> 索引
             ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
 
-            // 读取 ResultSet 数据
-            while (resultSet.next()) {
-                Object[] row = new Object[columnCount];
-                for (int i = 1; i <= columnCount; i++) {
-                    row[i - 1] = resultSet.getObject(i);
+            // 获取返回的列信息，动态映射到列索引
+            int columnCount = metaData.getColumnCount();
+            for (int i = 1; i <= columnCount; i++) {
+                String columnName = metaData.getColumnLabel(i).toLowerCase(); // 转为小写以匹配
+                if (requiredColumns.contains(columnName)) {
+                    columnIndexMapping.put(columnName, i); // 保存列名与索引映射
                 }
-                resultData.add(row);
             }
 
-            // 使用加载数据的 API 刷新表格
-            SwingUtilities.invokeLater(() -> loadAnalysis(resultData.toArray(new Object[0][])));
+            // 检查是否所有所需列都存在
+            if (columnIndexMapping.isEmpty()) {
+                throw new RuntimeException("The result set does not contain the required EXPLAIN columns!");
+            }
+
+            // 提取数据
+            List<Object[]> resultData = new ArrayList<>();
+            while (resultSet.next()) {
+                Object[] row = new Object[requiredColumns.size()]; // 创建行，列按指定顺序排列
+                for (int i = 0; i < requiredColumns.size(); i++) {
+                    String colName = requiredColumns.get(i);
+                    Integer colIdx = columnIndexMapping.get(colName); // 获取实际列索引
+                    row[i] = (colIdx != null) ? resultSet.getObject(colIdx) : null; // 获取值，如果列不存在则填充 null
+                }
+                resultData.add(row); // 添加行
+            }
+
+            // 结果数据传递到表格加载方法
+            SwingUtilities.invokeLater(() -> loadAnalysis(resultData.toArray(new Object[0][]), requiredColumns.toArray(new String[0])));
         } catch (Throwable ex) {
             setMsg("Error executing EXPLAIN: " + ex.getMessage());
         }
     }
 
-    private JPanel buildResultPanel(FlingToolWindow window) {
-        panelResults = new JPanel(new BorderLayout());
-        setMsg("");
-        return panelResults;
-    }
+    private void loadAnalysis(Object[][] data, String[] columnNames) {
+        // 创建标题 JLabel
+        JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT); // 标题居中
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14)); // 设置字体样式
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0)); // 添加上下间距
 
-    private void setMsg(String msg){
-        panelResults.removeAll();
-        JTextArea jsonInput = new JTextArea();
-        jsonInput.setText(msg);
-        jsonInput.setLineWrap(true);
-        jsonInput.setWrapStyleWord(true);
-        JBScrollPane scrollPane = new JBScrollPane(jsonInput);
-        panelResults.add(scrollPane, BorderLayout.CENTER);
-        panelResults.revalidate();
-        panelResults.repaint();
-    }
-
-
-    // 加载数据的 API
-    private void loadAnalysis(Object[][] data) {
-
-        // 创建表格结构
-        String[] columnNames = {"Id", "Select Type", "Table", "Type", "Possible Keys", "Key", "Key Length", "Ref", "Rows", "Extra"};
-        // 使用 JBTable
+        // 创建表格
         JBTable explainTable = new JBTable(new DefaultTableModel(data, columnNames));
 
         // 表格效果设置
@@ -244,16 +270,32 @@ public class SqlDialog extends JDialog {
             }
         });
 
-        // 垂直滚动条，禁止横向滚动条
-        JBScrollPane scrollPane = new JBScrollPane(explainTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        // 创建滚动条容器并嵌入表格
+        JBScrollPane scrollPane = new JBScrollPane(explainTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
-//
-//        DefaultTableModel model = (DefaultTableModel) explainTable.getModel();
-//        model.setRowCount(0); // 清空现有数据
-//        for (Object[] row : data) {
-//            model.addRow(row); // 添加新行
-//        }
+        // 使用 BorderLayout 管理组件布局
+        panelResults.removeAll(); // 清空现有组件
+        panelResults.setLayout(new BorderLayout());
+        panelResults.add(titleLabel, BorderLayout.NORTH); // 添加标题到顶部
+        panelResults.add(scrollPane, BorderLayout.CENTER); // 在中心添加表格部分
+        panelResults.revalidate(); // 刷新 panel
+        panelResults.repaint(); // 重绘组件
+    }
+
+
+    private JPanel buildResultPanel(FlingToolWindow window) {
+        panelResults = new JPanel(new BorderLayout());
+        setMsg("");
+        return panelResults;
+    }
+
+    private void setMsg(String msg){
         panelResults.removeAll();
+        JTextArea jsonInput = new JTextArea();
+        jsonInput.setText(msg);
+        jsonInput.setLineWrap(true);
+        jsonInput.setWrapStyleWord(true);
+        JBScrollPane scrollPane = new JBScrollPane(jsonInput);
         panelResults.add(scrollPane, BorderLayout.CENTER);
         panelResults.revalidate();
         panelResults.repaint();
@@ -270,6 +312,10 @@ public class SqlDialog extends JDialog {
         JLabel curlLabel = new JLabel("Sql:");
         inputSqlField = new LanguageTextField(SqlLanguage.INSTANCE, toolWindow.getProject(), "", false);
 //        inputTextArea.getEmptyText().setText("input your sql");
+// 添加一个 JScrollPane 包装 inputSqlField
+        JBScrollPane scrollPane = new JBScrollPane(inputSqlField);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
         // Add label
         c.fill = GridBagConstraints.NONE;
@@ -284,7 +330,7 @@ public class SqlDialog extends JDialog {
         c.weighty = 1;
         c.gridx = 1;
         c.gridy = 0;
-        panelCmd.add(inputSqlField, c);
+        panelCmd.add(scrollPane, c);
         return panelCmd;
     }
 

@@ -52,14 +52,14 @@ public class SettingsStorageHelper {
                     " * 可引用项目中的类及函数\n" +
                     " * trace写入\n" +
                     " * 登录态模拟\n" +
-                    " * 支持使用@Autowired注入项目中存在的bean\n" +
+                    " * 支持使用@Autowired, @Resource, @Qualifier注入项目中存在的bean\n" +
                     " */\n" +
                     "class MyInterceptor {\n" +
                     "\n" +
                     "    @Autowired\n" +
                     "    private ApplicationContext ctx;\n" +
                     "\n" +
-                    "    public MyScript() {\n" +
+                    "    public MyInterceptor() {\n" +
                     "    }\n" +
                     "\n" +
                     "\n" +
@@ -467,6 +467,7 @@ public class SettingsStorageHelper {
 
     private static SqlConfig copyDefSqlConfig() {
         SqlConfig sqlConfig = new SqlConfig();
+        sqlConfig.setProperties(datasourceTemplateProperties);
         return sqlConfig;
     }
 
