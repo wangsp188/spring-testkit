@@ -172,7 +172,7 @@ public class FlingToolWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 DefaultActionGroup actionGroup = new DefaultActionGroup();
-                actionGroup.setSearchable(true);
+//                actionGroup.setSearchable(true);
                 // 创建一个动作组
                 actionGroup.add(new AnAction("How to use " + FlingHelper.getPluginName() + " ?", null, AllIcons.General.Information) {
                     @Override
