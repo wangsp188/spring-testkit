@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.2.0"
 }
 
-group = "com.fling"
+group = "com.testkit"
 version = "1.0"
 
 repositories {
@@ -20,9 +20,9 @@ dependencies {
     implementation("org.mybatis:mybatis:3.5.6")
     implementation("org.apache.commons:commons-lang3:3.14.0")
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
-    implementation(files("libs/spring-fling_link-0.0.1.jar"))
-    implementation(files("libs/spring-fling_side_server-0.0.1.jar"))
-    implementation(files("libs/spring-fling_agent-0.0.1.jar"))
+    implementation(files("libs/spring-testkit_trace-0.0.1.jar"))
+    implementation(files("libs/spring-testkit_side_server-0.0.1.jar"))
+    implementation(files("libs/spring-testkit_agent-0.0.1.jar"))
     implementation("mysql:mysql-connector-java:8.0.33")
     intellijPlatform{
         create("IU","2023.2")

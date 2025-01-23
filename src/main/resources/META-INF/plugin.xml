@@ -1,14 +1,14 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-    <id>Spring-Fling</id>
+    <id>Spring-Testkit</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
-    <name>Spring-Fling</name>
+    <name>Spring-Testkit</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor email="1061909924@qq.com" url="https://www.yourcompany.com">wang zhe peng</vendor>
+    <vendor email="dex.wang" url="https://www.yourcompany.com">wang zhe peng</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
@@ -37,29 +37,29 @@
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <postStartupActivity implementation="com.fling.listener.FlingProjectListener"/>
+        <postStartupActivity implementation="com.testkit.listener.TestkitProjectListener"/>
         <!-- Register LineMarkerProvider -->
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.spring_cache.SpringCacheIconProvider"/>
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.flexible_test.FlexibleTestIconProvider"/>
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.method_call.MethodCallIconProvider"/>
-        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.tools.mapper_sql.MapperSqlIconProvider"/>
-        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.coding_guidelines.CodingGuidelinesIconProvider"/>
-        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.fling.tools.view_value.ViewValueLineMarkerProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.testkit.tools.spring_cache.SpringCacheIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.testkit.tools.flexible_test.FlexibleTestIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.testkit.tools.function_call.FunctionCallIconProvider"/>
+        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.testkit.tools.mapper_sql.MapperSqlIconProvider"/>
+        <codeInsight.lineMarkerProvider language="XML" implementationClass="com.testkit.coding_guidelines.CodingGuidelinesIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.testkit.coding_guidelines.CodingGuidelinesIconProvider"/>
+        <codeInsight.lineMarkerProvider language="JAVA" implementationClass="com.testkit.tools.view_value.ViewValueLineMarkerProvider"/>
 
-        <java.programPatcher implementation="com.fling.JavaProgramPatcher" />
-        <toolWindow id="Fling" icon="/icons/spring-fling.svg" factoryClass="com.fling.view.FlingToolWindowFactory" anchor="right"/>
+        <java.programPatcher implementation="com.testkit.JavaProgramPatcher" />
+        <toolWindow id="Spring-Testkit" icon="/icons/spring-testkit.svg" factoryClass="com.testkit.view.TestkitToolWindowFactory" anchor="right"/>
 <!--icon="PlatformDebuggerImplIcons.MemoryView.Active"-->
         <!-- Here you can register other extensions, for example, actions -->
     </extensions>
 
     <actions>
-        <action icon="/icons/dagre.svg" id="popup_graph_fling_profiler" class="com.fling.trace.FlingTraceViewAction" text="Popup graph fling profiler"
-                description="Processes the selected FLING_PROFILER and graph it">
+        <action icon="/icons/dagre.svg" id="popup_graph_testkit_profiler" class="com.testkit.trace.TestkitTraceViewAction" text="Popup graph testkit profiler"
+                description="Processes the selected TRACE_PROFILER and graph it">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
         <action icon="/icons/test-code.svg" id="generate_flexible_text_code"
-                class="com.fling.tools.method_call.GenerateFlexibleTestAction"
+                class="com.testkit.tools.function_call.GenerateFlexibleTestAction"
                 text="Generate flexible test code"
                 description="Generate flexible test code from selected code">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
