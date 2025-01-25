@@ -1498,15 +1498,15 @@ def detail(group: str, biz: str, action: str
             var beginIndex = nodeStr.indexOf(",", performanceIndex + 1);
             var begin = parseInt(nodeStr.slice(performanceIndex + 1, beginIndex));
 
-            var costIndex = nodeStr.indexOf(",", beginIndex + 1);
+            var costIndex = nodeStr.indexOf(")", beginIndex + 1);
             var cost = nodeStr.slice(beginIndex + 1, costIndex);
             cost = isNaN(parseInt(cost)) ? -1 : parseInt(cost);
 
-            var rateIndex = nodeStr.indexOf(")", costIndex + 1);
+            // var rateIndex = nodeStr.indexOf(")", costIndex + 1);
             // var rate = nodeStr.slice(costIndex+1, rateIndex);
 
             var digests = [];
-            var digestsStr = nodeStr.slice(rateIndex + 1).trim();
+            var digestsStr = nodeStr.slice(costIndex + 1).trim();
             //da=v1,db=v2
             var nextStart = 0;
             do {
