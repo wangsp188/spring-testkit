@@ -5,8 +5,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
+import com.testkit.sql_review.MysqlUtil;
 import com.testkit.util.HttpUtil;
-import com.testkit.util.sql.MysqlUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.lang.properties.PropertiesLanguage;
@@ -501,7 +501,7 @@ public class SettingsDialog {
                         params.put("code", code);
                         params.put("methodName", "hello");
                         params.put("argTypes", "[\"java.lang.String\",\"java.util.Date\"]");
-                        params.put("args", "[\""+TestkitHelper.getPluginName()+"\"," + System.currentTimeMillis() + "]");
+                        params.put("args", "[\"" + TestkitHelper.getPluginName() + "\"," + System.currentTimeMillis() + "]");
                         JSONObject req = new JSONObject();
                         req.put("method", "flexible-test");
                         req.put("params", params);
@@ -876,18 +876,27 @@ public class SettingsDialog {
 //            我现在需要找出datasource开头的内容，并且根据参数挨个验证数据库连接的连通性
 //            name是为每个链接取的名字
 
-            // 存储测试结果
-            Map<String, String> results = new HashMap<>();
+            List<SettingsStorageHelper.DatasourceConfig> finalDatasourceConfigs = datasourceConfigs;
+            ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing test connection, please wait ...", false) {
+                                                  @Override
+                                                  public void run(ProgressIndicator indicator) {
+                                                      // 存储测试结果
+                                                      Map<String, String> results = new HashMap<>();
 
-            // 遍历每个数据源配置，逐个验证连接
-            for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
-                // 测试连接
-                String result = MysqlUtil.testConnectionAndClose(config);
-                // 存储结果
-                results.put(config.getName(), result == null ? "connect success" : result);
-            }
-            TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), "Test result is " + JSON.toJSONString(results));
+                                                      // 遍历每个数据源配置，逐个验证连接
+                                                      for (SettingsStorageHelper.DatasourceConfig config : finalDatasourceConfigs) {
+                                                          // 测试连接
+                                                          String result = MysqlUtil.testConnectionAndClose(config);
+                                                          // 存储结果
+                                                          results.put(config.getName(), result == null ? "connect success" : result);
+                                                      }
+                                                      TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), "Test result is " + JSON.toJSONString(results));
+                                                  }
+                                              }
+            );
         };
+
+        ;
         testButton.addActionListener(testListener);
 
         // 保存按钮
@@ -902,29 +911,38 @@ public class SettingsDialog {
                 return;
             }
 
-            List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
-            for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
-                // 测试连接
-                String result = MysqlUtil.testConnectionAndClose(config);
-                if (result == null) {
-                    valids.add(config);
-                }
-            }
+            List<SettingsStorageHelper.DatasourceConfig> finalDatasourceConfigs = datasourceConfigs;
+            ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing test connection, please wait ...", false) {
+                                                  @Override
+                                                  public void run(ProgressIndicator indicator) {
+                                                      List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
+                                                      for (SettingsStorageHelper.DatasourceConfig config : finalDatasourceConfigs) {
+                                                          // 测试连接
+                                                          String result = MysqlUtil.testConnectionAndClose(config);
+                                                          if (result == null) {
+                                                              valids.add(config);
+                                                          }
+                                                      }
 
-            SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-            if (!Objects.equals(sqlConfig.getProperties(), propertiesStr)) {
-                sqlConfig.setProperties(propertiesStr.trim());
-                SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
-            }
+                                                      SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+                                                      if (!Objects.equals(sqlConfig.getProperties(), propertiesStr)) {
+                                                          sqlConfig.setProperties(propertiesStr.trim());
+                                                          SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
+                                                      }
 
-            RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids);
-            TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, valid datasources is " + valids.stream().map(SettingsStorageHelper.DatasourceConfig::getName).toList());
+                                                      RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids);
+                                                      TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, valid datasources is " + valids.stream().map(SettingsStorageHelper.DatasourceConfig::getName).toList());
+                                                  }
+                                              }
+            );
         };
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
         JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(e -> {
+        closeButton.addActionListener(e ->
+
+        {
             saveListener.actionPerformed(e);
             // 关闭当前窗口
             Window window = SwingUtilities.getWindowAncestor(panel);

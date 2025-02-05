@@ -2,6 +2,7 @@ package com.testkit;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
+import com.testkit.sql_review.MysqlUtil;
 import com.testkit.view.SettingsDialog;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang3.StringUtils;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -803,6 +805,10 @@ public class SettingsStorageHelper {
         private String url;
         private String username;
         private String password;
+
+        public Connection newConnection(){
+            return MysqlUtil.getDatabaseConnection(this);
+        }
 
         public String getUrl() {
             return url;

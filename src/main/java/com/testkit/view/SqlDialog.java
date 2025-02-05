@@ -2,8 +2,10 @@ package com.testkit.view;
 
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
+import com.testkit.sql_review.MysqlUtil;
+import com.testkit.sql_review.SqlReviewer;
+import com.testkit.sql_review.Suggest;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
-import com.testkit.util.sql.MysqlUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -13,6 +15,7 @@ import com.intellij.sql.psi.SqlLanguage;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,6 +38,11 @@ public class SqlDialog extends JDialog {
     private LanguageTextField inputSqlField;
     private JComboBox<String> dataSourceComboBox;
     private JPanel panelResults;
+
+    // 动态解析 ResultSet 列和数据
+    private static final List<String> explainColumns = List.of("id", "select_type", "table", "type",
+            "possible_keys", "key", "key_len",
+            "ref", "rows", "filtered", "Extra");
 
 
     public SqlDialog(TestkitToolWindow testkitWindow) {
@@ -121,10 +129,10 @@ public class SqlDialog extends JDialog {
                 return;
             }
             String selectedData = (String) dataSourceComboBox.getSelectedItem();
-            if (selectedData == null) {
-                setMsg("Please select a datasource, if there is no option, configure the database link in settings-SQL tool");
-                return;
-            }
+//            if (selectedData == null) {
+//                setMsg("Please select a datasource, if there is no option, configure the database link in settings-SQL tool");
+//                return;
+//            }
 
 
             Optional<SettingsStorageHelper.DatasourceConfig> first = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName())
@@ -132,21 +140,21 @@ public class SqlDialog extends JDialog {
                     .filter(new Predicate<SettingsStorageHelper.DatasourceConfig>() {
                         @Override
                         public boolean test(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
-                            return selectedData.equals(datasourceConfig.getName());
+                            return Objects.equals(selectedData,datasourceConfig.getName());
                         }
                     })
                     .findFirst();
-            if (!first.isPresent()) {
-                setMsg("Can not find valid datasource");
-                return;
-            }
+//            if (first.isEmpty()) {
+//                setMsg("Can not find valid datasource");
+//                return;
+//            }
             //执行explain，并刷新结果
 // 执行 EXPLAIN 逻辑部分
             ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Analysis sql, please wait ...", false) {
 
                                                   @Override
                                                   public void run(@NotNull ProgressIndicator progressIndicator) {
-                                                      analysisSql(first.get(), sqlText);
+                                                      analysisSql(first.orElse(null), sqlText);
                                                   }
                                               }
             );
@@ -191,14 +199,28 @@ public class SqlDialog extends JDialog {
 //    }
 
     private void analysisSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
+        // 提取数据
+        List<Map<String, Object>> explains;
+        try {
+            explains = explainSql(datasourceConfig,sqlText);
+        } catch (Throwable ex) {
+            setMsg("Error executing EXPLAIN: " + ex.getMessage());
+            return;
+        }
+
+        // 结果数据传递到表格加载方法
+        SwingUtilities.invokeLater(() -> loadAnalysis(explains,datasourceConfig,sqlText));
+    }
+
+    private List<Map<String,Object>> explainSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
+        if (datasourceConfig==null) {
+            return new ArrayList<>();
+        }
         try (Connection connection = MysqlUtil.getDatabaseConnection(datasourceConfig);
              PreparedStatement statement = connection.prepareStatement("EXPLAIN " + sqlText);
              ResultSet resultSet = statement.executeQuery()) {
 
             // 动态解析 ResultSet 列和数据
-            List<String> requiredColumns = List.of("id", "select_type", "table", "type",
-                    "possible_keys", "key", "key_len",
-                    "ref", "rows", "filtered", "Extra"); // 所需列
             Map<String, Integer> columnIndexMapping = new HashMap<>(); // 存放列名 -> 索引
             ResultSetMetaData metaData = resultSet.getMetaData();
 
@@ -206,7 +228,7 @@ public class SqlDialog extends JDialog {
             int columnCount = metaData.getColumnCount();
             for (int i = 1; i <= columnCount; i++) {
                 String columnName = metaData.getColumnLabel(i).toLowerCase(); // 转为小写以匹配
-                if (requiredColumns.contains(columnName)) {
+                if (explainColumns.contains(columnName)) {
                     columnIndexMapping.put(columnName, i); // 保存列名与索引映射
                 }
             }
@@ -216,70 +238,146 @@ public class SqlDialog extends JDialog {
                 throw new RuntimeException("The result set does not contain the required EXPLAIN columns!");
             }
 
-            // 提取数据
-            List<Object[]> resultData = new ArrayList<>();
-            while (resultSet.next()) {
-                Object[] row = new Object[requiredColumns.size()]; // 创建行，列按指定顺序排列
-                for (int i = 0; i < requiredColumns.size(); i++) {
-                    String colName = requiredColumns.get(i);
-                    Integer colIdx = columnIndexMapping.get(colName); // 获取实际列索引
-                    row[i] = (colIdx != null) ? resultSet.getObject(colIdx) : null; // 获取值，如果列不存在则填充 null
-                }
-                resultData.add(row); // 添加行
-            }
+            List<Map<String,Object>> explainList = new ArrayList<>();
 
-            // 结果数据传递到表格加载方法
-            SwingUtilities.invokeLater(() -> loadAnalysis(resultData.toArray(new Object[0][]), requiredColumns.toArray(new String[0])));
-        } catch (Throwable ex) {
-            setMsg("Error executing EXPLAIN: " + ex.getMessage());
+            while (resultSet.next()) {
+                HashMap<String, Object> map = new HashMap<>();
+                for (int i = 0; i < explainColumns.size(); i++) {
+                    String colName = explainColumns.get(i);
+                    Integer colIdx = columnIndexMapping.get(colName); // 获取实际列索引
+                    map.put(colName, (colIdx != null) ? resultSet.getObject(colIdx) : null);
+                }
+                explainList.add(map); // 添加行
+            }
+            return explainList;
+        } catch (Throwable e) {
+            throw new RuntimeException(e.getMessage(),e);
         }
     }
 
-    private void loadAnalysis(Object[][] data, String[] columnNames) {
-        // 创建标题 JLabel
-        JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT); // 标题居中
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 14)); // 设置字体样式
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0)); // 添加上下间距
-
-        // 创建表格
-        JBTable explainTable = new JBTable(new DefaultTableModel(data, columnNames));
-
-        // 表格效果设置
-        explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS); // 自动调整列宽
-        explainTable.setFillsViewportHeight(true); // 填满视图高度
-        explainTable.getTableHeader().setReorderingAllowed(false); // 禁止列拖动
-
-        // 自定义渲染器实现自动换行
-        explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                JTextArea textArea = new JTextArea();
-                textArea.setText(value == null ? "" : value.toString());
-                textArea.setWrapStyleWord(true); // 单词换行
-                textArea.setLineWrap(true); // 自动换行
-                textArea.setOpaque(true); // 确保颜色背景一致
-                textArea.setFont(table.getFont()); // 保持表格的字体一致
-                if (isSelected) {
-                    textArea.setBackground(table.getSelectionBackground());
-                    textArea.setForeground(table.getSelectionForeground());
-                } else {
-                    textArea.setBackground(table.getBackground());
-                    textArea.setForeground(table.getForeground());
-                }
-                return textArea;
-            }
-        });
-
-        // 创建滚动条容器并嵌入表格
-        JBScrollPane scrollPane = new JBScrollPane(explainTable, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-
+    private void loadAnalysis(List<Map<String,Object>> explains, SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
         // 使用 BorderLayout 管理组件布局
         panelResults.removeAll(); // 清空现有组件
         panelResults.setLayout(new BorderLayout());
-        panelResults.add(titleLabel, BorderLayout.NORTH); // 添加标题到顶部
-        panelResults.add(scrollPane, BorderLayout.CENTER); // 在中心添加表格部分
-        panelResults.revalidate(); // 刷新 panel
-        panelResults.repaint(); // 重绘组件
+
+        // 使用垂直布局容器承载所有内容（EXPLAIN 和 SQL Review 建议）
+        JPanel verticalPanel = new JPanel();
+        verticalPanel.setLayout(new BoxLayout(verticalPanel, BoxLayout.Y_AXIS));
+
+        // 1. EXPLAIN 结果展示
+        if (CollectionUtils.isNotEmpty(explains)) {
+            // 创建标题 JLabel
+            JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
+            titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
+            // 表格数据转换
+            List<Object[]> resultData = new ArrayList<>();
+            for (Map<String, Object> explain : explains) {
+                Object[] row = new Object[explainColumns.size()];
+                for (int i = 0; i < explainColumns.size(); i++) {
+                    row[i] = explain.get(explainColumns.get(i));
+                }
+                resultData.add(row);
+            }
+
+            // 创建表格
+            JBTable explainTable = new JBTable(new DefaultTableModel(resultData.toArray(new Object[0][]), explainColumns.toArray(new String[0])));
+            explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+            explainTable.setFillsViewportHeight(true);
+            explainTable.getTableHeader().setReorderingAllowed(false);
+
+            // 自动换行渲染器
+            explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                    JTextArea textArea = new JTextArea();
+                    textArea.setText(value == null ? "" : value.toString());
+                    textArea.setWrapStyleWord(true);
+                    textArea.setLineWrap(true);
+                    textArea.setOpaque(true);
+                    textArea.setFont(table.getFont());
+                    if (isSelected) {
+                        textArea.setBackground(table.getSelectionBackground());
+                        textArea.setForeground(table.getSelectionForeground());
+                    } else {
+                        textArea.setBackground(table.getBackground());
+                        textArea.setForeground(table.getForeground());
+                    }
+                    return textArea;
+                }
+            });
+
+            // 将表格和标题添加到垂直容器
+            verticalPanel.add(titleLabel);
+            verticalPanel.add(new JBScrollPane(explainTable));
+//            verticalPanel.add(Box.createVerticalStrut(20)); // 添加间距
+        }
+
+        // 2. SQL Review 建议展示
+        List<Suggest> suggests = SqlReviewer.reviewMysql(datasourceConfig, sqlText);
+        if (CollectionUtils.isNotEmpty(suggests)) {
+            // 创建建议标题
+            JLabel suggestTitleLabel = new JLabel("Rule Review", SwingConstants.LEFT);
+            suggestTitleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+            suggestTitleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
+            // 表格列名
+            String[] suggestColumns = {"Level", "Title", "Detail"};
+
+            // 转换建议数据
+            DefaultTableModel suggestModel = new DefaultTableModel(suggestColumns, 0);
+            for (Suggest suggest : suggests) {
+                suggestModel.addRow(new Object[]{
+                        suggest.getRule().getLevel().name(),
+                        suggest.getRule().getTitle(),
+                        suggest.getDetail()
+                });
+            }
+
+            // 创建建议表格
+            JBTable suggestTable = new JBTable(suggestModel);
+            suggestTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+            suggestTable.setFillsViewportHeight(true);
+            suggestTable.getTableHeader().setReorderingAllowed(false);
+
+            // 自动换行渲染器（特别处理 Message 列）
+            suggestTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                    // 对 Message 列使用 JTextArea 换行
+                    if (column == 2) {
+                        JTextArea textArea = new JTextArea();
+                        textArea.setText(value == null ? "" : value.toString());
+                        textArea.setWrapStyleWord(true);
+                        textArea.setLineWrap(true);
+                        textArea.setOpaque(true);
+                        textArea.setFont(table.getFont());
+                        if (isSelected) {
+                            textArea.setBackground(table.getSelectionBackground());
+                            textArea.setForeground(table.getSelectionForeground());
+                        } else {
+                            textArea.setBackground(table.getBackground());
+                            textArea.setForeground(table.getForeground());
+                        }
+                        return textArea;
+                    } else {
+                        return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                    }
+                }
+            });
+
+            // 将建议部分添加到垂直容器
+            verticalPanel.add(suggestTitleLabel);
+            verticalPanel.add(new JBScrollPane(suggestTable));
+        }
+
+        // 将垂直容器包裹在滚动面板中（支持整体滚动）
+        JBScrollPane mainScrollPane = new JBScrollPane(verticalPanel);
+        panelResults.add(mainScrollPane, BorderLayout.CENTER);
+
+        panelResults.revalidate();
+        panelResults.repaint();
     }
 
 
@@ -289,7 +387,7 @@ public class SqlDialog extends JDialog {
         return panelResults;
     }
 
-    private void setMsg(String msg){
+    private void setMsg(String msg) {
         panelResults.removeAll();
         JTextArea jsonInput = new JTextArea();
         jsonInput.setText(msg);
@@ -300,7 +398,6 @@ public class SqlDialog extends JDialog {
         panelResults.revalidate();
         panelResults.repaint();
     }
-
 
 
     private @NotNull JPanel buildCmdPanel(TestkitToolWindow window) {

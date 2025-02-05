@@ -24,6 +24,7 @@ dependencies {
     implementation(files("libs/spring-testkit_side_server-0.0.1.jar"))
     implementation(files("libs/spring-testkit_agent-0.0.1.jar"))
     implementation("mysql:mysql-connector-java:8.0.33")
+    implementation("com.github.jsqlparser:jsqlparser:4.6")
     intellijPlatform{
         create("IU","2023.2")
 //        "Git4Idea"
