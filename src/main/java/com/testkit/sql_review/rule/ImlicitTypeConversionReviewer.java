@@ -90,7 +90,7 @@ public class ImlicitTypeConversionReviewer implements Reviewer {
                 Suggest suggest = new Suggest();
                 suggest.setRule(SuggestRule.implicit_type_conversion);
                 suggest.setDetail("Implicit type conversion detected for indexed column '" + column.getName() +
-                        "' in expression: [" + binaryExpression + "]. Review to ensure optimal index usage.");
+                        "' in expression: [" + binaryExpression + "]. \nReview to ensure optimal index usage.");
                 suggestions.add(suggest);
             }
         }

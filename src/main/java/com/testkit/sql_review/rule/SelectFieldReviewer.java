@@ -48,7 +48,7 @@ public class SelectFieldReviewer implements Reviewer {
                 if (item instanceof AllColumns) { // 检测是否使用了 *
                     Suggest suggest = new Suggest();
                     suggest.setRule(SuggestRule.select_all_columns_rule);
-                    suggest.setDetail("Using 'SELECT *' can lead to unnecessary data retrieval and potentially impact query performance. Consider specifying only the necessary columns explicitly to optimize your query.");
+                    suggest.setDetail("Using 'SELECT *' can lead to unnecessary data retrieval and potentially impact query performance. \nConsider specifying only the necessary columns explicitly to optimize your query.");
                     suggestions.add(suggest);
                 }
             }

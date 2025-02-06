@@ -60,8 +60,8 @@ public class IsNullReviewer implements Reviewer {
                 suggest.setRule(SuggestRule.null_comparison);
                 suggest.setDetail("Detected comparison with NULL using " +
                         (expression instanceof EqualsTo ? "=" : "<>") +
-                        ". Use 'IS NULL' or 'IS NOT NULL' for correct NULL checks. " +
-                        "Direct comparison against NULL always returns NULL.");
+                        ". \nUse 'IS NULL' or 'IS NOT NULL' for correct NULL checks. " +
+                        "\nDirect comparison against NULL always returns NULL.");
                 suggestions.add(suggest);
             }
         } else if (expression instanceof AndExpression) {

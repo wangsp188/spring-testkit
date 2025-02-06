@@ -51,7 +51,7 @@ public class LimitNoneOrderReviewer implements Reviewer {
                     // 如果没有 ORDER BY，则记录建议
                     Suggest suggest = new Suggest();
                     suggest.setRule(SuggestRule.limit_no_order);
-                    suggest.setDetail("The query uses LIMIT without ORDER BY. This can result in non-deterministic results depending on the query execution plan. Consider adding an ORDER BY clause.");
+                    suggest.setDetail("The query uses LIMIT without ORDER BY. \nThis can result in non-deterministic results depending on the query execution plan. \nConsider adding an ORDER BY clause.");
                     suggestions.add(suggest);
                 }
             }

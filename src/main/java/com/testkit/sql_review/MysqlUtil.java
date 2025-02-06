@@ -9,6 +9,9 @@ public class MysqlUtil {
 
 
     public static String testConnectionAndClose(SettingsStorageHelper.DatasourceConfig datasource) {
+        if (datasource==null) {
+            return "datasource is null";
+        }
         Connection connection = null;
         try {
             // 尝试从 DataSource 获取连接
@@ -58,7 +61,7 @@ public class MysqlUtil {
     public static SqlTable getTableMeta(Connection connection, String tableName) throws Exception {
         SqlTable table = new SqlTable(tableName);
 
-// 获取数据库元数据
+        // 获取数据库元数据
         DatabaseMetaData metaData = connection.getMetaData();
 
         // 获取表字段信息
@@ -142,7 +145,7 @@ public class MysqlUtil {
         datasourceConfig.setName("111");
 
 
-        SqlTable house = getTableMeta(datasourceConfig.newConnection(), "house");
+        SqlTable house = getTableMeta(datasourceConfig.newConnection(), "house1");
         System.out.println(house);
     }
 }

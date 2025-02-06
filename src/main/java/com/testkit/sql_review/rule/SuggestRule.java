@@ -30,9 +30,18 @@ public enum SuggestRule {
     }
 
     public static enum Level {
-        BLOCKER,
-        CRITICAL,
-        MINOR;
+        BLOCKER(0),
+        CRITICAL(1),
+        MINOR(2);
+        private int order;
+
+        Level(int order) {
+            this.order = order;
+        }
+
+        public int getOrder() {
+            return order;
+        }
     }
 
 }

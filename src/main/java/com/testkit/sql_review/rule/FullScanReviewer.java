@@ -88,7 +88,7 @@ public class FullScanReviewer implements Reviewer {
                 Suggest suggest = new Suggest();
                 suggest.setRule(SuggestRule.full_scan);
                 suggest.setDetail("Potential full table scan detected on table '" + tableName +
-                        "' in query: [" + selectBody + "]. Consider optimizing the WHERE clause or adding indexes.");
+                        "' in query: [" + selectBody + "]. \nConsider optimizing the WHERE clause or adding indexes.");
                 suggestions.add(suggest);
             }
 

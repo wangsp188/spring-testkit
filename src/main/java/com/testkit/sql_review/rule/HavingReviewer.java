@@ -38,7 +38,7 @@ public class HavingReviewer implements Reviewer {
                 if (canMoveToWhere(havingExpression,aggregateAliases)) {
                     Suggest suggest = new Suggest();
                     suggest.setRule(SuggestRule.having_to_where_rule);
-                    suggest.setDetail("The query uses a HAVING clause that could be replaced with a WHERE clause to improve performance by leveraging indexes. Consider moving the condition `"
+                    suggest.setDetail("The query uses a HAVING clause that could be replaced with a WHERE clause to improve performance by leveraging indexes. \nConsider moving the condition `"
                             + havingExpression + "` to the WHERE clause.");
                     suggestions.add(suggest);
                 }

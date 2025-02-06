@@ -498,16 +498,16 @@ public class FunctionCallTool extends BasePluginTool {
         // Add the radio button
         useProxyButton = new JToggleButton(PROXY_ICON, true);
         useProxyButton.setPreferredSize(new Dimension(32, 32));
-        useProxyButton.setToolTipText("Use proxy obj call method");
+        useProxyButton.setToolTipText("Use proxy obj call function");
         useProxyButton.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (useProxyButton.isSelected()) {
                     useProxyButton.setIcon(PROXY_ICON);
-                    useProxyButton.setToolTipText("Use proxy obj call method");
+                    useProxyButton.setToolTipText("Use proxy obj call function");
                 } else {
                     useProxyButton.setIcon(PROXY_DISABLE_ICON);
-                    useProxyButton.setToolTipText("Use original obj call method");
+                    useProxyButton.setToolTipText("Use original obj call function");
                 }
             }
         });

@@ -82,7 +82,7 @@ public class SqlReviewer {
             // 3. 获取表的字段和索引元数据  
             Map<String, SqlTable> tableMetaMap = new HashMap<>();
 
-            if (datasourceConfig != null) {
+            if (MysqlUtil.testConnectionAndClose(datasourceConfig) == null) {
                 Connection connection = datasourceConfig.newConnection();
                 for (String tableName : tableNames) {
                     SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
@@ -119,6 +119,7 @@ public class SqlReviewer {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        Collections.sort(suggestions);
         return suggestions;
     }
 

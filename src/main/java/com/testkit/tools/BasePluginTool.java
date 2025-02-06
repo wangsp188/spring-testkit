@@ -484,7 +484,7 @@ public abstract class BasePluginTool {
             useScript = true;
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
-                    "<strong>脚本已打开</strong><br>\n" + tooltips + "\n</html>");
+                    "<strong>Interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -493,15 +493,15 @@ public abstract class BasePluginTool {
                         testBtn.setIcon(disableIcon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
-                                "<strong>脚本已关闭</strong><br>\n" + tooltips + "\n</html>");
-                        TestkitHelper.notify(getProject(),NotificationType.INFORMATION,"Tool-script is disable in "+getTool().getCode());
+                                "<strong>Tool interceptor已关闭</strong><br>\n" + tooltips + "\n</html>");
+                        TestkitHelper.notify(getProject(),NotificationType.INFORMATION,"Tool interceptor is disable in "+getTool().getCode());
                     } else {
                         useScript = true;
                         testBtn.setIcon(icon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
-                                "<strong>脚本已打开</strong><br>\n" + tooltips + "\n</html>");
-                        TestkitHelper.notify(getProject(),NotificationType.INFORMATION,"Tool-script is enable in "+getTool().getCode());
+                                "<strong>Tool interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
+                        TestkitHelper.notify(getProject(),NotificationType.INFORMATION,"Tool interceptor is enable in "+getTool().getCode());
                     }
                 }
             });
@@ -509,7 +509,7 @@ public abstract class BasePluginTool {
             useScript = false;
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
-                    "<strong>不支持脚本</strong><br>\n" + tooltips + "\n</html>");
+                    "<strong>不支持Tool interceptor</strong><br>\n" + tooltips + "\n</html>");
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {

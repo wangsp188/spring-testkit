@@ -2,6 +2,7 @@ package com.testkit.view;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.util.ui.JBUI;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
 public class SettingsDialog {
 
     private static final Icon FIRE_TEST_ICON = IconLoader.getIcon("/icons/fire-test.svg", TestkitToolWindow.class);
+
 
 
     private TestkitToolWindow toolWindow;
@@ -133,6 +135,7 @@ public class SettingsDialog {
 
         SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
         datasourcePropertiesField.setText(sqlConfig.getProperties());
+        datasourcePropertiesField.setVisible(SettingsStorageHelper.datasourceTemplateProperties.equals(datasourcePropertiesField.getText()));
     }
 
     private void init() {
@@ -721,7 +724,7 @@ public class SettingsDialog {
 
         // 添加新按钮到组合框右边
         JButton newButton = new JButton(AllIcons.Actions.Rollback);
-        newButton.setToolTipText("Use default Tool-interceptor");
+        newButton.setToolTipText("Use default interceptor");
         newButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -819,14 +822,14 @@ public class SettingsDialog {
     private JPanel createSqlPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+        gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
         JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool\n" +
                 "Configuration desc\n" +
                 "#Multiple database are supported, blew is nam1's config\n" +
                 "datasource.nam1.url=jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC\n" +
-                "datasource.nam1.username=root\n" +
-                "datasource.nam1.password=you");
+                "datasource.nam1.username=your_account\n" +
+                "datasource.nam1.password=your_pwd");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -837,17 +840,51 @@ public class SettingsDialog {
         gbc.anchor = GridBagConstraints.WEST;
         panel.add(tipArea, gbc);
 
+        JButton showDatasourceButton = new JButton(AllIcons.Actions.Show);
+        showDatasourceButton.setToolTipText("Show/hidden config");
+        showDatasourceButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                datasourcePropertiesField.setVisible(!datasourcePropertiesField.isVisible());
+            }
+        });
+
+        JButton resetButton = new JButton(AllIcons.Actions.Rollback);
+        resetButton.setToolTipText("Use demo config template");
+        resetButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                datasourcePropertiesField.setVisible(true);
+                datasourcePropertiesField.setText(SettingsStorageHelper.datasourceTemplateProperties);
+            }
+        });
+
+        // 创建按钮面板
+        JPanel button1Panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0)); // 左对齐，按钮间距5
+        button1Panel.add(showDatasourceButton);
+        button1Panel.add(resetButton);
+
+        gbc.gridy = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0.0;
+        gbc.insets = JBUI.emptyInsets();
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JBScrollPane(button1Panel), gbc);
+
+
 
 //        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
         datasourcePropertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.getSqlConfig(toolWindow.getProject()).getProperties(), false);
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 1; // 占据1
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.NORTHWEST;
+        gbc.insets = JBUI.insets(5);
         panel.add(new JBScrollPane(datasourcePropertiesField), gbc);
 
         // 创建按钮面板，使用FlowLayout以右对齐
@@ -958,7 +995,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 3; // 新的一行
+        gbc.gridy = 4; // 新的一行
         gbc.gridwidth = 3; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
