@@ -55,7 +55,7 @@ public class MultiJoinReviewer implements Reviewer {
 
                 // Generate optimization suggestions
                 Suggest suggest = new Suggest();
-                suggest.setRule(SuggestRule.multi_join_rule);
+                suggest.setRule(SuggestRule.MULTI_JOIN);
                 suggest.setDetail("The query involves " + (joinCount+1) + " tables in JOIN operations, exceeding the recommended limit of " + RECOMMENDED_JOIN_LIMIT + ".\n"
                         + "Consider the following optimizations:\n"
                         + "- Break the query into smaller, simpler queries and use application-side processing to combine results.\n"

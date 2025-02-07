@@ -45,7 +45,7 @@ public class DeepLimitReviewer implements Reviewer {
 
                 if (offsetValue > OFFSET_THRESHOLD) {
                     Suggest suggest = new Suggest();
-                    suggest.setRule(SuggestRule.deep_limit_rule);
+                    suggest.setRule(SuggestRule.DEEP_LIMIT);
                     suggest.setDetail("The query uses LIMIT with OFFSET, which can lead to performance issues for large datasets.\n"
                             + "Consider replacing OFFSET with an index-based pagination approach for better performance.\n"
                             + "Example:\n"

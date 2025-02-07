@@ -14,7 +14,7 @@ import java.util.List;
 
 public class FullScanReviewer implements Reviewer {
 
-    private static final int VERY_SMALL_TABLE_ROW_COUNT = 1; // 小表行数阈值
+    private static final int VERY_SMALL_TABLE_ROW_COUNT = 200; // 小表行数阈值
 
     @Override
     public List<Suggest> suggest(ReviewCtx ctx) {
@@ -86,7 +86,7 @@ public class FullScanReviewer implements Reviewer {
             Expression where = plainSelect.getWhere();
             if (where == null || isPotentialFullScanCondition(where.toString().toLowerCase())) {
                 Suggest suggest = new Suggest();
-                suggest.setRule(SuggestRule.full_scan);
+                suggest.setRule(SuggestRule.FULL_SCAN);
                 suggest.setDetail("Potential full table scan detected on table '" + tableName +
                         "' in query: [" + selectBody + "]. \nConsider optimizing the WHERE clause or adding indexes.");
                 suggestions.add(suggest);

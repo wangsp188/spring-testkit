@@ -286,7 +286,7 @@ public class MapperGenerator {
                         Node child2 = children2.item(i2);
 
                         // 只处理直接文本节点
-                        if (child2.getNodeType() == Node.TEXT_NODE) {
+                        if (child2.getNodeType() == Node.TEXT_NODE || child2.getNodeType() == Node.CDATA_SECTION_NODE) {
                             textContent.append(child2.getTextContent());
                         }
                     }
@@ -301,6 +301,8 @@ public class MapperGenerator {
 
                     // Recursively process child elements
                     extractParametersFromElement(element1, paramMap);
+                }else if(child.getNodeType() == Node.CDATA_SECTION_NODE){
+                    extractParametersFromElement((Element) child, paramMap);
                 }
             } catch (Throwable e) {
                 e.printStackTrace();

@@ -57,7 +57,7 @@ public class IsNullReviewer implements Reviewer {
 
             if (isNullValue(leftExpr) || isNullValue(rightExpr)) {
                 Suggest suggest = new Suggest();
-                suggest.setRule(SuggestRule.null_comparison);
+                suggest.setRule(SuggestRule.NULL_COMPARISON);
                 suggest.setDetail("Detected comparison with NULL using " +
                         (expression instanceof EqualsTo ? "=" : "<>") +
                         ". \nUse 'IS NULL' or 'IS NOT NULL' for correct NULL checks. " +

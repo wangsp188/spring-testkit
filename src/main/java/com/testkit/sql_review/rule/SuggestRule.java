@@ -2,15 +2,15 @@ package com.testkit.sql_review.rule;
 
 public enum SuggestRule {
 
-    full_scan(Level.CRITICAL, "Full scan"),
-    field_operation(Level.BLOCKER, "Field operation"),
-    implicit_type_conversion(Level.BLOCKER, "Implicit type conversion"),
-    null_comparison(Level.BLOCKER, "Null comparison"),
-    limit_no_order(Level.MINOR, "Limit no order"),
-    select_all_columns_rule(Level.MINOR, "Select *"),
-    multi_join_rule(Level.CRITICAL, "Multi join"),
-    having_to_where_rule(Level.CRITICAL, "Having to where"),
-    deep_limit_rule(Level.CRITICAL, "Deep limit"),
+    FULL_SCAN(Level.CRITICAL, "Full scan"),
+    FIELD_OPERATION(Level.BLOCKER, "Field operation"),
+    IMPLICIT_TYPE_CONVERSION(Level.BLOCKER, "Implicit type conversion"),
+    NULL_COMPARISON(Level.BLOCKER, "Null comparison"),
+    LIMIT_NO_ORDER(Level.MINOR, "Limit no order"),
+    SELECT_ALL_COLUMNS(Level.MINOR, "Select *"),
+    MULTI_JOIN(Level.CRITICAL, "Multi join"),
+    HAVING_TO_WHERE(Level.CRITICAL, "Having to where"),
+    DEEP_LIMIT(Level.CRITICAL, "Deep limit"),
 
     ;
     private Level level;

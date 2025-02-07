@@ -88,7 +88,7 @@ public class ImlicitTypeConversionReviewer implements Reviewer {
             // 检查右侧表达式，并判断是否发生了隐式类型转换
             if (!isTypeCompatible(column, right)) {
                 Suggest suggest = new Suggest();
-                suggest.setRule(SuggestRule.implicit_type_conversion);
+                suggest.setRule(SuggestRule.IMPLICIT_TYPE_CONVERSION);
                 suggest.setDetail("Implicit type conversion detected for indexed column '" + column.getName() +
                         "' in expression: [" + binaryExpression + "]. \nReview to ensure optimal index usage.");
                 suggestions.add(suggest);

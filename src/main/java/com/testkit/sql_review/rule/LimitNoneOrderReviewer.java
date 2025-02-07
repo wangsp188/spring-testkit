@@ -50,7 +50,7 @@ public class LimitNoneOrderReviewer implements Reviewer {
                 if (orderByElements == null || orderByElements.isEmpty()) {
                     // 如果没有 ORDER BY，则记录建议
                     Suggest suggest = new Suggest();
-                    suggest.setRule(SuggestRule.limit_no_order);
+                    suggest.setRule(SuggestRule.LIMIT_NO_ORDER);
                     suggest.setDetail("The query uses LIMIT without ORDER BY. \nThis can result in non-deterministic results depending on the query execution plan. \nConsider adding an ORDER BY clause.");
                     suggestions.add(suggest);
                 }

@@ -87,7 +87,7 @@ public class FieldOperationReviewer implements Reviewer {
 
             if (isFieldOperation(binaryExpression)) {
                 Suggest suggest = new Suggest();
-                suggest.setRule(SuggestRule.field_operation);
+                suggest.setRule(SuggestRule.FIELD_OPERATION);
                 suggest.setDetail("Field operation detected: [" + binaryExpression +
                         "].\nConsider simplifying the expression by removing operations on fields. \nFor example, 'a + 1 > 2' can be rewritten as 'a > 2 - 1'.");
                 suggestions.add(suggest);

@@ -1,6 +1,7 @@
 package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.util.ui.JBUI;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.sql_review.MysqlUtil;
@@ -138,7 +139,7 @@ public class SqlDialog extends JDialog {
             try {
                 CCJSqlParserUtil.parse(sqlText);
             } catch (JSQLParserException ex) {
-                setMsg("Parse SQL error, "+ex.getMessage());
+                setMsg("Parse SQL error, " + ex.getMessage());
                 return;
             }
 
@@ -168,8 +169,9 @@ public class SqlDialog extends JDialog {
 
                                                   @Override
                                                   public void run(@NotNull ProgressIndicator progressIndicator) {
+                                                      loadAnalysis(first.orElse(null), sqlText);
                                                       // 结果数据传递到表格加载方法
-                                                      SwingUtilities.invokeLater(() -> loadAnalysis(first.orElse(null), sqlText));
+//                                                      SwingUtilities.invokeLater(() -> loadAnalysis(first.orElse(null), sqlText));
                                                   }
                                               }
             );
@@ -235,11 +237,17 @@ public class SqlDialog extends JDialog {
         // 使用 BorderLayout 管理组件布局
         panelResults.removeAll(); // 清空现有组件
         panelResults.setLayout(new BorderLayout());
-
         // 使用垂直布局容器承载所有内容（EXPLAIN 和 SQL Review 建议）
         JPanel verticalPanel = new JPanel();
-        verticalPanel.setLayout(new BoxLayout(verticalPanel, BoxLayout.Y_AXIS));
-
+//        verticalPanel.setLayout(new BoxLayout(verticalPanel, BoxLayout.Y_AXIS));
+        verticalPanel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.NORTHWEST; // 左对齐
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
+        gbc.weightx = 1; // 水平权重
+        gbc.insets = JBUI.emptyInsets(); // 设置边距
         // 提取数据
         List<Map<String, Object>> explains;
         try {
@@ -248,6 +256,7 @@ public class SqlDialog extends JDialog {
             if (CollectionUtils.isNotEmpty(explains)) {
                 // 创建标题 JLabel
                 JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
+                titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
                 titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
                 titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
@@ -272,52 +281,29 @@ public class SqlDialog extends JDialog {
                 explainTable.setFillsViewportHeight(true);
                 explainTable.getTableHeader().setReorderingAllowed(false);
 
-                // 自动换行渲染器
-                explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-
-                    @Override
-                    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                        return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-
-//                        JTextArea textArea = new JTextArea();
-//                        textArea.setText(value == null ? "" : value.toString());
-//                        textArea.setWrapStyleWord(true);
-//                        textArea.setLineWrap(true);
-//                        textArea.setOpaque(true);
-//                        textArea.setFont(table.getFont());
-//                        if (isSelected) {
-//                            textArea.setBackground(table.getSelectionBackground());
-//                            textArea.setForeground(table.getSelectionForeground());
-//                        } else {
-//                            textArea.setBackground(table.getBackground());
-//                            textArea.setForeground(table.getForeground());
-//                        }
-//                        return textArea;
-                    }
-                });
-
                 // 将表格和标题添加到垂直容器
-                verticalPanel.add(titleLabel);
-                verticalPanel.add(new JBScrollPane(explainTable));
-//            verticalPanel.add(Box.createVerticalStrut(20)); // 添加间距
+                verticalPanel.add(titleLabel,gbc);
+                gbc.gridy++;
+                verticalPanel.add(new JBScrollPane(explainTable),gbc);
             }
         } catch (Throwable ex) {
             JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
             titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
             //优化字体
-            verticalPanel.add(titleLabel);
+            verticalPanel.add(titleLabel,gbc);
 
             JLabel titleLabel1 = new JLabel(ex.getMessage(), SwingConstants.LEFT);
             titleLabel1.setForeground(Color.pink);
             //优化字体
-            verticalPanel.add(titleLabel1);
+            gbc.gridy++;
+            verticalPanel.add(titleLabel1,gbc);
         }
 
         // 2. SQL Review 建议展示
         List<Suggest> suggests = SqlReviewer.reviewMysql(datasourceConfig, sqlText);
         if (CollectionUtils.isNotEmpty(suggests)) {
             // 创建建议标题
-            JLabel suggestTitleLabel = new JLabel("Rule Review", SwingConstants.LEFT);
+            JLabel suggestTitleLabel = new JLabel("Suggests", SwingConstants.LEFT);
             suggestTitleLabel.setFont(new Font("Arial", Font.BOLD, 14));
             suggestTitleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
@@ -325,7 +311,7 @@ public class SqlDialog extends JDialog {
             String[] suggestColumns = {"Level", "Title", "Detail"};
 
             // 转换建议数据
-            DefaultTableModel suggestModel = new DefaultTableModel(suggestColumns, 0){
+            DefaultTableModel suggestModel = new DefaultTableModel(suggestColumns, 0) {
                 @Override
                 public boolean isCellEditable(int row, int column) {
                     return false; // 禁止所有单元格编辑
@@ -342,7 +328,7 @@ public class SqlDialog extends JDialog {
             }
 
             // 创建建议表格
-            JBTable suggestTable = new JBTable(suggestModel){
+            JBTable suggestTable = new JBTable(suggestModel) {
                 @Override
                 public String getToolTipText(MouseEvent e) {
                     // 获取鼠标悬停的单元格位置
@@ -367,16 +353,18 @@ public class SqlDialog extends JDialog {
             TableColumnModel columnModel = suggestTable.getColumnModel();
             columnModel.getColumn(0).setPreferredWidth(80); // 第一列固定宽度
             columnModel.getColumn(1).setPreferredWidth(160); // 第二列固定宽度
-            columnModel.getColumn(2).setPreferredWidth((panelResults.getWidth() - 245));
+            columnModel.getColumn(2).setPreferredWidth((panelResults.getWidth() - 250));
 
+            gbc.gridy++;
             // 将建议部分添加到垂直容器
-            verticalPanel.add(suggestTitleLabel);
-            verticalPanel.add(new JBScrollPane(suggestTable));
+            verticalPanel.add(suggestTitleLabel,gbc);
+            gbc.gridy++;
+            verticalPanel.add(new JBScrollPane(suggestTable),gbc);
         }
 
         // 将垂直容器包裹在滚动面板中（支持整体滚动）
         JBScrollPane mainScrollPane = new JBScrollPane(verticalPanel);
-        panelResults.add(mainScrollPane, BorderLayout.CENTER);
+        panelResults.add(mainScrollPane, BorderLayout.NORTH);
 
         panelResults.revalidate();
         panelResults.repaint();

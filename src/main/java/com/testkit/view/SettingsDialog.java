@@ -43,8 +43,11 @@ import java.util.stream.Collectors;
 
 public class SettingsDialog {
 
-    private static final Icon FIRE_TEST_ICON = IconLoader.getIcon("/icons/fire-test.svg", TestkitToolWindow.class);
-
+    private static final Icon FIRE_TEST_ICON = IconLoader.getIcon("/icons/fire-test.svg", SettingsDialog.class);
+    private static final Icon SHOW_ICON = IconLoader.getIcon("/icons/show.svg", SettingsDialog.class);
+    ;
+    private static final Icon HIDDEN_ICON = IconLoader.getIcon("/icons/hidden.svg", SettingsDialog.class);
+    ;
 
 
     private TestkitToolWindow toolWindow;
@@ -62,6 +65,7 @@ public class SettingsDialog {
     private JBTextField controllerEnvTextField;
 
     private LanguageTextField datasourcePropertiesField;
+    private JButton showDatasourceButton;
 
     private JBTextField tracePackagesField;
 
@@ -77,8 +81,8 @@ public class SettingsDialog {
     }
 
     public void visible() {
-        refreshSettings();
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            refreshSettings();
             dialog.setVisible(true);
         }
     }
@@ -135,7 +139,9 @@ public class SettingsDialog {
 
         SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
         datasourcePropertiesField.setText(sqlConfig.getProperties());
-        datasourcePropertiesField.setVisible(SettingsStorageHelper.datasourceTemplateProperties.equals(datasourcePropertiesField.getText()));
+        boolean def = SettingsStorageHelper.datasourceTemplateProperties.equals(sqlConfig.getProperties());
+        datasourcePropertiesField.setVisible(def);
+        showDatasourceButton.setIcon(def ? SHOW_ICON : HIDDEN_ICON);
     }
 
     private void init() {
@@ -822,7 +828,7 @@ public class SettingsDialog {
     private JPanel createSqlPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
+        gbc.insets = JBUI.emptyInsets(); // 添加内边距以美化布局
 
         JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool\n" +
                 "Configuration desc\n" +
@@ -833,19 +839,20 @@ public class SettingsDialog {
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 1;
         gbc.weightx = 1;
         gbc.weighty = 0.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.WEST;
+        gbc.anchor = GridBagConstraints.NORTH;
         panel.add(tipArea, gbc);
-
-        JButton showDatasourceButton = new JButton(AllIcons.Actions.Show);
+        showDatasourceButton = new JButton(HIDDEN_ICON);
         showDatasourceButton.setToolTipText("Show/hidden config");
         showDatasourceButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                datasourcePropertiesField.setVisible(!datasourcePropertiesField.isVisible());
+                boolean visible = datasourcePropertiesField.isVisible();
+                datasourcePropertiesField.setVisible(!visible);
+                showDatasourceButton.setIcon(!visible ? SHOW_ICON : HIDDEN_ICON);
             }
         });
 
@@ -867,11 +874,10 @@ public class SettingsDialog {
         gbc.gridy = 1;
         gbc.weightx = 0;
         gbc.weighty = 0.0;
-        gbc.insets = JBUI.emptyInsets();
-        gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(new JBScrollPane(button1Panel), gbc);
-
+//        gbc.insets = JBUI.emptyInsets();
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        panel.add(button1Panel, gbc);
 
 
 //        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
@@ -884,7 +890,7 @@ public class SettingsDialog {
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.NORTHWEST;
-        gbc.insets = JBUI.insets(5);
+//        gbc.insets = JBUI.insets(5);
         panel.add(new JBScrollPane(datasourcePropertiesField), gbc);
 
         // 创建按钮面板，使用FlowLayout以右对齐
@@ -996,7 +1002,7 @@ public class SettingsDialog {
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
         gbc.gridy = 4; // 新的一行
-        gbc.gridwidth = 3; // 占据三列
+        gbc.gridwidth = 1; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
         gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
