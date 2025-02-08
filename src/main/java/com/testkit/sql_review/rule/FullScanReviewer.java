@@ -69,7 +69,11 @@ public class FullScanReviewer implements Reviewer {
 
 
             // 解析 FROM 表
-            String tableName = plainSelect.getFromItem().toString();
+            FromItem fromItem1 = plainSelect.getFromItem();
+            if (fromItem1==null) {
+                return;
+            }
+            String tableName = fromItem1.toString();
             SqlTable table = ctx.getTables().get(tableName);
 
             // 如果表不存在于上下文中，跳过处理

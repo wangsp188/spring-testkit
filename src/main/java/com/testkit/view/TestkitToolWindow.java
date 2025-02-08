@@ -61,7 +61,7 @@ import java.util.stream.Collectors;
 public class TestkitToolWindow {
 
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
-    private static final Icon dagreIcon = IconLoader.getIcon("/icons/dagre.svg", TestkitToolWindow.class);
+    private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
 
 
     private Project project;

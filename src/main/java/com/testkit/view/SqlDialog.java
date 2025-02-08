@@ -366,6 +366,12 @@ public class SqlDialog extends JDialog {
         JBScrollPane mainScrollPane = new JBScrollPane(verticalPanel);
         panelResults.add(mainScrollPane, BorderLayout.NORTH);
 
+        //新增一条线，线的中间有字符  Good luck
+        // 新增一条线，线的中间有字符 Good luck
+//        panelResults.add(new JSeparator(SwingConstants.HORIZONTAL), BorderLayout.SOUTH);
+        JLabel goodLuckLabel = new JLabel("Good luck", SwingConstants.CENTER);
+        goodLuckLabel.setForeground(Color.decode("#72a96b")); // 设置字体颜色为红色
+        panelResults.add(goodLuckLabel, BorderLayout.SOUTH);
         panelResults.revalidate();
         panelResults.repaint();
     }
@@ -398,8 +404,6 @@ public class SqlDialog extends JDialog {
 
         JLabel curlLabel = new JLabel("Sql:");
         inputSqlField = new LanguageTextField(SqlLanguage.INSTANCE, toolWindow.getProject(), "", false);
-//        inputTextArea.getEmptyText().setText("input your sql");
-// 添加一个 JScrollPane 包装 inputSqlField
         JBScrollPane scrollPane = new JBScrollPane(inputSqlField);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);

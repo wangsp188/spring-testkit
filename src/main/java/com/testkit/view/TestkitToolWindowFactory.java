@@ -103,7 +103,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
 
     private void addHeaderActions(ToolWindow toolWindow, Project project, TestkitToolWindow testkitToolWindow) {
         // 添加第一个按钮
-        AnAction curlAction = new AnAction("Parse curl", "Parse curl", CURL_ICON) {
+        AnAction curlAction = new AnAction("Curl Parser", "Curl Parser", CURL_ICON) {
             @Override
             public void actionPerformed(AnActionEvent e) {
                 SwingUtilities.invokeLater(new Runnable() {

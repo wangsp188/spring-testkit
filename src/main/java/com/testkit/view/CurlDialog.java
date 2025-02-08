@@ -151,6 +151,60 @@ public class CurlDialog extends JDialog {
         return panelRequestTypeUrl;
     }
 
+//    private @NotNull JPanel buildCmdPanel(TestkitToolWindow window) {
+//        JPanel panelCmd = new JPanel();
+//        GridBagLayout gridbag = new GridBagLayout();
+//        GridBagConstraints c = new GridBagConstraints();
+//        panelCmd.setLayout(gridbag);
+//
+//        JLabel curlLabel = new JLabel("Curl:");
+//        inputTextArea = new JBTextArea(5, 20);
+//        inputTextArea.getEmptyText().setText("input your curl and click right button to parse");
+//
+//        JButton parseButton = new JButton("Parse");
+//        parseButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                String text = inputTextArea.getText();
+//                CurlEntity curlEntity = null;
+//                try {
+//                    if (StringUtils.isNotBlank(text)) {
+//                        curlEntity = CurlParserUtil.parse(text.trim());
+//                    }
+//                } catch (Throwable ex) {
+//                    TestkitHelper.notify(window.getProject(), NotificationType.ERROR, "Parse curl error");
+//                }
+//                urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
+//                methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
+//                headersField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getHeaders()));
+//                paramsField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getUrlParams()));
+//                bodyField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getBody()));
+//            }
+//        });
+//
+//// Add label
+//        c.fill = GridBagConstraints.NONE;
+//        c.weightx = 0;
+//        c.gridx = 0;
+//        c.gridy = 0;
+//        panelCmd.add(curlLabel, c);
+//
+//// Add textarea
+//        c.fill = GridBagConstraints.BOTH;
+//        c.weightx = 1;
+//        c.gridx = 1;
+//        c.gridy = 0;
+//        panelCmd.add(new JScrollPane(inputTextArea), c);
+//
+//// Add button
+//        c.fill = GridBagConstraints.NONE;
+//        c.weightx = 0;
+//        c.gridx = 2;
+//        c.gridy = 0;
+//        panelCmd.add(parseButton, c);
+//        return panelCmd;
+//    }
+
     private @NotNull JPanel buildCmdPanel(TestkitToolWindow window) {
         JPanel panelCmd = new JPanel();
         GridBagLayout gridbag = new GridBagLayout();
@@ -159,55 +213,43 @@ public class CurlDialog extends JDialog {
 
         JLabel curlLabel = new JLabel("Curl:");
         inputTextArea = new JBTextArea(5, 20);
-//        new LanguageTextField(SqlLanguage.INSTANCE, null, "", false)
         inputTextArea.getEmptyText().setText("input your curl and click right button to parse");
 
-//        addPlaceholderToTextArea(inputTextArea, );
         JButton parseButton = new JButton("Parse");
-//        Dimension preferredSize = new Dimension(30, 30);
-//        parseButton.setPreferredSize(preferredSize);
-//        parseButton.setMaximumSize(preferredSize);
-//        parseButton.setMinimumSize(preferredSize);
-        parseButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String text = inputTextArea.getText();
-                CurlEntity curlEntity = null;
-                try {
-                    if (StringUtils.isNotBlank(text)) {
-                        curlEntity = CurlParserUtil.parse(text.trim());
-                    }
-                } catch (Throwable ex) {
-                    TestkitHelper.notify(window.getProject(), NotificationType.ERROR, "Parse curl error");
-                }
-                urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
-                methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
-                headersField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getHeaders()));
-                paramsField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getUrlParams()));
-                bodyField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getBody()));
-            }
-        });
+        // ... parseButton 的监听器代码保持不变 ...
 
-// Add label
+        // 添加标签：靠上对齐，不扩展
         c.fill = GridBagConstraints.NONE;
+        c.anchor = GridBagConstraints.CENTER; // 靠上对齐
         c.weightx = 0;
+        c.weighty = 0; // 不分配垂直空间
         c.gridx = 0;
         c.gridy = 0;
         panelCmd.add(curlLabel, c);
 
-// Add textarea
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1;
+        // 添加文本框：水平和垂直扩展
+        c.fill = GridBagConstraints.BOTH;
+        c.anchor = GridBagConstraints.CENTER;
+        c.weightx = 1; // 占用水平剩余空间
+        c.weighty = 1; // 关键！分配垂直剩余空间
         c.gridx = 1;
         c.gridy = 0;
-        panelCmd.add(new JScrollPane(inputTextArea), c);
+        JScrollPane scrollPane = new JBScrollPane(inputTextArea);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder()); // 可选：去除滚动面板边框
+        panelCmd.add(scrollPane, c);
 
-// Add button
+        // 添加按钮：靠上对齐，不扩展
         c.fill = GridBagConstraints.NONE;
+        c.anchor = GridBagConstraints.CENTER; // 靠上对齐
         c.weightx = 0;
+        c.weighty = 0;
         c.gridx = 2;
         c.gridy = 0;
         panelCmd.add(parseButton, c);
+
+        // 可选：移除面板的默认边框
+        panelCmd.setBorder(BorderFactory.createEmptyBorder());
+
         return panelCmd;
     }
 

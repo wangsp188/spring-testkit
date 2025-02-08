@@ -54,7 +54,7 @@
     </extensions>
 
     <actions>
-        <action icon="/icons/dagre.svg" id="popup_graph_testkit_profiler" class="com.testkit.trace.TestkitTraceViewAction" text="Popup graph testkit profiler"
+        <action icon="/icons/trace.svg" id="popup_graph_trace_profiler" class="com.testkit.trace.TestkitTraceViewAction" text="Popup graph req trace"
                 description="Processes the selected TRACE_PROFILER and graph it">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
