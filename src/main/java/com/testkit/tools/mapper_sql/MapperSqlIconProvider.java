@@ -40,7 +40,7 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
                 new Function<PsiElement, String>() {
                     @Override
                     public String fun(PsiElement element) {
-                        return "Build sql";
+                        return "Build SQL";
                     }
                 },
                 new GutterIconNavigationHandler() {

@@ -1,6 +1,12 @@
 package com.testkit.tools.mapper_sql;
 
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.util.Computable;
+import com.testkit.TestkitHelper;
 import com.testkit.tools.ToolHelper;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.testkit.util.Container;
@@ -21,7 +27,11 @@ import com.intellij.sql.psi.SqlLanguage;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.intellij.util.ui.JBUI;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.groovy.runtime.InvokerHelper;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
@@ -29,6 +39,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.util.HashMap;
 import java.util.function.Supplier;
 
 public class MapperSqlTool extends BasePluginTool {
@@ -60,7 +71,7 @@ public class MapperSqlTool extends BasePluginTool {
                 "<ul>\n" +
                 "    <li>mapper的xml文件内 sql标签</li>\n" +
                 "    <li>select/insert/update/delete</li>\n" +
-                "</ul>",topPanel, new ActionListener() {
+                "</ul>", topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -75,8 +86,8 @@ public class MapperSqlTool extends BasePluginTool {
         gbc.gridx = 3;
         gbc.gridy = 0;
         // Add the radio button
-        replaceParamsButton = new JToggleButton(REPLACE_DISABLE_ICON,false);
-        replaceParamsButton.setPreferredSize(new Dimension(32,32));
+        replaceParamsButton = new JToggleButton(REPLACE_DISABLE_ICON, false);
+        replaceParamsButton.setPreferredSize(new Dimension(32, 32));
         replaceParamsButton.setToolTipText("Build preparedSql");
         replaceParamsButton.addItemListener(new ItemListener() {
             @Override
@@ -91,10 +102,10 @@ public class MapperSqlTool extends BasePluginTool {
                 }
             }
         });
-        topPanel.add(replaceParamsButton,gbc);
+        topPanel.add(replaceParamsButton, gbc);
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);
-        runButton.setToolTipText("Build sql");
+        runButton.setToolTipText("Build SQL");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
         runButton.setPreferredSize(buttonSize);
@@ -102,7 +113,7 @@ public class MapperSqlTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                triggerLocalTask(runButton, AllIcons.Actions.Execute, new Supplier<String>() {
+                triggerLocalTask(runButton, AllIcons.Actions.Execute, "Build SQL", new Supplier<String>() {
                     @Override
                     public String get() {
                         String jsonInput = inputEditorTextField.getDocument().getText();
@@ -114,15 +125,27 @@ public class MapperSqlTool extends BasePluginTool {
                             jsonObject = JSONObject.parseObject(jsonInput);
                         } catch (Exception ex) {
                             ex.printStackTrace();
-                            return "input parameter must be json object";
+                            return "input parameter must be json object, " + ex.getMessage();
                         }
                         ToolHelper.XmlTagAction selectedItem = (ToolHelper.XmlTagAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
                             return "please select tag";
                         }
                         selectedItem.setArgs(jsonInput);
-                        String xmlContent = selectedItem.getXmlTag().getParent().getContainingFile().getText();
-                        String statementId = selectedItem.getXmlTag().getAttributeValue("id");
+                        String xmlContent = ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+                            @Override
+                            public String compute() {
+                                return selectedItem.getXmlTag().getParent().getContainingFile().getText();
+                            }
+
+                        });
+                        String statementId = ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+                            @Override
+                            public String compute() {
+                                return selectedItem.getXmlTag().getAttributeValue("id");
+                            }
+
+                        });
                         System.err.println("xml: " + xmlContent + ", statementId: " + statementId + ", params:" + jsonObject.toJSONString());
                         try {
                             String sql = MapperGenerator.generateSql(xmlContent, statementId, !replaceParamsButton.isSelected(), jsonObject);
@@ -149,7 +172,7 @@ public class MapperSqlTool extends BasePluginTool {
         });
 
         gbc.gridx = 4;
-        topPanel.add(runButton,gbc);
+        topPanel.add(runButton, gbc);
 
         return topPanel;
     }
@@ -233,7 +256,7 @@ public class MapperSqlTool extends BasePluginTool {
 
     @Override
     protected boolean hasActionBox() {
-        return actionComboBox!=null;
+        return actionComboBox != null;
     }
 
     @Override

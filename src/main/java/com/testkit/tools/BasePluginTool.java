@@ -2,7 +2,13 @@ package com.testkit.tools;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.intellij.openapi.editor.Document;
+import com.intellij.psi.*;
+import com.intellij.psi.codeStyle.CodeStyleManager;
+import com.intellij.sql.psi.SqlLanguage;
 import com.testkit.TestkitHelper;
+import com.testkit.tools.mapper_sql.MapperGenerator;
+import com.testkit.util.Container;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -25,8 +31,6 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.Computable;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiMethod;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
@@ -36,6 +40,7 @@ import com.testkit.util.HttpUtil;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -86,7 +91,6 @@ public abstract class BasePluginTool {
     }
 
 
-
     protected void initializePanel() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(1);
@@ -114,7 +118,7 @@ public abstract class BasePluginTool {
             AnAction refreshAction = new AnAction("Refresh parameters structure", "Refresh parameters structure", AllIcons.Actions.Refresh) {
                 @Override
                 public void actionPerformed(AnActionEvent e) {
-                    WriteCommandAction.runWriteCommandAction(toolWindow.getProject(),new Runnable() {
+                    WriteCommandAction.runWriteCommandAction(toolWindow.getProject(), new Runnable() {
                         @Override
                         public void run() {
                             refreshInputByActionBox();
@@ -347,7 +351,7 @@ public abstract class BasePluginTool {
             setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
             return;
         }
-        if (response==null || !response.getBooleanValue("success") || response.getString("data") == null) {
+        if (response == null || !response.getBooleanValue("success") || response.getString("data") == null) {
             setOutputText("submit req error \n" + response.getString("message"), null);
             return;
         }
@@ -413,7 +417,7 @@ public abstract class BasePluginTool {
         });
     }
 
-    protected void triggerLocalTask(JButton triggerBtn, Icon executeIcon, Supplier<String> submit) {
+    protected void triggerLocalTask(JButton triggerBtn, Icon executeIcon, String msg, Supplier<String> submit) {
         if (AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())) {
 //            triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
 //            if (lastLocalFuture == null) {
@@ -429,37 +433,25 @@ public abstract class BasePluginTool {
 //            }
             return;
         }
-//        使用线程池提交任务
-        SwingWorker worker = new SwingWorker<String, Void>() {
+
+
+        ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), msg + ", please wait ...", false) {
 
             @Override
-            protected String doInBackground() throws Exception {
-                return WriteCommandAction.runWriteCommandAction(getProject(), new Computable<String>() {
-                    @Override
-                    public String compute() {
-                        return submit.get();
-                    }
-                });
-            }
-
-            @Override
-            protected void done() {
+            public void run(@NotNull ProgressIndicator indicator) {
+                // 立即更新UI
+                setOutputText(msg + " ...");
+                triggerBtn.setIcon(AllIcons.Hierarchy.MethodNotDefined);
                 try {
-                    String val = get();
-                    SwingUtilities.invokeLater(() -> setOutputText(val));
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                    SwingUtilities.invokeLater(() -> setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(e)));
+                    String ret = submit.get();
+                    setOutputText(ret);
+                } catch (Throwable ex) {
+                    setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
                 } finally {
                     triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
                 }
             }
-        };
-
-        // 立即更新UI
-        setOutputText("Build sql ...");
-        triggerBtn.setIcon(AllIcons.Hierarchy.MethodNotDefined);
-        worker.execute();
+        });
     }
 
 
@@ -496,14 +488,14 @@ public abstract class BasePluginTool {
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>Tool interceptor已关闭</strong><br>\n" + tooltips + "\n</html>");
-                        TestkitHelper.notify(getProject(),NotificationType.INFORMATION,"Tool interceptor is disable in "+getTool().getCode());
+                        TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is disable in " + getTool().getCode());
                     } else {
                         useScript = true;
                         testBtn.setIcon(icon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>Tool interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
-                        TestkitHelper.notify(getProject(),NotificationType.INFORMATION,"Tool interceptor is enable in "+getTool().getCode());
+                        TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is enable in " + getTool().getCode());
                     }
                 }
             });
@@ -515,7 +507,7 @@ public abstract class BasePluginTool {
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    TestkitHelper.notify(getProject(),NotificationType.INFORMATION,getTool().getCode()+" don't support Tool-script");
+                    TestkitHelper.notify(getProject(), NotificationType.INFORMATION, getTool().getCode() + " don't support Tool-script");
                 }
             });
         }
@@ -531,17 +523,17 @@ public abstract class BasePluginTool {
             @Override
             public void actionPerformed(ActionEvent e) {
                 Object selectedItem = actionComboBox.getSelectedItem();
-                if(selectedItem instanceof ToolHelper.MethodAction){
+                if (selectedItem instanceof ToolHelper.MethodAction) {
                     PsiMethod method = ((ToolHelper.MethodAction) selectedItem).getMethod();
                     if (!method.isValid()) {
-                        TestkitHelper.notify(getProject(),NotificationType.ERROR,"Current method is invalid");
+                        TestkitHelper.notify(getProject(), NotificationType.ERROR, "Current method is invalid");
                         return;
                     }
                     method.navigate(true);
-                }else if(selectedItem instanceof ToolHelper.XmlTagAction xmlTagAction){
+                } else if (selectedItem instanceof ToolHelper.XmlTagAction xmlTagAction) {
                     XmlTag xmlTag = xmlTagAction.getXmlTag();
                     if (!xmlTag.isValid()) {
-                        TestkitHelper.notify(getProject(),NotificationType.ERROR,"Current tag is invalid");
+                        TestkitHelper.notify(getProject(), NotificationType.ERROR, "Current tag is invalid");
                         return;
                     }
                     PsiNavigationSupport.getInstance().createNavigatable(
