@@ -66,8 +66,6 @@ import java.util.stream.Collectors;
 public class ReqStoreDialog {
 
     public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", ReqStoreDialog.class);
-    public static final Icon EXPORT_ICON = IconLoader.getIcon("/icons/export.svg", ReqStoreDialog.class);
-    public static final Icon IMPORT_ICON = IconLoader.getIcon("/icons/import.svg", ReqStoreDialog.class);
 
 
     private JDialog dialog;
@@ -284,7 +282,7 @@ public class ReqStoreDialog {
         if (appBox.getItemCount() > 0) {
             String selectedItem = (String) appBox.getSelectedItem();
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
-            String selectedApp = visibleApp==null?null:visibleApp.getAppName();
+            String selectedApp = visibleApp == null ? null : visibleApp.getAppName();
             List<String> projectAppList = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().map(new Function<RuntimeHelper.AppMeta, String>() {
                 @Override
                 public String apply(RuntimeHelper.AppMeta appMeta) {
@@ -362,9 +360,9 @@ public class ReqStoreDialog {
         });
         panel.add(refreshButton);
 
-        JButton importButton = new JButton(IMPORT_ICON);
+        JButton importButton = new JButton(SettingsDialog.IMPORT_ICON);
         importButton.setPreferredSize(new Dimension(32, 32));
-        importButton.setToolTipText("Import/Update item to the selected app");
+        importButton.setToolTipText("Import/Overwrite item to the selected app");
         importButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -402,7 +400,7 @@ public class ReqStoreDialog {
                     try {
                         groupItems = JSON.parseObject(jsonInput.getText().trim(), ReqStorageHelper.GroupItems.class);
                     } catch (Exception ex) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import item must be group items");
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import item must be group items, " + ex.getMessage());
                         return;
                     }
                     try {
@@ -427,7 +425,7 @@ public class ReqStoreDialog {
         });
         panel.add(importButton);
 
-        JButton exportButton = new JButton(EXPORT_ICON);
+        JButton exportButton = new JButton(SettingsDialog.EXPORT_ICON);
         exportButton.setPreferredSize(new Dimension(32, 32));
         exportButton.setToolTipText("Export the selected group or item");
         exportButton.addActionListener(new ActionListener() {
@@ -1308,7 +1306,7 @@ public class ReqStoreDialog {
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
         req.put("trace", traceConfig.isEnable());
         req.put("singleClsDepth", traceConfig.getSingleClsDepth());
-        if (meta.isUseScript()) {
+        if (meta.isUseInterceptor()) {
             req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
@@ -1327,7 +1325,7 @@ public class ReqStoreDialog {
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
         req.put("trace", traceConfig.isEnable());
         req.put("singleClsDepth", traceConfig.getSingleClsDepth());
-        if (meta.isUseScript()) {
+        if (meta.isUseInterceptor()) {
             req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;

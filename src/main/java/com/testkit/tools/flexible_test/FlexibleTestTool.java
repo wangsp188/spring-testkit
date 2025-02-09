@@ -98,7 +98,7 @@ public class FlexibleTestTool extends BasePluginTool {
         methodMeta.setMethodName(method.getName());
         methodMeta.setArgNames(argNames);
         methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
-        methodMeta.setUseScript(useScript);
+        methodMeta.setUseInterceptor(useInterceptor);
         ReqStorageHelper.saveAppReq(getProject(), app, StringUtils.isBlank(group) ? "undefined" : group, ReqStorageHelper.ItemType.flexible_test, ToolHelper.buildMethodKey(method), methodMeta, savedReq.getTitle(), savedReq);
     }
 
@@ -189,7 +189,7 @@ public class FlexibleTestTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);
-        if(useScript){
+        if(useInterceptor){
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }

@@ -221,7 +221,7 @@ public class FunctionCallTool extends BasePluginTool {
         methodMeta.setMethodName(method.getName());
         methodMeta.setArgNames(argNames);
         methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
-        methodMeta.setUseScript(useScript);
+        methodMeta.setUseInterceptor(useInterceptor);
         ReqStorageHelper.SubItemType subItemType = null;
         if (Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.controller;
@@ -588,7 +588,7 @@ public class FunctionCallTool extends BasePluginTool {
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
         req.put("trace", traceConfig.isEnable());
         req.put("singleClsDepth", traceConfig.getSingleClsDepth());
-        if (useScript) {
+        if (useInterceptor) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }

@@ -388,6 +388,7 @@ public class SqlDialog extends JDialog {
         JTextArea jsonInput = new JTextArea();
         jsonInput.setText(msg);
         jsonInput.setLineWrap(true);
+        jsonInput.setEditable(false);
         jsonInput.setWrapStyleWord(true);
         JBScrollPane scrollPane = new JBScrollPane(jsonInput);
         panelResults.add(scrollPane, BorderLayout.CENTER);

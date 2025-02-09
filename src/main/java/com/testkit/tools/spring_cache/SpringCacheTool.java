@@ -182,7 +182,7 @@ public class SpringCacheTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", PluginToolEnum.SPRING_CACHE.getCode());
         req.put("params", params);
-        if(useScript){
+        if(useInterceptor){
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
         }

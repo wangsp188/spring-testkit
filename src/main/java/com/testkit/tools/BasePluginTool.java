@@ -2,13 +2,8 @@ package com.testkit.tools;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
-import com.intellij.openapi.editor.Document;
 import com.intellij.psi.*;
-import com.intellij.psi.codeStyle.CodeStyleManager;
-import com.intellij.sql.psi.SqlLanguage;
 import com.testkit.TestkitHelper;
-import com.testkit.tools.mapper_sql.MapperGenerator;
-import com.testkit.util.Container;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -30,7 +25,6 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
-import com.intellij.openapi.util.Computable;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.LanguageTextField;
@@ -40,7 +34,6 @@ import com.testkit.util.HttpUtil;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -49,7 +42,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
@@ -65,7 +57,7 @@ public abstract class BasePluginTool {
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
     protected EditorTextField inputEditorTextField;
-    protected boolean useScript;
+    protected boolean useInterceptor;
     protected DefaultActionGroup actionGroup;
 
     public BasePluginTool(TestkitToolWindow testkitToolWindow) {
@@ -475,7 +467,7 @@ public abstract class BasePluginTool {
         gbc.gridy = 0;
         JButton testBtn = new JButton(icon);
         if (icon != disableIcon) {
-            useScript = true;
+            useInterceptor = true;
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
                     "<strong>Interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
@@ -483,14 +475,14 @@ public abstract class BasePluginTool {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     if (testBtn.getIcon() == icon) {
-                        useScript = false;
+                        useInterceptor = false;
                         testBtn.setIcon(disableIcon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>Tool interceptor已关闭</strong><br>\n" + tooltips + "\n</html>");
                         TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is disable in " + getTool().getCode());
                     } else {
-                        useScript = true;
+                        useInterceptor = true;
                         testBtn.setIcon(icon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
@@ -500,7 +492,7 @@ public abstract class BasePluginTool {
                 }
             });
         } else {
-            useScript = false;
+            useInterceptor = false;
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
                     "<strong>不支持Tool interceptor</strong><br>\n" + tooltips + "\n</html>");

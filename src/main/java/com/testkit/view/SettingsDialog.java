@@ -20,6 +20,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.*;
+import com.testkit.util.JsonUtil;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -45,10 +46,9 @@ public class SettingsDialog {
 
     private static final Icon FIRE_TEST_ICON = IconLoader.getIcon("/icons/fire-test.svg", SettingsDialog.class);
     private static final Icon SHOW_ICON = IconLoader.getIcon("/icons/show.svg", SettingsDialog.class);
-    ;
     private static final Icon HIDDEN_ICON = IconLoader.getIcon("/icons/hidden.svg", SettingsDialog.class);
-    ;
-
+    public static final Icon EXPORT_ICON = IconLoader.getIcon("/icons/export.svg", SettingsDialog.class);
+    public static final Icon IMPORT_ICON = IconLoader.getIcon("/icons/import.svg", SettingsDialog.class);
 
     private TestkitToolWindow toolWindow;
 
@@ -194,9 +194,130 @@ public class SettingsDialog {
 
     private JPanel createBasicOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
         Dimension labelDimension = new Dimension(100, 20);
+
+        JButton importButton = new JButton(IMPORT_ICON);
+        importButton.setToolTipText("Import/Overwrite " + TestkitHelper.getPluginName() + " Settings");
+        importButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // 创建弹出对话框
+                JDialog dialog = new JDialog();
+                dialog.setTitle("Import/Overwrite " + TestkitHelper.getPluginName() + " Settings for project " + toolWindow.getProject().getName());
+                dialog.setModal(true);
+                dialog.setSize(500, 400);
+                dialog.setLocationRelativeTo(null);
+
+                // 创建说明文本标签
+                JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here<br>Usually json content exported from other device or project</html>");
+// 启用自动换行
+                instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 创建JSON输入框
+                JTextArea jsonInput = new JTextArea();
+                jsonInput.setLineWrap(true);
+                jsonInput.setWrapStyleWord(true);
+                JScrollPane scrollPane = new JScrollPane(jsonInput);
+
+                // 创建导入按钮
+                JButton importConfirmButton = new JButton("Import");
+                importConfirmButton.addActionListener(e1 -> {
+                    SettingsStorageHelper.ProjectConfig importData = null;
+                    try {
+                        importData = JSON.parseObject(jsonInput.getText().trim(), SettingsStorageHelper.ProjectConfig.class);
+                    } catch (Exception ex) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import must be json, " + ex.getMessage());
+                        return;
+                    }
+                    try {
+                        SettingsStorageHelper.saveProjectConfig(toolWindow.getProject(), importData);
+                        refreshSettings();
+                        dialog.dispose();
+                    } catch (Exception ex) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import error," + ex.getMessage());
+                    }
+                });
+
+                // 布局
+                dialog.setLayout(new BorderLayout());
+                dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 将组件添加到面板
+                dialog.add(instructionLabel, BorderLayout.NORTH);
+                dialog.add(scrollPane, BorderLayout.CENTER);
+                dialog.add(importConfirmButton, BorderLayout.SOUTH);
+                dialog.setVisible(true);
+            }
+        });
+
+        JButton exportButton = new JButton(EXPORT_ICON);
+        exportButton.setToolTipText("Export " + TestkitHelper.getPluginName() + " Settings");
+        exportButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+// 创建弹出对话框
+                JDialog dialog = new JDialog();
+                dialog.setTitle("Export " + TestkitHelper.getPluginName() + " Settings for project " + toolWindow.getProject().getName());
+                dialog.setModal(true);
+                dialog.setSize(500, 400);
+                dialog.setLocationRelativeTo(null);
+
+                SettingsStorageHelper.ProjectConfig exportData = SettingsStorageHelper.loadProjectConfig(toolWindow.getProject());
+                // 创建说明文本标签
+                JLabel instructionLabel = new JLabel("<html>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
+// 启用自动换行
+                instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 创建JSON输入框
+                JTextArea jsonInput = new JTextArea();
+                jsonInput.setEditable(false);
+                jsonInput.setLineWrap(true);
+                jsonInput.setWrapStyleWord(true);
+                JScrollPane scrollPane = new JScrollPane(jsonInput);
+                jsonInput.setText(exportData == null ? "{}" : JsonUtil.formatObj(exportData));
+                // 创建导入按钮
+                JButton copyConfirmButton = new JButton("Copy");
+                copyConfirmButton.addActionListener(e1 -> {
+                    TestkitHelper.copyToClipboard(toolWindow.getProject(), jsonInput.getText(), null);
+                    dialog.dispose();
+                });
+
+                // 布局
+                dialog.setLayout(new BorderLayout());
+                dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                // 将组件添加到面板
+                dialog.add(instructionLabel, BorderLayout.NORTH);
+                dialog.add(scrollPane, BorderLayout.CENTER);
+                dialog.add(copyConfirmButton, BorderLayout.SOUTH);
+                dialog.setVisible(true);
+            }
+        });
+
+        // 创建按钮面板
+        JPanel button1Panel = new JPanel(new BorderLayout()); // 左对齐，按钮间距5
+        JBLabel comp = new JBLabel("Import/Export Settings");
+//        comp.setPreferredSize(labelDimension);
+        button1Panel.add(comp, BorderLayout.WEST);
+
+        // 创建右侧按钮容器（水平排列，固定间距）
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.X_AXIS));
+        rightPanel.add(importButton);
+        rightPanel.add(Box.createHorizontalStrut(5)); // 5像素间距
+        rightPanel.add(exportButton);
+
+        button1Panel.add(rightPanel, BorderLayout.EAST);
+
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0;
+        gbc.weighty = 0.0;
+        gbc.gridwidth = 3;
+//        gbc.insets = JBUI.emptyInsets();
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(button1Panel, gbc);
+
 
         // Method Call Label
         JLabel springLabel = new JLabel("Spring enhancement");
@@ -240,9 +361,10 @@ public class SettingsDialog {
         labelButtonPanel.add(springLabel, BorderLayout.WEST);
         labelButtonPanel.add(springButton, BorderLayout.EAST);
 
+        gbc.gridwidth = 1;
         // 添加到主面板中
         gbc.gridx = 0; // 第一列
-        gbc.gridy = 0; // 第二行
+        gbc.gridy = 1; // 第二行
         gbc.weightx = 0; // 不占用多余水平空间
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
@@ -251,7 +373,7 @@ public class SettingsDialog {
         // 第二列
         gbc.gridx = 1; // 第二列
         gbc.weightx = 1; // 占据剩余水平空间
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
         panel.add(springDetailLabel, gbc);
 
@@ -267,13 +389,13 @@ public class SettingsDialog {
 
         // 布局输入框和标签
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         springOptionsPanel.add(packageNameLabel, gbc);
 
-        gbc.gridx = 1;
+        gbc.gridx = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0; // 让输入框占据剩余空间
         springOptionsPanel.add(flexibleTestPackageNameField, gbc);
@@ -288,7 +410,7 @@ public class SettingsDialog {
             }
         });
         gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
@@ -296,7 +418,7 @@ public class SettingsDialog {
         springOptionsPanel.add(newButton, gbc);
 
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         gbc.gridwidth = 3;
         gbc.weightx = 1.0;
         gbc.weighty = 0;
@@ -307,7 +429,7 @@ public class SettingsDialog {
 
         // 新增一行值得占用
         gbc.gridx = 0;
-        gbc.gridy = 2; // 新的一行
+        gbc.gridy = 3; // 新的一行
         gbc.weighty = 1.0; // 占用剩余空间
         gbc.gridwidth = 3;
         gbc.fill = GridBagConstraints.BOTH; // 使下一行占用空间
@@ -359,7 +481,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 3; // 新的一行
+        gbc.gridy = 4; // 新的一行
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重
         gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间

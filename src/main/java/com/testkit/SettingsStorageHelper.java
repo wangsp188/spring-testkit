@@ -509,7 +509,7 @@ public class SettingsStorageHelper {
     }
 
 
-    private static ProjectConfig loadProjectConfig(Project project) {
+    public static ProjectConfig loadProjectConfig(Project project) {
         File configFile = getConfigFile(project);
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
@@ -523,7 +523,7 @@ public class SettingsStorageHelper {
         return null;
     }
 
-    private synchronized static void saveProjectConfig(Project project, ProjectConfig projectConfig) {
+    public synchronized static void saveProjectConfig(Project project, ProjectConfig projectConfig) {
         File configFile = getConfigFile(project);
         try (FileWriter writer = new FileWriter(configFile)) {
             JSON.writeJSONString(writer, projectConfig);

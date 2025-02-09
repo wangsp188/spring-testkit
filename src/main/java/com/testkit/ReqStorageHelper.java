@@ -289,7 +289,7 @@ public class ReqStorageHelper {
     }
 
 
-    private static Map<String, List<GroupItems>> loadWebReqs(Project project) {
+    public static Map<String, List<GroupItems>> loadWebReqs(Project project) {
         File configFile = getStoreFile(project);
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
@@ -464,7 +464,7 @@ public class ReqStorageHelper {
         private String typeClass;
         private String beanName;
         private String methodName;
-        private boolean useScript;
+        private boolean useInterceptor;
         private String argTypes;
         private List<String> argNames;
 
@@ -504,12 +504,12 @@ public class ReqStorageHelper {
             this.argTypes = argTypes;
         }
 
-        public boolean isUseScript() {
-            return useScript;
+        public boolean isUseInterceptor() {
+            return useInterceptor;
         }
 
-        public void setUseScript(boolean useScript) {
-            this.useScript = useScript;
+        public void setUseInterceptor(boolean useInterceptor) {
+            this.useInterceptor = useInterceptor;
         }
 
 
@@ -590,7 +590,7 @@ public class ReqStorageHelper {
 
     public static class FlexibleTestMeta {
 
-        private boolean useScript;
+        private boolean useInterceptor;
         private String code;
         private String methodName;
         private String argTypes;
@@ -605,12 +605,12 @@ public class ReqStorageHelper {
             this.code = code;
         }
 
-        public boolean isUseScript() {
-            return useScript;
+        public boolean isUseInterceptor() {
+            return useInterceptor;
         }
 
-        public void setUseScript(boolean useScript) {
-            this.useScript = useScript;
+        public void setUseInterceptor(boolean useInterceptor) {
+            this.useInterceptor = useInterceptor;
         }
 
         public String getMethodName() {
