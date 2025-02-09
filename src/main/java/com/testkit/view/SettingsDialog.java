@@ -228,6 +228,7 @@ public class SettingsDialog {
                         TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import must be json, " + ex.getMessage());
                         return;
                     }
+
                     try {
                         SettingsStorageHelper.saveProjectConfig(toolWindow.getProject(), importData);
                         refreshSettings();
