@@ -120,7 +120,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             }
 
             if(show){
-                TestkitHelper.notify(project,NotificationType.INFORMATION,"Buddha bless, Never Bug");
+                TestkitHelper.notify(project,NotificationType.INFORMATION,"佛祖保佑 永无BUG");
             }
         } catch (Exception e) {
             e.printStackTrace();

@@ -84,7 +84,6 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     private ArrayList<LineMarkerInfo<?>> createLineMarkers(PsiMethod psiMethod) {
         ArrayList<LineMarkerInfo<?>> lineMarkers = new ArrayList<>();
 
-
         String directInvoke = isDirectInvoke(psiMethod);
         if (directInvoke == null) {
             // 添加第一个图标
@@ -166,6 +165,9 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     }
 
     private String isDirectInvoke(PsiMethod psiMethod) {
+        if (FunctionCallIconProvider.isRequestMethod(psiMethod)) {
+            return null;
+        }
         // 新增：检查所有参数都可以直接序列化
         for (PsiParameter parameter : psiMethod.getParameterList().getParameters()) {
             PsiType parameterType = parameter.getType();
@@ -623,15 +625,15 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         }
 
         // Check if the class has @RestController or @Controller annotation
-        PsiClass containingClass = method.getContainingClass();
-        if (containingClass != null) {
-            PsiAnnotation restControllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RestController");
-            PsiAnnotation controllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.stereotype.Controller");
-
-            if (restControllerAnnotation != null || controllerAnnotation != null) {
-                return true;
-            }
-        }
+//        PsiClass containingClass = method.getContainingClass();
+//        if (containingClass != null) {
+//            PsiAnnotation restControllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RestController");
+//            PsiAnnotation controllerAnnotation = containingClass.getModifierList().findAnnotation("org.springframework.stereotype.Controller");
+//
+//            if (restControllerAnnotation != null || controllerAnnotation != null) {
+//                return true;
+//            }
+//        }
 
         return false;
     }
