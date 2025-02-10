@@ -232,6 +232,7 @@ public class SettingsDialog {
                     try {
                         SettingsStorageHelper.saveProjectConfig(toolWindow.getProject(), importData);
                         refreshSettings();
+                        TestkitHelper.refresh(toolWindow.getProject());
                         dialog.dispose();
                     } catch (Exception ex) {
                         TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import error," + ex.getMessage());

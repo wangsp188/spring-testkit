@@ -106,7 +106,7 @@ public class SettingsStorageHelper {
                 "\n" +
                 "\n" +
                 "/**\n" +
-                " * groovy脚本，在idea-plugin环境执行\n" +
+                " * groovy脚本，在idea-plugin容器执行\n" +
                 " * controller command构建函数，返回结果会被copy到剪切板，建议采用curl格式\n" +
                 " * <p>\n" +
                 " * 不可使用项目中类，不可使用项目中类，不可使用项目中类\n" +
@@ -118,7 +118,7 @@ public class SettingsStorageHelper {
                 " * Object build = InvokerHelper.invokeMethod(script, \"generate\", new Object[]{env,  selectedAppPort, httpMethod, path, params, jsonBody});\n" +
                 " * return build == null ? \"\" : String.valueOf(build);\n" +
                 " * <p>\n" +
-                " * 工具函数\n" +
+                " * 提供以下工具函数\n" +
                 " * buildCurl：构建curl函数\n" +
                 " * http：发起http请求函数\n" +
                 " *\n" +
@@ -235,7 +235,7 @@ public class SettingsStorageHelper {
                 "\n" +
                 "def buildCurl(domain, httpMethod, path, params, headers, jsonBody) {\n" +
                 "    StringBuilder ret = new StringBuilder()\n" +
-                "    ret.append(\"curl -X ${httpMethod.toUpperCase()} '${domain}${path}\")\n" +
+                "    ret.append(\"curl -i -X ${httpMethod.toUpperCase()} '${domain}${path}\")\n" +
                 "\n" +
                 "    if (params != null && params.size() > 0) {\n" +
                 "        ret.append(\"?\");\n" +
