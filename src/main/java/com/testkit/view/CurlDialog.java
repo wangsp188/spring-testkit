@@ -217,7 +217,25 @@ public class CurlDialog extends JDialog {
 
         JButton parseButton = new JButton("Parse");
         // ... parseButton 的监听器代码保持不变 ...
-
+        parseButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String text = inputTextArea.getText();
+                CurlEntity curlEntity = null;
+                try {
+                    if (StringUtils.isNotBlank(text)) {
+                        curlEntity = CurlParserUtil.parse(text.trim());
+                    }
+                } catch (Throwable ex) {
+                    TestkitHelper.notify(window.getProject(), NotificationType.ERROR, "Parse curl error");
+                }
+                urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
+                methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
+                headersField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getHeaders()));
+                paramsField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getUrlParams()));
+                bodyField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getBody()));
+            }
+        });
         // 添加标签：靠上对齐，不扩展
         c.fill = GridBagConstraints.NONE;
         c.anchor = GridBagConstraints.CENTER; // 靠上对齐

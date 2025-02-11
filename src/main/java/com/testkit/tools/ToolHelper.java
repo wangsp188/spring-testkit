@@ -2,6 +2,9 @@ package com.testkit.tools;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.testkit.util.JsonUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
@@ -138,24 +141,39 @@ public class ToolHelper {
             editorTextField.setText(method.getArgs());
             return;
         }
-        ApplicationManager.getApplication().invokeLater(new Runnable() {
+        ProgressManager.getInstance().run(new Task.Backgroundable(method.method.getProject(), "init params" + ", please wait ...", false) {
             @Override
-            public void run() {
-                String oldText = editorTextField.getText();
-                editorTextField.setText("init params ...");
-                // 在这里执行耗时操作
-                JSONObject initParams = doInitParams(method.getMethod());
+            public void run(ProgressIndicator indicator) {
+                ApplicationManager.getApplication().invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        String oldText = editorTextField.getText();
+                        editorTextField.setText("init params ...");
+                        // 在这里执行耗时操作
+                        JSONObject initParams = doInitParams(method.getMethod());
 
-                try {
-                    JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
-                    migration(jsonObject, initParams);
-                } catch (Throwable e) {
-                }
-                String jsonString = JsonUtil.formatObj(initParams);
-                editorTextField.setText(jsonString);
-                method.setArgs(jsonString);
+                        try {
+                            JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
+                            migration(jsonObject, initParams);
+                        } catch (Throwable e) {
+                        }
+                        String jsonString = JsonUtil.formatObj(initParams);
+                        editorTextField.setText(jsonString);
+                        method.setArgs(jsonString);
+                    }
+                });
+
+//                ApplicationManager.getApplication().runWriteAction(new Runnable() {
+//                    @Override
+//                    public void run() {
+//
+//                    }
+//                });
+
             }
         });
+
+
     }
 
     private static JSONObject doInitParams(PsiMethod method) {
