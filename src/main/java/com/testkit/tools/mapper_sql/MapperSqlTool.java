@@ -238,7 +238,6 @@ public class MapperSqlTool extends BasePluginTool {
             protected void done() {
                 try {
                     JSONObject initParams = get();
-
                     try {
                         JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
                         ToolHelper.migration(jsonObject, initParams);

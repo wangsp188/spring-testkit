@@ -297,6 +297,11 @@ public abstract class BasePluginTool {
 
 
     protected void triggerHttpTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
+        if(AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())){
+            return;
+        }
+
+
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
             if (lastReqId == null) {
                 triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);

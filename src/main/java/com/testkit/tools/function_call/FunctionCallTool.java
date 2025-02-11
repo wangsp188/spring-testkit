@@ -3,6 +3,7 @@ package com.testkit.tools.function_call;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.intellij.psi.util.PsiUtil;
 import com.testkit.TestkitHelper;
 import com.testkit.ReqStorageHelper;
 import com.testkit.RuntimeHelper;
@@ -62,6 +63,7 @@ public class FunctionCallTool extends BasePluginTool {
 
 
     private JButton controllerCommandButton;
+    private JButton runButton;
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
 
     private JToggleButton useProxyButton;
@@ -513,7 +515,7 @@ public class FunctionCallTool extends BasePluginTool {
         });
         panel.add(useProxyButton, gbc);
 
-        JButton runButton = new JButton(AllIcons.Actions.Execute);
+        runButton = new JButton(AllIcons.Actions.Execute);
         runButton.setToolTipText("Execute this");
         //        // 设置按钮大小
         Dimension buttonSize = new Dimension(32, 32);
@@ -638,6 +640,16 @@ public class FunctionCallTool extends BasePluginTool {
 
         PsiMethod method = methodAction.getMethod();
         boolean requestMethod = FunctionCallIconProvider.isRequestMethod(method);
+        if(requestMethod && !FunctionCallIconProvider.canInitparams(method)){
+            //如果存在接口或者超类无法明确类那就设置按钮
+            // 新增：检查所有参数都可以直接序列化
+            runButton.setIcon(AllIcons.Hierarchy.MethodNotDefined);
+            runButton.setToolTipText("Can not support execute");
+        }else{
+            runButton.setIcon(AllIcons.Actions.Execute);
+            runButton.setToolTipText("Execute this");
+        }
+
         //判断panel1是否存在button1
         if (requestMethod && !Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
             actionPanel.add(controllerCommandButton);

@@ -30,6 +30,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.util.Function;
 import com.intellij.openapi.module.Module;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -45,7 +46,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     public static final Icon FUNCTION_CALL_ICON = IconLoader.getIcon("/icons/function-call.svg", FunctionCallIconProvider.class);
 
     @Override
-    public LineMarkerInfo<?> getLineMarkerInfo( PsiElement element) {
+    public LineMarkerInfo<?> getLineMarkerInfo(PsiElement element) {
         return null; // 不再使用单个图标的方法
     }
 
@@ -168,6 +169,15 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         if (FunctionCallIconProvider.isRequestMethod(psiMethod)) {
             return null;
         }
+        boolean canInitparams = canInitparams(psiMethod);
+        if (!canInitparams) {
+            return "params_not_impl_class";
+        }
+
+        return null;
+    }
+
+    public static boolean canInitparams(PsiMethod psiMethod) {
         // 新增：检查所有参数都可以直接序列化
         for (PsiParameter parameter : psiMethod.getParameterList().getParameters()) {
             PsiType parameterType = parameter.getType();
@@ -181,12 +191,10 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
             }
 
             if (parameterClass == null || parameterClass.isInterface() || parameterClass.hasModifierProperty(PsiModifier.ABSTRACT)) {
-                return "params_not_impl_class";
+                return false;
             }
         }
-
-
-        return null;
+        return true;
     }
 
     private String isBeanMethod(PsiModifierList modifierList) {
@@ -219,7 +227,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         }
 
 
-        if(!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
+        if (!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
             if (!FunctionCallIconProvider.isRequestMethod(psiMethod)) {
                 return "no_side_server";
             }
@@ -404,7 +412,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         }
     }
 
-    public void generateOrAddTestMethod(PsiMethod psiMethod,Project project,PsiDirectory testSourceRoot) {
+    public void generateOrAddTestMethod(PsiMethod psiMethod, Project project, PsiDirectory testSourceRoot) {
         String packageName = SettingsStorageHelper.getFlexibleTestPackage(project);
         String methodName = psiMethod.getName();
         PsiClass containingClass = psiMethod.getContainingClass();
@@ -504,7 +512,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
                 }
             }
             PsiClass psiClass = PsiUtil.resolveClassInType(psiType);
-            if (psiClass==null) {
+            if (psiClass == null) {
                 return psiType.getPresentableText();
             }
             PsiImportStatement psiImportStatement = ApplicationManager.getApplication().runWriteAction(new Computable<PsiImportStatement>() {

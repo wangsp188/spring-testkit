@@ -196,6 +196,10 @@ public class MapperGenerator {
     private static Document parseXml(String xmlContent) throws ParserConfigurationException, IOException, SAXException {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            // 禁用外部实体，避免解析时下载远程DTD
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
             factory.setIgnoringElementContentWhitespace(true);
             DocumentBuilder builder = factory.newDocumentBuilder();
             return builder.parse(new InputSource(new StringReader(xmlContent)));
