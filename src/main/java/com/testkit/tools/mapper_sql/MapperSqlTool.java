@@ -247,7 +247,7 @@ public class MapperSqlTool extends BasePluginTool {
                     inputEditorTextField.setText(JsonUtil.formatObj(initParams));
                 } catch (Throwable e) {
                     e.printStackTrace();
-                    inputEditorTextField.setText("{\"Testkit\":\"init fail, You're on your own\"}");
+                    inputEditorTextField.setText("init fail, " + e.getMessage());
                 }
             }
         }.execute();
