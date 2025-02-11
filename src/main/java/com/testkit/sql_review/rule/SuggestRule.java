@@ -11,6 +11,7 @@ public enum SuggestRule {
     MULTI_JOIN(Level.CRITICAL, "Multi join"),
     HAVING_TO_WHERE(Level.CRITICAL, "Having to where"),
     DEEP_LIMIT(Level.CRITICAL, "Deep limit"),
+    MULTIPLE_UPDATE_DELETE(Level.CRITICAL, "Multiple update delete"),
 
     ;
     private Level level;

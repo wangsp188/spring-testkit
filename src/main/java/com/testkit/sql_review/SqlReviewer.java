@@ -9,6 +9,7 @@ import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
 import net.sf.jsqlparser.statement.create.index.CreateIndex;
+import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.insert.Insert;
@@ -33,6 +34,39 @@ public class SqlReviewer {
                 , new LimitNoneOrderReviewer()
                 , new MultiJoinReviewer()
                 , new SelectFieldReviewer()
+        ));
+
+        reviewRules.put(SqlType.createTable, Arrays.asList(
+                new CreateTableReviewer()
+        ));
+
+
+        reviewRules.put(SqlType.ALTER_TABLE, Arrays.asList(
+                new AlterTableReviewer()
+        ));
+
+        reviewRules.put(SqlType.DROP_INDEX, Arrays.asList(
+                new DropIndexReviewer()
+        ));
+
+        reviewRules.put(SqlType.DROP_TABLE, Arrays.asList(
+                new DropTableReviewer()
+        ));
+
+        reviewRules.put(SqlType.CREATE_INDEX, Arrays.asList(
+                new CreateIndexReviewer()
+        ));
+
+        reviewRules.put(SqlType.insert, Arrays.asList(
+                new InsertReviewer()
+        ));
+
+        reviewRules.put(SqlType.update, Arrays.asList(
+                new MultipleUpdateDeleteReviewer()
+        ));
+
+        reviewRules.put(SqlType.delete, Arrays.asList(
+                new MultipleUpdateDeleteReviewer()
         ));
     }
 
@@ -96,12 +130,8 @@ public class SqlReviewer {
             reviewCtx.setTables(tableMetaMap);
             reviewCtx.setStatement(statement);
 
-            List<Reviewer> rules = null;
-
-            if (statement instanceof Select) {
-                rules = reviewRules.get(SqlType.select);
-            }
-
+            SqlType reviewType = determineSqlType(statement);
+            List<Reviewer> rules = reviewRules.get(reviewType);
             if (rules != null) {
                 for (Reviewer rule : rules) {
                     List<Suggest> suggest = rule.suggest(reviewCtx);
@@ -121,6 +151,20 @@ public class SqlReviewer {
         }
         Collections.sort(suggestions);
         return suggestions;
+    }
+
+    private static SqlType determineSqlType(Statement statement) {
+        if (statement instanceof Select) return SqlType.select;
+        else if (statement instanceof Insert) return SqlType.insert;
+        else if (statement instanceof Update) return SqlType.update;
+        else if (statement instanceof Delete) return SqlType.delete;
+        else if (statement instanceof CreateTable) return SqlType.createTable;
+        else if (statement instanceof Alter) return SqlType.ALTER_TABLE;
+        else if (statement instanceof Drop) {
+            Drop drop = (Drop) statement;
+            return drop.getType().equals("INDEX") ? SqlType.DROP_INDEX : SqlType.DROP_TABLE;
+        } else if (statement instanceof CreateIndex) return SqlType.CREATE_INDEX;
+        return null;
     }
 
     /**
@@ -239,7 +283,15 @@ public class SqlReviewer {
 
 
     public static enum SqlType {
-        select
+        select,
+        insert,
+        update,
+        delete,
+        createTable,
+        ALTER_TABLE,
+        DROP_INDEX,
+        DROP_TABLE,
+        CREATE_INDEX
     }
 
 
