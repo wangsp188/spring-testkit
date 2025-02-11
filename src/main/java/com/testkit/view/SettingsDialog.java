@@ -323,7 +323,7 @@ public class SettingsDialog {
 
         // Method Call Label
         JLabel springLabel = new JLabel("Spring enhancement");
-        JLabel springDetailLabel = new JLabel("Method-call, flexible-test and so on require turned on this");
+        JLabel springDetailLabel = new JLabel("Function-call, flexible-test and so on require turned on this");
         springDetailLabel.setForeground(new Color(0x72A96B));
         springDetailLabel.setFont(new Font("Arial", Font.BOLD, 13));
 
@@ -346,7 +346,7 @@ public class SettingsDialog {
                     SettingsStorageHelper.setEnableSideServer(toolWindow.getProject(), false);
                     TestkitHelper.refresh(toolWindow.getProject());
                 }
-                springDetailLabel.setText("Method-call, flexible-test and so on require turned on this");
+                springDetailLabel.setText("Function-call, flexible-test and so on require turned on this");
             }
             TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Spring enhancement is " + (springButton.isSelected() ? "enable" : "disable"));
         });
@@ -508,7 +508,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nMethod-call, flexible-test, spring-cache support interceptor");
+        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nFunction-call, flexible-test, spring-cache support interceptor");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
