@@ -96,9 +96,6 @@ public class MultipleUpdateDeleteReviewer implements Reviewer {
         } else if (fromItem instanceof Join) {
             Join join = (Join) fromItem;
             return countTablesInFromItem(join.getRightItem());
-        } else if (fromItem instanceof LateralSubSelect) {
-            // 处理LATERAL子查询
-            return 0;
         }
         // 其他未处理的类型（如子查询）返回0
         return 0;

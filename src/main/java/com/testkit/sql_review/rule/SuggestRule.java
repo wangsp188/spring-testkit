@@ -13,6 +13,16 @@ public enum SuggestRule {
     DEEP_LIMIT(Level.CRITICAL, "Deep limit"),
     MULTIPLE_UPDATE_DELETE(Level.CRITICAL, "Multiple update delete"),
 
+    REQUIRED_PRIMARY_KEY(Level.BLOCKER, "Required primary key"),
+    TOO_MANY_INDEXES(Level.CRITICAL, "Too many indexes"),
+    LARGE_FIELD_TYPE(Level.MINOR, "Large field type"),
+    AVOID_FOREIGN_KEY(Level.BLOCKER, "Avoid foreign key"),
+    LARGE_TABLE_ALTER(Level.CRITICAL, "Large table alter"),
+    COLUMN_MODIFY_RISK(Level.MINOR, "Column modify risk"),
+    LARGE_TABLE_ADD_COLUMN(Level.CRITICAL, "Large table add column"),
+    DROP_COLUMN_DEPENDENCY(Level.BLOCKER, "Drop column dependency"),
+    TABLE_EXISTS(Level.BLOCKER, "Table exists"),
+
     ;
     private Level level;
     private String title;

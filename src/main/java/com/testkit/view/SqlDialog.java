@@ -19,6 +19,10 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.delete.Delete;
+import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.statement.update.Update;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -194,6 +198,16 @@ public class SqlDialog extends JDialog {
         if (datasourceConfig == null) {
             return new ArrayList<>();
         }
+
+        try {
+            Statement statement = CCJSqlParserUtil.parse(sqlText);
+            if (!(statement instanceof Select) && !(statement instanceof Update) && !(statement instanceof Delete)) {
+                return new ArrayList<>();
+            }
+        } catch (JSQLParserException e) {
+            return new ArrayList<>();
+        }
+
         try (Connection connection = MysqlUtil.getDatabaseConnection(datasourceConfig);
              PreparedStatement statement = connection.prepareStatement("EXPLAIN " + sqlText);
              ResultSet resultSet = statement.executeQuery()) {

@@ -10,6 +10,14 @@ public class Suggest implements Comparable<Suggest> {
 
     private String detail;
 
+
+    public static Suggest build(SuggestRule rule, String detail) {
+        Suggest suggest = new Suggest();
+        suggest.rule = rule;
+        suggest.detail = detail;
+        return suggest;
+    }
+
     public SuggestRule getRule() {
         return rule;
     }
