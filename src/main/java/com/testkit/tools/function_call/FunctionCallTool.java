@@ -112,7 +112,7 @@ public class FunctionCallTool extends BasePluginTool {
                     }
                     for (String env : envs) {
                         //显示的一个图标加上标题
-                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, GENERATE_ICON) {
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, CONTROLLER_ICON) {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 Application application = ApplicationManager.getApplication();

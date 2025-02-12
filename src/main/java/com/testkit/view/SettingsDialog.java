@@ -2,11 +2,19 @@ package com.testkit.view;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.util.ui.JBUI;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.sql_review.MysqlUtil;
+import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.util.HttpUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.java.JavaLanguage;
@@ -506,7 +514,7 @@ public class SettingsDialog {
     private JPanel createInterceptorOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+        gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
         JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nFunction-call, flexible-test, spring-cache support interceptor");
         // 添加标签到新行
@@ -881,25 +889,27 @@ public class SettingsDialog {
         ActionListener testListener = e -> {
             RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
             String scriptCode = scriptField.getText();
-            String env = StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? "local" : controllerEnvTextField.getText().trim().split(",")[0];
-            ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Fire-Test generate function, please wait ...", false) {
+            String app = String.valueOf(controllerScriptAppBox.getSelectedItem());
+            if (StringUtils.isBlank(controllerEnvTextField.getText().trim())) {
+                fireTestGenerateFunction(scriptCode, null, selectedApp);
+                return;
+            }
 
-                @Override
-                public void run(@NotNull ProgressIndicator indicator) {
-                    try {
-                        GroovyShell groovyShell = new GroovyShell();
-                        Script script = groovyShell.parse(scriptCode);
-                        HashMap<String, String> params = new HashMap<>();
-                        params.put("param1", "v1");
-                        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, "{}"});
-                        String ret = build == null ? "" : String.valueOf(build);
-                        TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
-                    } catch (Throwable ex) {
-                        TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test generate function error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            String[] envs = controllerEnvTextField.getText().trim().split(",");
+            DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
+            for (String env : envs) {
+                //显示的一个图标加上标题
+                AnAction documentation = new AnAction("Fire-Test with " + app + ":" + env, "Fire-Test with " + app + ":" + env, FunctionCallTool.CONTROLLER_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        fireTestGenerateFunction(scriptCode, env, selectedApp);
                     }
-                }
-            });
+                };
+                controllerActionGroup.add(documentation); // 将动作添加到动作组中
+            }
 
+            JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerCommandPopup", controllerActionGroup).getComponent();
+            popupMenu.show(testButton, 0, 0);
         };
         testButton.addActionListener(testListener);
 
@@ -947,6 +957,26 @@ public class SettingsDialog {
         panel.add(buttonPanel, gbc);
 
         return panel;
+    }
+
+    private void fireTestGenerateFunction(String scriptCode, String env, RuntimeHelper.VisibleApp selectedApp) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Fire-Test generate function, please wait ...", false) {
+
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    GroovyShell groovyShell = new GroovyShell();
+                    Script script = groovyShell.parse(scriptCode);
+                    HashMap<String, String> params = new HashMap<>();
+                    params.put("param1", "v1");
+                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, "{}"});
+                    String ret = build == null ? "" : String.valueOf(build);
+                    TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
+                } catch (Throwable ex) {
+                    TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test generate function error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                }
+            }
+        });
     }
 
     private JPanel createSqlPanel() {
