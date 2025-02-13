@@ -21,11 +21,10 @@ public enum SuggestRule {
     COLUMN_MODIFY_RISK(Level.MINOR, "Column modify risk"),
     LARGE_TABLE_ADD_COLUMN(Level.CRITICAL, "Large table add column"),
     DROP_COLUMN_DEPENDENCY(Level.BLOCKER, "Drop column dependency"),
-    TABLE_EXISTS(Level.BLOCKER, "Table exists"),
-
-    ;
+    INDEX_DROP_VERIFY(Level.MINOR, "Index drop verify"),;
     private Level level;
     private String title;
+
 
     SuggestRule(Level level, String title) {
         this.level = level;

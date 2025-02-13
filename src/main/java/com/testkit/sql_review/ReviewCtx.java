@@ -10,6 +10,8 @@ public class ReviewCtx {
 
     private Statement statement;
 
+    private String database;
+
     private Map<String,SqlTable> tables;
 
 
@@ -39,5 +41,13 @@ public class ReviewCtx {
 
     public void setStatement(Statement statement) {
         this.statement = statement;
+    }
+
+    public String getDatabase() {
+        return database;
+    }
+
+    public void setDatabase(String database) {
+        this.database = database;
     }
 }

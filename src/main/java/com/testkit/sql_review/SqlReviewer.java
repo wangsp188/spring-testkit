@@ -49,18 +49,6 @@ public class SqlReviewer {
                 new DropIndexReviewer()
         ));
 
-        reviewRules.put(SqlType.DROP_TABLE, Arrays.asList(
-                new DropTableReviewer()
-        ));
-
-        reviewRules.put(SqlType.CREATE_INDEX, Arrays.asList(
-                new CreateIndexReviewer()
-        ));
-
-        reviewRules.put(SqlType.insert, Arrays.asList(
-                new InsertReviewer()
-        ));
-
         reviewRules.put(SqlType.update, Arrays.asList(
                 new MultipleUpdateDeleteReviewer()
         ));
@@ -82,6 +70,7 @@ public class SqlReviewer {
             Statement statement = CCJSqlParserUtil.parse(sql);
             // 2. 提取 SQL 中列出表名
             Set<String> tableNames = extractTableNames(statement);
+            ReviewCtx reviewCtx = new ReviewCtx();
 
             // 3. 获取表的字段和索引元数据
             Map<String, SqlTable> tableMetaMap = new HashMap<>();
@@ -91,8 +80,9 @@ public class SqlReviewer {
                 SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
                 tableMetaMap.put(tableName, tableMeta);
             }
+            reviewCtx.setDatabase(connection.getCatalog());
+
             connection.close();
-            ReviewCtx reviewCtx = new ReviewCtx();
             reviewCtx.setSql(sql);
             reviewCtx.setTables(tableMetaMap);
             reviewCtx.setStatement(statement);
@@ -113,7 +103,8 @@ public class SqlReviewer {
             // 2. 提取 SQL 中列出表名
             Set<String> tableNames = extractTableNames(statement);
 
-            // 3. 获取表的字段和索引元数据  
+            ReviewCtx reviewCtx = new ReviewCtx();
+            // 3. 获取表的字段和索引元数据
             Map<String, SqlTable> tableMetaMap = new HashMap<>();
 
             if (MysqlUtil.testConnectionAndClose(datasourceConfig) == null) {
@@ -122,10 +113,9 @@ public class SqlReviewer {
                     SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
                     tableMetaMap.put(tableName, tableMeta);
                 }
+                reviewCtx.setDatabase(connection.getCatalog());
                 connection.close();
             }
-
-            ReviewCtx reviewCtx = new ReviewCtx();
             reviewCtx.setSql(sql);
             reviewCtx.setTables(tableMetaMap);
             reviewCtx.setStatement(statement);
@@ -163,7 +153,7 @@ public class SqlReviewer {
         else if (statement instanceof Drop) {
             Drop drop = (Drop) statement;
             return drop.getType().equals("INDEX") ? SqlType.DROP_INDEX : SqlType.DROP_TABLE;
-        } else if (statement instanceof CreateIndex) return SqlType.CREATE_INDEX;
+        };
         return null;
     }
 
@@ -232,10 +222,6 @@ public class SqlReviewer {
             // 处理字段更改（新增、删除、修改）
             Alter alter = (Alter) statement;
             tableNames.add(alter.getTable().getName());
-        } else if (statement instanceof Insert) {
-            // 处理 INSERT 查询（可选）
-            // 可扩展实现...
-
         }
         return tableNames;
     }
@@ -290,8 +276,7 @@ public class SqlReviewer {
         createTable,
         ALTER_TABLE,
         DROP_INDEX,
-        DROP_TABLE,
-        CREATE_INDEX
+        DROP_TABLE
     }
 
 

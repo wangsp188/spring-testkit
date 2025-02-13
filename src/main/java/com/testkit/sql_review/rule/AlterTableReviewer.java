@@ -8,6 +8,7 @@ import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
 import net.sf.jsqlparser.statement.alter.AlterExpression;
 import net.sf.jsqlparser.statement.alter.AlterOperation;
+import net.sf.jsqlparser.statement.create.table.ForeignKeyIndex;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,11 @@ public class AlterTableReviewer implements Reviewer {
         // 3. 检查删除字段前的依赖
         checkDropColumnDependency(alter, table).ifPresent(suggestions::add);
 
+
+        //4新增外建提示禁止 todo
+        checkForeignKeyOperation(alter, table).ifPresent(suggestions::add);
+
+
         return suggestions;
     }
 
@@ -76,7 +82,7 @@ public class AlterTableReviewer implements Reviewer {
                                     }
                                     String msg = String.format("Table %s modified field %s type (%s → %s) may trigger a full table rebuild,\nwhich is performed after impact assessment",
                                             table.getTableName(), columnName, oldType, colDataType);
-                                    return createSuggest(SuggestRule.COLUMN_MODIFY_RISK, msg);
+                                    return Suggest.build(SuggestRule.COLUMN_MODIFY_RISK, msg);
                                 }
                             })
                             .filter(Objects::nonNull)
@@ -91,12 +97,14 @@ public class AlterTableReviewer implements Reviewer {
         }
 
         boolean hasAddColumn = alter.getAlterExpressions().stream()
-                .anyMatch(expr -> expr.getOperation() == AlterOperation.ADD); // 识别新增字段操作
+                .anyMatch(expr -> {
+                    return expr.getOperation() == AlterOperation.ADD && expr.getColDataTypeList()!=null;
+                }); // 识别新增字段操作
 
         if (hasAddColumn) {
             String msg = String.format("A new field in the large table %s (current row %d) may lock the table.\nYou are advised to use pt-online-schema-change",
                     table.getTableName(), table.getRowCount());
-            return Optional.of(createSuggest(SuggestRule.LARGE_TABLE_ADD_COLUMN, msg));
+            return Optional.of(Suggest.build(SuggestRule.LARGE_TABLE_ADD_COLUMN, msg));
         }
         return Optional.empty();
     }
@@ -126,21 +134,30 @@ public class AlterTableReviewer implements Reviewer {
         if (!affectedIndexes.isEmpty()) {
             String msg = String.format("Table %s Delete the associated index [%s] before deleting Field %s",
                     table.getTableName(), String.join(",", dropColumns), String.join(",", affectedIndexes));
-            return Optional.of(createSuggest(SuggestRule.DROP_COLUMN_DEPENDENCY, msg));
+            return Optional.of(Suggest.build(SuggestRule.DROP_COLUMN_DEPENDENCY, msg));
         }
         return Optional.empty();
     }
 
-    private Suggest createSuggest(SuggestRule rule, String detail) {
-        Suggest suggest = new Suggest();
-        suggest.setRule(rule);
-        suggest.setDetail(detail);
-        return suggest;
+    private Optional<Suggest> checkForeignKeyOperation(Alter alter, SqlTable table) {
+        // 检查是否添加了外键
+        boolean hasAddForeignKey = alter.getAlterExpressions().stream()
+                .anyMatch(expr -> expr.getOperation() == AlterOperation.ADD && expr.getIndex() != null && expr.getIndex() instanceof ForeignKeyIndex);
+
+        if (hasAddForeignKey) {
+            String msg = String.format("Adding a foreign key to table %s is not recommended. " +
+                            "Consider creating an index first to avoid performance issues or data integrity risks.",
+                    table.getTableName());
+            return Optional.of(Suggest.build(SuggestRule.AVOID_FOREIGN_KEY, msg));
+        }
+
+        return Optional.empty();
     }
 
 
+
     public static void main(String[] args) {
-        List<Suggest> suggests = SqlReviewer.testReviewer(new AlterTableReviewer(), "ALTER TABLE house drop COLUMN name2");
+        List<Suggest> suggests = SqlReviewer.testReviewer(new AlterTableReviewer(), "ALTER TABLE orders ADD CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customers(id);\n\n");
         System.out.println(suggests);
     }
 }

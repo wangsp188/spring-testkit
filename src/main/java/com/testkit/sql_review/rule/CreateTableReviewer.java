@@ -34,7 +34,6 @@ public class CreateTableReviewer implements Reviewer {
         String tableName = table.getName();
 
         if (ctx.findTable(tableName) != null) {
-            suggestions.add(Suggest.build(SuggestRule.TABLE_EXISTS, tableName + " is exists"));
             return suggestions;
         }
 

@@ -538,7 +538,7 @@ public class ToolHelper {
         return null;
     }
 
-    // 提取文本内容，处理常量引用
+    // 提取文本内容，处理常量引用和拼接表达式
     private static String extractTextFromValue(PsiAnnotationMemberValue value) {
         if (value instanceof PsiLiteralExpression) {
             return String.valueOf(((PsiLiteralExpression) value).getValue());
@@ -547,10 +547,18 @@ public class ToolHelper {
             PsiElement resolvedElement = referenceExpression.resolve();
             if (resolvedElement instanceof PsiField field) {
                 PsiExpression initializer = field.getInitializer();
-                if (initializer instanceof PsiLiteralExpression) {
-                    return String.valueOf(((PsiLiteralExpression) initializer).getValue());
+                return extractTextFromValue(initializer);
+            }
+        } else if (value instanceof PsiPolyadicExpression polyadicExpression) {
+            // 处理拼接表达式
+            StringBuilder sb = new StringBuilder();
+            for (PsiExpression operand : polyadicExpression.getOperands()) {
+                String operandText = extractTextFromValue(operand);
+                if (operandText != null) {
+                    sb.append(operandText);
                 }
             }
+            return sb.toString();
         } else if (value != null) {
             return value.getText();
         }
