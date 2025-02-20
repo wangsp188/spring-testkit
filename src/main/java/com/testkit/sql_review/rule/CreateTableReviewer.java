@@ -75,7 +75,7 @@ public class CreateTableReviewer implements Reviewer {
         // 如果没有主键
         if (!hasPrimaryKeyInColumn && !hasPrimaryKeyInIndex) {
             String msg = String.format("Table %s lacks a primary key definition and must explicitly define it", tableName);
-            return Optional.of(createSuggest(SuggestRule.REQUIRED_PRIMARY_KEY, msg));
+            return Optional.of(Suggest.build(SuggestRule.REQUIRED_PRIMARY_KEY, msg));
         }
         return Optional.empty();
     }
@@ -113,7 +113,7 @@ public class CreateTableReviewer implements Reviewer {
         if (normalIndexCount > MAX_INDEX_COUNT) {
             String msg = String.format("Table %s contains %d normal indexes (a maximum of %d is recommended), which may affect write performance",
                     tableName, normalIndexCount, MAX_INDEX_COUNT);
-            return Optional.of(createSuggest(SuggestRule.TOO_MANY_INDEXES, msg));
+            return Optional.of(Suggest.build(SuggestRule.TOO_MANY_INDEXES, msg));
         }
         return Optional.empty();
     }
@@ -140,7 +140,7 @@ public class CreateTableReviewer implements Reviewer {
         if (!largeFields.isEmpty()) {
             String msg = String.format("Table %s contains a large field [%s],\nwhich is recommended to be split or used with caution",
                     tableName, String.join(", ", largeFields));
-            return Optional.of(createSuggest(SuggestRule.LARGE_FIELD_TYPE, msg));
+            return Optional.of(Suggest.build(SuggestRule.LARGE_FIELD_TYPE, msg));
         }
         return Optional.empty();
     }
@@ -156,16 +156,9 @@ public class CreateTableReviewer implements Reviewer {
 
         if (hasForeignKey) {
             String msg = String.format("Table %s contains foreign key constraints.\nIt is recommended to maintain data consistency at the application layer", tableName);
-            return Optional.of(createSuggest(SuggestRule.AVOID_FOREIGN_KEY, msg));
+            return Optional.of(Suggest.build(SuggestRule.AVOID_FOREIGN_KEY, msg));
         }
         return Optional.empty();
-    }
-
-    private Suggest createSuggest(SuggestRule rule, String detail) {
-        Suggest suggest = new Suggest();
-        suggest.setRule(rule);
-        suggest.setDetail(detail);
-        return suggest;
     }
 
 

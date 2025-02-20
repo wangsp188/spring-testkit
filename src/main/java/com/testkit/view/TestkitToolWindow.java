@@ -686,14 +686,18 @@ public class TestkitToolWindow {
         }
 
         List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
+        List<String> ddls = new ArrayList<>();
         for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
             // 测试连接
-            String result = MysqlUtil.testConnectionAndClose(config);
-            if (result == null) {
+            Object result = MysqlUtil.testConnectionAndClose(config);
+            if (!(result instanceof String)) {
                 valids.add(config);
+                if (result == Boolean.TRUE) {
+                    ddls.add(config.getName());
+                }
             }
         }
-        RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids);
+        RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids, ddls);
     }
 
 

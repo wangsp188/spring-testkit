@@ -107,7 +107,7 @@ public class SqlReviewer {
             // 3. 获取表的字段和索引元数据
             Map<String, SqlTable> tableMetaMap = new HashMap<>();
 
-            if (MysqlUtil.testConnectionAndClose(datasourceConfig) == null) {
+            if (!(MysqlUtil.testConnectionAndClose(datasourceConfig) instanceof String)) {
                 Connection connection = datasourceConfig.newConnection();
                 for (String tableName : tableNames) {
                     SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);

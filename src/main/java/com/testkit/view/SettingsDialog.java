@@ -1083,9 +1083,9 @@ public class SettingsDialog {
                                                       // 遍历每个数据源配置，逐个验证连接
                                                       for (SettingsStorageHelper.DatasourceConfig config : finalDatasourceConfigs) {
                                                           // 测试连接
-                                                          String result = MysqlUtil.testConnectionAndClose(config);
+                                                          Object result = MysqlUtil.testConnectionAndClose(config);
                                                           // 存储结果
-                                                          results.put(config.getName(), result == null ? "connect success" : result);
+                                                          results.put(config.getName(), !(result instanceof String) ? ("connect success, DDL: " + result) : result.toString());
                                                       }
                                                       TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), "Test result is " + JSON.toJSONString(results));
                                                   }
@@ -1113,11 +1113,15 @@ public class SettingsDialog {
                                                   @Override
                                                   public void run(ProgressIndicator indicator) {
                                                       List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
+                                                      List<String> ddls = new ArrayList<>();
                                                       for (SettingsStorageHelper.DatasourceConfig config : finalDatasourceConfigs) {
                                                           // 测试连接
-                                                          String result = MysqlUtil.testConnectionAndClose(config);
-                                                          if (result == null) {
+                                                          Object result = MysqlUtil.testConnectionAndClose(config);
+                                                          if (!(result instanceof String)) {
                                                               valids.add(config);
+                                                              if (result == Boolean.TRUE) {
+                                                                  ddls.add(config.getName());
+                                                              }
                                                           }
                                                       }
 
@@ -1127,7 +1131,7 @@ public class SettingsDialog {
                                                           SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
                                                       }
 
-                                                      RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids);
+                                                      RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids, ddls);
                                                       TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, valid datasources is " + valids.stream().map(SettingsStorageHelper.DatasourceConfig::getName).toList());
                                                   }
                                               }

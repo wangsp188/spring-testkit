@@ -8,16 +8,21 @@ import java.util.ArrayList;
 public class MysqlUtil {
 
 
-    public static String testConnectionAndClose(SettingsStorageHelper.DatasourceConfig datasource) {
-        if (datasource==null) {
+    public static Object testConnectionAndClose(SettingsStorageHelper.DatasourceConfig datasource) {
+        if (datasource == null) {
             return "datasource is null";
         }
+
         Connection connection = null;
         try {
             // 尝试从 DataSource 获取连接
             connection = getDatabaseConnection(datasource);
-            // 如果获取成功，返回 null 表示连接成功
-            return null;
+
+            // 检查 DDL 权限
+            boolean hasDDLPermission = checkDDLPermission(connection);
+
+            // 返回是否有 DDL 权限
+            return hasDDLPermission;
         } catch (Exception e) {
             // 捕获异常并返回异常信息
             return e.getMessage();
@@ -31,6 +36,35 @@ public class MysqlUtil {
                 }
             }
         }
+    }
+
+    /**
+     * 检查当前连接是否具有 DDL 权限
+     *
+     * @param connection 数据库连接
+     * @return true 表示有 DDL 权限，false 表示没有
+     * @throws Exception 如果查询权限时发生异常
+     */
+    private static boolean checkDDLPermission(Connection connection) throws Exception {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SHOW GRANTS FOR CURRENT_USER();")) {
+
+            // 检查权限字符串是否包含 DDL 权限
+            while (rs.next()) {
+                String grant = rs.getString(1);
+                if (grant != null) {
+                    // 判断权限字符串中是否包含 DDL 权限
+                    if (grant.contains("ALL PRIVILEGES") ||
+                            grant.contains("CREATE") ||
+                            grant.contains("ALTER") ||
+                            grant.contains("DROP") ||
+                            grant.contains("INDEX")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public static Connection getDatabaseConnection(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
@@ -135,6 +169,9 @@ public class MysqlUtil {
         }
         return -1; // 如果获取失败，返回 -1（表示未知）
     }
+
+
+
 
 
     public static void main(String[] args) throws Exception {

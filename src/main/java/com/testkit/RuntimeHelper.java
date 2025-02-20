@@ -12,10 +12,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Predicate;
 
 public class RuntimeHelper {
 
@@ -32,7 +30,8 @@ public class RuntimeHelper {
 
     private static final Map<String, List<VisibleApp>> visibleApps = new HashMap<>();
 
-    private static final Map<String,List<SettingsStorageHelper.DatasourceConfig>> validDatasources = new HashMap<>();
+    private static final Map<String, List<SettingsStorageHelper.DatasourceConfig>> validDatasources = new HashMap<>();
+    private static final Map<String, List<String>> ddlDatasources = new HashMap<>();
 
 
     public static VisibleApp getSelectedApp(String project) {
@@ -69,15 +68,17 @@ public class RuntimeHelper {
         return monitor != null && monitor;
     }
 
-    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources) {
+    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls) {
         if (project == null) {
             return;
         }
         if (CollectionUtils.isEmpty(datasources)) {
             validDatasources.remove(project);
+            ddlDatasources.remove(project);
             return;
         }
         validDatasources.put(project, datasources);
+        ddlDatasources.put(project, ddls);
     }
 
     public static List<SettingsStorageHelper.DatasourceConfig> getValidDatasources(String project) {
@@ -85,6 +86,28 @@ public class RuntimeHelper {
             return new ArrayList<>();
         }
         List<SettingsStorageHelper.DatasourceConfig> visibleApps1 = validDatasources.get(project);
+        return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
+    }
+
+    public static SettingsStorageHelper.DatasourceConfig getDatasource(String project,String datasource) {
+        if (datasource == null) {
+            return null;
+        }
+        List<SettingsStorageHelper.DatasourceConfig> datasources = getValidDatasources(project);
+        Optional<SettingsStorageHelper.DatasourceConfig> first = datasources.stream().filter(new Predicate<SettingsStorageHelper.DatasourceConfig>() {
+            @Override
+            public boolean test(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
+                return datasource.equals(datasourceConfig.getName());
+            }
+        }).findFirst();
+        return first.orElse(null);
+    }
+
+    public static List<String> getDDLDatasources(String project) {
+        if (project == null) {
+            return new ArrayList<>();
+        }
+        List<String> visibleApps1 = ddlDatasources.get(project);
         return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
     }
 

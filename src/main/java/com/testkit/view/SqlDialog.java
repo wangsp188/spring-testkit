@@ -1,17 +1,19 @@
 package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.util.ui.AbstractTableCellEditor;
 import com.intellij.util.ui.JBUI;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
+import com.testkit.TestkitHelper;
+import com.testkit.sql_review.MysqlDDLUtil;
 import com.testkit.sql_review.MysqlUtil;
 import com.testkit.sql_review.SqlReviewer;
 import com.testkit.sql_review.Suggest;
-import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.sql.psi.SqlLanguage;
 import com.intellij.ui.LanguageTextField;
@@ -20,7 +22,11 @@ import com.intellij.ui.table.JBTable;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.alter.Alter;
+import net.sf.jsqlparser.statement.create.index.CreateIndex;
+import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.delete.Delete;
+import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.update.Update;
 import org.apache.commons.collections.CollectionUtils;
@@ -28,26 +34,31 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellRenderer;
-import javax.swing.table.TableColumnModel;
+import javax.swing.table.*;
 import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class SqlDialog extends JDialog {
 
-    public static final Icon SQL_ANALYSIS_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", FunctionCallIconProvider.class);
+    public static final Icon SQL_ANALYSIS_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", SqlDialog.class);
+    public static final Icon FAST_SQL_ICON = IconLoader.getIcon("/icons/fast-sql.svg", SqlDialog.class);
+
 
     private TestkitToolWindow toolWindow;
     private LanguageTextField inputSqlField;
     private JComboBox<String> dataSourceComboBox;
+    private JButton unfoldButton;
+    private JPanel actionResults;
     private JPanel panelResults;
 
     // 动态解析 ResultSet 列和数据
@@ -120,14 +131,14 @@ public class SqlDialog extends JDialog {
     }
 
     private JPanel buildActionPanel(TestkitToolWindow window) {
-        JPanel panelResults = new JPanel();
-        panelResults.setLayout(new BoxLayout(panelResults, BoxLayout.X_AXIS)); // 顺序排列（水平）
+        actionResults = new JPanel();
+        actionResults.setLayout(new BoxLayout(actionResults, BoxLayout.X_AXIS)); // 顺序排列（水平）
 
         // 一个Label，代表datasource
         JLabel dataSourceLabel = new JLabel("Datasource:");
 
         // 一个下拉框
-        dataSourceComboBox = new ComboBox<>();
+        dataSourceComboBox = new JComboBox<>();
 
         // 一个按钮
         JButton button = new JButton(SQL_ANALYSIS_ICON);
@@ -148,11 +159,10 @@ public class SqlDialog extends JDialog {
             }
 
             String selectedData = (String) dataSourceComboBox.getSelectedItem();
-//            if (selectedData == null) {
-//                setMsg("Please select a datasource, if there is no option, configure the database link in settings-SQL tool");
-//                return;
-//            }
-
+            // if (selectedData == null) {
+            // setMsg("Please select a datasource, if there is no option, configure the database link in settings - SQL tool");
+            // return;
+            // }
 
             Optional<SettingsStorageHelper.DatasourceConfig> first = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName())
                     .stream()
@@ -163,34 +173,334 @@ public class SqlDialog extends JDialog {
                         }
                     })
                     .findFirst();
-//            if (first.isEmpty()) {
-//                setMsg("Can not find valid datasource");
-//                return;
-//            }
-            //执行explain，并刷新结果
-// 执行 EXPLAIN 逻辑部分
+            // if (first.isEmpty()) {
+            // setMsg("Can not find valid datasource");
+            // return;
+            // }
+
+            // 执行 EXPLAIN 逻辑部分
             ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Analysis sql, please wait ...", false) {
-
-                                                  @Override
-                                                  public void run(@NotNull ProgressIndicator progressIndicator) {
-                                                      loadAnalysis(first.orElse(null), sqlText);
-                                                      // 结果数据传递到表格加载方法
-//                                                      SwingUtilities.invokeLater(() -> loadAnalysis(first.orElse(null), sqlText));
-                                                  }
-                                              }
-            );
-
-
+                @Override
+                public void run(@NotNull ProgressIndicator progressIndicator) {
+                    loadAnalysis(first.orElse(null), sqlText);
+                    // 结果数据传递到表格加载方法
+                    // SwingUtilities.invokeLater(() -> loadAnalysis(first.orElse(null), sqlText));
+                }
+            });
         });
 
-        // 添加组件到panel
-        panelResults.add(dataSourceLabel);
-        panelResults.add(Box.createHorizontalStrut(10)); // 添加间隔
-        panelResults.add(dataSourceComboBox);
-        panelResults.add(Box.createHorizontalStrut(10)); // 添加间隔
-        panelResults.add(button);
+        // 回滚按钮
+        JButton rollbackButton = new JButton(AllIcons.Actions.Rollback);
+        rollbackButton.setToolTipText("Generate rollback sql");
+        rollbackButton.setPreferredSize(new Dimension(32, 32));
+        rollbackButton.addActionListener(e -> {
+            // 回滚逻辑解析当前sql
+//            根据sql
+            rollbackDDL();
+        });
 
-        return panelResults;
+
+        // 一个展开的按钮
+        unfoldButton = new JButton(FAST_SQL_ICON);
+        unfoldButton.setToolTipText("Fast DDL");
+        unfoldButton.setPreferredSize(new Dimension(32, 32));
+        unfoldButton.addActionListener(e -> {
+            // 创建表格模型
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[]{"Datasource", "Verify", "Result", "Operate"}, 0) {
+                @Override
+                public boolean isCellEditable(int row, int column) {
+                    return column == 3; // 只有Operate列可编辑
+                }
+            };
+
+            List<String> datasources = RuntimeHelper.getDDLDatasources(toolWindow.getProject().getName());
+            if (CollectionUtils.isEmpty(datasources)) {
+                setMsg("No Datasource has DDL permission");
+                return;
+            }
+            // 填充数据源
+            for (String ds : datasources) {
+                model.addRow(new Object[]{ds, "", "", ""});
+            }
+
+            // 创建表格
+            JBTable table = new JBTable(model);
+            table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+            table.setFillsViewportHeight(true);
+            table.getTableHeader().setReorderingAllowed(false);
+
+            // 设置列宽
+            TableColumnModel columnModel = table.getColumnModel();
+            columnModel.getColumn(0).setPreferredWidth(120);   // 数据源名称
+            columnModel.getColumn(1).setPreferredWidth((panelResults.getWidth() - 207)/2);
+            columnModel.getColumn(2).setPreferredWidth((panelResults.getWidth() - 207)/2);
+            columnModel.getColumn(3).setPreferredWidth(80);   // Operate
+
+
+            // 添加点击复制功能
+            table.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    int row = table.rowAtPoint(e.getPoint());
+                    int col = table.columnAtPoint(e.getPoint());
+
+                    if (row >= 0 && col >= 0 && (col == 1 || col == 2)) {
+                        Object value = table.getValueAt(row, col);
+                        String text = value != null ? value.toString() : "";
+
+                        TestkitHelper.copyToClipboard(toolWindow.getProject(), text, null);
+                    }
+                }
+            });
+
+
+            // 自定义操作列渲染
+            columnModel.getColumn(3).setCellRenderer(new TableCellRenderer() {
+
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value,
+                                                               boolean isSelected, boolean hasFocus, int row, int column) {
+                    JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 2));
+                    JButton checkBtn = new JButton(AllIcons.Actions.Checked);
+                    checkBtn.setToolTipText("Verify this");
+                    JButton executeBtn = new JButton(AllIcons.Actions.Execute);
+                    executeBtn.setToolTipText("Execute this");
+                    checkBtn.setPreferredSize(new Dimension(32, 32));
+                    executeBtn.setPreferredSize(new Dimension(32, 32));
+                    panel.add(checkBtn);
+                    panel.add(executeBtn);
+                    return panel;
+                }
+            });
+
+            // 自定义操作列的编辑器
+            columnModel.getColumn(3).setCellEditor(new AbstractTableCellEditor() {
+                private Map<Integer, JPanel> panels = new HashMap<>();
+
+                @Override
+                public Object getCellEditorValue() {
+                    return ""; // 返回值无关紧要，因为操作直接通过按钮事件处理
+                }
+
+                @Override
+                public boolean isCellEditable(EventObject e) {
+                    return true;
+                }
+
+                @Override
+                public Component getTableCellEditorComponent(JTable table, Object value,
+                                                             boolean isSelected, int row, int column) {
+                    return panels.computeIfAbsent(row, new Function<Integer, JPanel>() {
+                        @Override
+                        public JPanel apply(Integer integer) {
+                            JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 2));
+                            JButton checkBtn;
+                            JButton executeBtn;
+                            checkBtn = new JButton(AllIcons.Actions.Checked);
+                            checkBtn.setToolTipText("Verify this");
+                            executeBtn = new JButton(AllIcons.Actions.Execute);
+                            executeBtn.setToolTipText("Execute this");
+                            checkBtn.setPreferredSize(new Dimension(32, 32));
+                            executeBtn.setPreferredSize(new Dimension(32, 32));
+
+                            // 验证按钮事件
+                            checkBtn.addActionListener(e -> {
+                                checkDDL(table, integer);
+                            });
+
+                            // 执行按钮事件
+                            executeBtn.addActionListener(e -> {
+                                executeDDL(table, integer);
+                            });
+
+                            panel.add(checkBtn);
+                            panel.add(executeBtn);
+                            return panel;
+                        }
+                    });
+                }
+
+                private void executeDDL(JTable table, int row) {
+                    String sqlText = inputSqlField.getText();
+                    if (StringUtils.isBlank(sqlText)) {
+                        setMsg("Please input your SQL");
+                        return;
+                    }
+
+                    Statement statement = null;
+                    try {
+                        statement = CCJSqlParserUtil.parse(sqlText);
+                    } catch (JSQLParserException ex) {
+                        setMsg("Parse SQL error, " + ex.getMessage());
+                        return;
+                    }
+
+                    boolean b = statement instanceof Alter
+                            || statement instanceof Drop
+                            || statement instanceof CreateIndex
+                            || statement instanceof CreateTable;
+                    if (!b) {
+                        setMsg("Only support DDL, Alter or Drop or CreateIndex or CreateTable");
+                        return;
+                    }
+                    String datasourceName = (String) table.getModel().getValueAt(row, 0);
+
+                    SettingsStorageHelper.DatasourceConfig datasource = RuntimeHelper.getDatasource(toolWindow.getProject().getName(), datasourceName);
+                    if (datasource == null) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Can not find valid datasource");
+                        fireEditingStopped(); // 结束编辑状态
+                        return;
+                    }
+
+                    // 执行 EXPLAIN 逻辑部分
+                    ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Execute DDL, please wait ...", false) {
+                        @Override
+                        public void run(@NotNull ProgressIndicator progressIndicator) {
+                            try (Connection connection = datasource.newConnection()) {
+                                String checkDdl = MysqlDDLUtil.executeDDl(sqlText, connection);
+                                table.getModel().setValueAt(checkDdl, row, 2);
+                            } catch (Throwable ex) {
+                                TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Execute error, " + ex.getMessage());
+                            } finally {
+                                fireEditingStopped(); // 结束编辑状态
+                            }
+                        }
+                    });
+                }
+
+                private void checkDDL(JTable table, int row) {
+                    String sqlText = inputSqlField.getText();
+                    if (StringUtils.isBlank(sqlText)) {
+                        setMsg("Please input your SQL");
+                        return;
+                    }
+
+                    Statement statement = null;
+                    try {
+                        statement = CCJSqlParserUtil.parse(sqlText);
+                    } catch (JSQLParserException ex) {
+                        setMsg("Parse SQL error, " + ex.getMessage());
+                        return;
+                    }
+
+                    boolean b = statement instanceof Alter
+                            || statement instanceof Drop
+                            || statement instanceof CreateIndex
+                            || statement instanceof CreateTable;
+                    if (!b) {
+                        setMsg("Only support DDL, Alter or Drop or CreateIndex or CreateTable");
+                        return;
+                    }
+
+                    String datasourceName = (String) table.getModel().getValueAt(row, 0);
+
+                    SettingsStorageHelper.DatasourceConfig datasource = RuntimeHelper.getDatasource(toolWindow.getProject().getName(), datasourceName);
+                    if (datasource == null) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Can not find valid datasource");
+                        fireEditingStopped(); // 结束编辑状态
+                        return;
+                    }
+
+                    // 执行 EXPLAIN 逻辑部分
+                    Statement finalStatement = statement;
+                    ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Verify DDL, please wait ...", false) {
+                        @Override
+                        public void run(@NotNull ProgressIndicator progressIndicator) {
+                            try (Connection connection = datasource.newConnection()) {
+                                String checkDdl = MysqlDDLUtil.checkDdl(finalStatement, connection);
+                                table.getModel().setValueAt(checkDdl, row, 1);
+                            } catch (Throwable ex) {
+                                TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Verify error, " + ex.getMessage());
+                            } finally {
+                                fireEditingStopped(); // 结束编辑状态
+                            }
+                        }
+                    });
+                }
+            });
+
+            // 设置ToolTip
+            table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value,
+                                                               boolean isSelected, boolean hasFocus, int row, int column) {
+                    Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                    if (c instanceof JComponent) {
+                        JComponent jc = (JComponent) c;
+                        if (column == 1 || column == 2) {
+                            jc.setToolTipText(value != null ? value.toString() : null);
+                        } else {
+                            jc.setToolTipText(null);
+                        }
+                    }
+                    return c;
+                }
+            });
+
+            // 更新结果面板
+            panelResults.removeAll();
+            panelResults.setLayout(new BorderLayout());
+            panelResults.add(new JBScrollPane(table), BorderLayout.CENTER);
+            panelResults.revalidate();
+            panelResults.repaint();
+        });
+
+        actionResults.add(dataSourceLabel);
+        actionResults.add(dataSourceComboBox);
+        actionResults.add(rollbackButton);
+        actionResults.add(button);
+        return actionResults;
+    }
+
+    private void rollbackDDL() {
+        String sqlText = inputSqlField.getText();
+        if (StringUtils.isBlank(sqlText)) {
+            setMsg("Please input your SQL");
+            return;
+        }
+
+        Statement statement = null;
+        try {
+            statement = CCJSqlParserUtil.parse(sqlText);
+        } catch (JSQLParserException ex) {
+            setMsg("Parse SQL error, " + ex.getMessage());
+            return;
+        }
+
+        boolean b = statement instanceof Alter
+                || statement instanceof Drop
+                || statement instanceof CreateIndex
+                || statement instanceof CreateTable;
+        if (!b) {
+            setMsg("Only support DDL, Alter or Drop or CreateIndex or CreateTable");
+            return;
+        }
+
+        if (dataSourceComboBox.getSelectedItem() == null) {
+            setMsg("Please select a datasource, if there is no option, configure the database link in settings - SQL tool");
+            return;
+        }
+
+        SettingsStorageHelper.DatasourceConfig datasource = RuntimeHelper.getDatasource(toolWindow.getProject().getName(), dataSourceComboBox.getSelectedItem().toString());
+        if (datasource == null) {
+            setMsg("Can not find valid datasource");
+            return;
+        }
+
+        // 执行 EXPLAIN 逻辑部分
+        Statement finalStatement = statement;
+        ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Generate rollback sql, please wait ...", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator progressIndicator) {
+                try (Connection connection = datasource.newConnection()) {
+                    String rollbackDdl = MysqlDDLUtil.rollbackDdl(finalStatement, connection);
+                    setMsg("Generate rollback sql, verify it carefully !!!\n" + rollbackDdl);
+                } catch (Throwable ex) {
+                    setMsg("Generate error\n" + ex.getMessage());
+                }
+            }
+        });
     }
 
 
@@ -296,21 +606,21 @@ public class SqlDialog extends JDialog {
                 explainTable.getTableHeader().setReorderingAllowed(false);
 
                 // 将表格和标题添加到垂直容器
-                verticalPanel.add(titleLabel,gbc);
+                verticalPanel.add(titleLabel, gbc);
                 gbc.gridy++;
-                verticalPanel.add(new JBScrollPane(explainTable),gbc);
+                verticalPanel.add(new JBScrollPane(explainTable), gbc);
             }
         } catch (Throwable ex) {
             JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
             titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
             //优化字体
-            verticalPanel.add(titleLabel,gbc);
+            verticalPanel.add(titleLabel, gbc);
 
             JLabel titleLabel1 = new JLabel(ex.getMessage(), SwingConstants.LEFT);
             titleLabel1.setForeground(Color.pink);
             //优化字体
             gbc.gridy++;
-            verticalPanel.add(titleLabel1,gbc);
+            verticalPanel.add(titleLabel1, gbc);
         }
 
         // 2. SQL Review 建议展示
@@ -371,9 +681,9 @@ public class SqlDialog extends JDialog {
 
             gbc.gridy++;
             // 将建议部分添加到垂直容器
-            verticalPanel.add(suggestTitleLabel,gbc);
+            verticalPanel.add(suggestTitleLabel, gbc);
             gbc.gridy++;
-            verticalPanel.add(new JBScrollPane(suggestTable),gbc);
+            verticalPanel.add(new JBScrollPane(suggestTable), gbc);
         }
 
         // 将垂直容器包裹在滚动面板中（支持整体滚动）
@@ -444,11 +754,37 @@ public class SqlDialog extends JDialog {
         String selectedData = (String) dataSourceComboBox.getSelectedItem();
         dataSourceComboBox.removeAllItems();
         List<SettingsStorageHelper.DatasourceConfig> validDatasources = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName());
+        List<String> ddlDatasources = RuntimeHelper.getDDLDatasources(toolWindow.getProject().getName());
+
+        LinkedHashMap<String, List<String>> objects = new LinkedHashMap<>();
         for (SettingsStorageHelper.DatasourceConfig validDatasource : validDatasources) {
-            dataSourceComboBox.addItem(validDatasource.getName());
+            objects.computeIfAbsent(validDatasource.getUrl(), new Function<String, List<String>>() {
+                @Override
+                public List<String> apply(String s) {
+                    return new ArrayList<>();
+                }
+            }).add(validDatasource.getName());
         }
+
+        for (Map.Entry<String, List<String>> listEntry : objects.entrySet()) {
+            List<String> value = new ArrayList<>(listEntry.getValue());
+            value.removeAll(ddlDatasources);
+            if (value.isEmpty()) {
+                dataSourceComboBox.addItem(listEntry.getValue().get(0));
+            } else {
+                dataSourceComboBox.addItem(value.get(0));
+            }
+        }
+
         if (selectedData != null) {
             dataSourceComboBox.setSelectedItem(selectedData);
+        }
+
+        boolean ddl = CollectionUtils.isNotEmpty(ddlDatasources);
+        if (ddl && !Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
+            actionResults.add(unfoldButton);
+        } else if (!ddl && Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
+            actionResults.remove(unfoldButton);
         }
     }
 }

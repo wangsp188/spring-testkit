@@ -14,14 +14,16 @@
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-    No-Bug
-    No-Bug
-    No-Bug
-    No-Bug
-    No-Bug
-    No-Bug
-    No-Bug
-    No-Bug
+    1.Function-call
+    2.Flexible-test
+    3.Spring-cache
+    4.Mapper-sql
+
+
+    1.SQL-tool
+    2.Coding-guidelines
+    3.Controller-command
+    4.Function-Trace
   ]]></description>
 <!--  开发F&Q  https://intellij-support.jetbrains.com/hc/en-us/search?utf8=%E2%9C%93-->
 
@@ -30,7 +32,6 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <depends>org.intellij.groovy</depends>
-<!--    <depends>Git4Idea</depends>-->
     <depends>com.intellij.spring.boot</depends>
     <depends>com.intellij.database</depends>
 

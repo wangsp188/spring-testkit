@@ -48,7 +48,7 @@ public class AlterTableReviewer implements Reviewer {
         checkDropColumnDependency(alter, table).ifPresent(suggestions::add);
 
 
-        //4新增外建提示禁止 todo
+        //4新增外建提示禁止
         checkForeignKeyOperation(alter, table).ifPresent(suggestions::add);
 
 
