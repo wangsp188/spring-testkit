@@ -1019,8 +1019,8 @@ public class ReqStoreDialog {
 
         // 将 JTextComponent 放入 JScrollPane
         JScrollPane scrollPane = new JBScrollPane(field);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Input"));
         if (field instanceof EditorTextComponent) {
+            scrollPane.setBorder(BorderFactory.createTitledBorder("Input"));
             ((EditorTextComponent) field).getDocument().addDocumentListener(new DocumentAdapter() {
                 @Override
                 public void documentChanged(DocumentEvent event) {
