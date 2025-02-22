@@ -50,7 +50,6 @@
 
         <java.programPatcher implementation="com.testkit.JavaProgramPatcher" />
         <toolWindow id="Spring-Testkit" icon="/icons/spring-testkit.svg" factoryClass="com.testkit.view.TestkitToolWindowFactory" anchor="right"/>
-<!--icon="PlatformDebuggerImplIcons.MemoryView.Active"-->
         <!-- Here you can register other extensions, for example, actions -->
     </extensions>
 

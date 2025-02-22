@@ -1,9 +1,14 @@
 package com.testkit.sql_review;
 
 import com.testkit.SettingsStorageHelper;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 public class MysqlUtil {
 
@@ -19,7 +24,7 @@ public class MysqlUtil {
             connection = getDatabaseConnection(datasource);
 
             // 检查 DDL 权限
-            boolean hasDDLPermission = checkDDLPermission(connection);
+            boolean hasDDLPermission = checkWritePermission(connection);
 
             // 返回是否有 DDL 权限
             return hasDDLPermission;
@@ -45,7 +50,7 @@ public class MysqlUtil {
      * @return true 表示有 DDL 权限，false 表示没有
      * @throws Exception 如果查询权限时发生异常
      */
-    private static boolean checkDDLPermission(Connection connection) throws Exception {
+    private static boolean checkWritePermission(Connection connection) throws Exception {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery("SHOW GRANTS FOR CURRENT_USER();")) {
 
@@ -58,7 +63,9 @@ public class MysqlUtil {
                             grant.contains("CREATE") ||
                             grant.contains("ALTER") ||
                             grant.contains("DROP") ||
-                            grant.contains("INDEX")) {
+                            grant.contains("INDEX") ||
+                            grant.contains("UPDATE")
+                    ) {
                         return true;
                     }
                 }
@@ -88,11 +95,13 @@ public class MysqlUtil {
 
     /**
      * 根据表名获取表的元数据信息
+     *
      * @param tableName 表名
      * @return SqlTable 对象，包含字段信息和索引信息
      * @throws Exception 异常
      */
     public static SqlTable getTableMeta(Connection connection, String tableName) throws Exception {
+        tableName = remove(tableName);
         SqlTable table = new SqlTable(tableName);
 
         // 获取数据库元数据
@@ -151,13 +160,16 @@ public class MysqlUtil {
 
     /**
      * 使用 SHOW TABLE STATUS 获取表的近似行数
+     *
      * @param connection 数据库连接
-     * @param tableName 表名
+     * @param tableName  表名
      * @return 表的估算行数，失败时返回 -1
      */
-    private static int getTableRowCountByShowTableStatus(Connection connection, String tableName) {
+    public static int getTableRowCountByShowTableStatus(Connection connection, String tableName) {
+        tableName = remove(tableName);
         String sql = "SHOW TABLE STATUS where `name` = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setQueryTimeout(30);
             stmt.setString(1, tableName); // 使用表名匹配
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -170,8 +182,145 @@ public class MysqlUtil {
         return -1; // 如果获取失败，返回 -1（表示未知）
     }
 
+    public static String remove(String xx) {
+        if (xx.startsWith("`") && xx.endsWith("`")) {
+            return xx.substring(1, xx.length() - 1);
+        }
+        return xx;
+    }
+
+    public static SqlRet executeSQL(String sql, Connection connection) {
+        if (sql == null || connection == null) {
+            return SqlRet.buildFail("sql is null");
+        }
+        boolean autoCommit = false;
+        try {
+            autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+        } catch (SQLException e) {
+            return SqlRet.buildFail("setAutoCommit(false) error: " + e.getMessage());
+        }
+
+        long startTime = System.currentTimeMillis();
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        try (Statement statement = connection.createStatement()) {
+            statement.setQueryTimeout(30);
+            // 提交定时取消任务
+            ScheduledFuture<?> cancelTask = executor.schedule(() -> {
+                try {
+                    if (!statement.isClosed()) {
+                        statement.cancel(); // 在超时后取消执行
+                    }
+                } catch (SQLException ex) {
+                    System.err.println("Cancel failed: " + ex.getMessage());
+                }
+            }, 32, TimeUnit.SECONDS);
+
+            try {
+                boolean isResultSet = statement.execute(sql);
+                connection.commit();
+                long endTime = System.currentTimeMillis();
+                //取最前面的
+                // 取消定时任务（如果尚未执行）
+                cancelTask.cancel(true);
+
+                //select语句，返回最近的
+                //update语句，返回受影响的行
+                //insert语句，返回受影响的行
+                //alter,ddl语句返回null
+                Object ret = null;
+                if (isResultSet) {
+                    ResultSet resultSet = statement.getResultSet();
+                    if (sql.replace(" ", "").toLowerCase().startsWith("selectcount(")) {
+                        //如果是select count 则返回第一行的第一列的结果
+                        resultSet.next();
+                        ret = resultSet.getObject(1);
+                    } else {
+                        //返回行数
+                        ret = "return row" + getResultSetRowCount(resultSet);
+                    }
+                } else {
+                    ret = statement.getUpdateCount() >= 0 ? ("affect row:" + statement.getUpdateCount()) : null;
+                }
+
+                return SqlRet.buildSuccess(ret);
+            } catch (SQLException e) {
+                // 判断是否为取消导致的超时
+                boolean isCancelled = e.getSQLState() != null && e.getSQLState().equals("HY008");
+                String errorMsg = isCancelled ? "timeout" : e.getMessage();
+
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    errorMsg = ex.getMessage();
+                }
+
+                long endTime = System.currentTimeMillis();
+                return SqlRet.buildFail("SQLState: " + e.getSQLState() + "\nVendor Code: " + e.getErrorCode() + "\n" + errorMsg);
+            } finally {
+                executor.shutdownNow(); // 确保关闭线程池
+            }
+        } catch (SQLException e) {
+            long endTime = System.currentTimeMillis();
+            return SqlRet.buildFail("SQLState: " + e.getSQLState() + "\nVendor Code: " + e.getErrorCode() + "\n" + e.getMessage());
+        } finally {
+            try {
+                connection.setAutoCommit(autoCommit);
+            } catch (Throwable e) {
+            }
+        }
+    }
+
+    private static int getResultSetRowCount(ResultSet rs) throws SQLException {
+        int rowCount = 0;
+        rs.last(); // 移动到最后一行
+        rowCount = rs.getRow(); // 获取当前行号
+        rs.beforeFirst(); // 将游标重置到第一行之前，以便后续处理
+        return rowCount;
+    }
 
 
+    public static class SqlRet {
+        private boolean success;
+        private Object ret;
+
+
+        public static SqlRet buildSuccess(Object ret) {
+            SqlRet sqlRet = new SqlRet();
+            sqlRet.setSuccess(true);
+            sqlRet.setRet(ret);
+            return sqlRet;
+        }
+
+        public static SqlRet buildFail(String message) {
+            SqlRet sqlRet = new SqlRet();
+            sqlRet.setSuccess(false);
+            sqlRet.setRet(message);
+            return sqlRet;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
+
+        public Object getRet() {
+            return ret;
+        }
+
+        public void setRet(Object ret) {
+            this.ret = ret;
+        }
+
+        @Override
+        public String toString() {
+            return (success ? "SUCCESS" : "FAIL")
+                    + ",\n" + ret;
+        }
+    }
 
 
     public static void main(String[] args) throws Exception {
