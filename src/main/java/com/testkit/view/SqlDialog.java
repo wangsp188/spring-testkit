@@ -1,6 +1,8 @@
 package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.editor.event.DocumentAdapter;
+import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.AbstractTableCellEditor;
@@ -72,16 +74,17 @@ public class SqlDialog extends JDialog {
         JPanel panelMain = new JPanel(new GridBagLayout());
         GridBagConstraints c1 = new GridBagConstraints();
 
+        JBScrollPane scrollPane = buildInputPane();
         // 设置 panelCmd
-        JPanel panelCmd = buildCmdPanel(testkitWindow);
         c1.fill = GridBagConstraints.BOTH;
         c1.anchor = GridBagConstraints.NORTH;// 使组件在水平方向和垂直方向都拉伸
+        c1.gridwidth = 3;
         c1.weightx = 1;   // 水平方向占满
         c1.weighty = 0.3; // 垂直方向占30%
         c1.gridx = 0;
         c1.gridy = 0;
-        c1.gridwidth = 2; // 横跨两列
-        panelMain.add(panelCmd, c1);
+//        c1.gridwidth = 2; // 横跨两列
+        panelMain.add(scrollPane, c1);
 
         JPanel panelAction = buildActionPanel(testkitWindow);
         c1.gridy = 1;
@@ -127,6 +130,22 @@ public class SqlDialog extends JDialog {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         setSize((int) (screenSize.width * 0.7), (int) (screenSize.height * 0.7));
         setLocationRelativeTo(null);
+    }
+
+    private JBScrollPane buildInputPane() {
+        inputSqlField = new LanguageTextField(SqlLanguage.INSTANCE, toolWindow.getProject(), "", false);
+        JBScrollPane scrollPane = new JBScrollPane(inputSqlField);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("SQL Input"));
+
+        // 添加文档监听器以更新滚动条
+        inputSqlField.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            public void documentChanged(DocumentEvent event) {
+                scrollPane.revalidate();
+                scrollPane.repaint();
+            }
+        });
+        return scrollPane;
     }
 
     private JPanel buildActionPanel(TestkitToolWindow window) {
@@ -650,7 +669,7 @@ public class SqlDialog extends JDialog {
                 explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
                 explainTable.setFillsViewportHeight(true);
                 explainTable.getTableHeader().setReorderingAllowed(false);
-                explainTable.setDefaultRenderer(Object.class, new TextAreaCellRenderer(1, Set.of(1,2,3,4,5,6,7,8,9,10)));
+                explainTable.setDefaultRenderer(Object.class, new TextAreaCellRenderer(1, Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)));
 
 
                 // 将表格和标题添加到垂直容器
@@ -752,36 +771,6 @@ public class SqlDialog extends JDialog {
         panelResults.add(scrollPane, BorderLayout.CENTER);
         panelResults.revalidate();
         panelResults.repaint();
-    }
-
-
-    private @NotNull JPanel buildCmdPanel(TestkitToolWindow window) {
-        JPanel panelCmd = new JPanel();
-        GridBagLayout gridbag = new GridBagLayout();
-        GridBagConstraints c = new GridBagConstraints();
-        panelCmd.setLayout(gridbag);
-
-        JLabel curlLabel = new JLabel("Sql:");
-        inputSqlField = new LanguageTextField(SqlLanguage.INSTANCE, toolWindow.getProject(), "", false);
-        JBScrollPane scrollPane = new JBScrollPane(inputSqlField);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-
-        // Add label
-        c.fill = GridBagConstraints.NONE;
-        c.weightx = 0;
-        c.gridx = 0;
-        c.gridy = 0;
-        panelCmd.add(curlLabel, c);
-
-        // Add textarea
-        c.fill = GridBagConstraints.BOTH;
-        c.weightx = 1;
-        c.weighty = 1;
-        c.gridx = 1;
-        c.gridy = 0;
-        panelCmd.add(scrollPane, c);
-        return panelCmd;
     }
 
     public void refreshDatasources() {

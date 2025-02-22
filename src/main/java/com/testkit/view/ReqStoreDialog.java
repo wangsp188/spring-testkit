@@ -5,6 +5,9 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.intellij.openapi.editor.event.DocumentAdapter;
+import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.editor.event.DocumentListener;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -1016,8 +1019,17 @@ public class ReqStoreDialog {
 
         // 将 JTextComponent 放入 JScrollPane
         JScrollPane scrollPane = new JBScrollPane(field);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); // 允许横向滚动
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Input"));
+        if (field instanceof EditorTextComponent) {
+            ((EditorTextComponent) field).getDocument().addDocumentListener(new DocumentAdapter() {
+                @Override
+                public void documentChanged(DocumentEvent event) {
+                    scrollPane.revalidate();
+                    scrollPane.repaint();
+                }
+            });
+        }
+
 
         // 顶部面板
         JPanel northPanel = new JPanel();

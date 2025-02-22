@@ -2,6 +2,8 @@ package com.testkit.tools;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.intellij.openapi.editor.event.DocumentAdapter;
+import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.psi.*;
 import com.testkit.TestkitHelper;
 import com.testkit.util.JsonUtil;
@@ -158,7 +160,16 @@ public abstract class BasePluginTool {
 
         inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
 //        inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
-        inputPanel.add(new JBScrollPane(inputEditorTextField), BorderLayout.CENTER);
+        JBScrollPane scrollPane = new JBScrollPane(inputEditorTextField);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Input"));
+        inputEditorTextField.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            public void documentChanged(DocumentEvent event) {
+                scrollPane.revalidate();
+                scrollPane.repaint();
+            }
+        });
+        inputPanel.add(scrollPane, BorderLayout.CENTER);
         panel.add(inputPanel, gbc);
     }
 
@@ -297,7 +308,7 @@ public abstract class BasePluginTool {
 
 
     protected void triggerHttpTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
-        if(AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())){
+        if (AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())) {
             return;
         }
 
