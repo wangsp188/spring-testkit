@@ -74,7 +74,10 @@ public class SettingsDialog {
 
     private LanguageTextField datasourcePropertiesField;
     private JButton showDatasourceButton;
-
+    private OnOffButton traceToggleButton;
+    private OnOffButton traceWebToggleButton;
+    private OnOffButton traceMybatisToggleButton;
+    private OnOffButton logMybatisToggleButton;
     private JBTextField tracePackagesField;
 
     private JBTextField traceClassSuffixField;
@@ -139,6 +142,10 @@ public class SettingsDialog {
 
 //        trace
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        traceToggleButton.setSelected(traceConfig.isEnable());
+        traceWebToggleButton.setSelected(traceConfig.isTraceWeb());
+        traceMybatisToggleButton.setSelected(traceConfig.isTraceMybatis());
+        logMybatisToggleButton.setSelected(traceConfig.isLogMybatis());
         tracePackagesField.setText(traceConfig.getPackages());
         traceClassSuffixField.setText(traceConfig.getClsSuffix());
         traceBlackListField.setText(traceConfig.getBlacks());
@@ -1224,7 +1231,7 @@ public class SettingsDialog {
 
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
         JLabel traceLabel = new JLabel("Trace");
-        OnOffButton traceToggleButton = new OnOffButton();
+        traceToggleButton = new OnOffButton();
         JPanel labelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
         labelButtonPanel.add(traceLabel, BorderLayout.WEST);
         labelButtonPanel.add(traceToggleButton, BorderLayout.EAST);
@@ -1271,7 +1278,7 @@ public class SettingsDialog {
 
 
         JLabel traceWebLabel = new JLabel("Trace Web");
-        OnOffButton traceWebToggleButton = new OnOffButton();
+        traceWebToggleButton = new OnOffButton();
         JPanel traceWebLabelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
         traceWebLabelButtonPanel.add(traceWebLabel, BorderLayout.WEST);
         traceWebLabelButtonPanel.add(traceWebToggleButton, BorderLayout.EAST);
@@ -1311,7 +1318,7 @@ public class SettingsDialog {
 
 
         JLabel traceMybatisLabel = new JLabel("Trace Mybatis");
-        OnOffButton traceMybatisToggleButton = new OnOffButton();
+        traceMybatisToggleButton = new OnOffButton();
         JPanel traceMybatisLabelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
         traceMybatisLabelButtonPanel.add(traceMybatisLabel, BorderLayout.WEST);
         traceMybatisLabelButtonPanel.add(traceMybatisToggleButton, BorderLayout.EAST);
@@ -1351,7 +1358,7 @@ public class SettingsDialog {
 
 
         JLabel logMybatisLabel = new JLabel("Log Mybatis");
-        OnOffButton logMybatisToggleButton = new OnOffButton();
+        logMybatisToggleButton = new OnOffButton();
         JPanel logMybatisLabelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
         logMybatisLabelButtonPanel.add(logMybatisLabel, BorderLayout.WEST);
         logMybatisLabelButtonPanel.add(logMybatisToggleButton, BorderLayout.EAST);
