@@ -684,23 +684,28 @@ public class TestkitToolWindow {
         } catch (Throwable ex) {
             return;
         }
-
-        List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
-        List<String> ddls = new ArrayList<>();
-        List<String> writes = new ArrayList<>();
-        for (SettingsStorageHelper.DatasourceConfig config : datasourceConfigs) {
-            // 测试连接
-            Object result = MysqlUtil.testConnectionAndClose(config);
-            if (result instanceof Integer) {
-                valids.add(config);
-                if (Objects.equals(result, 2)) {
-                    ddls.add(config.getName());
-                } else if (Objects.equals(result, 1)) {
-                    writes.add(config.getName());
+        List<SettingsStorageHelper.DatasourceConfig> finalDatasourceConfigs = datasourceConfigs;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
+                List<String> ddls = new ArrayList<>();
+                List<String> writes = new ArrayList<>();
+                for (SettingsStorageHelper.DatasourceConfig config : finalDatasourceConfigs) {
+                    // 测试连接
+                    Object result = MysqlUtil.testConnectionAndClose(config);
+                    if (result instanceof Integer) {
+                        valids.add(config);
+                        if (Objects.equals(result, 2)) {
+                            ddls.add(config.getName());
+                        } else if (Objects.equals(result, 1)) {
+                            writes.add(config.getName());
+                        }
+                    }
                 }
+                RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids, ddls, writes);
             }
-        }
-        RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids, ddls, writes);
+        }).start();
     }
 
 
