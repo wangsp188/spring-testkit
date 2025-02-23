@@ -226,6 +226,8 @@ public class SettingsDialog {
                 // 创建说明文本标签
                 JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here<br>Usually json content exported from other device or project</html>");
 // 启用自动换行
+                instructionLabel.setForeground(new Color(0x72A96B));
+                instructionLabel.setFont(new Font("Arial", Font.BOLD, 13));
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 创建JSON输入框
                 JTextArea jsonInput = new JTextArea();
@@ -249,6 +251,7 @@ public class SettingsDialog {
                         refreshSettings();
                         TestkitHelper.refresh(toolWindow.getProject());
                         dialog.dispose();
+                        TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Import successfully");
                     } catch (Exception ex) {
                         TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import error," + ex.getMessage());
                     }
@@ -280,6 +283,8 @@ public class SettingsDialog {
                 SettingsStorageHelper.ProjectConfig exportData = SettingsStorageHelper.loadProjectConfig(toolWindow.getProject());
                 // 创建说明文本标签
                 JLabel instructionLabel = new JLabel("<html>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
+                instructionLabel.setForeground(new Color(0x72A96B));
+                instructionLabel.setFont(new Font("Arial", Font.BOLD, 13));
 // 启用自动换行
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 创建JSON输入框
@@ -994,7 +999,7 @@ public class SettingsDialog {
         JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool\n" +
                 "Configuration desc\n" +
                 "#Multiple database are supported, blew is nam1's config\n" +
-                "datasource.nam1.url=jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC\n" +
+                "datasource.nam1.url=jdbc:mysql:///test\n" +
                 "datasource.nam1.username=your_account\n" +
                 "datasource.nam1.password=your_pwd");
         // 添加标签到新行
