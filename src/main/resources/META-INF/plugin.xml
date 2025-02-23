@@ -17,7 +17,7 @@
         <![CDATA[
 <p>提升 Spring 项目研发效率的解决方案，支持方法级测试，对常见框架提供调试增强</p>
 
-<h2>🚀 核心功能</h2>
+<h2>🚀 核心工具</h2>
 <ul>
   <li><b>Function-call</b> - 运行时方法级调试</li>
   <li><b>Controller-command</b> - 定制化生成可执行curl</li>
@@ -26,7 +26,7 @@
   <li><b>Spring-cache</b> - 可视化调试@Cacheable</li>
 </ul>
 
-<h2>📦 技术支持</h2>
+<h2>📦 研发支撑</h2>
 <ul>
   <li><b>SQL-tool</b> - Sql-reviewer & DDL-execute</li>
   <li><b>Coding-guidelines</b> - 角标指引式研发提醒</li>

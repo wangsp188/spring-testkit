@@ -75,6 +75,7 @@ public class SettingsDialog {
     private LanguageTextField datasourcePropertiesField;
     private JButton showDatasourceButton;
     private OnOffButton traceToggleButton;
+    private JPanel traceOptionsPanel;
     private OnOffButton traceWebToggleButton;
     private OnOffButton traceMybatisToggleButton;
     private OnOffButton logMybatisToggleButton;
@@ -143,6 +144,7 @@ public class SettingsDialog {
 //        trace
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
         traceToggleButton.setSelected(traceConfig.isEnable());
+        traceOptionsPanel.setVisible(traceConfig.isEnable());
         traceWebToggleButton.setSelected(traceConfig.isTraceWeb());
         traceMybatisToggleButton.setSelected(traceConfig.isTraceMybatis());
         logMybatisToggleButton.setSelected(traceConfig.isLogMybatis());
@@ -1257,7 +1259,7 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(traceDetailLabel, gbc);
 
-        JPanel traceOptionsPanel = new JPanel(new GridBagLayout());
+        traceOptionsPanel = new JPanel(new GridBagLayout());
         traceOptionsPanel.setVisible(false);
         traceToggleButton.addActionListener(e -> {
             traceOptionsPanel.setVisible(traceToggleButton.isSelected());
