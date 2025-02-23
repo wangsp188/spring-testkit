@@ -751,7 +751,7 @@ public class ReqStoreDialog {
 
         copyRetButton = new JButton(AllIcons.Actions.Copy);
         copyRetButton.setPreferredSize(new Dimension(32, 32));
-        copyRetButton.setToolTipText("Copy the text below");
+        copyRetButton.setToolTipText("Copy result text");
         copyRetButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {

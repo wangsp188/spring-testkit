@@ -1,6 +1,5 @@
 package com.testkit.sql_review;
 
-import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
 import net.sf.jsqlparser.statement.alter.AlterExpression;
@@ -56,7 +55,7 @@ public class MysqlWriteUtil {
 
     private static String rollbackAlterTable(Alter alter, Connection connection) {
         StringBuilder rollbackDDL = new StringBuilder();
-        rollbackDDL.append("ALTER TABLE ").append(alter.getTable().getName()).append(" ");
+        rollbackDDL.append("ALTER TABLE `").append(alter.getTable().getName()).append("` ");
 
         List<String> rollbackOps = new ArrayList<>();
 
@@ -69,11 +68,19 @@ public class MysqlWriteUtil {
                     lastCol = null;
                     if (expr.getColDataTypeList() != null) {
                         // 添加列
-                        String columnName = expr.getColumnName();
-                        rollbackOps.add("DROP COLUMN " + columnName);
+                        // 添加列
+                        for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
+                            String columnName = columnDataType.getColumnName();
+                            rollbackOps.add("DROP COLUMN " + columnName);
+                        }
+//                        String columnName = expr.getColumnName();
+//                        rollbackOps.add("DROP COLUMN " + columnName);
                     } else if (expr.getIndex() != null) {
                         // 添加索引
                         String indexName = expr.getIndex().getName();
+                        rollbackOps.add("DROP INDEX " + indexName);
+                    } else if (expr.getUkName() != null) {
+                        String indexName = expr.getUkName();
                         rollbackOps.add("DROP INDEX " + indexName);
                     } else {
                         // 其他ADD操作，无法处理
@@ -161,7 +168,7 @@ public class MysqlWriteUtil {
             }
         }
 
-        rollbackDDL.append(String.join(", ", rollbackOps));
+        rollbackDDL.append(String.join(",\n", rollbackOps));
         rollbackDDL.append(";");
         return rollbackDDL.toString();
     }
@@ -178,15 +185,20 @@ public class MysqlWriteUtil {
                     lastCol = null;
                     if (expr.getColDataTypeList() != null) {
                         // 添加列
-                        String columnName = expr.getColumnName();
-                        checks.add(descColumnDefinition(tableName, columnName, connection));
+                        for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
+                            String columnName = columnDataType.getColumnName();
+                            checks.add(descColumnDefinition(tableName, columnName, connection));
+                        }
                     } else if (expr.getIndex() != null) {
                         // 添加索引
                         String indexName = expr.getIndex().getName();
                         checks.add(descIndexDefinition(tableName, indexName, connection));
+                    } else if (expr.getUkName() != null) {
+                        String indexName = expr.getUkName();
+                        checks.add(descIndexDefinition(tableName, indexName, connection));
                     } else {
                         // 其他ADD操作，无法处理
-                        throw new UnsupportedOperationException("Unsupported ADD operation in ALTER TABLE: " + expr);
+                        throw new UnsupportedOperationException("Unsupported ADD operation in expr: " + expr);
                     }
                     break;
                 case "DROP":
@@ -204,14 +216,14 @@ public class MysqlWriteUtil {
                     } else {
                         lastCol = null;
                         // 其他DROP操作，无法处理
-                        throw new UnsupportedOperationException("Unsupported DROP operation in ALTER TABLE: " + expr);
+                        throw new UnsupportedOperationException("Unsupported DROP operation in expr: " + expr);
                     }
                     break;
 
                 case "UNSPECIFIC":
                     // 处理DROP操作
                     if (lastCol == null) {
-                        throw new UnsupportedOperationException("Unsupported UNSPECIFIC operation in ALTER TABLE: " + alter.getTable().getName());
+                        throw new UnsupportedOperationException("Unsupported UNSPECIFIC operation in expr: " + alter.getTable().getName());
                     }
                     if (lastCol) {
                         // 删除列
@@ -227,7 +239,7 @@ public class MysqlWriteUtil {
                     throw new UnsupportedOperationException("Unsupported ALTER operation: " + operation);
             }
         }
-        return String.join(";<br>", checks);
+        return String.join("\n", checks);
     }
 
 
@@ -255,7 +267,7 @@ public class MysqlWriteUtil {
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 StringBuilder definition = new StringBuilder();
-                definition.append(rs.getString("COLUMN_NAME")).append(" ");
+                definition.append("`").append(rs.getString("COLUMN_NAME")).append("` ");
                 definition.append(rs.getString("COLUMN_TYPE")).append(" ");
                 if ("NO".equals(rs.getString("IS_NULLABLE"))) {
                     definition.append("NOT NULL ");
@@ -289,26 +301,86 @@ public class MysqlWriteUtil {
     }
 
     private static String getIndexDefinition(String tableName, String indexName, Connection connection) throws SQLException {
-        String query = "SELECT INDEX_NAME, COLUMN_NAME, INDEX_TYPE, NON_UNIQUE " +
+        String query = "SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, INDEX_TYPE, " +
+                "       NON_UNIQUE, SUB_PART, COLLATION " +
                 "FROM information_schema.STATISTICS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?";
+                "WHERE TABLE_SCHEMA = DATABASE() " +
+                "  AND TABLE_NAME = ? " +
+                "  AND INDEX_NAME = ? " +
+                "ORDER BY SEQ_IN_INDEX"; // 确保列顺序正确
+
         try (PreparedStatement stmt = connection.prepareStatement(query)) {
-            stmt.setQueryTimeout(30);
             stmt.setString(1, MysqlUtil.remove(tableName));
             stmt.setString(2, MysqlUtil.remove(indexName));
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                StringBuilder definition = new StringBuilder();
-                definition.append("INDEX ").append(rs.getString("INDEX_NAME")).append(" ");
-                definition.append("ON ").append(tableName).append(" (");
-                definition.append(rs.getString("COLUMN_NAME")).append(")");
-                if ("1".equals(rs.getString("NON_UNIQUE"))) {
-                    definition.append(" NON_UNIQUE");
-                }
-                return definition.toString();
+
+            if (!rs.isBeforeFirst()) {
+                return null; // 没有找到索引
             }
-            return null;
+
+            StringBuilder definition = new StringBuilder();
+            List<String> columns = new ArrayList<>();
+
+            // 处理索引类型修饰符
+            String oriType = null;
+
+            String indexType = "";
+            if (rs.next()) {
+                oriType = rs.getString("INDEX_TYPE").toUpperCase();
+                switch (oriType) {
+                    case "FULLTEXT":
+                        indexType = "FULLTEXT ";
+                        break;
+                    case "SPATIAL":
+                        indexType = "SPATIAL ";
+                        break;
+                }
+
+                // 处理UNIQUE需要放在类型之后（因为FULLTEXT/SPATIAL不能是UNIQUE）
+                if ("0".equals(rs.getString("NON_UNIQUE"))) {
+                    indexType = "UNIQUE " + indexType;
+                }
+
+                // 处理第一个列
+                columns.add(buildColumnExpression(rs));
+            }
+
+            // 收集剩余列
+            while (rs.next()) {
+                columns.add(buildColumnExpression(rs));
+            }
+
+            definition.append(indexType)
+                    .append("INDEX `").append(indexName).append("` (")
+                    .append(String.join(", ", columns))
+                    .append(")");
+
+            // 处理索引类型声明（如BTREE）
+            if (!"BTREE".equalsIgnoreCase(oriType)) {
+                definition.append(" USING ").append(oriType);
+            }
+
+            return definition.toString();
         }
+    }
+
+    // 构建单个列的表达式
+    private static String buildColumnExpression(ResultSet rs) throws SQLException {
+        String column = "`" + rs.getString("COLUMN_NAME") + "`";
+
+        // 处理前缀长度
+        String subPart = rs.getString("SUB_PART");
+        if (subPart != null) {
+            column += "(" + subPart + ")";
+        }
+
+        // 处理排序方式 (A=asc, D=desc)
+        String collation = rs.getString("COLLATION");
+        if ("D".equalsIgnoreCase(collation)) {
+            column += " DESC";
+        }
+
+        return column;
     }
 
 
@@ -378,7 +450,7 @@ public class MysqlWriteUtil {
                 if (indexDefinition == null) {
                     throw new RuntimeException(tableName + "." + indexName + " not exits");
                 }
-                return indexDefinition;
+                return "ALTER TABLE `" + tableName + "` ADD " + indexDefinition;
             } catch (SQLException e) {
                 throw new RuntimeException("index: " + tableName + "." + indexName + ", " + e.getMessage());
             }
@@ -413,7 +485,7 @@ public class MysqlWriteUtil {
      */
     private static String rollbackCreateTable(CreateTable createTable) {
         String tableName = createTable.getTable().getName();
-        return "DROP TABLE " + tableName + ";";
+        return "DROP TABLE `" + tableName + "`;";
     }
 
     private static String rollbackCreateIndex(CreateIndex createIndex) {
@@ -422,7 +494,7 @@ public class MysqlWriteUtil {
         // 回滚语句可能是 "DROP INDEX index_name ON table_name"
         String indexName = createIndex.getIndex().getName();
         String tableName = createIndex.getTable().getName();
-        return "DROP INDEX " + indexName + " ON " + tableName + ";";
+        return "DROP INDEX `" + indexName + "` ON `" + tableName + "`;";
     }
 
     /**
@@ -506,25 +578,4 @@ public class MysqlWriteUtil {
                 !join.isInner();
     }
 
-
-    public static void main(String[] args) throws JSQLParserException, SQLException {
-        // 测试示例
-//        String ddl1 = "CREATE TABLE my_table (id INT, name VARCHAR(255));";
-//        String ddl2 = "drop index PRIMARY on house;";
-//        String ddl3 = "ALTER TABLE house drop COLUMN  name,age;";
-//        String ddl4 = "CREATE INDEX idx_name ON my_table(name);";
-//
-//        Statement stmt1 = CCJSqlParserUtil.parse(ddl1);
-//        Statement stmt2 = CCJSqlParserUtil.parse(ddl2);
-//        Statement stmt3 = CCJSqlParserUtil.parse(ddl3);
-//        Statement stmt4 = CCJSqlParserUtil.parse(ddl4);
-//        SettingsStorageHelper.DatasourceConfig datasourceConfig = new SettingsStorageHelper.DatasourceConfig();
-//        datasourceConfig.setUrl("jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC");
-//        datasourceConfig.setUsername("root");
-//        datasourceConfig.setPassword("wsd123==");
-//        datasourceConfig.setName("111");
-//        Connection databaseConnection = MysqlUtil.getDatabaseConnection(datasourceConfig);
-//        String rollbackDdl = rollbackDdl(stmt3, databaseConnection);
-//        System.out.println(rollbackDdl);
-    }
 }

@@ -1,8 +1,10 @@
 package com.testkit.sql_review;
 
 import com.testkit.SettingsStorageHelper;
+import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 
+import java.io.StringReader;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
@@ -12,6 +14,18 @@ import java.util.concurrent.TimeUnit;
 
 public class MysqlUtil {
 
+
+    public static net.sf.jsqlparser.statement.Statement parse(String sql) {
+        if (sql == null) {
+            throw new IllegalArgumentException("sql is null");
+        }
+        try {
+            return CCJSqlParserUtil.parse(sql);
+        } catch (Throwable ex) {
+            // 错误处理
+            throw new RuntimeException("Sorry, i can't parse the sql:\n" + sql + ",\n" + ex.getMessage());
+        }
+    }
 
     public static Object testConnectionAndClose(SettingsStorageHelper.DatasourceConfig datasource) {
         if (datasource == null) {

@@ -1,6 +1,7 @@
 package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.ui.Messages;
@@ -170,9 +171,9 @@ public class SqlDialog extends JDialog {
             }
 
             try {
-                CCJSqlParserUtil.parse(sqlText);
-            } catch (JSQLParserException ex) {
-                setMsg("Parse SQL error, " + ex.getMessage());
+                MysqlUtil.parse(sqlText);
+            } catch (Throwable ex) {
+                setMsg(ex.getMessage());
                 return;
             }
 
@@ -347,9 +348,9 @@ public class SqlDialog extends JDialog {
 
                     Statement statement = null;
                     try {
-                        statement = CCJSqlParserUtil.parse(sqlText);
-                    } catch (JSQLParserException ex) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Parse SQL error, " + ex.getMessage());
+                        statement = MysqlUtil.parse(sqlText);
+                    } catch (Throwable ex) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), ex.getMessage());
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
@@ -387,7 +388,7 @@ public class SqlDialog extends JDialog {
                                 } catch (Throwable ex) {
                                     table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 2);
                                 }
-                                String msg = rollbackDdl == null ? ("Are you sure you want to execute this SQL?\nDatasource:" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nGenerate rollback error") : ("Are you sure you want to execute this SQL?\nDatasource:" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nHere's rollback sql:\n" + rollbackDdl);
+                                String msg = rollbackDdl == null ? ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nGenerate rollback error") : ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nHere's rollback sql:\n" + rollbackDdl);
                                 // 添加确认对话框
                                 int result = JOptionPane.showConfirmDialog(
                                         null, // 父组件，可以为 null
@@ -403,6 +404,7 @@ public class SqlDialog extends JDialog {
                                 }
                                 MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection);
                                 table.getModel().setValueAt(sqlRet.toString(), row, 3);
+                            } catch (RuntimeExceptionWithAttachments edt) {
                             } catch (Throwable ex) {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Execute error, " + ex.getMessage());
                             } finally {
@@ -422,9 +424,9 @@ public class SqlDialog extends JDialog {
 
                     Statement statement = null;
                     try {
-                        statement = CCJSqlParserUtil.parse(sqlText);
-                    } catch (JSQLParserException ex) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Parse SQL error, " + ex.getMessage());
+                        statement = MysqlUtil.parse(sqlText);
+                    } catch (Throwable ex) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), ex.getMessage());
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
@@ -500,9 +502,9 @@ public class SqlDialog extends JDialog {
             // 更新结果面板
             panelResults.removeAll();
             panelResults.setLayout(new BorderLayout());
-            JBLabel titleField = new JBLabel("Please verify carefully before executing");
+            JBLabel titleField = new JBLabel("Please verify carefully before executing, Now support alter/drop/create/update");
             titleField.setForeground(Color.pink);
-            titleField.setFont(new Font("Arial", Font.BOLD, 15));
+            titleField.setFont(new Font("Arial", Font.BOLD, 14));
             titleField.setHorizontalAlignment(SwingConstants.CENTER); // 设置文本居中
             panelResults.add(titleField, BorderLayout.NORTH);
             panelResults.add(new JBScrollPane(table), BorderLayout.CENTER);
@@ -574,12 +576,8 @@ public class SqlDialog extends JDialog {
             return new ArrayList<>();
         }
 
-        try {
-            Statement statement = CCJSqlParserUtil.parse(sqlText);
-            if (!(statement instanceof Select) && !(statement instanceof Update) && !(statement instanceof Delete)) {
-                return new ArrayList<>();
-            }
-        } catch (JSQLParserException e) {
+        Statement jstatement = MysqlUtil.parse(sqlText);
+        if (!(jstatement instanceof Select) && !(jstatement instanceof Update) && !(jstatement instanceof Delete)) {
             return new ArrayList<>();
         }
 
@@ -746,8 +744,9 @@ public class SqlDialog extends JDialog {
         //新增一条线，线的中间有字符  Good luck
         // 新增一条线，线的中间有字符 Good luck
 //        panelResults.add(new JSeparator(SwingConstants.HORIZONTAL), BorderLayout.SOUTH);
-        JLabel goodLuckLabel = new JLabel("Good luck", SwingConstants.CENTER);
+        JLabel goodLuckLabel = new JLabel("Good luck, Now support select/update/delete/drop/create", SwingConstants.CENTER);
         goodLuckLabel.setForeground(Color.decode("#72a96b")); // 设置字体颜色为红色
+        goodLuckLabel.setFont(new Font("Arial", Font.BOLD, 14));
         panelResults.add(goodLuckLabel, BorderLayout.SOUTH);
         panelResults.revalidate();
         panelResults.repaint();

@@ -4,7 +4,19 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.table.JBTable;
+import com.intellij.util.ui.AbstractTableCellEditor;
+import com.testkit.RuntimeHelper;
+import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
+import com.testkit.sql_review.MysqlUtil;
+import com.testkit.sql_review.MysqlWriteUtil;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.util.JsonUtil;
 import com.testkit.util.curl.CurlEntity;
@@ -14,14 +26,32 @@ import com.intellij.notification.NotificationType;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
+import net.sf.jsqlparser.JSQLParserException;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.alter.Alter;
+import net.sf.jsqlparser.statement.create.index.CreateIndex;
+import net.sf.jsqlparser.statement.create.table.CreateTable;
+import net.sf.jsqlparser.statement.drop.Drop;
+import net.sf.jsqlparser.statement.update.Update;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumnModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Map;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.util.*;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class CurlDialog extends JDialog {
 
@@ -49,12 +79,23 @@ public class CurlDialog extends JDialog {
         c1.gridwidth = 2; // 横跨两列
         panelMain.add(panelCmd, c1);
 
+
+        // 设置 panelResults
+        JPanel actionPanel = buildActionPanel(testkitWindow);
+        c1.gridy = 1;
+        c1.weightx = 1;
+        c1.weighty = 0;
+        c1.gridwidth = 2; // 不再跨列
+        c1.fill = GridBagConstraints.NONE;
+        c1.anchor = GridBagConstraints.WEST;
+        panelMain.add(actionPanel, c1);
+
         // 设置 panelResults
         JPanel panelResults = buildResultPanel(testkitWindow);
         c1.anchor = GridBagConstraints.CENTER;
         c1.fill = GridBagConstraints.BOTH;
         c1.weighty = 0.8; // 垂直方向占70%
-        c1.gridy = 1;
+        c1.gridy = 2;
         c1.gridwidth = 2; // 不再跨列
         panelMain.add(panelResults, c1);
 
@@ -75,15 +116,46 @@ public class CurlDialog extends JDialog {
         c1.weightx = 0;  // 不占据额外空间
         c1.weighty = 0;
         c1.gridx = 1;    // 放在第二列
-        c1.gridy = 2;    // 放在第三行
+        c1.gridy = 3;    // 放在第三行
         panelMain.add(closePanel, c1);
 
         add(panelMain);
         pack();
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setSize((int) (screenSize.width*0.7), (int) (screenSize.height*0.7));
+        setSize((int) (screenSize.width * 0.7), (int) (screenSize.height * 0.7));
         setLocationRelativeTo(null);
+    }
+
+    private JPanel buildActionPanel(TestkitToolWindow window) {
+        JPanel actionResults = new JPanel();
+        actionResults.setLayout(new BoxLayout(actionResults, BoxLayout.X_AXIS)); // 顺序排列（水平）
+
+        JButton parseButton = new JButton("Parse");
+        // ... parseButton 的监听器代码保持不变 ...
+        parseButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String text = inputTextArea.getText();
+                CurlEntity curlEntity = null;
+                try {
+                    if (StringUtils.isNotBlank(text)) {
+                        curlEntity = CurlParserUtil.parse(text.trim());
+                    }
+                } catch (Throwable ex) {
+                    TestkitHelper.alert(window.getProject(), Messages.getErrorIcon(), "Parse curl error,\n" + ex.getMessage());
+                    return;
+                }
+                urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
+                methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
+                headersField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getHeaders()));
+                paramsField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getUrlParams()));
+                bodyField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getBody()));
+            }
+        });
+
+        actionResults.add(parseButton);
+        return actionResults;
     }
 
     private JPanel buildResultPanel(TestkitToolWindow window) {
@@ -162,28 +234,6 @@ public class CurlDialog extends JDialog {
         inputTextArea = new JBTextArea(5, 20);
         inputTextArea.getEmptyText().setText("input your curl and click right button to parse");
 
-        JButton parseButton = new JButton("Parse");
-        // ... parseButton 的监听器代码保持不变 ...
-        parseButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String text = inputTextArea.getText();
-                CurlEntity curlEntity = null;
-                try {
-                    if (StringUtils.isNotBlank(text)) {
-                        curlEntity = CurlParserUtil.parse(text.trim());
-                    }
-                } catch (Throwable ex) {
-                    TestkitHelper.notify(window.getProject(), NotificationType.ERROR, "Parse curl error");
-                }
-                urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
-                methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
-                headersField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getHeaders()));
-                paramsField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getUrlParams()));
-                bodyField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getBody()));
-            }
-        });
-
         // 添加文本框：水平和垂直扩展
         c.fill = GridBagConstraints.BOTH;
         c.anchor = GridBagConstraints.CENTER;
@@ -194,19 +244,8 @@ public class CurlDialog extends JDialog {
         JScrollPane scrollPane = new JBScrollPane(inputTextArea);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Curl Input")); // 可选：去除滚动面板边框
         panelCmd.add(scrollPane, c);
-
-        // 添加按钮：靠上对齐，不扩展
-        c.fill = GridBagConstraints.NONE;
-        c.anchor = GridBagConstraints.CENTER; // 靠上对齐
-        c.weightx = 0;
-        c.weighty = 0;
-        c.gridx = 1;
-        c.gridy = 0;
-        panelCmd.add(parseButton, c);
-
         // 可选：移除面板的默认边框
-        panelCmd.setBorder(BorderFactory.createEmptyBorder());
-
+//        panelCmd.setBorder(BorderFactory.createEmptyBorder());
         return panelCmd;
     }
 

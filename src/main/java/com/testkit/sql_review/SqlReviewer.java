@@ -67,7 +67,7 @@ public class SqlReviewer {
             datasourceConfig.setPassword("wsd123==");
             datasourceConfig.setName("111");
             // 1. 使用 JSQLParser 解析 SQL
-            Statement statement = CCJSqlParserUtil.parse(sql);
+            Statement statement = MysqlUtil.parse(sql);
             // 2. 提取 SQL 中列出表名
             Set<String> tableNames = extractTableNames(statement);
             ReviewCtx reviewCtx = new ReviewCtx();
@@ -99,7 +99,7 @@ public class SqlReviewer {
         List<Suggest> suggestions = new ArrayList<>();
         try {
             // 1. 使用 JSQLParser 解析 SQL  
-            Statement statement = CCJSqlParserUtil.parse(sql);
+            Statement statement = MysqlUtil.parse(sql);
             // 2. 提取 SQL 中列出表名
             Set<String> tableNames = extractTableNames(statement);
 
