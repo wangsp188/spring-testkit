@@ -547,6 +547,8 @@ public class TestkitToolWindow {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             sqlDialog.refreshDatasources();
             sqlDialog.setVisible(true);
+            sqlDialog.revalidate();
+            sqlDialog.repaint();
         }
     }
 

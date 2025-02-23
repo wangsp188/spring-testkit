@@ -222,10 +222,10 @@ public class SqlDialog extends JDialog {
         unfoldButton.addActionListener(e -> {
             // 创建表格模型
             DefaultTableModel model = new DefaultTableModel(
-                    new Object[]{"Datasource", "Verify", "Rollback", "Result", "Operate"}, 0) {
+                    new Object[]{"Datasource","Operate", "Verify", "Rollback", "Result"}, 0) {
                 @Override
                 public boolean isCellEditable(int row, int column) {
-                    return column == 4; // 只有Operate列可编辑
+                    return column == 1; // 只有Operate列可编辑
                 }
             };
 
@@ -249,11 +249,11 @@ public class SqlDialog extends JDialog {
             // 设置列宽
             TableColumnModel columnModel = table.getColumnModel();
             columnModel.getColumn(0).setPreferredWidth(120);   // 数据源名称
-            columnModel.getColumn(1).setPreferredWidth((panelResults.getWidth() - 207) / 3);
+            columnModel.getColumn(1).setPreferredWidth(80);   // Operate
             columnModel.getColumn(2).setPreferredWidth((panelResults.getWidth() - 207) / 3);
             columnModel.getColumn(3).setPreferredWidth((panelResults.getWidth() - 207) / 3);
-            columnModel.getColumn(4).setPreferredWidth(80);   // Operate
-            table.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(1, 2, 3)));
+            columnModel.getColumn(4).setPreferredWidth((panelResults.getWidth() - 207) / 3);
+            table.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of( 2, 3,4)));
 
             // 添加点击复制功能
             table.addMouseListener(new MouseAdapter() {
@@ -262,7 +262,7 @@ public class SqlDialog extends JDialog {
                     int row = table.rowAtPoint(e.getPoint());
                     int col = table.columnAtPoint(e.getPoint());
 
-                    if (row >= 0 && col >= 0 && (col == 1 || col == 2)) {
+                    if (row >= 0 && (col == 2 || col == 3)) {
                         Object value = table.getValueAt(row, col);
                         String text = value != null ? value.toString() : "";
                         TestkitHelper.copyToClipboard(toolWindow.getProject(), text, null);
@@ -272,7 +272,7 @@ public class SqlDialog extends JDialog {
 
 
             // 自定义操作列渲染
-            columnModel.getColumn(4).setCellRenderer(new TableCellRenderer() {
+            columnModel.getColumn(1).setCellRenderer(new TableCellRenderer() {
 
                 @Override
                 public Component getTableCellRendererComponent(JTable table, Object value,
@@ -291,7 +291,7 @@ public class SqlDialog extends JDialog {
             });
 
             // 自定义操作列的编辑器
-            columnModel.getColumn(4).setCellEditor(new AbstractTableCellEditor() {
+            columnModel.getColumn(1).setCellEditor(new AbstractTableCellEditor() {
                 private Map<Integer, JPanel> panels = new HashMap<>();
 
                 @Override
@@ -379,13 +379,13 @@ public class SqlDialog extends JDialog {
                         public void run(@NotNull ProgressIndicator progressIndicator) {
                             try (Connection connection = datasource.newConnection()) {
                                 String verifyDdl = MysqlWriteUtil.verifyWriteSQL(finalStatement, connection);
-                                table.getModel().setValueAt(verifyDdl, row, 1);
+                                table.getModel().setValueAt(verifyDdl, row, 2);
                                 String rollbackDdl = null;
                                 try {
                                     rollbackDdl = MysqlWriteUtil.rollbackWriteSQL(finalStatement, connection);
-                                    table.getModel().setValueAt(rollbackDdl, row, 2);
+                                    table.getModel().setValueAt(rollbackDdl, row, 3);
                                 } catch (Throwable ex) {
-                                    table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 2);
+                                    table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 3);
                                 }
                                 String msg = rollbackDdl == null ? ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nGenerate rollback error") : ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nHere's rollback sql:\n" + rollbackDdl);
                                 // 添加确认对话框
@@ -402,7 +402,7 @@ public class SqlDialog extends JDialog {
                                     return;
                                 }
                                 MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection);
-                                table.getModel().setValueAt(sqlRet.toString(), row, 3);
+                                table.getModel().setValueAt(sqlRet.toString(), row, 4);
                             } catch (RuntimeExceptionWithAttachments edt) {
                             } catch (Throwable ex) {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Execute error, " + ex.getMessage());
@@ -457,12 +457,12 @@ public class SqlDialog extends JDialog {
                         public void run(@NotNull ProgressIndicator progressIndicator) {
                             try (Connection connection = datasource.newConnection()) {
                                 String checkDdl = MysqlWriteUtil.verifyWriteSQL(finalStatement, connection);
-                                table.getModel().setValueAt(checkDdl, row, 1);
+                                table.getModel().setValueAt(checkDdl, row, 2);
                                 try {
                                     String rollbackDdl = MysqlWriteUtil.rollbackWriteSQL(finalStatement, connection);
-                                    table.getModel().setValueAt(rollbackDdl, row, 2);
+                                    table.getModel().setValueAt(rollbackDdl, row, 3);
                                 } catch (Throwable ex) {
-                                    table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 2);
+                                    table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 3);
                                 }
                             } catch (Throwable ex) {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Verify error, " + ex.getMessage());
@@ -814,13 +814,11 @@ public class SqlDialog extends JDialog {
         boolean ddl = CollectionUtils.isNotEmpty(ddlDatasources);
         if (ddl && !Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
             actionResults.add(unfoldButton);
-            actionResults.revalidate();
-            actionResults.repaint();
         } else if (!ddl && Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
             actionResults.remove(unfoldButton);
-            actionResults.revalidate();
-            actionResults.repaint();
         }
+        actionResults.revalidate();
+        actionResults.repaint();
     }
 
 

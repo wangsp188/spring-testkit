@@ -1000,7 +1000,9 @@ public class ReqStoreDialog {
         if (selectedItem != null && newItems.contains(selectedItem)) {
             visibleAppComboBox.setSelectedItem(selectedItem);
         }
-        visibleAppComboBox.repaint();
+//        visibleAppComboBox.repaint();
+        dialog.revalidate();
+        dialog.repaint();
     }
 
 
