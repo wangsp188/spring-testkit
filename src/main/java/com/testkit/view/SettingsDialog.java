@@ -80,7 +80,7 @@ public class SettingsDialog {
     private JBTextField traceClassSuffixField;
     private JBTextField traceWhiteListField;
     private JBTextField traceBlackListField;
-    private JBTextField traceSingleClsDepthField;
+//    private JBTextField traceSingleClsDepthField;
 
 
     public SettingsDialog(TestkitToolWindow toolWindow) {
@@ -145,7 +145,7 @@ public class SettingsDialog {
         traceClassSuffixField.setText(traceConfig.getClsSuffix());
         traceBlackListField.setText(traceConfig.getBlacks());
         traceWhiteListField.setText(traceConfig.getWhites());
-        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
+//        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
 
         SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
         datasourcePropertiesField.setText(sqlConfig.getProperties());
@@ -651,7 +651,7 @@ public class SettingsDialog {
                         req.put("interceptor", interceptor);
                         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
                         req.put("trace", traceConfig.isEnable());
-                        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+//                        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
                         String reqId;
                         try {
                             JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", req, JSONObject.class);
@@ -1451,24 +1451,25 @@ public class SettingsDialog {
         traceOptionsPanel.add(traceBlackListField, gbc);
 
 
-        JLabel monitorPrivateLabel = new JLabel("Single Class Depth:");
-        monitorPrivateLabel.setToolTipText("Maximum tracking depth for a single class");
-        monitorPrivateLabel.setPreferredSize(labelDimension);
+//        JLabel monitorPrivateLabel = new JLabel("Single Class Depth:");
+//        monitorPrivateLabel.setToolTipText("Maximum tracking depth for a single class");
+//        monitorPrivateLabel.setPreferredSize(labelDimension);
+//
+//
+//        gbc.gridx = 0;
+//        gbc.gridy = 8;
+//        gbc.weightx = 0.0;
+//        traceOptionsPanel.add(monitorPrivateLabel, gbc);
 
-        traceSingleClsDepthField = new JBTextField(String.valueOf(traceConfig.getSingleClsDepth()), 10);
-        traceSingleClsDepthField.getEmptyText().setText("Maximum tracking depth for a single class, Default: 2");
+//        traceSingleClsDepthField = new JBTextField(String.valueOf(traceConfig.getSingleClsDepth()), 10);
+//        traceSingleClsDepthField.getEmptyText().setText("Maximum tracking depth for a single class, Default: 2");
+//        gbc.gridx = 1;
+//        gbc.weightx = 1.0;
+//        traceOptionsPanel.add(traceSingleClsDepthField, gbc);
+
+
         gbc.gridx = 0;
         gbc.gridy = 8;
-        gbc.weightx = 0.0;
-        traceOptionsPanel.add(monitorPrivateLabel, gbc);
-
-        gbc.gridx = 1;
-        gbc.weightx = 1.0;
-        traceOptionsPanel.add(traceSingleClsDepthField, gbc);
-
-
-        gbc.gridx = 0;
-        gbc.gridy = 9;
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
         panel.add(traceOptionsPanel, gbc);
@@ -1476,7 +1477,7 @@ public class SettingsDialog {
 
         // 新增一行值得占用
         gbc.gridx = 0;
-        gbc.gridy = 10; // 新的一行
+        gbc.gridy = 9; // 新的一行
         gbc.gridwidth = 2; // 占据两列
         gbc.weighty = 1.0; // 占用剩余空间
         gbc.fill = GridBagConstraints.BOTH; // 使下一行占用空间
@@ -1494,16 +1495,16 @@ public class SettingsDialog {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "No config need to save");
                     return;
                 }
-                String text = traceSingleClsDepthField.getText();
-                if (StringUtils.isNotBlank(text) && !StringUtils.isNumeric(text.trim())) {
-                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth must be integer");
-                    return;
-                }
-                int singleClsDepth = Integer.parseInt(traceSingleClsDepthField.getText().trim());
-                if (singleClsDepth > 100) {
-                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth max num is 100");
-                    return;
-                }
+//                String text = traceSingleClsDepthField.getText();
+//                if (StringUtils.isNotBlank(text) && !StringUtils.isNumeric(text.trim())) {
+//                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth must be integer");
+//                    return;
+//                }
+//                int singleClsDepth = Integer.parseInt(traceSingleClsDepthField.getText().trim());
+//                if (singleClsDepth > 100) {
+//                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Single Class Depth max num is 100");
+//                    return;
+//                }
 
 
                 SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
@@ -1511,7 +1512,7 @@ public class SettingsDialog {
                 nowConfig.setClsSuffix(traceClassSuffixField.getText().trim());
                 nowConfig.setWhites(traceWhiteListField.getText().trim());
                 nowConfig.setBlacks(traceBlackListField.getText().trim());
-                nowConfig.setSingleClsDepth(singleClsDepth);
+//                nowConfig.setSingleClsDepth(singleClsDepth);
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
                 TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace config was saved");
             }
@@ -1538,7 +1539,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 11; // 新的一行
+        gbc.gridy = 10; // 新的一行
         gbc.gridwidth = 2; // 占据两列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重

@@ -188,7 +188,7 @@ public class SpringCacheTool extends BasePluginTool {
         }
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
         req.put("trace", traceConfig.isEnable());
-        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+//        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         return req;
     }
 

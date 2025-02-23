@@ -277,7 +277,7 @@ public class SettingsStorageHelper {
         DEF_TRACE_CONFIG.setClsSuffix("Controller,Service,Impl,Repository");
         DEF_TRACE_CONFIG.setBlacks("");
         DEF_TRACE_CONFIG.setWhites("");
-        DEF_TRACE_CONFIG.setSingleClsDepth(2);
+//        DEF_TRACE_CONFIG.setSingleClsDepth(2);
     }
 
     public static final SqlConfig DEF_SQL_CONFIG = new SqlConfig();
@@ -455,7 +455,7 @@ public class SettingsStorageHelper {
 
     private static TraceConfig copyDefMonitorConfig() {
         TraceConfig copyConfig = new TraceConfig();
-        copyConfig.setSingleClsDepth(DEF_TRACE_CONFIG.getSingleClsDepth());
+//        copyConfig.setSingleClsDepth(DEF_TRACE_CONFIG.getSingleClsDepth());
         copyConfig.setPackages(DEF_TRACE_CONFIG.getPackages());
         copyConfig.setClsSuffix(DEF_TRACE_CONFIG.getClsSuffix());
         copyConfig.setWhites(DEF_TRACE_CONFIG.getWhites());
@@ -717,7 +717,7 @@ public class SettingsStorageHelper {
 
         private String blacks;
 
-        private int singleClsDepth = 2;
+//        private int singleClsDepth = 2;
 
         public boolean judgeIsAppThreePackage() {
             return "app.three.package".equals(packages);
@@ -788,13 +788,13 @@ public class SettingsStorageHelper {
             this.logMybatis = logMybatis;
         }
 
-        public int getSingleClsDepth() {
-            return singleClsDepth;
-        }
-
-        public void setSingleClsDepth(int singleClsDepth) {
-            this.singleClsDepth = singleClsDepth;
-        }
+//        public int getSingleClsDepth() {
+//            return singleClsDepth;
+//        }
+//
+//        public void setSingleClsDepth(int singleClsDepth) {
+//            this.singleClsDepth = singleClsDepth;
+//        }
     }
 
 

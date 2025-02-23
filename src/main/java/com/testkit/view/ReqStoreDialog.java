@@ -1317,7 +1317,7 @@ public class ReqStoreDialog {
 
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
         req.put("trace", traceConfig.isEnable());
-        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+//        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
             req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }
@@ -1336,7 +1336,7 @@ public class ReqStoreDialog {
 
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
         req.put("trace", traceConfig.isEnable());
-        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+//        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
             req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
         }

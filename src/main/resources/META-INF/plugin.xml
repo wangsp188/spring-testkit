@@ -13,18 +13,27 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
-    <description><![CDATA[
-    1.Function-call
-    2.Flexible-test
-    3.Spring-cache
-    4.Mapper-sql
+    <description>
+        <![CDATA[
+<p>提升 Spring 项目研发效率的解决方案，支持方法级测试，对常见框架提供调试增强</p>
 
+<h2>🚀 核心功能</h2>
+<ul>
+  <li><b>Function-call</b> - 运行时方法级调试</li>
+  <li><b>Controller-command</b> - 定制化生成可执行curl</li>
+  <li><b>Flexible-test</b> - 动态编译代码及调试</li>
+  <li><b>Mapper-sql</b> - 根据mapper-xml动态生成sql</li>
+  <li><b>Spring-cache</b> - 可视化调试@Cacheable</li>
+</ul>
 
-    1.SQL-tool
-    2.Coding-guidelines
-    3.Controller-command
-    4.Function-Trace
-  ]]></description>
+<h2>📦 技术支持</h2>
+<ul>
+  <li><b>SQL-tool</b> - Sql-reviewer & DDL-execute</li>
+  <li><b>Coding-guidelines</b> - 角标指引式研发提醒</li>
+  <li><b>Trace</b> - 可视化请求链路</li>
+  <li><b>Curl-parser</b> - 简易curl解析器</li>
+</ul>
+]]></description>
 <!--  开发F&Q  https://intellij-support.jetbrains.com/hc/en-us/search?utf8=%E2%9C%93-->
 
     <!-- Product and plugin compatibility requirements.

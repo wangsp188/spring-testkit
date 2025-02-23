@@ -589,7 +589,7 @@ public class FunctionCallTool extends BasePluginTool {
 
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
         req.put("trace", traceConfig.isEnable());
-        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+//        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (useInterceptor) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
             req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
