@@ -23,8 +23,6 @@ import com.intellij.sql.psi.SqlLanguage;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
-import net.sf.jsqlparser.JSQLParserException;
-import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
 import net.sf.jsqlparser.statement.create.index.CreateIndex;
@@ -53,7 +51,7 @@ import java.util.function.Predicate;
 public class SqlDialog extends JDialog {
 
     public static final Icon SQL_ANALYSIS_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", SqlDialog.class);
-    public static final Icon FAST_SQL_ICON = IconLoader.getIcon("/icons/fast-sql.svg", SqlDialog.class);
+    public static final Icon SAFE_SQL_ICON = IconLoader.getIcon("/icons/safe-sql.svg", SqlDialog.class);
 
 
     private TestkitToolWindow toolWindow;
@@ -218,8 +216,8 @@ public class SqlDialog extends JDialog {
 
 
         // 一个展开的按钮
-        unfoldButton = new JButton(FAST_SQL_ICON);
-        unfoldButton.setToolTipText("Fast Write");
+        unfoldButton = new JButton(SAFE_SQL_ICON);
+        unfoldButton.setToolTipText("Safe Execute");
         unfoldButton.setPreferredSize(new Dimension(32, 32));
         unfoldButton.addActionListener(e -> {
             // 创建表格模型
@@ -232,8 +230,9 @@ public class SqlDialog extends JDialog {
             };
 
             List<String> datasources = RuntimeHelper.getDDLDatasources(toolWindow.getProject().getName());
-            if (CollectionUtils.isEmpty(datasources)) {
-                setMsg("No Datasource has Write permission");
+            List<String> datasources2 = RuntimeHelper.getWriteDatasources(toolWindow.getProject().getName());
+            if (CollectionUtils.isEmpty(datasources) && CollectionUtils.isEmpty(datasources2)) {
+                setMsg("No Datasource has Write/DDL permission");
                 return;
             }
             // 填充数据源
@@ -777,10 +776,10 @@ public class SqlDialog extends JDialog {
         dataSourceComboBox.removeAllItems();
         List<SettingsStorageHelper.DatasourceConfig> validDatasources = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName());
         List<String> ddlDatasources = RuntimeHelper.getDDLDatasources(toolWindow.getProject().getName());
-
-        LinkedHashMap<String, List<String>> objects = new LinkedHashMap<>();
+        List<String> writeDatasources = RuntimeHelper.getWriteDatasources(toolWindow.getProject().getName());
+        LinkedHashMap<String, List<String>> url2Names = new LinkedHashMap<>();
         for (SettingsStorageHelper.DatasourceConfig validDatasource : validDatasources) {
-            objects.computeIfAbsent(validDatasource.getUrl(), new Function<String, List<String>>() {
+            url2Names.computeIfAbsent(validDatasource.getUrl(), new Function<String, List<String>>() {
                 @Override
                 public List<String> apply(String s) {
                     return new ArrayList<>();
@@ -788,14 +787,21 @@ public class SqlDialog extends JDialog {
             }).add(validDatasource.getName());
         }
 
-        for (Map.Entry<String, List<String>> listEntry : objects.entrySet()) {
-            List<String> value = new ArrayList<>(listEntry.getValue());
-            value.removeAll(ddlDatasources);
-            if (value.isEmpty()) {
-                dataSourceComboBox.addItem(listEntry.getValue().get(0));
-            } else {
-                dataSourceComboBox.addItem(value.get(0));
+        for (Map.Entry<String, List<String>> listEntry : url2Names.entrySet()) {
+            List<String> optinals = new ArrayList<>(listEntry.getValue());
+            String ddl = findAny(optinals, ddlDatasources);
+            if (ddl != null) {
+                dataSourceComboBox.addItem(ddl);
+                continue;
             }
+
+            String write = findAny(optinals, writeDatasources);
+            if (write != null) {
+                dataSourceComboBox.addItem(write);
+                continue;
+            }
+
+            dataSourceComboBox.addItem(optinals.get(0));
         }
 
         if (selectedData != null) {
@@ -812,7 +818,19 @@ public class SqlDialog extends JDialog {
             actionResults.revalidate();
             actionResults.repaint();
         }
+    }
 
+
+    private static String findAny(List<String> sources, List<String> search) {
+        if (sources == null || search == null) {
+            return null;
+        }
+        for (String source : sources) {
+            if (search.contains(source)) {
+                return source;
+            }
+        }
+        return null;
     }
 
 }

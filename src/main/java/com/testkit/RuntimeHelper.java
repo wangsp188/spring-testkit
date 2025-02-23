@@ -32,6 +32,7 @@ public class RuntimeHelper {
 
     private static final Map<String, List<SettingsStorageHelper.DatasourceConfig>> validDatasources = new HashMap<>();
     private static final Map<String, List<String>> ddlDatasources = new HashMap<>();
+    private static final Map<String, List<String>> writeDatasources = new HashMap<>();
 
 
     public static VisibleApp getSelectedApp(String project) {
@@ -68,17 +69,19 @@ public class RuntimeHelper {
         return monitor != null && monitor;
     }
 
-    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls) {
+    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls,List<String> writes) {
         if (project == null) {
             return;
         }
         if (CollectionUtils.isEmpty(datasources)) {
             validDatasources.remove(project);
             ddlDatasources.remove(project);
+            writeDatasources.remove(project);
             return;
         }
         validDatasources.put(project, datasources);
         ddlDatasources.put(project, ddls);
+        writeDatasources.put(project,writes);
     }
 
     public static List<SettingsStorageHelper.DatasourceConfig> getValidDatasources(String project) {
@@ -108,6 +111,14 @@ public class RuntimeHelper {
             return new ArrayList<>();
         }
         List<String> visibleApps1 = ddlDatasources.get(project);
+        return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
+    }
+
+    public static List<String> getWriteDatasources(String project) {
+        if (project == null) {
+            return new ArrayList<>();
+        }
+        List<String> visibleApps1 = writeDatasources.get(project);
         return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
     }
 

@@ -38,10 +38,7 @@ public class MysqlUtil {
             connection = getDatabaseConnection(datasource);
 
             // 检查 DDL 权限
-            boolean hasDDLPermission = checkWritePermission(connection);
-
-            // 返回是否有 DDL 权限
-            return hasDDLPermission;
+            return checkWritePermission(connection);
         } catch (Exception e) {
             // 捕获异常并返回异常信息
             return e.getMessage();
@@ -59,33 +56,39 @@ public class MysqlUtil {
 
     /**
      * 检查当前连接是否具有 DDL 权限
+     * 0:read
+     * 1:write
+     * 2:ddl
      *
      * @param connection 数据库连接
      * @return true 表示有 DDL 权限，false 表示没有
      * @throws Exception 如果查询权限时发生异常
      */
-    private static boolean checkWritePermission(Connection connection) throws Exception {
+    private static Integer checkWritePermission(Connection connection) throws Exception {
+        int ret = 0;
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery("SHOW GRANTS FOR CURRENT_USER();")) {
 
             // 检查权限字符串是否包含 DDL 权限
             while (rs.next()) {
                 String grant = rs.getString(1);
-                if (grant != null) {
-                    // 判断权限字符串中是否包含 DDL 权限
-                    if (grant.contains("ALL PRIVILEGES") ||
-                            grant.contains("CREATE") ||
-                            grant.contains("ALTER") ||
-                            grant.contains("DROP") ||
-                            grant.contains("INDEX") ||
-                            grant.contains("UPDATE")
-                    ) {
-                        return true;
-                    }
+                if (grant == null) {
+                    continue;
+                }
+                // 判断权限字符串中是否包含 DDL 权限
+                if (grant.contains("ALL PRIVILEGES") ||
+                        grant.contains("CREATE") ||
+                        grant.contains("ALTER") ||
+                        grant.contains("DROP") ||
+                        grant.contains("INDEX")
+                ) {
+                    return 2;
+                } else if (grant.contains("UPDATE")) {
+                    ret = 1;
                 }
             }
         }
-        return false;
+        return ret;
     }
 
     public static Connection getDatabaseConnection(SettingsStorageHelper.DatasourceConfig datasourceConfig) {
