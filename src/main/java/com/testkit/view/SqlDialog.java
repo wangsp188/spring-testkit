@@ -51,7 +51,7 @@ import java.util.function.Predicate;
 public class SqlDialog extends JDialog {
 
     public static final Icon SQL_ANALYSIS_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", SqlDialog.class);
-    public static final Icon SAFE_SQL_ICON = IconLoader.getIcon("/icons/safe-sql.svg", SqlDialog.class);
+    public static final Icon SAFE_EXECUTE_ICON = IconLoader.getIcon("/icons/safe-execute.svg", SqlDialog.class);
 
 
     private TestkitToolWindow toolWindow;
@@ -216,8 +216,8 @@ public class SqlDialog extends JDialog {
 
 
         // 一个展开的按钮
-        unfoldButton = new JButton(SAFE_SQL_ICON);
-        unfoldButton.setToolTipText("Safe Execute");
+        unfoldButton = new JButton(SAFE_EXECUTE_ICON);
+        unfoldButton.setToolTipText("DDL Executor");
         unfoldButton.setPreferredSize(new Dimension(32, 32));
         unfoldButton.addActionListener(e -> {
             // 创建表格模型
@@ -630,6 +630,15 @@ public class SqlDialog extends JDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridx = 0;
         gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.CENTER; // 居中对齐
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
+
+        JLabel goodLuckLabel = new JLabel("Good luck, Analysis support select/update/delete/drop/create", SwingConstants.CENTER);
+        goodLuckLabel.setForeground(Color.decode("#72a96b")); // 设置字体颜色为红色
+        goodLuckLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        verticalPanel.add(goodLuckLabel, gbc);
+
+        gbc.gridy = 1;
         gbc.anchor = GridBagConstraints.NORTHWEST; // 左对齐
         gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
         gbc.weightx = 1; // 水平权重
@@ -739,14 +748,6 @@ public class SqlDialog extends JDialog {
         // 将垂直容器包裹在滚动面板中（支持整体滚动）
         JBScrollPane mainScrollPane = new JBScrollPane(verticalPanel);
         panelResults.add(mainScrollPane, BorderLayout.NORTH);
-
-        //新增一条线，线的中间有字符  Good luck
-        // 新增一条线，线的中间有字符 Good luck
-//        panelResults.add(new JSeparator(SwingConstants.HORIZONTAL), BorderLayout.SOUTH);
-        JLabel goodLuckLabel = new JLabel("Good luck, Now support select/update/delete/drop/create", SwingConstants.CENTER);
-        goodLuckLabel.setForeground(Color.decode("#72a96b")); // 设置字体颜色为红色
-        goodLuckLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        panelResults.add(goodLuckLabel, BorderLayout.SOUTH);
         panelResults.revalidate();
         panelResults.repaint();
     }
@@ -779,7 +780,9 @@ public class SqlDialog extends JDialog {
         List<String> writeDatasources = RuntimeHelper.getWriteDatasources(toolWindow.getProject().getName());
         LinkedHashMap<String, List<String>> url2Names = new LinkedHashMap<>();
         for (SettingsStorageHelper.DatasourceConfig validDatasource : validDatasources) {
-            url2Names.computeIfAbsent(validDatasource.getUrl(), new Function<String, List<String>>() {
+            String url = validDatasource.getUrl();
+            url = url.split("\\?")[0];
+            url2Names.computeIfAbsent(url, new Function<String, List<String>>() {
                 @Override
                 public List<String> apply(String s) {
                     return new ArrayList<>();

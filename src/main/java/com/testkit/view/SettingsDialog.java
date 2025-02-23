@@ -91,8 +91,6 @@ public class SettingsDialog {
     public void visible() {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             refreshSettings();
-            dialog.revalidate();
-            dialog.repaint();
             dialog.setVisible(true);
         }
     }

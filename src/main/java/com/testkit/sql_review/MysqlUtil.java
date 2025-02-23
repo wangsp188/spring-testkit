@@ -77,10 +77,8 @@ public class MysqlUtil {
                 }
                 // 判断权限字符串中是否包含 DDL 权限
                 if (grant.contains("ALL PRIVILEGES") ||
-                        grant.contains("CREATE") ||
                         grant.contains("ALTER") ||
-                        grant.contains("DROP") ||
-                        grant.contains("INDEX")
+                        grant.contains("DROP")
                 ) {
                     return 2;
                 } else if (grant.contains("UPDATE")) {
@@ -98,9 +96,22 @@ public class MysqlUtil {
         // 加载驱动（如果未自动注册）
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
+            String url = datasourceConfig.getUrl();
+            if (!url.contains("?")) {
+                url += "?connectTimeout=5000&socketTimeout=30000";
+            } else {
+                if (!url.contains("connectTimeout=")) {
+                    url += "&connectTimeout=5000";
+                }
+
+                if (!url.contains("socketTimeout=")) {
+                    url += "&socketTimeout=30000";
+                }
+            }
+
             // 直接通过 DriverManager 获取连接
             return DriverManager.getConnection(
-                    datasourceConfig.getUrl(),
+                    url,
                     datasourceConfig.getUsername(),
                     datasourceConfig.getPassword()
             );
