@@ -1,6 +1,8 @@
 package com.testkit.tools.view_value;
 
 import com.alibaba.fastjson.JSONObject;
+import com.google.protobuf.Message;
+import com.intellij.openapi.ui.Messages;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -45,7 +47,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
         }
         PsiField field = (PsiField) element;
         String verifyMsg = test(field);
-        if(verifyMsg!=null){
+        if (verifyMsg != null) {
             System.out.println("not_support_view-value, " + verifyMsg + element);
             return null;
         }
@@ -112,7 +114,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
 
                         if (controllerActionGroup.getChildrenCount() == 0) {
-                            TestkitHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find runtime app");
+                            TestkitHelper.alert(element.getProject(), Messages.getWarningIcon(), "Can't find runtime app");
                             return;
                         }
 
@@ -125,6 +127,9 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
     }
 
     private static String test(PsiField field) {
+        if (RuntimeHelper.getVisibleApps(field.getProject().getName()).isEmpty()) {
+            return "no_runtime_app";
+        }
         PsiClass containingClass = field.getContainingClass();
         if (containingClass == null || containingClass.getName() == null) {
             return "containingClassNull";
@@ -152,7 +157,6 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 //        如果是serialVersionUID 返回 ser
 
 
-
         PsiFile psiFile = field.getContainingFile();
         // 5. 必须不在Java的test模块下
         VirtualFile virtualFile = psiFile.getVirtualFile();
@@ -165,13 +169,13 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
             }
         }
 
-        if(!RuntimeHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())){
+        if (!RuntimeHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())) {
             return "no_side_server";
         }
 
         // 2. 必须是非静态方法
         PsiModifierList modifierList = field.getModifierList();
-        if (modifierList !=null && modifierList.hasModifierProperty(PsiModifier.STATIC)) {
+        if (modifierList != null && modifierList.hasModifierProperty(PsiModifier.STATIC)) {
             return null;
         }
 
@@ -240,7 +244,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             } else {
                                 Object data = result.get("data");
                                 if (data == null) {
-                                    TestkitHelper.showMessageWithCopy(element.getProject(),"null");
+                                    TestkitHelper.showMessageWithCopy(element.getProject(), "null");
                                 } else if (data instanceof String
                                         || data instanceof Byte
                                         || data instanceof Short
@@ -251,9 +255,9 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                         || data instanceof Character
                                         || data instanceof Boolean
                                         || data.getClass().isEnum()) {
-                                    TestkitHelper.showMessageWithCopy(element.getProject(),  data.toString());
+                                    TestkitHelper.showMessageWithCopy(element.getProject(), data.toString());
                                 } else {
-                                    TestkitHelper.showMessageWithCopy(element.getProject(),  JsonUtil.formatObj(data));
+                                    TestkitHelper.showMessageWithCopy(element.getProject(), JsonUtil.formatObj(data));
                                 }
                             }
                         } catch (Throwable ex) {

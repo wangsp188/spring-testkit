@@ -28,11 +28,18 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
     public static final Icon SQL_TOOL_ICON = IconLoader.getIcon("/icons/sql-tool.svg", FunctionCallIconProvider.class);
 
 
-
     private static final Map<Project, TestkitToolWindow> windows = new HashMap<>();
 
     private static boolean isRegisterWindow(Project project) {
         return windows.containsKey(project);
+    }
+
+
+    public static TestkitToolWindow getToolWindow(Project project) {
+        if (project == null) {
+            return null;
+        }
+        return windows.get(project);
     }
 
     private static void registerWindow(Project project, TestkitToolWindow window) {
@@ -88,7 +95,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             return;
         }
         synchronized (project) {
-            TestkitToolWindow testkitToolWindow = new TestkitToolWindow(project,toolWindow);
+            TestkitToolWindow testkitToolWindow = new TestkitToolWindow(project, toolWindow);
             registerWindow(project, testkitToolWindow);
             // 使用 ApplicationManager 获取 ContentFactory 实例
             ContentFactory contentFactory = ContentFactory.getInstance();
@@ -117,9 +124,9 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         };
 
         // 添加第二个按钮
-        AnAction sql = new AnAction("SQL tool", "SQL tool", SQL_TOOL_ICON) {
+        AnAction sql = new AnAction("SQL Tool", "SQL Tool", SQL_TOOL_ICON) {
             @Override
-            public void actionPerformed( AnActionEvent e) {
+            public void actionPerformed(AnActionEvent e) {
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {

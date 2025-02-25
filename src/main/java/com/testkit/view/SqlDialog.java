@@ -68,7 +68,7 @@ public class SqlDialog extends JDialog {
 
 
     public SqlDialog(TestkitToolWindow testkitWindow) {
-        super((Frame) null, "SQL tool", true);
+        super((Frame) null, "SQL Tool", true);
         this.toolWindow = testkitWindow;
         JPanel panelMain = new JPanel(new GridBagLayout());
         GridBagConstraints c1 = new GridBagConstraints();
@@ -772,7 +772,7 @@ public class SqlDialog extends JDialog {
         panelResults.repaint();
     }
 
-    public void refreshDatasources() {
+    public synchronized void refreshDatasources() {
         String selectedData = (String) dataSourceComboBox.getSelectedItem();
         dataSourceComboBox.removeAllItems();
         List<SettingsStorageHelper.DatasourceConfig> validDatasources = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName());

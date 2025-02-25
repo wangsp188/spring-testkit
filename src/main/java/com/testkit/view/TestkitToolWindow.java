@@ -65,7 +65,7 @@ public class TestkitToolWindow {
 
 
     private Project project;
-    private ToolWindow toolWindow;
+    private ToolWindow window;
     private JPanel windowContent;
     private JButton tipsButton;
     private JButton settingsButton;
@@ -104,10 +104,10 @@ public class TestkitToolWindow {
         }
     }
 
-    public TestkitToolWindow(Project project, ToolWindow toolWindow) {
+    public TestkitToolWindow(Project project, ToolWindow window) {
 
         this.project = project;
-        this.toolWindow = toolWindow;
+        this.window = window;
         // 初始化主面板
         windowContent = new JPanel(new GridBagLayout());
 
@@ -285,7 +285,7 @@ public class TestkitToolWindow {
         if (CollectionUtils.isNotEmpty(scopeDocs)) {
             homeDocs.addAll(scopeDocs);
         }
-        List<CodingGuidelinesHelper.Doc> preSetDocs = CodingGuidelinesHelper.getHomeDocs(toolWindow.getProject());
+        List<CodingGuidelinesHelper.Doc> preSetDocs = CodingGuidelinesHelper.getHomeDocs(window.getProject());
         if (CollectionUtils.isNotEmpty(preSetDocs)) {
             homeDocs.addAll(preSetDocs);
         }
@@ -506,6 +506,9 @@ public class TestkitToolWindow {
                 }
             }
         }
+
+        //更新索引
+        TestkitHelper.refresh(project);
     }
 
     private void openTipsDoc() {
@@ -543,12 +546,13 @@ public class TestkitToolWindow {
         }
     }
 
+    public void refreshSqlDatasources(){
+        sqlDialog.refreshDatasources();
+    }
+
     public void openSqlDialog() {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
-            sqlDialog.refreshDatasources();
             sqlDialog.setVisible(true);
-            sqlDialog.revalidate();
-            sqlDialog.repaint();
         }
     }
 
@@ -557,7 +561,7 @@ public class TestkitToolWindow {
         toolBox.setSelectedItem(tool.getCode());
         BasePluginTool pluginTool = tools.get(tool);
         pluginTool.onSwitchAction(element);
-        toolWindow.show();
+        window.show();
     }
 
     private void onSwitchTool() {
@@ -682,7 +686,7 @@ public class TestkitToolWindow {
     private void updateDatasources() {
         List<SettingsStorageHelper.DatasourceConfig> datasourceConfigs = null;
         try {
-            datasourceConfigs = SettingsStorageHelper.SqlConfig.parseDatasources(SettingsStorageHelper.getSqlConfig(toolWindow.getProject()).getProperties());
+            datasourceConfigs = SettingsStorageHelper.SqlConfig.parseDatasources(SettingsStorageHelper.getSqlConfig(window.getProject()).getProperties());
         } catch (Throwable ex) {
             return;
         }
@@ -705,7 +709,8 @@ public class TestkitToolWindow {
                         }
                     }
                 }
-                RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids, ddls, writes);
+                RuntimeHelper.updateValidDatasources(window.getProject().getName(), valids, ddls, writes);
+                refreshSqlDatasources();
             }
         }).start();
     }

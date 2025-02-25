@@ -1123,11 +1123,20 @@ public class SettingsDialog {
                 TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Config must be properties model");
                 return;
             }
+            SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+            if (Objects.equals(sqlConfig.getProperties(), propertiesStr)) {
+                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config not changed");
+                return;
+            }
+            sqlConfig.setProperties(propertiesStr.trim());
+            SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
+            TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, " + TestkitHelper.getPluginName() + " will test connection");
 
             List<SettingsStorageHelper.DatasourceConfig> finalDatasourceConfigs = datasourceConfigs;
             ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing test connection, please wait ...", false) {
                                                   @Override
                                                   public void run(ProgressIndicator indicator) {
+                                                      Map<String, String> results = new HashMap<>();
                                                       List<SettingsStorageHelper.DatasourceConfig> valids = new ArrayList<>();
                                                       List<String> ddls = new ArrayList<>();
                                                       List<String> writes = new ArrayList<>();
@@ -1142,16 +1151,12 @@ public class SettingsDialog {
                                                                   writes.add(config.getName());
                                                               }
                                                           }
-                                                      }
-
-                                                      SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-                                                      if (!Objects.equals(sqlConfig.getProperties(), propertiesStr)) {
-                                                          sqlConfig.setProperties(propertiesStr.trim());
-                                                          SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
+                                                          results.put(config.getName(), !(result instanceof String) ? ("connect success, DDL: " + result) : result.toString());
                                                       }
 
                                                       RuntimeHelper.updateValidDatasources(toolWindow.getProject().getName(), valids, ddls, writes);
-                                                      TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, valid datasources is " + valids.stream().map(SettingsStorageHelper.DatasourceConfig::getName).toList());
+                                                      toolWindow.refreshSqlDatasources();
+                                                      TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "SQL Tool is updated, Connection result is " + JSON.toJSONString(results));
                                                   }
                                               }
             );

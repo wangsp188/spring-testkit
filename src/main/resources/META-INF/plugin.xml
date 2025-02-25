@@ -31,6 +31,7 @@
   <li><b>SQL-tool</b> - Sql-reviewer & DDL-execute</li>
   <li><b>Coding-guidelines</b> - 角标指引式研发提醒</li>
   <li><b>Trace</b> - 可视化请求链路</li>
+  <li><b>Realtime-view-value</b> - 实时观测bean的字段内容</li>
   <li><b>Curl-parser</b> - 简易curl解析器</li>
 </ul>
 ]]></description>
