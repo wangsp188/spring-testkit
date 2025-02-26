@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.testkit.SettingsStorageHelper;
 import com.testkit.util.JsonUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
@@ -452,35 +453,34 @@ public class ToolHelper {
 
     public static String getBeanNameFromClass(PsiClass psiClass) {
         PsiModifierList modifierList = psiClass.getModifierList();
-        String beanName = null;
+        if (modifierList == null) {
+            return null;
+        }
+        for (PsiAnnotation annotation : modifierList.getAnnotations()) {
+            String qualifiedName = annotation.getQualifiedName();
+            if (qualifiedName != null &&
+                    (qualifiedName.equals("org.springframework.stereotype.Component") ||
+                            qualifiedName.equals("org.springframework.stereotype.Service") ||
+                            qualifiedName.equals("org.springframework.stereotype.Repository") ||
+                            qualifiedName.equals("org.springframework.context.annotation.Configuration") ||
+                            qualifiedName.equals("org.springframework.stereotype.Controller") ||
+                            qualifiedName.equals("org.springframework.web.bind.annotation.RestController") ||
+                            qualifiedName.equals("org.apache.ibatis.annotations.Mapper")
+                    )) {
 
-        if (modifierList != null) {
-            for (PsiAnnotation annotation : modifierList.getAnnotations()) {
-                String qualifiedName = annotation.getQualifiedName();
-                if (qualifiedName != null &&
-                        (qualifiedName.equals("org.springframework.stereotype.Component") ||
-                                qualifiedName.equals("org.springframework.stereotype.Service") ||
-                                qualifiedName.equals("org.springframework.stereotype.Repository") ||
-                                qualifiedName.equals("org.springframework.context.annotation.Configuration") ||
-                                qualifiedName.equals("org.springframework.stereotype.Controller") ||
-                                qualifiedName.equals("org.springframework.web.bind.annotation.RestController") ||
-                                qualifiedName.equals("org.apache.ibatis.annotations.Mapper"))) {
 
-                    if (annotation.findAttributeValue("value") != null) {
-                        beanName = annotation.findAttributeValue("value").getText().replace("\"", "");
+                String value = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
+                if (value != null && !value.isEmpty()) {
+                    return value;
+                } else {
+                    String className = psiClass.getName();
+                    if (className != null && !className.isEmpty()) {
+                        return Character.toLowerCase(className.charAt(0)) + className.substring(1);
                     }
                 }
             }
         }
-
-        if (beanName == null || beanName.isBlank()) {
-            String className = psiClass.getName();
-            if (className != null && !className.isEmpty()) {
-                beanName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
-            }
-        }
-
-        return beanName;
+        return null;
     }
 
     public static String getStackTrace(Throwable throwable) {
@@ -516,6 +516,12 @@ public class ToolHelper {
             }
         }
 
+        List<String> beanAnnotations = SettingsStorageHelper.getBeanAnnotations(psiClass.getProject());
+        for (String beanAnnotation : beanAnnotations) {
+            if (psiClass.hasAnnotation(beanAnnotation)) {
+                return true;
+            }
+        }
         return false;
     }
 

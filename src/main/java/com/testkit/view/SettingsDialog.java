@@ -64,6 +64,8 @@ public class SettingsDialog {
 
     private JBTextField flexibleTestPackageNameField;
 
+    private JBTextField beanAnnotationField;
+
     private ComboBox<String> interceptorAppBox;
 
     private ComboBox<String> controllerScriptAppBox;
@@ -213,7 +215,7 @@ public class SettingsDialog {
 
     private JPanel createBasicOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        Dimension labelDimension = new Dimension(100, 20);
+        Dimension labelDimension = new Dimension(120, 20);
 
         JButton importButton = new JButton(IMPORT_ICON);
         importButton.setToolTipText("Import/Overwrite " + TestkitHelper.getPluginName() + " Settings");
@@ -403,6 +405,45 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
         panel.add(springDetailLabel, gbc);
 
+        beanAnnotationField = new JBTextField(String.join(",",SettingsStorageHelper.getBeanAnnotations(toolWindow.getProject())), 20);
+        beanAnnotationField.getEmptyText().setText("The annotation list will registered bean to spring container. Default: Mapper,FeignClient");
+
+        // 输入框
+        JLabel beanAnnotationLabel = new JLabel("Bean Annotations:");
+        beanAnnotationLabel.setPreferredSize(labelDimension);
+        beanAnnotationLabel.setLabelFor(beanAnnotationField); // 关联标签和输入框
+        beanAnnotationLabel.setToolTipText("The annotation list will registered bean to spring container"); // 提示信息
+
+        // 布局输入框和标签
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        springOptionsPanel.add(beanAnnotationLabel, gbc);
+
+        gbc.gridx = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0; // 让输入框占据剩余空间
+        springOptionsPanel.add(beanAnnotationField, gbc);
+
+        // 添加新按钮到组合框右边
+        JButton beanButton = new JButton(AllIcons.Actions.Rollback);
+        beanButton.setToolTipText("Use default annotation list");
+        beanButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                beanAnnotationField.setText(String.join(",",SettingsStorageHelper.defBeanAnnotations));
+            }
+        });
+        gbc.gridx = 3;  // 放在同一行的尾部
+        gbc.gridy = 2;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        springOptionsPanel.add(beanButton, gbc);
+
 
         flexibleTestPackageNameField = new JBTextField(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()), 20);
         flexibleTestPackageNameField.getEmptyText().setText("Which package do you want to enable flexible test? Default: flexibletest");
@@ -415,7 +456,7 @@ public class SettingsDialog {
 
         // 布局输入框和标签
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 3;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
@@ -435,8 +476,8 @@ public class SettingsDialog {
                 flexibleTestPackageNameField.setText(SettingsStorageHelper.defFlexibleTestPackage);
             }
         });
-        gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 2;
+        gbc.gridx = 3;  // 放在同一行的尾部
+        gbc.gridy = 3;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
@@ -483,6 +524,16 @@ public class SettingsDialog {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Package name is refreshed by " + packageName.trim());
                 }
 
+                String annotationFieldText = beanAnnotationField.getText();
+                if (StringUtils.isBlank(annotationFieldText.trim())) {
+                    SettingsStorageHelper.setBeanAnnotations(toolWindow.getProject(), null);
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Bean annotations is blank, use default list");
+                } else {
+                    SettingsStorageHelper.setBeanAnnotations(toolWindow.getProject(), Arrays.asList(annotationFieldText.trim().split(",")));
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Bean annotations is refreshed by " + Arrays.asList(annotationFieldText.trim().split(",")));
+                }
+
+                TestkitHelper.refresh(toolWindow.getProject());
             }
         };
         saveButton.addActionListener(saveListener);
