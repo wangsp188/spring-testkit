@@ -76,6 +76,10 @@ public class SpringCacheIconProvider implements LineMarkerProvider {
             return false;
         }
 
+        if (containingClass.isAnnotationType()) {
+            return false;
+        }
+
         if(!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())){
             return false;
         }

@@ -1175,10 +1175,6 @@ public class SettingsDialog {
                 return;
             }
             SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-            if (Objects.equals(sqlConfig.getProperties(), propertiesStr)) {
-                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config not changed");
-                return;
-            }
             sqlConfig.setProperties(propertiesStr.trim());
             SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
             TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Config was saved, " + TestkitHelper.getPluginName() + " will test connection");

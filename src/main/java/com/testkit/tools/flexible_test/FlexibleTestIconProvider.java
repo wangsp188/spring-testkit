@@ -92,6 +92,10 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return "is_inner_class";
         }
 
+        if (containingClass.isAnnotationType()) {
+            return "annotationType";
+        }
+
         PsiFile psiFile = method.getContainingFile();
 
         // 3. 必须是在Java的test模块下

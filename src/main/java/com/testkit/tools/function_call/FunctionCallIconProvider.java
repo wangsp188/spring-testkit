@@ -221,10 +221,19 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
             return "containingClassNull";
         }
 
+        if (containingClass.isAnnotationType()) {
+            return "annotationType";
+        }
+
         // 4. 检查类是否含有 Spring 可注册 Bean 的注解
         if (!ToolHelper.isSpringBean(containingClass)) {
             return "not_spring_bean";
         }
+
+        if (containingClass.isInterface() && modifierList.hasModifierProperty(PsiModifier.STATIC)) {
+            return "interface_static";
+        }
+
 
 
         if (!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
