@@ -620,6 +620,13 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         }
     }
 
+    public static boolean isFeign(PsiMethod method) {
+        if (method == null) {
+            return false;
+        }
+        return method.getContainingClass().hasAnnotation("org.springframework.cloud.openfeign.FeignClient");
+    }
+
     public static boolean isRequestMethod(PsiMethod method) {
         if (method == null) {
             return false;

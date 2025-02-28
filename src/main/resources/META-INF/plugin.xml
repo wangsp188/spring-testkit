@@ -20,10 +20,11 @@
 <h2>🚀 核心工具</h2>
 <ul>
   <li><b>Function-call</b> - 运行时方法级调试</li>
-  <li><b>Controller-command</b> - 定制化生成可执行curl</li>
   <li><b>Flexible-test</b> - 动态编译代码及调试</li>
   <li><b>Mapper-sql</b> - 根据mapper-xml动态生成sql</li>
-  <li><b>Spring-cache</b> - 可视化调试@Cacheable</li>
+  <li><b>Controller-command</b> - 可定制化Controller脚本</li>
+  <li><b>FeignClient-command</b> - 可定制化FeignClient脚本</li>
+  <li><b>Spring-cache</b> - 可视化调试Spring-cache</li>
 </ul>
 
 <h2>📦 研发支撑</h2>

@@ -3,7 +3,6 @@ package com.testkit.tools.function_call;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
-import com.intellij.psi.util.PsiUtil;
 import com.testkit.TestkitHelper;
 import com.testkit.ReqStorageHelper;
 import com.testkit.RuntimeHelper;
@@ -59,10 +58,13 @@ public class FunctionCallTool extends BasePluginTool {
     public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", FunctionCallTool.class);
     public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", FunctionCallTool.class);
     public static final Icon CONTROLLER_ICON = IconLoader.getIcon("/icons/controller.svg", FunctionCallTool.class);
+    public static final Icon FEIGN_ICON = IconLoader.getIcon("/icons/feign.svg", FunctionCallTool.class);
+
     public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", FunctionCallTool.class);
 
 
     private JButton controllerCommandButton;
+    private JButton feignCommandButton;
     private JButton runButton;
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
 
@@ -75,19 +77,24 @@ public class FunctionCallTool extends BasePluginTool {
     public FunctionCallTool(TestkitToolWindow testkitToolWindow) {
         super(testkitToolWindow);
 
+        buildControllerButton(testkitToolWindow);
+        buildFeignButton(testkitToolWindow);
+    }
+
+    private void buildControllerButton(TestkitToolWindow testkitToolWindow) {
         controllerCommandButton = new JButton(CONTROLLER_ICON);
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
         controllerCommandButton.setToolTipText("Generate controller command");
         controllerCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
-                TestkitHelper.alert(getProject(),Messages.getErrorIcon(),"Please select a method");
+                TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Please select a method");
                 return;
             }
             List<String> projectAppList = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                         @Override
                         public boolean test(RuntimeHelper.AppMeta appMeta) {
-                            return ToolHelper.isDependency(selectedItem.getMethod(),getProject(),appMeta.getModule());
+                            return ToolHelper.isDependency(selectedItem.getMethod(), getProject(), appMeta.getModule());
                         }
                     }).map(new Function<RuntimeHelper.AppMeta, String>() {
                         @Override
@@ -100,13 +107,13 @@ public class FunctionCallTool extends BasePluginTool {
             DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
             if (CollectionUtils.isNotEmpty(projectAppList)) {
                 for (String app : projectAppList) {
-                    SettingsStorageHelper.ControllerCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(testkitToolWindow.getProject(), app);
+                    SettingsStorageHelper.HttpCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(testkitToolWindow.getProject(), app);
                     String script = controllerCommand.getScript();
                     List<String> envs = controllerCommand.getEnvs();
                     if (CollectionUtils.isEmpty(envs) && Objects.equals(script, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
                         continue;
                     }
-                    if(CollectionUtils.isEmpty(envs)){
+                    if (CollectionUtils.isEmpty(envs)) {
                         envs = new ArrayList<>();
                         envs.add(null);
                     }
@@ -161,6 +168,93 @@ public class FunctionCallTool extends BasePluginTool {
         });
     }
 
+    private void buildFeignButton(TestkitToolWindow testkitToolWindow) {
+        feignCommandButton = new JButton(FEIGN_ICON);
+        feignCommandButton.setPreferredSize(new Dimension(32, 32));
+        feignCommandButton.setToolTipText("Generate feign command");
+        feignCommandButton.addActionListener(e -> {
+            ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+            if (selectedItem == null) {
+                TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Please select a method");
+                return;
+            }
+            List<String> projectAppList = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
+                        @Override
+                        public boolean test(RuntimeHelper.AppMeta appMeta) {
+                            return ToolHelper.isDependency(selectedItem.getMethod(), getProject(), appMeta.getModule());
+                        }
+                    }).map(new Function<RuntimeHelper.AppMeta, String>() {
+                        @Override
+                        public String apply(RuntimeHelper.AppMeta appMeta) {
+                            return appMeta.getApp();
+                        }
+                    })
+                    .toList();
+
+            DefaultActionGroup feignActionGroup = new DefaultActionGroup();
+            if (CollectionUtils.isNotEmpty(projectAppList)) {
+                for (String app : projectAppList) {
+                    SettingsStorageHelper.HttpCommand appFeignCommand = SettingsStorageHelper.getAppFeignCommand(testkitToolWindow.getProject(), app);
+                    String script = appFeignCommand.getScript();
+                    List<String> envs = appFeignCommand.getEnvs();
+                    if (CollectionUtils.isEmpty(envs) && Objects.equals(script, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript())) {
+                        continue;
+                    }
+                    if (CollectionUtils.isEmpty(envs)) {
+                        envs = new ArrayList<>();
+                        envs.add(null);
+                    }
+                    for (String env : envs) {
+                        //显示的一个图标加上标题
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FEIGN_ICON) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                Application application = ApplicationManager.getApplication();
+                                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
+
+                                    @Override
+                                    public void run(@NotNull ProgressIndicator indicator) {
+                                        application.runReadAction(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                handleFeignCommand(env, script, selectedItem.getMethod());
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        feignActionGroup.add(documentation); // 将动作添加到动作组中
+                    }
+                }
+            }
+
+
+            if (feignActionGroup.getChildrenCount() == 0) {
+                //没有自定义逻辑，则直接处理
+
+                Application application = ApplicationManager.getApplication();
+                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
+
+                    @Override
+                    public void run(@NotNull ProgressIndicator indicator) {
+                        application.runReadAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                handleFeignCommand(null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), selectedItem.getMethod());
+                            }
+                        });
+                    }
+                });
+
+                return;
+            }
+
+            JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("FeignCommandPopup", feignActionGroup).getComponent();
+            popupMenu.show(feignCommandButton, 0, 0);
+        });
+    }
+
 
     protected boolean canStore() {
         return true;
@@ -177,11 +271,11 @@ public class FunctionCallTool extends BasePluginTool {
             throw new RuntimeException("Input parameter must be json object");
         }
         return RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
-            @Override
-            public boolean test(RuntimeHelper.AppMeta appMeta) {
-                return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
-            }
-        }).map(new Function<RuntimeHelper.AppMeta, String>() {
+                    @Override
+                    public boolean test(RuntimeHelper.AppMeta appMeta) {
+                        return ToolHelper.isDependency(methodAction.getMethod(), getProject(), appMeta.getModule());
+                    }
+                }).map(new Function<RuntimeHelper.AppMeta, String>() {
                     @Override
                     public String apply(RuntimeHelper.AppMeta appMeta) {
                         return appMeta.getApp();
@@ -227,16 +321,18 @@ public class FunctionCallTool extends BasePluginTool {
         ReqStorageHelper.SubItemType subItemType = null;
         if (Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.controller;
-            methodMeta.setControllerMeta(parseControllerMeta(method));
+            methodMeta.setHttpMeta(parseControllerMeta(method));
+        }else if(Arrays.asList(actionPanel.getComponents()).contains(feignCommandButton)){
+            subItemType = ReqStorageHelper.SubItemType.feign_client;
+            methodMeta.setHttpMeta(parseFeignMeta(method));
         }
         methodMeta.setSubType(subItemType);
         ReqStorageHelper.saveAppReq(getProject(), app, StringUtils.isBlank(group) ? "undefined" : group, ReqStorageHelper.ItemType.function_call, ToolHelper.buildMethodKey(method), methodMeta, savedReq.getTitle(), savedReq);
     }
 
 
-
-    public ReqStorageHelper.ControllerCommandMeta parseControllerMeta(PsiMethod method) {
-        ReqStorageHelper.ControllerCommandMeta commandMeta = new ReqStorageHelper.ControllerCommandMeta();
+    public ReqStorageHelper.HttpCommandMeta parseControllerMeta(PsiMethod method) {
+        ReqStorageHelper.HttpCommandMeta commandMeta = new ReqStorageHelper.HttpCommandMeta();
 
         String httpMethod = "GET"; // Default to GET
         String path1 = "/";
@@ -369,6 +465,148 @@ public class FunctionCallTool extends BasePluginTool {
         return commandMeta;
     }
 
+    public ReqStorageHelper.HttpCommandMeta parseFeignMeta(PsiMethod method) {
+        ReqStorageHelper.HttpCommandMeta commandMeta = new ReqStorageHelper.HttpCommandMeta();
+
+        String httpMethod = "GET"; // Default to GET
+        String path1 = "/";
+        String feignName = null;
+        String feignUrl = null;
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass.hasAnnotation("org.springframework.cloud.openfeign.FeignClient")) {
+            PsiAnnotation annotation = containingClass.getAnnotation("org.springframework.cloud.openfeign.FeignClient");
+            String rootPath = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("path"));
+            feignName = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("name"));
+            if (StringUtils.isBlank(feignName)) {
+                feignName = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
+            }
+            feignUrl = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("url"));
+            if(StringUtils.isBlank(feignUrl)){
+                feignUrl = null;
+            }
+            if (StringUtils.isNotBlank(rootPath) && rootPath.startsWith("/")) {
+                path1 += rootPath.substring(1);
+            } else {
+                path1 += rootPath;
+            }
+        }
+
+        String[] requestMethodAnnotations = new String[]{
+                "org.springframework.web.bind.annotation.RequestMapping",
+                "org.springframework.web.bind.annotation.GetMapping",
+                "org.springframework.web.bind.annotation.PostMapping",
+                "org.springframework.web.bind.annotation.PutMapping",
+                "org.springframework.web.bind.annotation.DeleteMapping",
+                "org.springframework.web.bind.annotation.PatchMapping"
+        };
+
+
+        // Check for method-level annotations to determine HTTP method and path
+        for (String annotationFqn : requestMethodAnnotations) {
+            PsiAnnotation methodAnnotation = method.getModifierList().findAnnotation(annotationFqn);
+            if (methodAnnotation == null) {
+                continue;
+            }
+            if (annotationFqn.contains("GetMapping")) {
+                httpMethod = "GET";
+            } else if (annotationFqn.contains("PostMapping")) {
+                httpMethod = "POST";
+            } else if (annotationFqn.contains("PutMapping")) {
+                httpMethod = "PUT";
+            } else if (annotationFqn.contains("DeleteMapping")) {
+                httpMethod = "DELETE";
+            } else if (annotationFqn.contains("PatchMapping")) {
+                httpMethod = "PATCH";
+            } else if (annotationFqn.contains("RequestMapping")) {
+                //从注解中的method属性取出一个 method,注意,method 是个数组,随便取一个就好
+                String mappingMethod = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("method"));
+                if (StringUtils.isNotBlank(mappingMethod)) {
+                    httpMethod = mappingMethod.toUpperCase();
+                }
+            }
+
+            String reqPath = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("value"));
+            if (StringUtils.isBlank(reqPath)) {
+                reqPath = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("path"));
+            }
+
+
+            PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("value");
+            if (methodValue == null || (methodValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue())))) {
+                methodValue = methodAnnotation.findAttributeValue("path");
+            }
+            if (StringUtils.isNotBlank(reqPath)) {
+                if (path1.endsWith("/")) {
+                    if (reqPath.startsWith("/")) {
+                        path1 += reqPath.substring(1);
+                    } else {
+                        path1 += methodValue.getText();
+                    }
+                } else {
+                    if (reqPath.startsWith("/")) {
+                        path1 += reqPath;
+                    } else {
+                        path1 += ("/" + reqPath);
+                    }
+                }
+            }
+            break;
+        }
+
+        // Process parameters
+        // Get the parameters
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        ArrayList<String> paths = new ArrayList<>();
+        Map<String, String> aliasmap = new HashMap<>();
+        String jsonBodyKey = null;
+        for (PsiParameter parameter : parameters) {
+            PsiAnnotation requestBodyAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestBody");
+            if (requestBodyAnnotation != null) {
+                if (httpMethod.equals("GET")) {
+                    httpMethod = "POST";
+                }
+                jsonBodyKey = parameter.getName();
+                continue;
+            }
+            //判断是否含有 requestParam注解,如果有,则将别名注册到 aliasmap 中,key 是形参名,val 是 requestparam 的配置
+            // 如果不存在 @RequestBody 注解，则检查 @RequestParam 注解
+            PsiAnnotation requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestParam");
+            boolean path = false;
+            if (requestParamAnnotation == null) {
+                requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.PathVariable");
+                path = true;
+            }
+            if (requestParamAnnotation == null) {
+                continue;
+            }
+
+            if (path) {
+                paths.add(parameter.getName());
+            }
+            // 获取 @RequestParam 注解中的配置值
+            PsiAnnotationMemberValue requestParamValue = requestParamAnnotation.findAttributeValue("value");
+            if (requestParamValue == null || (requestParamValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) requestParamValue).getValue())))) {
+                requestParamValue = requestParamAnnotation.findAttributeValue("name");
+            }
+            if (requestParamValue instanceof PsiLiteralExpression) {
+                String cs = String.valueOf(((PsiLiteralExpression) requestParamValue).getValue());
+                if (StringUtils.isNotBlank(cs)) {
+                    // 将别名注册到 aliasMap 中
+                    aliasmap.put(parameter.getName(), cs);
+                }
+            }
+        }
+
+        commandMeta.setHttpMethod(httpMethod);
+        commandMeta.setPath(path1);
+        commandMeta.setAliasmap(aliasmap);
+        commandMeta.setJsonBodyKey(jsonBodyKey);
+        commandMeta.setPathKeys(paths);
+        commandMeta.setFeignName(feignName);
+        commandMeta.setFeignUrl(feignUrl);
+        return commandMeta;
+    }
+
     private void handleControllerCommand(String env, String script, PsiMethod method) {
         String jsonParams = inputEditorTextField.getText();
         JSONObject inputParams = null;
@@ -378,7 +616,7 @@ public class FunctionCallTool extends BasePluginTool {
             setOutputText("Input parameter must be json object");
             return;
         }
-        ReqStorageHelper.ControllerCommandMeta commandMeta = parseControllerMeta(method);
+        ReqStorageHelper.HttpCommandMeta commandMeta = parseControllerMeta(method);
         String httpMethod = commandMeta.getHttpMethod();
         String path1 = commandMeta.getPath();
         Map<String, String> aliasmap = commandMeta.getAliasmap();
@@ -462,6 +700,108 @@ public class FunctionCallTool extends BasePluginTool {
             ex.printStackTrace();
             setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
         }
+    }
+
+    private void handleFeignCommand(String env, String script, PsiMethod method) {
+        String jsonParams = inputEditorTextField.getText();
+        JSONObject inputParams = null;
+        try {
+            inputParams = JSONObject.parseObject(jsonParams);
+        } catch (Exception e) {
+            setOutputText("Input parameter must be json object");
+            return;
+        }
+        ReqStorageHelper.HttpCommandMeta commandMeta = parseFeignMeta(method);
+        String httpMethod = commandMeta.getHttpMethod();
+        String path1 = commandMeta.getPath();
+        Map<String, String> aliasmap = commandMeta.getAliasmap();
+        List<String> pathKeys = commandMeta.getPathKeys();
+        String jsonBodyKey = commandMeta.getJsonBodyKey();
+
+
+        String jsonBody = null;
+        if (jsonBodyKey != null) {
+            if (inputParams.get(jsonBodyKey) != null) {
+                jsonBody = JSONObject.toJSONString(inputParams.get(jsonBodyKey), SerializerFeature.WriteMapNullValue);
+            } else {
+                jsonBody = "{}";
+            }
+            inputParams.remove(jsonBodyKey);
+        }
+
+
+//               parse是个双层 map 参数
+//                我想让双层key展开平铺
+        JSONObject flattenedParse = new JSONObject();
+        flattenJson(inputParams, flattenedParse);
+//                @requestParam Set<String> ids 这种是需要支持的
+        Iterator<Map.Entry<String, Object>> iterator = inputParams.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Object> entry = iterator.next();
+            if (entry.getValue() instanceof JSONArray) {
+                flattenedParse.put(entry.getKey(), StringUtils.join((JSONArray) entry.getValue(), ","));
+                iterator.remove();
+            }
+        }
+
+        if (!pathKeys.isEmpty()) {
+            for (String path : pathKeys) {
+                String val = null;
+                try {
+                    val = URLEncoder.encode(String.valueOf(flattenedParse.get(path)), "UTF-8");
+                } catch (UnsupportedEncodingException ex) {
+                }
+                flattenedParse.remove(path);
+
+                if (aliasmap.containsKey(path)) {
+                    path = aliasmap.get(path);
+                }
+                path1 = path1.replace("{" + path + "}", val);
+//                        path 支持写类似正则的内容,类似/{userId1}/orders/{orderId:\\d+}
+//                        请手动在 path1 中找{+path:的内容再找到下一个}进行补充替换
+                // 处理带有正则的路径变量，例如：/{userId1}/orders/{orderId:\\d+}
+                Pattern pattern = Pattern.compile("\\{" + Pattern.quote(path) + ":.*?\\}");
+                Matcher matcher = pattern.matcher(path1);
+                if (matcher.find()) {
+                    path1 = matcher.replaceFirst(val);
+                }
+            }
+        }
+
+        Map<String, String> urlParams = new HashMap<>();
+        if (!flattenedParse.isEmpty()) {
+            Container<Boolean> first = new Container<>();
+            first.set(true);
+            flattenedParse.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
+                @Override
+                public void accept(Map.Entry<String, Object> stringObjectEntry) {
+                    String s = aliasmap.get(stringObjectEntry.getKey());
+                    if (s != null && StringUtils.isBlank(s)) {
+                        return;
+                    }
+                    s = s == null ? stringObjectEntry.getKey() : s;
+                    urlParams.put(s, String.valueOf(stringObjectEntry.getValue()));
+                }
+            });
+        }
+        setOutputText("Generate FeignClient command ...");
+        try {
+            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody);
+            setOutputText(ret);
+        } catch (CompilationFailedException ex) {
+            ex.printStackTrace();
+            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+        }
+    }
+
+    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+        GroovyShell groovyShell = new GroovyShell();
+        Script script = groovyShell.parse(code);
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params, jsonBody});
+        return build == null ? "" : String.valueOf(build);
     }
 
 
@@ -549,7 +889,7 @@ public class FunctionCallTool extends BasePluginTool {
                         }
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
-                            TestkitHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
+                            TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Please select method");
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);
@@ -592,7 +932,7 @@ public class FunctionCallTool extends BasePluginTool {
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (useInterceptor) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
-            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
         }
         return req;
     }
@@ -640,26 +980,43 @@ public class FunctionCallTool extends BasePluginTool {
 
         PsiMethod method = methodAction.getMethod();
         boolean requestMethod = FunctionCallIconProvider.isRequestMethod(method);
-        if(requestMethod && !FunctionCallIconProvider.canInitparams(method)){
+        if (requestMethod && !FunctionCallIconProvider.canInitparams(method)) {
             //如果存在接口或者超类无法明确类那就设置按钮
             // 新增：检查所有参数都可以直接序列化
             runButton.setIcon(AllIcons.Hierarchy.MethodNotDefined);
-            runButton.setToolTipText("Can not support execute");
-        }else{
+            runButton.setToolTipText("Un support execute");
+        } else {
             runButton.setIcon(AllIcons.Actions.Execute);
             runButton.setToolTipText("Execute this");
         }
 
-        //判断panel1是否存在button1
-        if (requestMethod && !Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
-            actionPanel.add(controllerCommandButton);
-        } else if (!requestMethod && Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
-            actionPanel.remove(controllerCommandButton);
+
+        //判断是http 还是 feign
+        if (FunctionCallIconProvider.isFeign(method)) {
+            List<Component> components = Arrays.asList(actionPanel.getComponents());
+            if(components.contains(controllerCommandButton)){
+                actionPanel.remove(controllerCommandButton);
+            }
+            if (requestMethod && !components.contains(feignCommandButton)) {
+                actionPanel.add(feignCommandButton);
+            } else if (!requestMethod && components.contains(feignCommandButton)) {
+                actionPanel.remove(feignCommandButton);
+            }
+        }else{
+            //判断panel1是否存在button1
+            List<Component> components = Arrays.asList(actionPanel.getComponents());
+            if(components.contains(feignCommandButton)){
+                actionPanel.remove(feignCommandButton);
+            }
+            if (requestMethod && !components.contains(controllerCommandButton)) {
+                actionPanel.add(controllerCommandButton);
+            } else if (!requestMethod && components.contains(controllerCommandButton)) {
+                actionPanel.remove(controllerCommandButton);
+            }
         }
+
         ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
     }
-
-
 
 
     public static void flattenJson(JSONObject parse, JSONObject flattenedParse) {

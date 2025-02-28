@@ -7,7 +7,6 @@ import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
-import com.intellij.openapi.editor.event.DocumentListener;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -96,6 +95,8 @@ public class ReqStoreDialog {
     private JToggleButton useProxyButton;
     private JButton executeButton;
     private JButton controllerCommandButton;
+
+    private JButton feignCommandButton;
 
     private JComboBox<ReqStorageHelper.SavedReq> reqsComboBox;
 
@@ -783,6 +784,13 @@ public class ReqStoreDialog {
         executeButton.setToolTipText("Execute this");
         executeButton.setPreferredSize(new Dimension(32, 32));
         executeButton.addActionListener(e -> executeAction());
+
+        buildControllerButton();
+        buildFeignButton();
+        return panelResults;
+    }
+
+    private void buildControllerButton() {
         controllerCommandButton = new JButton(FunctionCallTool.CONTROLLER_ICON);
         controllerCommandButton.setToolTipText("Generate controller command");
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
@@ -794,14 +802,14 @@ public class ReqStoreDialog {
                     return;
                 }
                 ReqStorageHelper.CallMethodMeta callMethodMeta = selectedItem.metaObj(ReqStorageHelper.CallMethodMeta.class);
-                if (callMethodMeta.getSubType() != ReqStorageHelper.SubItemType.controller || callMethodMeta.getControllerMeta() == null) {
+                if (callMethodMeta.getSubType() != ReqStorageHelper.SubItemType.controller || callMethodMeta.getHttpMeta() == null) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
                     return;
                 }
 
                 String app = (String) appBox.getSelectedItem();
                 DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-                SettingsStorageHelper.ControllerCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(toolWindow.getProject(), app);
+                SettingsStorageHelper.HttpCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(toolWindow.getProject(), app);
                 String script = controllerCommand.getScript();
                 List<String> envs = controllerCommand.getEnvs();
                 if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
@@ -822,7 +830,7 @@ public class ReqStoreDialog {
                                         application.runReadAction(new Runnable() {
                                             @Override
                                             public void run() {
-                                                handleControllerCommand(env, script, callMethodMeta.getControllerMeta());
+                                                handleControllerCommand(env, script, callMethodMeta.getHttpMeta());
                                             }
                                         });
                                     }
@@ -845,7 +853,7 @@ public class ReqStoreDialog {
                             application.runReadAction(new Runnable() {
                                 @Override
                                 public void run() {
-                                    handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), callMethodMeta.getControllerMeta());
+                                    handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), callMethodMeta.getHttpMeta());
                                 }
                             });
                         }
@@ -858,11 +866,10 @@ public class ReqStoreDialog {
                 popupMenu.show(controllerCommandButton, 32, 0);
             }
         });
-        return panelResults;
     }
 
 
-    private void handleControllerCommand(String env, String script, ReqStorageHelper.ControllerCommandMeta commandMeta) {
+    private void handleControllerCommand(String env, String script, ReqStorageHelper.HttpCommandMeta commandMeta) {
         String jsonParams = jsonInputField.getText();
         JSONObject inputParams = null;
         try {
@@ -961,6 +968,187 @@ public class ReqStoreDialog {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
+        return build == null ? "" : String.valueOf(build);
+    }
+
+
+    private void buildFeignButton() {
+        feignCommandButton = new JButton(FunctionCallTool.FEIGN_ICON);
+        feignCommandButton.setToolTipText("Generate feign command");
+        feignCommandButton.setPreferredSize(new Dimension(32, 32));
+        feignCommandButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (selectedItem == null || appBox.getSelectedItem() == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a app and item");
+                    return;
+                }
+                ReqStorageHelper.CallMethodMeta callMethodMeta = selectedItem.metaObj(ReqStorageHelper.CallMethodMeta.class);
+                if (callMethodMeta.getSubType() != ReqStorageHelper.SubItemType.feign_client || callMethodMeta.getHttpMeta() == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
+                    return;
+                }
+
+                String app = (String) appBox.getSelectedItem();
+                DefaultActionGroup feignActionGroup = new DefaultActionGroup();
+                SettingsStorageHelper.HttpCommand httpCommand = SettingsStorageHelper.getAppFeignCommand(toolWindow.getProject(), app);
+                String script = httpCommand.getScript();
+                List<String> envs = httpCommand.getEnvs();
+                if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript())) {
+                    if (CollectionUtils.isEmpty(envs)) {
+                        envs = new ArrayList<>();
+                        envs.add(null);
+                    }
+                    for (String env : envs) {
+                        //显示的一个图标加上标题
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FunctionCallTool.FEIGN_ICON) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                Application application = ApplicationManager.getApplication();
+                                ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+
+                                    @Override
+                                    public void run(@NotNull ProgressIndicator indicator) {
+                                        application.runReadAction(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                handleFeignCommand(env, script, callMethodMeta.getHttpMeta());
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        feignActionGroup.add(documentation); // 将动作添加到动作组中
+                    }
+                }
+
+
+                if (feignActionGroup.getChildrenCount() == 0) {
+                    //没有自定义逻辑，则直接处理
+
+                    Application application = ApplicationManager.getApplication();
+                    ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+
+                        @Override
+                        public void run(@NotNull ProgressIndicator indicator) {
+                            application.runReadAction(new Runnable() {
+                                @Override
+                                public void run() {
+                                    handleFeignCommand(null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), callMethodMeta.getHttpMeta());
+                                }
+                            });
+                        }
+                    });
+
+                    return;
+                }
+
+                JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("FeignCommandPopup", feignActionGroup).getComponent();
+                popupMenu.show(controllerCommandButton, 32, 0);
+            }
+        });
+    }
+
+
+    private void handleFeignCommand(String env, String script, ReqStorageHelper.HttpCommandMeta commandMeta) {
+        String jsonParams = jsonInputField.getText();
+        JSONObject inputParams = null;
+        try {
+            inputParams = JSONObject.parseObject(jsonParams);
+        } catch (Exception e) {
+            setOutputText("Input parameter must be json object", null);
+            return;
+        }
+        String httpMethod = commandMeta.getHttpMethod();
+        String path1 = commandMeta.getPath();
+        Map<String, String> aliasmap = commandMeta.getAliasmap();
+        List<String> pathKeys = commandMeta.getPathKeys();
+        String jsonBodyKey = commandMeta.getJsonBodyKey();
+
+
+        String jsonBody = null;
+        if (jsonBodyKey != null) {
+            if (inputParams.get(jsonBodyKey) != null) {
+                jsonBody = JSONObject.toJSONString(inputParams.get(jsonBodyKey), SerializerFeature.WriteMapNullValue);
+            } else {
+                jsonBody = "{}";
+            }
+            inputParams.remove(jsonBodyKey);
+        }
+
+
+//               parse是个双层 map 参数
+//                我想让双层key展开平铺
+        JSONObject flattenedParse = new JSONObject();
+        FunctionCallTool.flattenJson(inputParams, flattenedParse);
+//                @requestParam Set<String> ids 这种是需要支持的
+        Iterator<Map.Entry<String, Object>> iterator = inputParams.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Object> entry = iterator.next();
+            if (entry.getValue() instanceof JSONArray) {
+                flattenedParse.put(entry.getKey(), StringUtils.join((JSONArray) entry.getValue(), ","));
+                iterator.remove();
+            }
+        }
+
+        if (!pathKeys.isEmpty()) {
+            for (String path : pathKeys) {
+                String val = null;
+                try {
+                    val = URLEncoder.encode(String.valueOf(flattenedParse.get(path)), "UTF-8");
+                } catch (UnsupportedEncodingException ex) {
+                }
+                flattenedParse.remove(path);
+
+                if (aliasmap.containsKey(path)) {
+                    path = aliasmap.get(path);
+                }
+                path1 = path1.replace("{" + path + "}", val);
+//                        path 支持写类似正则的内容,类似/{userId1}/orders/{orderId:\\d+}
+//                        请手动在 path1 中找{+path:的内容再找到下一个}进行补充替换
+                // 处理带有正则的路径变量，例如：/{userId1}/orders/{orderId:\\d+}
+                Pattern pattern = Pattern.compile("\\{" + Pattern.quote(path) + ":.*?\\}");
+                Matcher matcher = pattern.matcher(path1);
+                if (matcher.find()) {
+                    path1 = matcher.replaceFirst(val);
+                }
+            }
+        }
+
+        Map<String, String> urlParams = new HashMap<>();
+        if (!flattenedParse.isEmpty()) {
+            com.testkit.util.Container<Boolean> first = new Container<>();
+            first.set(true);
+            flattenedParse.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
+                @Override
+                public void accept(Map.Entry<String, Object> stringObjectEntry) {
+                    String s = aliasmap.get(stringObjectEntry.getKey());
+                    if (s != null && StringUtils.isBlank(s)) {
+                        return;
+                    }
+                    s = s == null ? stringObjectEntry.getKey() : s;
+                    urlParams.put(s, String.valueOf(stringObjectEntry.getValue()));
+                }
+            });
+        }
+        setOutputText("Generate FeignClient command ...", null);
+        try {
+            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody);
+            setOutputText(ret, null);
+        } catch (CompilationFailedException ex) {
+            ex.printStackTrace();
+            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+        }
+    }
+
+    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+        GroovyShell groovyShell = new GroovyShell();
+        Script script = groovyShell.parse(code);
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
@@ -1112,6 +1300,8 @@ public class ReqStoreDialog {
                 actionPanel.add(executeButton);
                 if (item.fetchSubType() == ReqStorageHelper.SubItemType.controller) {
                     actionPanel.add(controllerCommandButton);
+                } else if (item.fetchSubType() == ReqStorageHelper.SubItemType.feign_client) {
+                    actionPanel.add(feignCommandButton);
                 }
                 // 刷新面板
                 actionPanel.revalidate();

@@ -91,7 +91,10 @@ public class SettingsStorageHelper {
                     "\n" +
                     "}";
 
-    public static final ControllerCommand DEF_CONTROLLER_COMMAND = new ControllerCommand();
+    public static final HttpCommand DEF_CONTROLLER_COMMAND = new HttpCommand();
+
+    public static final HttpCommand DEF_FEIGN_COMMAND = new HttpCommand();
+
 
     static {
         DEF_CONTROLLER_COMMAND.setScript("import groovy.json.JsonOutput\n" +
@@ -234,6 +237,8 @@ public class SettingsStorageHelper {
                 "\n" +
                 "def buildCurl(domain, httpMethod, path, params, headers, jsonBody) {\n" +
                 "    StringBuilder ret = new StringBuilder()\n" +
+                "    domain = domain.endsWith('/') ? domain.substring(0, domain.length() - 1) : domain\n" +
+                "    path = path.startsWith('/') ? path : (\"/\"+path)\n" +
                 "    ret.append(\"curl -i -X ${httpMethod.toUpperCase()} '${domain}${path}\")\n" +
                 "\n" +
                 "    if (params != null && params.size() > 0) {\n" +
@@ -264,6 +269,189 @@ public class SettingsStorageHelper {
                 "}\n" +
                 "\n");
     }
+
+
+
+    static {
+        DEF_FEIGN_COMMAND.setScript("import groovy.json.JsonOutput\n" +
+                "import groovy.json.JsonSlurper\n" +
+                "\n" +
+                "import java.io.FileNotFoundException;\n" +
+                "import java.io.IOException;\n" +
+                "import java.net.HttpURLConnection;\n" +
+                "import java.net.URLEncoder;\n" +
+                "import java.util.Map;\n" +
+                "\n" +
+                "\n" +
+                "/**\n" +
+                " * groovy脚本，在idea-plugin容器执行\n" +
+                " * FeignClient command构建函数，返回结果会被copy到剪切板，建议采用curl格式\n" +
+                " * <p>\n" +
+                " * 不可使用项目中类，不可使用项目中类，不可使用项目中类\n" +
+                " * <p>\n" +
+                " * 运行代码如下\n" +
+                " * <p>\n" +
+                " * GroovyShell groovyShell = new GroovyShell();\n" +
+                " * Script script = groovyShell.parse(this-code);\n" +
+                " * Object build = InvokerHelper.invokeMethod(script, \"generate\", new Object[]{env,  feignName, feignUrl, httpMethod, path, params, jsonBody});\n" +
+                " * return build == null ? \"\" : String.valueOf(build);\n" +
+                " * <p>\n" +
+                " * 提供以下工具函数\n" +
+                " * buildCurl：构建curl函数\n" +
+                " * http：发起http请求函数\n" +
+                " *\n" +
+                " * @param env        环境，可能为空\n" +
+                " * @param feignName    FeignClient.name  非空\n" +
+                " * @param feignUrl        FeignClient.url  可能为空\n" +
+                " * @param httpMethod GET/POST 等等http方法，非空\n" +
+                " * @param path       /uri 非空\n" +
+                " * @param params     传递的参数，k和v都是string，非空\n" +
+                " * @param jsonBody   json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
+                " * @return 返回结果会被copy到剪切板\n" +
+                " */\n" +
+                "def generate(String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody) {\n" +
+                "    String domain = getDomain(feignName,feignUrl)\n" +
+                "    String token = getToken(env)\n" +
+                "    buildCurl(domain, httpMethod, path, params,[\"Authorization\":\"Bearer ${token}\"],jsonBody)\n" +
+                "}\n" +
+                "\n" +
+                "def getDomain(feignName, feignUrl){\n" +
+                "   if(feignUrl){\n" +
+                "       return feignUrl\n" +
+                "   }\n" +
+                "   return \"http://\"+feignName\n" +
+                "}\n" +
+                "\n" +
+                "\n" +
+                "def getToken(env) {\n" +
+                "    // your project logic\n" +
+                "    return \"your_token\"\n" +
+                "}\n" +
+                "\n" +
+                "\n" +
+                "class HttpRes {\n" +
+                "    Integer status\n" +
+                "    String body\n" +
+                "    Map<String, List<String>> headers\n" +
+                "\n" +
+                "    String toJson() {\n" +
+                "        def responseMap = [\n" +
+                "                status:\n" +
+                "                        status,\n" +
+                "                body:parseBodyAsJson(),\n" +
+                "                headers:filterNullKeys(headers)\n" +
+                "        ]\n" +
+                "        return JsonOutput.toJson(responseMap)\n" +
+                "    }\n" +
+                "\n" +
+                "    private Object parseBodyAsJson() {\n" +
+                "        try {\n" +
+                "            return new JsonSlurper().parseText(body)\n" +
+                "        } catch (Exception e) {\n" +
+                "            return body\n" +
+                "        }\n" +
+                "    }\n" +
+                "\n" +
+                "    private Map<String, List<String>> filterNullKeys(Map<String, List<String>> map) {\n" +
+                "        return map.findAll {\n" +
+                "            k, v -> k != null\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "HttpRes http(String httpMethod, String uri, Map<String, String> headers, Map<String, String> params, String jsonBody) {\n" +
+                "    if (params) {\n" +
+                "        def queryString = params.collect {\n" +
+                "            k, v -> \"${URLEncoder.encode(k, 'UTF-8')}=${URLEncoder.encode(v==null?\" \":v, 'UTF-8')}\"\n" +
+                "        }.join('&')\n" +
+                "        uri += \"?${queryString}\"\n" +
+                "    }\n" +
+                "    HttpURLConnection connection = null\n" +
+                "    try {\n" +
+                "        connection = new URL(uri).openConnection()\n" +
+                "        connection.setRequestMethod(httpMethod.toUpperCase())\n" +
+                "\n" +
+                "        if (headers) {\n" +
+                "            headers.each {\n" +
+                "                key, value ->\n" +
+                "                    connection.setRequestProperty(key, value)\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        if (jsonBody) {\n" +
+                "            connection.setRequestProperty(\"Content-Type\", \"application/json\")\n" +
+                "            connection.doOutput = true\n" +
+                "            connection.outputStream.withWriter(\"UTF-8\") {\n" +
+                "                writer ->\n" +
+                "                    writer << jsonBody\n" +
+                "            }\n" +
+                "        }\n" +
+                "\n" +
+                "        def responseCode = connection.responseCode\n" +
+                "        def responseHeaders = connection.headerFields\n" +
+                "\n" +
+                "        def responseBody\n" +
+                "        try {\n" +
+                "            responseBody = connection.inputStream.withReader(\"UTF-8\") {\n" +
+                "                reader ->\n" +
+                "                    reader.text\n" +
+                "            }\n" +
+                "        } catch (Throwable e) {\n" +
+                "            responseBody = connection.errorStream.withReader(\"UTF-8\") {\n" +
+                "                reader ->\n" +
+                "                    reader.text\n" +
+                "            }\n" +
+                "        }\n" +
+                "        return new HttpRes(status:responseCode, body:responseBody, headers:responseHeaders)\n" +
+                "    } catch (ConnectException e) {\n" +
+                "        return new HttpRes(status:503, body:\"Service unavailable\", headers: [:])\n" +
+                "    } catch (FileNotFoundException e) {\n" +
+                "        return new HttpRes(status:404, body:\"Resource not found: ${e.message}\", headers: [:])\n" +
+                "    } catch (IOException e) {\n" +
+                "        return new HttpRes(status:500, body:\"IO Exception: ${e.message}\", headers: [:])\n" +
+                "    } finally {\n" +
+                "        if (connection != null) {\n" +
+                "            connection.disconnect()\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "\n" +
+                "def buildCurl(domain, httpMethod, path, params, headers, jsonBody) {\n" +
+                "    StringBuilder ret = new StringBuilder()\n" +
+                "    domain = domain.endsWith('/') ? domain.substring(0, domain.length() - 1) : domain\n" +
+                "    path = path.startsWith('/') ? path : (\"/\"+path)\n" +
+                "    ret.append(\"curl -i -X ${httpMethod.toUpperCase()} '${domain}${path}\")\n" +
+                "\n" +
+                "    if (params != null && params.size() > 0) {\n" +
+                "        ret.append(\"?\");\n" +
+                "        params.forEach((key, value) -> {\n" +
+                "            ret.append(URLEncoder.encode(key, \"UTF-8\"))\n" +
+                "                    .append(\"=\")\n" +
+                "                    .append(URLEncoder.encode(value, \"UTF-8\"))\n" +
+                "                    .append(\"&\");\n" +
+                "        });\n" +
+                "        // Remove the trailing '&'  \n" +
+                "        ret.setLength(ret.length() - 1);\n" +
+                "    }\n" +
+                "    ret.append(\"' \")\n" +
+                "\n" +
+                "    if (headers != null && headers.size() > 0) {\n" +
+                "        headers.forEach((key, value) -> {\n" +
+                "            if (\"Content-Type\" == key) {\n" +
+                "                return\n" +
+                "            }\n" +
+                "            ret.append(\" \\\\\\n  -H '${key}: ${value}'\")\n" +
+                "        });\n" +
+                "    }\n" +
+                "    if (jsonBody != null) {\n" +
+                "        ret.append(\" \\\\\\n  -H 'Content-Type: application/json' \\\\\\n  -d '${jsonBody}'\")\n" +
+                "    }\n" +
+                "    return ret\n" +
+                "}\n" +
+                "\n");
+    }
+
 
     public static final TraceConfig DEF_TRACE_CONFIG = new TraceConfig();
 
@@ -327,8 +515,12 @@ public class SettingsStorageHelper {
     }
 
 
-    public static ControllerCommand getAppControllerCommand(Project project, String app) {
+    public static HttpCommand getAppControllerCommand(Project project, String app) {
         return getAppConfig(project, app).getControllerCommand();
+    }
+
+    public static HttpCommand getAppFeignCommand(Project project, String app) {
+        return getAppConfig(project, app).getFeignCommand();
     }
 
 
@@ -422,7 +614,7 @@ public class SettingsStorageHelper {
     }
 
 
-    public static void setAppControllerCommand(Project project, String app, ControllerCommand adapter) {
+    public static void setAppControllerCommand(Project project, String app, HttpCommand adapter) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
             projectConfig = new ProjectConfig();
@@ -438,6 +630,25 @@ public class SettingsStorageHelper {
                 return new Config();
             }
         }).setControllerCommand(adapter);
+        saveProjectConfig(project, projectConfig);
+    }
+
+    public static void setAppFeignCommand(Project project, String app, HttpCommand adapter) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        if (projectConfig.getAppConfigs() == null) {
+            projectConfig.setAppConfigs(new HashMap<>());
+        }
+
+
+        projectConfig.getAppConfigs().computeIfAbsent(app, new Function<String, Config>() {
+            @Override
+            public Config apply(String s) {
+                return new Config();
+            }
+        }).setFeignCommand(adapter);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -490,6 +701,7 @@ public class SettingsStorageHelper {
 //            config.setFlexibleTestPackage(defFlexibleTestPackage);
 //            config.setScript(defScript);
             config.setControllerCommand(DEF_CONTROLLER_COMMAND);
+            config.setFeignCommand(DEF_FEIGN_COMMAND);
             config.setProperties(defProperties);
             return config;
         }
@@ -498,6 +710,7 @@ public class SettingsStorageHelper {
 //            config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
 //            config.setScript(projectConfig.getScript() == null ? defScript : projectConfig.getScript());
             config.setControllerCommand(projectConfig.getControllerCommand() == null ? DEF_CONTROLLER_COMMAND : projectConfig.getControllerCommand());
+            config.setFeignCommand(projectConfig.getFeignCommand() == null ? DEF_FEIGN_COMMAND : projectConfig.getFeignCommand());
             config.setProperties(defProperties);
             return config;
         }
@@ -510,6 +723,10 @@ public class SettingsStorageHelper {
 //        }
         if (config.getControllerCommand() == null) {
             config.setControllerCommand(projectConfig.getControllerCommand() == null ? DEF_CONTROLLER_COMMAND : projectConfig.getControllerCommand());
+        }
+
+        if (config.getFeignCommand() == null) {
+            config.setFeignCommand(projectConfig.getFeignCommand() == null ? DEF_FEIGN_COMMAND : projectConfig.getFeignCommand());
         }
         if (config.getProperties() == null) {
             config.setProperties(defProperties);
@@ -560,7 +777,9 @@ public class SettingsStorageHelper {
         private String flexibleTestPackage;
         private List<String> beanAnnotations;
         private String script;
-        private ControllerCommand controllerCommand;
+        private HttpCommand controllerCommand;
+        private HttpCommand feignCommand;
+
         private Map<String, Config> appConfigs;
         private TraceConfig traceConfig;
         private SqlConfig sqlConfig;
@@ -597,12 +816,20 @@ public class SettingsStorageHelper {
             this.traceConfig = traceConfig;
         }
 
-        public ControllerCommand getControllerCommand() {
+        public HttpCommand getControllerCommand() {
             return controllerCommand;
         }
 
-        public void setControllerCommand(ControllerCommand controllerCommand) {
+        public void setControllerCommand(HttpCommand controllerCommand) {
             this.controllerCommand = controllerCommand;
+        }
+
+        public HttpCommand getFeignCommand() {
+            return feignCommand;
+        }
+
+        public void setFeignCommand(HttpCommand feignCommand) {
+            this.feignCommand = feignCommand;
         }
 
         public boolean isEnableSideServer() {
@@ -636,7 +863,8 @@ public class SettingsStorageHelper {
         private String flexibleTestPackage;
         private List<String> beanAnnotations;
         private String script;
-        private ControllerCommand controllerCommand;
+        private HttpCommand controllerCommand;
+        private HttpCommand feignCommand;
         private String properties;
         private TraceConfig traceConfig;
         private SqlConfig sqlConfig;
@@ -673,12 +901,20 @@ public class SettingsStorageHelper {
             this.traceConfig = traceConfig;
         }
 
-        public ControllerCommand getControllerCommand() {
+        public HttpCommand getControllerCommand() {
             return controllerCommand;
         }
 
-        public void setControllerCommand(ControllerCommand controllerCommand) {
+        public void setControllerCommand(HttpCommand controllerCommand) {
             this.controllerCommand = controllerCommand;
+        }
+
+        public HttpCommand getFeignCommand() {
+            return feignCommand;
+        }
+
+        public void setFeignCommand(HttpCommand feignCommand) {
+            this.feignCommand = feignCommand;
         }
 
         public boolean isEnableSideServer() {
@@ -707,7 +943,7 @@ public class SettingsStorageHelper {
     }
 
 
-    public static class ControllerCommand {
+    public static class HttpCommand {
         //        controllerInstruction
         private String script;
         private List<String> envs;

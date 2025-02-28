@@ -69,10 +69,15 @@ public class SettingsDialog {
     private ComboBox<String> interceptorAppBox;
 
     private ComboBox<String> controllerScriptAppBox;
+    private ComboBox<String> feignScriptAppBox;
+
 
     private ComboBox<String> propertiesAppBox;
 
     private JBTextField controllerEnvTextField;
+
+    private JBTextField feignEnvTextField;
+
 
     private LanguageTextField datasourcePropertiesField;
     private JButton showDatasourceButton;
@@ -112,6 +117,7 @@ public class SettingsDialog {
             public void accept(String app) {
                 interceptorAppBox.addItem(app);
                 controllerScriptAppBox.addItem(app);
+                feignScriptAppBox.addItem(app);
                 propertiesAppBox.addItem(app);
             }
         });
@@ -128,6 +134,9 @@ public class SettingsDialog {
             if (controllerScriptAppBox.getItemCount() > 0) {
                 controllerScriptAppBox.setSelectedIndex(0);
             }
+            if (feignScriptAppBox.getItemCount() > 0) {
+                feignScriptAppBox.setSelectedIndex(0);
+            }
             if (propertiesAppBox.getItemCount() > 0) {
                 // 选择第一个选项
                 propertiesAppBox.setSelectedIndex(0);
@@ -138,6 +147,9 @@ public class SettingsDialog {
             }
             if (controllerScriptAppBox.getItemCount() > 0) {
                 controllerScriptAppBox.setSelectedItem(selectedAppName);
+            }
+            if (feignScriptAppBox.getItemCount() > 0) {
+                feignScriptAppBox.setSelectedItem(selectedAppName);
             }
             if (propertiesAppBox.getItemCount() > 0) {
                 // 选择第一个选项
@@ -171,7 +183,7 @@ public class SettingsDialog {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {TestkitHelper.getPluginName(), "Trace", "Tool interceptor", "Spring properties", "Controller command", "SQL tool"};
+        String[] options = {TestkitHelper.getPluginName(), "Trace", "Tool interceptor", "Spring properties", "Controller command", "FeignClient command", "SQL tool"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
@@ -184,6 +196,8 @@ public class SettingsDialog {
         rightContent.add(createInterceptorOptionPanel(), "Tool interceptor");
         rightContent.add(createPropertiesOptionPanel(), "Spring properties");
         rightContent.add(createControllerOptionPanel(), "Controller command");
+        rightContent.add(createFeignOptionPanel(), "FeignClient command");
+
         // 监听选项改变，更新右侧内容
         optionList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -405,7 +419,7 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL; // 水平方向填充
         panel.add(springDetailLabel, gbc);
 
-        beanAnnotationField = new JBTextField(String.join(",",SettingsStorageHelper.getBeanAnnotations(toolWindow.getProject())), 20);
+        beanAnnotationField = new JBTextField(String.join(",", SettingsStorageHelper.getBeanAnnotations(toolWindow.getProject())), 20);
         beanAnnotationField.getEmptyText().setText("The annotation list will registered bean to spring container. Default: Mapper,FeignClient");
 
         // 输入框
@@ -433,7 +447,7 @@ public class SettingsDialog {
         beanButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                beanAnnotationField.setText(String.join(",",SettingsStorageHelper.defBeanAnnotations));
+                beanAnnotationField.setText(String.join(",", SettingsStorageHelper.defBeanAnnotations));
             }
         });
         gbc.gridx = 3;  // 放在同一行的尾部
@@ -920,7 +934,7 @@ public class SettingsDialog {
                     scriptField.setText(SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript());
                     controllerEnvTextField.setText("");
                 } else {
-                    SettingsStorageHelper.ControllerCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(toolWindow.getProject(), selectedApp);
+                    SettingsStorageHelper.HttpCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(toolWindow.getProject(), selectedApp);
                     scriptField.setText(controllerCommand.getScript() == null ? SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript() : controllerCommand.getScript());
                     controllerEnvTextField.setText(CollectionUtils.isEmpty(controllerCommand.getEnvs()) ? "" : String.join(",", controllerCommand.getEnvs()));
                 }
@@ -989,7 +1003,7 @@ public class SettingsDialog {
                 return;
             }
 
-            SettingsStorageHelper.ControllerCommand controllerCommand = new SettingsStorageHelper.ControllerCommand();
+            SettingsStorageHelper.HttpCommand controllerCommand = new SettingsStorageHelper.HttpCommand();
             controllerCommand.setScript(StringUtils.isBlank(script) ? SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript() : script);
             controllerCommand.setEnvs(StringUtils.isBlank(controllerEnvTextField.getText().trim()) ? SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getEnvs() : Arrays.asList(controllerEnvTextField.getText().trim().split(",")));
             SettingsStorageHelper.setAppControllerCommand(toolWindow.getProject(), selectedApp, controllerCommand);
@@ -1037,6 +1051,250 @@ public class SettingsDialog {
                     HashMap<String, String> params = new HashMap<>();
                     params.put("param1", "v1");
                     Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, "{}"});
+                    String ret = build == null ? "" : String.valueOf(build);
+                    TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
+                } catch (Throwable ex) {
+                    TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test generate function error\n" + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                }
+            }
+        });
+    }
+
+
+    private JPanel createFeignOptionPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
+
+        JTextArea tipArea = createTips("When the interface is FeignClient, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result");
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 0; // 新的一行
+        gbc.gridwidth = 5;
+        gbc.weightx = 1;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(tipArea, gbc);
+
+
+        LanguageTextField scriptField = new LanguageTextField(GroovyLanguage.INSTANCE, null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), false);
+        // 布局输入框
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 5; // 占据3列
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        panel.add(new JBScrollPane(scriptField), gbc);
+
+        String[] apps = new String[]{};
+
+        // 添加标签到新行
+        gbc.gridx = 0;
+        gbc.gridy = 1; // 新的一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+
+        feignEnvTextField = new JBTextField(10); // 设定文本框的列数
+        feignEnvTextField.getEmptyText().setText("Optional environment list; multiple use,split");
+        feignEnvTextField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            private void updateToolTip() {
+                String text = feignEnvTextField.getText().trim();
+                if (StringUtils.isBlank(text)) {
+                    feignEnvTextField.setToolTipText("not config env list");
+                } else {
+                    feignEnvTextField.setToolTipText("env list is " + JSON.toJSONString(text.split(",")));
+                }
+            }
+        });
+        feignEnvTextField.setText("");
+
+        JLabel envLabel = new JLabel("Env:");
+        envLabel.setLabelFor(feignEnvTextField);
+        envLabel.setToolTipText("Optional environment list; multiple use,split");
+
+        // 添加标签和组合框
+        JLabel comboBoxLabel = new JLabel("App:");
+        feignScriptAppBox = new ComboBox<>(apps);
+        comboBoxLabel.setLabelFor(feignScriptAppBox);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        panel.add(comboBoxLabel, gbc);
+
+        // 添加组合框到标签右边
+        gbc.gridx = 1;
+        gbc.gridy = 1; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(feignScriptAppBox, gbc);
+
+
+        gbc.gridx = 2;
+        gbc.gridy = 1; // 第一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(envLabel, gbc);
+
+        // 添加环境文本框
+        gbc.gridx = 3;
+        gbc.gridy = 1; // 同一行
+        gbc.gridwidth = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(feignEnvTextField, gbc);
+
+
+        feignScriptAppBox.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedApp = (String) feignScriptAppBox.getSelectedItem();
+                if (selectedApp == null) {
+                    scriptField.setText(SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript());
+                    feignEnvTextField.setText("");
+                } else {
+                    SettingsStorageHelper.HttpCommand httpCommand = SettingsStorageHelper.getAppFeignCommand(toolWindow.getProject(), selectedApp);
+                    scriptField.setText(httpCommand.getScript() == null ? SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript() : httpCommand.getScript());
+                    feignEnvTextField.setText(CollectionUtils.isEmpty(httpCommand.getEnvs()) ? "" : String.join(",", httpCommand.getEnvs()));
+                }
+            }
+        });
+
+        // 添加新按钮到组合框右边
+        JButton newButton = new JButton(AllIcons.Actions.Rollback);
+        newButton.setToolTipText("Use default interceptor");
+        newButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                scriptField.setText(SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript());
+                feignEnvTextField.setText("");
+            }
+        });
+        gbc.gridx = 4;  // 放在同一行的尾部
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        panel.add(newButton, gbc);
+
+
+        // 创建按钮面板，使用FlowLayout以右对齐
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        //测试按钮
+        JButton testButton = new JButton(FIRE_TEST_ICON);
+        testButton.setPreferredSize(new Dimension(20, 20));
+        testButton.setToolTipText("Fire-Test feign generate function use simple params");
+        ActionListener testListener = e -> {
+            String scriptCode = scriptField.getText();
+            String app = String.valueOf(feignScriptAppBox.getSelectedItem());
+            if (StringUtils.isBlank(feignEnvTextField.getText().trim())) {
+                fireTestFeignFunction(scriptCode, null);
+                return;
+            }
+
+            String[] envs = feignEnvTextField.getText().trim().split(",");
+            DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
+            for (String env : envs) {
+                //显示的一个图标加上标题
+                AnAction documentation = new AnAction("Fire-Test with " + app + ":" + env, "Fire-Test with " + app + ":" + env, FunctionCallTool.FEIGN_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        fireTestFeignFunction(scriptCode, env);
+                    }
+                };
+                controllerActionGroup.add(documentation); // 将动作添加到动作组中
+            }
+
+            JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("FeignCommandPopup", controllerActionGroup).getComponent();
+            popupMenu.show(testButton, 0, 0);
+        };
+        testButton.addActionListener(testListener);
+
+        // 保存按钮
+        JButton saveButton = new JButton("Apply");
+        ActionListener saveListener = e -> {
+            String script = scriptField.getText();
+            String selectedApp = (String) feignScriptAppBox.getSelectedItem();
+            if (selectedApp == null) {
+                return;
+            }
+
+            SettingsStorageHelper.HttpCommand httpCommand = new SettingsStorageHelper.HttpCommand();
+            httpCommand.setScript(StringUtils.isBlank(script) ? SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript() : script);
+            httpCommand.setEnvs(StringUtils.isBlank(feignEnvTextField.getText().trim()) ? SettingsStorageHelper.DEF_FEIGN_COMMAND.getEnvs() : Arrays.asList(feignEnvTextField.getText().trim().split(",")));
+            SettingsStorageHelper.setAppFeignCommand(toolWindow.getProject(), selectedApp, httpCommand);
+            TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "FeignClient Command is saved");
+        };
+        saveButton.addActionListener(saveListener);
+
+        // 关闭按钮
+        JButton closeButton = new JButton("OK");
+        closeButton.addActionListener(e -> {
+            saveListener.actionPerformed(e);
+            // 关闭当前窗口
+            Window window = SwingUtilities.getWindowAncestor(panel);
+            if (window != null) {
+                window.dispose();
+            }
+        });
+
+        // 将按钮添加到按钮面板
+        buttonPanel.add(testButton);
+        buttonPanel.add(saveButton);
+        buttonPanel.add(closeButton);
+
+        // 将按钮面板添加到主面板的底部
+        gbc.gridx = 0;
+        gbc.gridy = 3; // 新的一行
+        gbc.gridwidth = 5; // 占据三列
+        gbc.weightx = 0.0; // 重置权重
+        gbc.weighty = 0.0; // 重置权重
+        gbc.fill = GridBagConstraints.HORIZONTAL; // 按钮面板充满水平空间
+        gbc.anchor = GridBagConstraints.SOUTH; // 向下对齐
+        panel.add(buttonPanel, gbc);
+
+        return panel;
+    }
+
+    private void fireTestFeignFunction(String scriptCode, String env) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Fire-Test generate function, please wait ...", false) {
+
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    GroovyShell groovyShell = new GroovyShell();
+                    Script script = groovyShell.parse(scriptCode);
+                    HashMap<String, String> params = new HashMap<>();
+                    params.put("param1", "v1");
+                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, "third-api",null, "POST", "/health", params, "{}"});
                     String ret = build == null ? "" : String.valueOf(build);
                     TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
                 } catch (Throwable ex) {

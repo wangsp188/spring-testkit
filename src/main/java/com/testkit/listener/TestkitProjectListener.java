@@ -32,7 +32,7 @@ public class TestkitProjectListener implements ProjectActivity {
                         CodingGuidelinesHelper.refreshDoc(project);
                         TestkitHelper.refresh(project);
                         //刷新数据库链接
-                        refreshValidDatasources(project);
+//                        refreshValidDatasources(project);
                         try {
                             Thread.sleep(24 * 3600 * 1000);
                         } catch (InterruptedException e) {

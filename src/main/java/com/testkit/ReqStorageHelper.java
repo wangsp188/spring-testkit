@@ -354,7 +354,7 @@ public class ReqStorageHelper {
     }
 
     public static enum SubItemType {
-        controller
+        controller,feign_client
     }
 
     public static class Item {
@@ -469,7 +469,7 @@ public class ReqStorageHelper {
         private List<String> argNames;
 
         private SubItemType subType;
-        private ControllerCommandMeta controllerMeta;
+        private HttpCommandMeta httpMeta;
 
 
         public String getTypeClass() {
@@ -529,21 +529,24 @@ public class ReqStorageHelper {
             this.subType = subType;
         }
 
-        public ControllerCommandMeta getControllerMeta() {
-            return controllerMeta;
+        public HttpCommandMeta getHttpMeta() {
+            return httpMeta;
         }
 
-        public void setControllerMeta(ControllerCommandMeta controllerMeta) {
-            this.controllerMeta = controllerMeta;
+        public void setHttpMeta(HttpCommandMeta httpMeta) {
+            this.httpMeta = httpMeta;
         }
     }
 
-    public static class ControllerCommandMeta {
+    public static class HttpCommandMeta {
         private String httpMethod;
         private String path;
         private String jsonBodyKey;
         private Map<String, String> aliasmap;
         private List<String> pathKeys;
+
+        private String feignName;
+        private String feignUrl;
 
 
         public String getHttpMethod() {
@@ -584,6 +587,22 @@ public class ReqStorageHelper {
 
         public void setPathKeys(List<String> pathKeys) {
             this.pathKeys = pathKeys;
+        }
+
+        public String getFeignName() {
+            return feignName;
+        }
+
+        public void setFeignName(String feignName) {
+            this.feignName = feignName;
+        }
+
+        public String getFeignUrl() {
+            return feignUrl;
+        }
+
+        public void setFeignUrl(String feignUrl) {
+            this.feignUrl = feignUrl;
         }
     }
 
