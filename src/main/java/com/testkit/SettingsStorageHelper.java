@@ -128,16 +128,18 @@ public class SettingsStorageHelper {
                 " * @param httpMethod GET/POST 等等http方法，非空\n" +
                 " * @param path       /uri 非空\n" +
                 " * @param params     传递的参数，k和v都是string，非空\n" +
+                " * @param requesterHeaders  Map<String,String> 形式请求头，非空\n" +
                 " * @param jsonBody   json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
                 " * @return 返回结果会被copy到剪切板\n" +
                 " */\n" +
-                "def generate(String env, Integer runtimePort, String httpMethod, String path, Map<String, String> params, String jsonBody) {\n" +
+                "def generate(String env, Integer runtimePort, String httpMethod, String path, Map<String, String> params, Map<String, String> requesterHeaders, String jsonBody) {\n" +
                 "    String domain = \"http://localhost:8080\"\n" +
                 "    if (\"local\" == env && runtimePort != null) {\n" +
                 "        domain = \"http://localhost:\" + runtimePort\n" +
                 "    }\n" +
                 "    String token = getToken(env)\n" +
-                "    buildCurl(domain, httpMethod, path, params,[\"Authorization\":\"Bearer ${token}\"],jsonBody)\n" +
+                "    requesterHeaders['Authorization'] = \"Bearer ${token}\"\n" +
+                "    buildCurl(domain, httpMethod, path, params,requesterHeaders,jsonBody)\n" +
                 "}\n" +
                 "\n" +
                 "\n" +
@@ -306,13 +308,15 @@ public class SettingsStorageHelper {
                 " * @param httpMethod GET/POST 等等http方法，非空\n" +
                 " * @param path       /uri 非空\n" +
                 " * @param params     传递的参数，k和v都是string，非空\n" +
+                " * @param requesterHeaders  Map<String,String> 形式请求头，非空\n" +
                 " * @param jsonBody   json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
                 " * @return 返回结果会被copy到剪切板\n" +
                 " */\n" +
-                "def generate(String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody) {\n" +
+                "def generate(String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, Map<String, String> requesterHeaders, String jsonBody) {\n" +
                 "    String domain = getDomain(feignName,feignUrl)\n" +
                 "    String token = getToken(env)\n" +
-                "    buildCurl(domain, httpMethod, path, params,[\"Authorization\":\"Bearer ${token}\"],jsonBody)\n" +
+                "    requesterHeaders['Authorization'] = \"Bearer ${token}\"\n" +
+                "    buildCurl(domain, httpMethod, path, params,requesterHeaders,jsonBody)\n" +
                 "}\n" +
                 "\n" +
                 "def getDomain(feignName, feignUrl){\n" +

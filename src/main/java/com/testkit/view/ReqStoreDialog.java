@@ -883,7 +883,8 @@ public class ReqStoreDialog {
         Map<String, String> aliasmap = commandMeta.getAliasmap();
         List<String> pathKeys = commandMeta.getPathKeys();
         String jsonBodyKey = commandMeta.getJsonBodyKey();
-
+        Map<String, String> headers = commandMeta.getHeaders();
+        Map<String, String> headerValues = new HashMap<>();
 
         String jsonBody = null;
         if (jsonBodyKey != null) {
@@ -893,6 +894,17 @@ public class ReqStoreDialog {
                 jsonBody = "{}";
             }
             inputParams.remove(jsonBodyKey);
+        }
+
+        if (headers != null) {
+            for (Map.Entry<String, String> stringEntry : headers.entrySet()) {
+                String headerVal = inputParams.getString(stringEntry.getKey());
+                inputParams.remove(stringEntry.getKey());
+                if (headerVal == null) {
+                    continue;
+                }
+                headerValues.put(stringEntry.getValue(), headerVal);
+            }
         }
 
 
@@ -952,7 +964,7 @@ public class ReqStoreDialog {
         }
         setOutputText("Generate controller command ...", null);
         try {
-            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
+            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret, null);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
@@ -963,11 +975,11 @@ public class ReqStoreDialog {
         }
     }
 
-    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
         RuntimeHelper.VisibleApp selectedApp = parseApp((String) visibleAppComboBox.getSelectedItem());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, headerValues, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
@@ -1065,8 +1077,9 @@ public class ReqStoreDialog {
         Map<String, String> aliasmap = commandMeta.getAliasmap();
         List<String> pathKeys = commandMeta.getPathKeys();
         String jsonBodyKey = commandMeta.getJsonBodyKey();
+        Map<String, String> headers = commandMeta.getHeaders();
 
-
+        HashMap<String, String> headerValues = new HashMap<>();
         String jsonBody = null;
         if (jsonBodyKey != null) {
             if (inputParams.get(jsonBodyKey) != null) {
@@ -1075,6 +1088,17 @@ public class ReqStoreDialog {
                 jsonBody = "{}";
             }
             inputParams.remove(jsonBodyKey);
+        }
+
+        if (headers != null) {
+            for (Map.Entry<String, String> stringEntry : headers.entrySet()) {
+                String headerVal = inputParams.getString(stringEntry.getKey());
+                inputParams.remove(stringEntry.getKey());
+                if (headerVal == null) {
+                    continue;
+                }
+                headerValues.put(stringEntry.getValue(), headerVal);
+            }
         }
 
 
@@ -1134,7 +1158,7 @@ public class ReqStoreDialog {
         }
         setOutputText("Generate FeignClient command ...", null);
         try {
-            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody);
+            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret, null);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
@@ -1145,10 +1169,10 @@ public class ReqStoreDialog {
         }
     }
 
-    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody, HashMap<String, String> headerValues) {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params,headerValues ,jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 

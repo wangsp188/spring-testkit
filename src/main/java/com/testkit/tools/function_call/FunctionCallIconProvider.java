@@ -36,10 +36,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 
 public class FunctionCallIconProvider implements LineMarkerProvider {
 
@@ -233,7 +231,6 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         if (containingClass.isInterface() && modifierList.hasModifierProperty(PsiModifier.STATIC)) {
             return "interface_static";
         }
-
 
 
         if (!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
@@ -644,6 +641,12 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
 
         for (String annotationFqn : requestMethodAnnotations) {
             if (method.getModifierList().findAnnotation(annotationFqn) != null) {
+                PsiParameter[] parameters = method.getParameterList().getParameters();
+                for (PsiParameter parameter : parameters) {
+                    if (Objects.equals(parameter.getType().getCanonicalText(), "org.springframework.web.multipart.MultipartFile")) {
+                        return false;
+                    }
+                }
                 return true;
             }
         }

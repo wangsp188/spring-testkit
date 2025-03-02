@@ -544,6 +544,7 @@ public class ReqStorageHelper {
         private String jsonBodyKey;
         private Map<String, String> aliasmap;
         private List<String> pathKeys;
+        private Map<String,String> headers;
 
         private String feignName;
         private String feignUrl;
@@ -603,6 +604,14 @@ public class ReqStorageHelper {
 
         public void setFeignUrl(String feignUrl) {
             this.feignUrl = feignUrl;
+        }
+
+        public Map<String, String> getHeaders() {
+            return headers;
+        }
+
+        public void setHeaders(Map<String, String> headers) {
+            this.headers = headers;
         }
     }
 

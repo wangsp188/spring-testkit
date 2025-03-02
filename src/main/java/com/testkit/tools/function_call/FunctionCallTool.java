@@ -44,10 +44,7 @@ import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.util.*;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -322,7 +319,7 @@ public class FunctionCallTool extends BasePluginTool {
         if (Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.controller;
             methodMeta.setHttpMeta(parseControllerMeta(method));
-        }else if(Arrays.asList(actionPanel.getComponents()).contains(feignCommandButton)){
+        } else if (Arrays.asList(actionPanel.getComponents()).contains(feignCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.feign_client;
             methodMeta.setHttpMeta(parseFeignMeta(method));
         }
@@ -390,17 +387,12 @@ public class FunctionCallTool extends BasePluginTool {
                 reqPath = ToolHelper.getAnnotationValueText(methodAnnotation.findAttributeValue("path"));
             }
 
-
-            PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("value");
-            if (methodValue == null || (methodValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue())))) {
-                methodValue = methodAnnotation.findAttributeValue("path");
-            }
             if (StringUtils.isNotBlank(reqPath)) {
                 if (path1.endsWith("/")) {
                     if (reqPath.startsWith("/")) {
                         path1 += reqPath.substring(1);
                     } else {
-                        path1 += methodValue.getText();
+                        path1 += reqPath;
                     }
                 } else {
                     if (reqPath.startsWith("/")) {
@@ -419,6 +411,7 @@ public class FunctionCallTool extends BasePluginTool {
         ArrayList<String> paths = new ArrayList<>();
         Map<String, String> aliasmap = new HashMap<>();
         String jsonBodyKey = null;
+        Map<String, String> headers = new HashMap<>();
         for (PsiParameter parameter : parameters) {
             PsiAnnotation requestBodyAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestBody");
             if (requestBodyAnnotation != null) {
@@ -428,6 +421,20 @@ public class FunctionCallTool extends BasePluginTool {
                 jsonBodyKey = parameter.getName();
                 continue;
             }
+            PsiAnnotation headerAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestHeader");
+            if (headerAnnotation != null) {
+                String headerKey = ToolHelper.getAnnotationValueText(headerAnnotation.findAttributeValue("value"));
+                if (StringUtils.isBlank(headerKey)) {
+                    headerKey = ToolHelper.getAnnotationValueText(headerAnnotation.findAttributeValue("name"));
+                }
+                if (StringUtils.isBlank(headerKey)) {
+                    headerKey = parameter.getName();
+                }
+                headers.put(parameter.getName(), headerKey);
+                continue;
+            }
+
+
             //判断是否含有 requestParam注解,如果有,则将别名注册到 aliasmap 中,key 是形参名,val 是 requestparam 的配置
             // 如果不存在 @RequestBody 注解，则检查 @RequestParam 注解
             PsiAnnotation requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestParam");
@@ -443,17 +450,14 @@ public class FunctionCallTool extends BasePluginTool {
             if (path) {
                 paths.add(parameter.getName());
             }
-            // 获取 @RequestParam 注解中的配置值
-            PsiAnnotationMemberValue requestParamValue = requestParamAnnotation.findAttributeValue("value");
-            if (requestParamValue == null || (requestParamValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) requestParamValue).getValue())))) {
-                requestParamValue = requestParamAnnotation.findAttributeValue("name");
+
+            String alias = ToolHelper.getAnnotationValueText(requestParamAnnotation.findAttributeValue("value"));
+            if (StringUtils.isBlank(alias)) {
+                alias = ToolHelper.getAnnotationValueText(requestParamAnnotation.findAttributeValue("name"));
             }
-            if (requestParamValue instanceof PsiLiteralExpression) {
-                String cs = String.valueOf(((PsiLiteralExpression) requestParamValue).getValue());
-                if (StringUtils.isNotBlank(cs)) {
-                    // 将别名注册到 aliasMap 中
-                    aliasmap.put(parameter.getName(), cs);
-                }
+            if (StringUtils.isNotBlank(alias)) {
+                // 将别名注册到 aliasMap 中
+                aliasmap.put(parameter.getName(), alias);
             }
         }
 
@@ -462,6 +466,7 @@ public class FunctionCallTool extends BasePluginTool {
         commandMeta.setAliasmap(aliasmap);
         commandMeta.setJsonBodyKey(jsonBodyKey);
         commandMeta.setPathKeys(paths);
+        commandMeta.setHeaders(headers);
         return commandMeta;
     }
 
@@ -481,7 +486,7 @@ public class FunctionCallTool extends BasePluginTool {
                 feignName = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
             }
             feignUrl = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("url"));
-            if(StringUtils.isBlank(feignUrl)){
+            if (StringUtils.isBlank(feignUrl) || (feignUrl.startsWith("${") && feignUrl.endsWith("}"))) {
                 feignUrl = null;
             }
             if (StringUtils.isNotBlank(rootPath) && rootPath.startsWith("/")) {
@@ -531,16 +536,12 @@ public class FunctionCallTool extends BasePluginTool {
             }
 
 
-            PsiAnnotationMemberValue methodValue = methodAnnotation.findAttributeValue("value");
-            if (methodValue == null || (methodValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) methodValue).getValue())))) {
-                methodValue = methodAnnotation.findAttributeValue("path");
-            }
             if (StringUtils.isNotBlank(reqPath)) {
                 if (path1.endsWith("/")) {
                     if (reqPath.startsWith("/")) {
                         path1 += reqPath.substring(1);
                     } else {
-                        path1 += methodValue.getText();
+                        path1 += reqPath;
                     }
                 } else {
                     if (reqPath.startsWith("/")) {
@@ -559,6 +560,7 @@ public class FunctionCallTool extends BasePluginTool {
         ArrayList<String> paths = new ArrayList<>();
         Map<String, String> aliasmap = new HashMap<>();
         String jsonBodyKey = null;
+        Map<String, String> headers = new HashMap<>();
         for (PsiParameter parameter : parameters) {
             PsiAnnotation requestBodyAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestBody");
             if (requestBodyAnnotation != null) {
@@ -568,6 +570,20 @@ public class FunctionCallTool extends BasePluginTool {
                 jsonBodyKey = parameter.getName();
                 continue;
             }
+
+            PsiAnnotation headerAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestHeader");
+            if (headerAnnotation != null) {
+                String headerKey = ToolHelper.getAnnotationValueText(headerAnnotation.findAttributeValue("value"));
+                if (StringUtils.isBlank(headerKey)) {
+                    headerKey = ToolHelper.getAnnotationValueText(headerAnnotation.findAttributeValue("name"));
+                }
+                if (StringUtils.isBlank(headerKey)) {
+                    headerKey = parameter.getName();
+                }
+                headers.put(parameter.getName(), headerKey);
+                continue;
+            }
+
             //判断是否含有 requestParam注解,如果有,则将别名注册到 aliasmap 中,key 是形参名,val 是 requestparam 的配置
             // 如果不存在 @RequestBody 注解，则检查 @RequestParam 注解
             PsiAnnotation requestParamAnnotation = parameter.getModifierList().findAnnotation("org.springframework.web.bind.annotation.RequestParam");
@@ -584,16 +600,13 @@ public class FunctionCallTool extends BasePluginTool {
                 paths.add(parameter.getName());
             }
             // 获取 @RequestParam 注解中的配置值
-            PsiAnnotationMemberValue requestParamValue = requestParamAnnotation.findAttributeValue("value");
-            if (requestParamValue == null || (requestParamValue instanceof PsiLiteralExpression && StringUtils.isBlank(String.valueOf(((PsiLiteralExpression) requestParamValue).getValue())))) {
-                requestParamValue = requestParamAnnotation.findAttributeValue("name");
+            String alias = ToolHelper.getAnnotationValueText(requestParamAnnotation.findAttributeValue("value"));
+            if (StringUtils.isBlank(alias)) {
+                alias = ToolHelper.getAnnotationValueText(requestParamAnnotation.findAttributeValue("name"));
             }
-            if (requestParamValue instanceof PsiLiteralExpression) {
-                String cs = String.valueOf(((PsiLiteralExpression) requestParamValue).getValue());
-                if (StringUtils.isNotBlank(cs)) {
-                    // 将别名注册到 aliasMap 中
-                    aliasmap.put(parameter.getName(), cs);
-                }
+            if (StringUtils.isNotBlank(alias)) {
+                // 将别名注册到 aliasMap 中
+                aliasmap.put(parameter.getName(), alias);
             }
         }
 
@@ -604,6 +617,7 @@ public class FunctionCallTool extends BasePluginTool {
         commandMeta.setPathKeys(paths);
         commandMeta.setFeignName(feignName);
         commandMeta.setFeignUrl(feignUrl);
+        commandMeta.setHeaders(headers);
         return commandMeta;
     }
 
@@ -622,7 +636,8 @@ public class FunctionCallTool extends BasePluginTool {
         Map<String, String> aliasmap = commandMeta.getAliasmap();
         List<String> pathKeys = commandMeta.getPathKeys();
         String jsonBodyKey = commandMeta.getJsonBodyKey();
-
+        Map<String, String> headers = commandMeta.getHeaders();
+        Map<String, String> headerValues = new HashMap<>();
 
         String jsonBody = null;
         if (jsonBodyKey != null) {
@@ -632,6 +647,17 @@ public class FunctionCallTool extends BasePluginTool {
                 jsonBody = "{}";
             }
             inputParams.remove(jsonBodyKey);
+        }
+
+        if (headers != null) {
+            for (Map.Entry<String, String> stringEntry : headers.entrySet()) {
+                String headerVal = inputParams.getString(stringEntry.getKey());
+                inputParams.remove(stringEntry.getKey());
+                if (headerVal == null) {
+                    continue;
+                }
+                headerValues.put(stringEntry.getValue(), headerVal);
+            }
         }
 
 
@@ -691,7 +717,7 @@ public class FunctionCallTool extends BasePluginTool {
         }
         setOutputText("Generate controller command ...");
         try {
-            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody);
+            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
@@ -717,7 +743,8 @@ public class FunctionCallTool extends BasePluginTool {
         Map<String, String> aliasmap = commandMeta.getAliasmap();
         List<String> pathKeys = commandMeta.getPathKeys();
         String jsonBodyKey = commandMeta.getJsonBodyKey();
-
+        Map<String, String> headers = commandMeta.getHeaders();
+        Map<String, String> headerValues = new HashMap<>();
 
         String jsonBody = null;
         if (jsonBodyKey != null) {
@@ -727,6 +754,17 @@ public class FunctionCallTool extends BasePluginTool {
                 jsonBody = "{}";
             }
             inputParams.remove(jsonBodyKey);
+        }
+
+        if (headers != null) {
+            for (Map.Entry<String, String> stringEntry : headers.entrySet()) {
+                String headerVal = inputParams.getString(stringEntry.getKey());
+                inputParams.remove(stringEntry.getKey());
+                if (headerVal == null) {
+                    continue;
+                }
+                headerValues.put(stringEntry.getValue(), headerVal);
+            }
         }
 
 
@@ -786,7 +824,7 @@ public class FunctionCallTool extends BasePluginTool {
         }
         setOutputText("Generate FeignClient command ...");
         try {
-            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody);
+            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
@@ -797,19 +835,19 @@ public class FunctionCallTool extends BasePluginTool {
         }
     }
 
-    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params, headerValues, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
 
-    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody) {
+    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
         RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(getProject().getName());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, headerValues,jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
@@ -994,7 +1032,7 @@ public class FunctionCallTool extends BasePluginTool {
         //判断是http 还是 feign
         if (FunctionCallIconProvider.isFeign(method)) {
             List<Component> components = Arrays.asList(actionPanel.getComponents());
-            if(components.contains(controllerCommandButton)){
+            if (components.contains(controllerCommandButton)) {
                 actionPanel.remove(controllerCommandButton);
             }
             if (requestMethod && !components.contains(feignCommandButton)) {
@@ -1002,10 +1040,10 @@ public class FunctionCallTool extends BasePluginTool {
             } else if (!requestMethod && components.contains(feignCommandButton)) {
                 actionPanel.remove(feignCommandButton);
             }
-        }else{
+        } else {
             //判断panel1是否存在button1
             List<Component> components = Arrays.asList(actionPanel.getComponents());
-            if(components.contains(feignCommandButton)){
+            if (components.contains(feignCommandButton)) {
                 actionPanel.remove(feignCommandButton);
             }
             if (requestMethod && !components.contains(controllerCommandButton)) {

@@ -1050,7 +1050,9 @@ public class SettingsDialog {
                     Script script = groovyShell.parse(scriptCode);
                     HashMap<String, String> params = new HashMap<>();
                     params.put("param1", "v1");
-                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, "{}"});
+                    HashMap<String, String> headers = new HashMap<>();
+                    headers.put("T-header", "1");
+                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, headers, "{}"});
                     String ret = build == null ? "" : String.valueOf(build);
                     TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
                 } catch (Throwable ex) {
@@ -1294,7 +1296,10 @@ public class SettingsDialog {
                     Script script = groovyShell.parse(scriptCode);
                     HashMap<String, String> params = new HashMap<>();
                     params.put("param1", "v1");
-                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, "third-api",null, "POST", "/health", params, "{}"});
+
+                    HashMap<String, String> headers = new HashMap<>();
+                    headers.put("T-header", "1");
+                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, "third-api", null, "POST", "/health", params, headers, "{}"});
                     String ret = build == null ? "" : String.valueOf(build);
                     TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
                 } catch (Throwable ex) {
