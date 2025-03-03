@@ -1,6 +1,5 @@
 package com.testkit.view;
 
-import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
 import javax.swing.table.TableCellRenderer;
@@ -10,32 +9,56 @@ import java.util.List;
 
 // 自定义单元格渲染器，实现自动换行
 class TextAreaCellRenderer extends JTextArea implements TableCellRenderer {
-    private Set<Integer> tooltips = new HashSet<>();
+    // 精选10款科技感配色（HEX格式）
+    private static final Color[] TECH_COLORS = {
+            new Color(245, 225, 220), // #F5F5DC 珍珠白
+            new Color(240, 255, 220), // #F0FFF0 薄荷雾
+    };
+
+
+    private final Set<Integer> tooltips;
+    private final int randomBackLoop;
+
+    // 添加构造参数控制颜色重复周期
+    public TextAreaCellRenderer(int row, Set<Integer> tooltips, int randomBackLoop) {
+        setLineWrap(true);
+        setWrapStyleWord(true);
+        setOpaque(true);
+        setRows(row);
+        this.tooltips = tooltips != null ? new HashSet<>(tooltips) : Collections.emptySet();
+        this.randomBackLoop = randomBackLoop;
+    }
 
     public TextAreaCellRenderer(int row, Set<Integer> tooltips) {
-        setLineWrap(true); // 自动换行
-        setWrapStyleWord(true); // 按单词换行
-        setOpaque(true); // 设置不透明
-        setRows(row);
-        if (tooltips != null) {
-            this.tooltips.addAll(tooltips);
-        }
+        this(row, tooltips, 0);
     }
 
     @Override
-    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-        setText((value == null) ? "" : value.toString());
+    public Component getTableCellRendererComponent(JTable table, Object value,
+                                                   boolean isSelected, boolean hasFocus, int row, int column) {
+        // 原始文本处理逻辑
+        setText(value != null ? value.toString() : "");
+        handleTooltip(value, column);
+
+        if (randomBackLoop > 0) {
+            int colorIndex = (row / randomBackLoop) % TECH_COLORS.length;
+            setBackground(TECH_COLORS[colorIndex]);
+        }
+        return this;
+    }
+
+    // 原有工具提示逻辑
+    private void handleTooltip(Object value, int column) {
         if (tooltips.contains(column)) {
             String str = value != null ? value.toString() : "";
-            List<String> strs = Arrays.asList(str.replace("\n", "<br>").split("<br>"));
-            if (strs.size() > 20) {
-                strs = new ArrayList<>(strs.subList(0, 19));
+            List<String> strs = Arrays.asList(str.replace("\n", "<br>").split("br>"));
+            if (strs.size() > 10) {
+                strs = new ArrayList<>(strs.subList(0, 9));
                 strs.add("...");
             }
             setToolTipText(String.join("<br>", strs));
         } else {
             setToolTipText(null);
         }
-        return this;
     }
 }

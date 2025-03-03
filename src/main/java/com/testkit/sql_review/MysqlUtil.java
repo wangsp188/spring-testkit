@@ -1,10 +1,9 @@
 package com.testkit.sql_review;
 
 import com.testkit.SettingsStorageHelper;
-import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.Statements;
 
-import java.io.StringReader;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
@@ -21,6 +20,18 @@ public class MysqlUtil {
         }
         try {
             return CCJSqlParserUtil.parse(sql);
+        } catch (Throwable ex) {
+            // 错误处理
+            throw new RuntimeException("Sorry, i can't parse the sql:\n" + sql + ",\n" + ex.getMessage());
+        }
+    }
+
+    public static Statements parses(String sql) {
+        if (sql == null) {
+            throw new IllegalArgumentException("sql is null");
+        }
+        try {
+            return CCJSqlParserUtil.parseStatements(sql);
         } catch (Throwable ex) {
             // 错误处理
             throw new RuntimeException("Sorry, i can't parse the sql:\n" + sql + ",\n" + ex.getMessage());
@@ -268,7 +279,7 @@ public class MysqlUtil {
                         ret = "return row" + getResultSetRowCount(resultSet);
                     }
                 } else {
-                    ret = statement.getUpdateCount() >= 0 ? ("affect row:" + statement.getUpdateCount()) : null;
+                    ret = statement.getUpdateCount() > 0 ? ("affect row:" + statement.getUpdateCount()) : null;
                 }
 
                 return SqlRet.buildSuccess(ret);
