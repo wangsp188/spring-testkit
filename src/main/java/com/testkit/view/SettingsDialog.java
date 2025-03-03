@@ -597,7 +597,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nFunction-call, flexible-test, spring-cache support interceptor");
+        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nAvailable tools: Function-call, flexible-test, spring-cache\nScript language: JAVA (Classes in your project can be used, You can refer to spring-beans using @Autowired)");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -821,7 +821,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("When the method is spring-web requestMapping, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result");
+        JTextArea tipArea = createTips("When the method is spring-web requestMapping, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result\nScript language: Groovy(You cannot use classes in your project)");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -1068,7 +1068,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("When the interface is FeignClient, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result");
+        JTextArea tipArea = createTips("When the interface is FeignClient, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result\nScript language: Groovy(You cannot use classes in your project)");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
