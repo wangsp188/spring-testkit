@@ -217,7 +217,7 @@ public class SqlDialog extends JDialog {
 
         // 一个展开的按钮
         unfoldButton = new JButton(SAFE_EXECUTE_ICON);
-        unfoldButton.setToolTipText("DDL Executor");
+        unfoldButton.setToolTipText("Verify & Execute");
         unfoldButton.setPreferredSize(new Dimension(32, 32));
         unfoldButton.addActionListener(e -> {
             // 创建表格模型
