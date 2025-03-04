@@ -9,10 +9,11 @@ import java.util.List;
 
 // 自定义单元格渲染器，实现自动换行
 class TextAreaCellRenderer extends JTextArea implements TableCellRenderer {
-    // 精选10款科技感配色（HEX格式）
     private static final Color[] TECH_COLORS = {
-            new Color(245, 225, 220), // #F5F5DC 珍珠白
-            new Color(240, 255, 220), // #F0FFF0 薄荷雾
+//            new Color(207, 201, 201, 255),
+//            new Color(240, 255, 220),
+            new Color(178, 198, 11, 255),
+            new Color(255, 75, 219),
     };
 
 
@@ -42,7 +43,8 @@ class TextAreaCellRenderer extends JTextArea implements TableCellRenderer {
 
         if (randomBackLoop > 0) {
             int colorIndex = (row / randomBackLoop) % TECH_COLORS.length;
-            setBackground(TECH_COLORS[colorIndex]);
+            setForeground(TECH_COLORS[colorIndex]);
+//            setBackground(TECH_COLORS[colorIndex]);
         }
         return this;
     }

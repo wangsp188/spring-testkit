@@ -1,5 +1,6 @@
 package com.testkit.sql_review;
 
+import com.testkit.SettingsStorageHelper;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.alter.Alter;
 import net.sf.jsqlparser.statement.alter.AlterExpression;
@@ -91,31 +92,21 @@ public class MysqlVerifyExecuteUtil {
                         lastCol = Boolean.TRUE;
                         // 删除列
                         String columnName = MysqlUtil.remove(expr.getColumnName());
-                        String columnDefinition = null;
-                        try {
-                            columnDefinition = getColumnDefinition(tableName, columnName, connection);
-                        } catch (SQLException e) {
-                            throw new RuntimeException("Column definition not found: `" + tableName + "`.`" + columnName + "` " + e.getMessage());
-                        }
+                        String columnDefinition = getColumnDefinition(tableName, columnName, connection);
                         if (columnDefinition != null) {
                             rollbackOps.add("ADD COLUMN `" + columnDefinition + "`");
                         } else {
-                            throw new RuntimeException("Column definition not found: `" + tableName + "`.`" + columnName + "`  not exist");
+                            throw new RuntimeException("Drop column: `" + tableName + "`.`" + columnName + "` not exist");
                         }
                     } else if (expr.getIndex() != null) {
                         lastCol = Boolean.FALSE;
                         // 删除索引
                         String indexName = MysqlUtil.remove(expr.getIndex().getName());
-                        String indexDefinition = null;
-                        try {
-                            indexDefinition = getIndexDefinition(tableName, indexName, connection);
-                        } catch (SQLException e) {
-                            throw new RuntimeException("Index definition not found: `" + tableName + "`.`" + indexName + "` " + e.getMessage());
-                        }
-                        if (indexDefinition != null) {
-                            rollbackOps.add("ADD `" + indexDefinition + "`");
+                        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+                        if (indexDefinition == null) {
+                            throw new RuntimeException("Drop index: `" + tableName + "`.`" + indexName + "` not exist");
                         } else {
-                            throw new RuntimeException("Index definition not found: `" + tableName + "`.`" + indexName + "`  not exist");
+                            rollbackOps.add("ADD `" + indexDefinition + "`");
                         }
                     } else {
                         lastCol = null;
@@ -127,19 +118,15 @@ public class MysqlVerifyExecuteUtil {
                     lastCol = null;
                     if (expr.getColDataTypeList() != null && expr.getColumnOldName() != null) {
                         String columnOldName = MysqlUtil.remove(expr.getColumnOldName());
-                        String columnDefinition = null;
-                        try {
-                            columnDefinition = getColumnDefinition(tableName, columnOldName, connection);
-                            if (columnDefinition == null) {
-                                throw new RuntimeException();
-                            }
-                        } catch (SQLException e) {
-                            throw new RuntimeException("Column definition not found: `" + tableName + "`.`" + columnOldName + "`  not exist");
+                        String oldColumnDefinition = getColumnDefinition(tableName, columnOldName, connection);
+                        if (oldColumnDefinition == null) {
+                            throw new RuntimeException("Change column: `" + tableName + "`.`" + columnOldName + "` not exist");
                         }
-                        for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
-                            String columnName = MysqlUtil.remove(columnDataType.getColumnName());
-                            rollbackOps.add("CHANGE `" + columnName + "` " + columnDefinition);
+                        if (expr.getColDataTypeList().isEmpty() || expr.getColDataTypeList().size() != 1) {
+                            throw new UnsupportedOperationException("Unsupported CHANGE operation in expr: " + expr);
                         }
+                        String columnName = MysqlUtil.remove(expr.getColDataTypeList().get(0).getColumnName());
+                        rollbackOps.add("CHANGE `" + columnName + "` " + oldColumnDefinition);
                     } else {
                         // 其他DROP操作，无法处理
                         throw new UnsupportedOperationException("Unsupported CHANGE operation in expr: " + expr);
@@ -151,15 +138,11 @@ public class MysqlVerifyExecuteUtil {
                         // 遍历所有被修改的列
                         for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
                             String columnName = MysqlUtil.remove(columnDataType.getColumnName());
-                            try {
-                                String columnDefinition = getColumnDefinition(tableName, columnName, connection);
-                                if (columnDefinition == null) {
-                                    throw new RuntimeException("column `" + tableName + "`.`" + columnName + "` not exist");
-                                }
-                                rollbackOps.add("MODIFY COLUMN " + columnDefinition);
-                            } catch (SQLException e) {
-                                throw new RuntimeException("Column definition not found: `" + tableName + "`.`" + columnName + "` " + e.getMessage());
+                            String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                            if (columnDefinition == null) {
+                                throw new RuntimeException("Modify column: `" + tableName + "`.`" + columnName + "` not exist");
                             }
+                            rollbackOps.add("MODIFY COLUMN " + columnDefinition);
                         }
                     } else {
                         throw new UnsupportedOperationException("Unsupported MODIFY operation in expr: " + expr);
@@ -192,30 +175,19 @@ public class MysqlVerifyExecuteUtil {
                     if (lastCol) {
                         // 删除列
                         String columnName = MysqlUtil.remove(expr.getOptionalSpecifier());
-                        String columnDefinition = null;
-                        try {
-                            columnDefinition = getColumnDefinition(tableName, columnName, connection);
-                        } catch (SQLException e) {
-                            throw new RuntimeException("Column definition not found: `" + tableName + "`.`" + columnName + "` " + e.getMessage());
+                        String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                        if (columnDefinition == null) {
+                            throw new RuntimeException("Drop column: `" + tableName + "`.`" + columnName + "` not exist");
                         }
-                        if (columnDefinition != null) {
-                            rollbackOps.add("ADD COLUMN `" + columnDefinition + "`");
-                        } else {
-                            throw new RuntimeException("Column definition not found: `" + tableName + "`.`" + columnName + "`  not exist");
-                        }
+                        rollbackOps.add("ADD COLUMN `" + columnDefinition + "`");
                     } else {
                         // 删除索引
                         String indexName = MysqlUtil.remove(expr.getOptionalSpecifier());
-                        String indexDefinition = null;
-                        try {
-                            indexDefinition = getIndexDefinition(tableName, indexName, connection);
-                        } catch (SQLException e) {
-                            throw new RuntimeException("Index definition not found: `" + tableName + "`.`" + indexName + "` " + e.getMessage());
-                        }
-                        if (indexDefinition != null) {
-                            rollbackOps.add("ADD `" + indexDefinition + "`");
+                        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+                        if (indexDefinition == null) {
+                            throw new RuntimeException("Drop index: `" + tableName + "`.`" + indexName + "` not exist");
                         } else {
-                            throw new RuntimeException("Index definition not found: `" + tableName + "`.`" + indexName + "`  not exist");
+                            rollbackOps.add("ADD `" + indexDefinition + "`");
                         }
                     }
 
@@ -236,6 +208,12 @@ public class MysqlVerifyExecuteUtil {
         Boolean lastCol = null;
         List<String> checks = new ArrayList<>();
         String tableName = MysqlUtil.remove(alter.getTable().getName());
+
+        SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
+        if (!tableMeta.judgeIsExists()) {
+            return "Alter table: `" + tableName + "` not exist";
+        }
+
         for (AlterExpression expr : alter.getAlterExpressions()) {
             String operation = expr.getOperation().toString().toUpperCase();
 
@@ -246,15 +224,30 @@ public class MysqlVerifyExecuteUtil {
                         // 添加列
                         for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
                             String columnName = MysqlUtil.remove(columnDataType.getColumnName());
-                            checks.add(descColumnDefinition(tableName, columnName, connection));
+                            String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                            if (columnDefinition != null) {
+                                checks.add("Add column: `" + tableName + "`.`" + columnName + "`  already exist, " + columnDefinition);
+                            } else {
+                                checks.add(expr.toString());
+                            }
                         }
                     } else if (expr.getIndex() != null) {
                         // 添加索引
                         String indexName = MysqlUtil.remove(expr.getIndex().getName());
-                        checks.add(descIndexDefinition(tableName, indexName, connection));
+                        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+                        if (indexDefinition != null) {
+                            checks.add("Add index: `" + tableName + "`.`" + indexName + "`  already exist, " + indexDefinition);
+                        } else {
+                            checks.add(expr.toString());
+                        }
                     } else if (expr.getUkName() != null) {
                         String indexName = MysqlUtil.remove(expr.getUkName());
-                        checks.add(descIndexDefinition(tableName, indexName, connection));
+                        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+                        if (indexDefinition != null) {
+                            checks.add("Add Unique index: `" + tableName + "`.`" + indexName + "`  already exist, " + indexDefinition);
+                        } else {
+                            checks.add(expr.toString());
+                        }
                     } else {
                         // 其他ADD操作，无法处理
                         throw new UnsupportedOperationException("Unsupported ADD operation in expr: " + expr);
@@ -266,12 +259,22 @@ public class MysqlVerifyExecuteUtil {
                         lastCol = Boolean.TRUE;
                         // 删除列
                         String columnName = MysqlUtil.remove(expr.getColumnName());
-                        checks.add(descColumnDefinition(tableName, columnName, connection));
+                        String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                        if (columnDefinition == null) {
+                            checks.add("Drop column: `" + tableName + "`.`" + columnName + "` not exist");
+                        } else {
+                            checks.add("Drop column: " + columnDefinition);
+                        }
                     } else if (expr.getIndex() != null) {
                         lastCol = Boolean.FALSE;
                         // 删除索引
                         String indexName = MysqlUtil.remove(expr.getIndex().getName());
-                        checks.add(descIndexDefinition(tableName, indexName, connection));
+                        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+                        if (indexDefinition == null) {
+                            checks.add("Drop index: `" + tableName + "`.`" + indexName + "` not exist");
+                        } else {
+                            checks.add("Drop index: " + indexDefinition);
+                        }
                     } else {
                         lastCol = null;
                         // 其他DROP操作，无法处理
@@ -282,33 +285,24 @@ public class MysqlVerifyExecuteUtil {
                     lastCol = null;
                     if (expr.getColumnOldName() != null && expr.getColDataTypeList() != null) {
                         String columnOldName = MysqlUtil.remove(expr.getColumnOldName());
-                        try {
-                            String oldColumnDefinition = getColumnDefinition(tableName, columnOldName, connection);
-                            if (oldColumnDefinition == null) {
-                                checks.add("-- old column `" + tableName + "`.`" + columnOldName + "` not exist");
-                                break;
-                            }
-                        } catch (SQLException e) {
-                            checks.add("-- old column `" + tableName + "`.`" + columnOldName + "` " + e.getMessage());
+                        String oldColumnDefinition = getColumnDefinition(tableName, columnOldName, connection);
+                        if (oldColumnDefinition == null) {
+                            checks.add("Change column: `" + tableName + "`.`" + columnOldName + "` not exist");
                             break;
                         }
-                        String oldColumnDefinition = descColumnDefinition(tableName, columnOldName, connection);
-                        for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
-                            String columnName = MysqlUtil.remove(columnDataType.getColumnName());
-                            if (!Objects.equals(columnOldName, columnName)) {
-                                try {
-                                    String columnDefinition = getColumnDefinition(tableName, columnName, connection);
-                                    if (columnDefinition != null) {
-                                        checks.add("-- new column `" + tableName + "`.`" + columnName + "` already exist");
-                                        continue;
-                                    }
-                                } catch (SQLException e) {
-                                    checks.add("-- new column `" + tableName + "`.`" + columnName + "` " + e.getMessage());
-                                    continue;
-                                }
-                            }
-                            checks.add("-- old column: " + oldColumnDefinition + " change to: " + expr);
+                        if (expr.getColDataTypeList().isEmpty() || expr.getColDataTypeList().size() != 1) {
+                            throw new UnsupportedOperationException("Unsupported CHANGE operation in expr: " + expr);
                         }
+                        String columnName = MysqlUtil.remove(expr.getColDataTypeList().get(0).getColumnName());
+                        if (!Objects.equals(columnOldName, columnName)) {
+                            String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                            if (columnDefinition != null) {
+                                checks.add("Change to column: `" + tableName + "`.`" + columnName + "` already exist");
+                                break;
+                            }
+                        }
+
+                        checks.add(expr.toString());
                     } else {
                         // 其他DROP操作，无法处理
                         throw new UnsupportedOperationException("Unsupported CHANGE operation in expr: " + expr);
@@ -320,8 +314,12 @@ public class MysqlVerifyExecuteUtil {
                         // 遍历所有被修改的列
                         for (AlterExpression.ColumnDataType columnDataType : expr.getColDataTypeList()) {
                             String columnName = MysqlUtil.remove(columnDataType.getColumnName());
-                            // 添加列定义验证（与ADD/DROP逻辑一致）
-                            checks.add("column:" + descColumnDefinition(tableName, columnName, connection) + " modify to:" + expr);
+                            String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                            if (columnDefinition == null) {
+                                checks.add("Modify column: `" + tableName + "`.`" + columnName + "` not exist");
+                            } else {
+                                checks.add(expr.toString());
+                            }
                         }
                     } else {
                         throw new UnsupportedOperationException("Unsupported MODIFY operation in expr: " + expr);
@@ -332,54 +330,33 @@ public class MysqlVerifyExecuteUtil {
                     // 处理列重命名
                     if (expr.getColumnName() != null && expr.getColumnOldName() != null) {
                         String oldColumn = MysqlUtil.remove(expr.getColumnOldName());
-                        try {
-                            if (getColumnDefinition(tableName, oldColumn, connection) == null) {
-                                checks.add("-- old column `" + tableName + "`.`" + oldColumn + "` not exits");
-                                break;
-                            }
-                        } catch (SQLException e) {
-                            checks.add("-- old column `" + tableName + "`.`" + oldColumn + "` " + e.getMessage());
+                        if (getColumnDefinition(tableName, oldColumn, connection) == null) {
+                            checks.add("Rename column: `" + tableName + "`.`" + oldColumn + "` not exits");
                             break;
                         }
                         String newColumn = MysqlUtil.remove(expr.getColumnName());
-                        try {
-                            if (getColumnDefinition(tableName, newColumn, connection) != null) {
-                                checks.add("-- new column `" + tableName + "`.`" + oldColumn + "` already exits");
-                                break;
-                            } else {
-                                checks.add("-- old column `" + tableName + "`.`" + oldColumn + "` can rename to `" + newColumn + "`");
-                            }
-                        } catch (SQLException e) {
-                            checks.add("-- new column `" + tableName + "`.`" + newColumn + "` " + e.getMessage());
+                        if (getColumnDefinition(tableName, newColumn, connection) != null) {
+                            checks.add("Rename to column: `" + tableName + "`.`" + newColumn + "` already exits");
+                            break;
                         }
+                        checks.add("Rename column: `" + tableName + "`.`" + oldColumn + "` to: `" + newColumn + "`");
                     } else {
                         throw new UnsupportedOperationException("Unsupported RENAME operation in expr: " + expr);
                     }
                     break;
                 case "RENAME_TABLE":
                     lastCol = null;
-                    try {
-                        String tableCreateSQL = getTableCreateSQL(connection, tableName);
-                        if (tableCreateSQL == null) {
-                            checks.add("-- old table `" + tableName + "` not exits");
-                            break;
-                        }
-                    } catch (Throwable e) {
-                        checks.add("-- old table `" + tableName + "` " + e.getMessage());
+                    String oldTableCreateSQL = getTableCreateSQL(connection, tableName);
+                    if (oldTableCreateSQL == null) {
+                        checks.add("Rename table: `" + tableName + "` not exits");
                         break;
                     }
                     String newTableName = MysqlUtil.remove(expr.getNewTableName());
-                    try {
-                        String tableCreateSQL = getTableCreateSQL(connection, newTableName);
-                        if (tableCreateSQL != null) {
-                            checks.add("-- new table `" + newTableName + "` already exits");
-                        } else {
-                            checks.add("-- old table `" + tableName + "` rename to `" + newTableName + "`");
-                        }
-                    } catch (SQLException e) {
-                        checks.add("-- old table `" + tableName + "` rename to `" + newTableName + "`");
-                    } catch (Throwable e) {
-                        checks.add("-- new table `" + tableName + "` " + e.getMessage());
+                    String tableCreateSQL = getTableCreateSQL(connection, newTableName);
+                    if (tableCreateSQL != null) {
+                        checks.add("Rename to table: `" + newTableName + "` already exits");
+                    } else {
+                        checks.add("Rename table `" + tableName + "` to: `" + newTableName + "`");
                     }
                     break;
 
@@ -391,11 +368,21 @@ public class MysqlVerifyExecuteUtil {
                     if (lastCol) {
                         // 删除列
                         String columnName = MysqlUtil.remove(expr.getOptionalSpecifier());
-                        checks.add(descColumnDefinition(tableName, columnName, connection));
+                        String columnDefinition = getColumnDefinition(tableName, columnName, connection);
+                        if (columnDefinition == null) {
+                            checks.add("Drop column: `" + tableName + "`.`" + columnName + "` not exist");
+                        } else {
+                            checks.add("Drop column: " + columnDefinition);
+                        }
                     } else {
                         // 删除索引
                         String indexName = MysqlUtil.remove(expr.getOptionalSpecifier());
-                        checks.add(descIndexDefinition(tableName, indexName, connection));
+                        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+                        if (indexDefinition == null) {
+                            checks.add("Drop index: `" + tableName + "`.`" + indexName + "` not exist");
+                        } else {
+                            checks.add("Drop index: " + indexDefinition);
+                        }
                     }
                     break;
                 default:
@@ -405,21 +392,7 @@ public class MysqlVerifyExecuteUtil {
         return String.join("\n", checks);
     }
 
-
-    private static String descColumnDefinition(String tableName, String columnName, Connection connection) {
-        try {
-            String columnDefinition = getColumnDefinition(tableName, columnName, connection);
-            if (columnDefinition == null) {
-                return "-- column `" + tableName + "`.`" + columnName + "` not exits";
-            } else {
-                return "-- column `" + tableName + "`.`" + columnName + "` : " + columnDefinition;
-            }
-        } catch (SQLException e) {
-            return "-- column: `" + tableName + "`.`" + columnName + "`, " + e.getMessage();
-        }
-    }
-
-    private static String getColumnDefinition(String tableName, String columnName, Connection connection) throws SQLException {
+    private static String getColumnDefinition(String tableName, String columnName, Connection connection) {
         // SQL 查询包括 COLUMN_COMMENT 以获取列的注释
         String query = "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA, COLUMN_COMMENT " +
                 "FROM information_schema.COLUMNS " +
@@ -459,24 +432,12 @@ public class MysqlVerifyExecuteUtil {
             }
             // 如果没有找到对应的列，返回 null
             return null;
-        }
-    }
-
-
-    private static String descIndexDefinition(String tableName, String indexName, Connection connection) {
-        try {
-            String indexDefinition = getIndexDefinition(tableName, indexName, connection);
-            if (indexDefinition == null) {
-                return "-- index: `" + tableName + "`.`" + indexName + "` not exits";
-            } else {
-                return "-- index: `" + tableName + "`.`" + indexName + "` : " + indexDefinition;
-            }
         } catch (SQLException e) {
-            return "-- index: `" + tableName + "`.`" + indexName + "`, " + e.getMessage();
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
-    private static String getIndexDefinition(String tableName, String indexName, Connection connection) throws SQLException {
+    private static String getIndexDefinition(String tableName, String indexName, Connection connection) {
         // SQL 查询包括 INDEX_COMMENT 以获取索引的注释
         String query = "SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, INDEX_TYPE, " +
                 "       NON_UNIQUE, SUB_PART, COLLATION, INDEX_COMMENT " +
@@ -544,6 +505,8 @@ public class MysqlVerifyExecuteUtil {
             }
 
             return definition.toString();
+        } catch (SQLException e) {
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -581,21 +544,22 @@ public class MysqlVerifyExecuteUtil {
         // 仅处理 DROP TABLE 的情况
         if (type.equalsIgnoreCase("TABLE")) {
             String tableName = MysqlUtil.remove(drop.getName().getName());
-            try {
-                SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
-                if (tableMeta.judgeIsExists()) {
-                    return MessageFormat.format("-- table: `{0}`, row:{1}, column:{2}, index:{3}", tableName, tableMeta.getRowCount(), tableMeta.getFields().size(), tableMeta.getIndices().size());
-                }
-                return "-- table: `" + tableName + "` not exits";
-            } catch (Throwable e) {
-                return "-- table: `" + tableName + "`, " + e.getMessage();
+            SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
+            if (!tableMeta.judgeIsExists()) {
+                return MessageFormat.format("Drop table: `{0}` not exist", tableName);
             }
+            return MessageFormat.format("Drop table: `{0}`, row:{1}, column:{2}, index:{3}", tableName, tableMeta.getRowCount(), tableMeta.getFields().size(), tableMeta.getIndices().size());
         } else if (type.equalsIgnoreCase("INDEX")) {
             //补全alter drop index的逻辑
             // 处理 DROP INDEX 的情况
             String tableName = MysqlUtil.remove(drop.getParameters().get(1));
             String indexName = MysqlUtil.remove(drop.getName().getName());
-            return descIndexDefinition(tableName, indexName, connection);
+            String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+            if (indexDefinition == null) {
+                return "Drop index: `" + tableName + "`.`" + indexName + "` not exist";
+            } else {
+                return "Drop index: `" + tableName + "`." + indexDefinition;
+            }
         }
         throw new UnsupportedOperationException("Unsupported DDL statement: " + drop.getClass().getSimpleName());
     }
@@ -614,14 +578,9 @@ public class MysqlVerifyExecuteUtil {
         if (type.equalsIgnoreCase("TABLE")) {
             String tableName = MysqlUtil.remove(drop.getName().getName());
             // 获取表的创建语句
-            try {
-                String tableCreateSQL = getTableCreateSQL(connection, tableName);
-                if (tableCreateSQL == null) {
-                    throw new RuntimeException(tableName + " not exits");
-                }
-                return tableCreateSQL;
-            } catch (SQLException e) {
-                throw new RuntimeException("table: `" + tableName + "`, " + e.getMessage());
+            String tableCreateSQL = getTableCreateSQL(connection, tableName);
+            if (tableCreateSQL == null) {
+                throw new RuntimeException("`" + tableName + "` not exits");
             }
         } else if (type.equalsIgnoreCase("INDEX")) {
             //补全alter drop index的逻辑
@@ -629,15 +588,11 @@ public class MysqlVerifyExecuteUtil {
             String indexName = MysqlUtil.remove(drop.getName().getName());
             String tableName = MysqlUtil.remove(drop.getParameters().get(1));
             // 获取索引的创建语句
-            try {
-                String indexDefinition = getIndexDefinition(tableName, indexName, connection);
-                if (indexDefinition == null) {
-                    throw new RuntimeException(tableName + "." + indexName + " not exits");
-                }
-                return "ALTER TABLE `" + tableName + "` ADD " + indexDefinition;
-            } catch (SQLException e) {
-                throw new RuntimeException("index: `" + tableName + "`.`" + indexName + "`, " + e.getMessage());
+            String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+            if (indexDefinition == null) {
+                throw new RuntimeException("`" + tableName + "`.`" + indexName + "` not exits");
             }
+            return "ALTER TABLE `" + tableName + "` ADD " + indexDefinition;
         }
         throw new UnsupportedOperationException("Unsupported DDL statement: " + drop.getClass().getSimpleName());
     }
@@ -649,15 +604,20 @@ public class MysqlVerifyExecuteUtil {
      * @param tableName  表名
      * @return 表的创建 SQL，如果失败则返回 null
      */
-    private static String getTableCreateSQL(Connection connection, String tableName) throws SQLException {
+    public static String getTableCreateSQL(Connection connection, String tableName) {
         String sql = "SHOW CREATE TABLE " + tableName;
-        try (PreparedStatement stmt = connection.prepareStatement(sql);) {
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setQueryTimeout(30);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 return rs.getString("Create Table");
             }
             return null;
+        } catch (SQLException e) {
+            if ("42000".equals(e.getSQLState())) {
+                return null;
+            }
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -690,29 +650,37 @@ public class MysqlVerifyExecuteUtil {
      */
     private static String verifyCreateTable(CreateTable createTable, Connection connection) {
         String tableName = MysqlUtil.remove(createTable.getTable().getName());
-        try {
-            SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
-            if (tableMeta.judgeIsExists()) {
-                return MessageFormat.format("-- table: `{0}`, row:{1}, column:{2}, index:{3}", tableName, tableMeta.getRowCount(), tableMeta.getFields().size(), tableMeta.getIndices().size());
-            }
-            return "-- table: `" + tableName + "` not exits";
-        } catch (Throwable e) {
-            return "-- table: `" + tableName + "`, " + e.getMessage();
+        SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
+        if (tableMeta.judgeIsExists()) {
+            return MessageFormat.format("Create table: `{0}` already exist, row:{1}, column:{2}, index:{3}", tableName, tableMeta.getRowCount(), tableMeta.getFields().size(), tableMeta.getIndices().size());
         }
+        return "Create table: `" + tableName + "`";
     }
 
     private static String verifyCreateIndex(CreateIndex createIndex, Connection connection) {
         // 生成回滚的DROP INDEX语句
         // 例如：原语句是 "CREATE INDEX index_name ON table_name(column_name)"
         // 回滚语句可能是 "DROP INDEX index_name ON table_name"
-        String indexName = MysqlUtil.remove(createIndex.getIndex().getName());
         String tableName = MysqlUtil.remove(createIndex.getTable().getName());
-        return descIndexDefinition(tableName, indexName, connection);
+        SqlTable tableMeta = MysqlUtil.getTableMeta(connection, tableName);
+        if (!tableMeta.judgeIsExists()) {
+            return "Create index table: `" + tableName + "` not exist";
+        }
+
+        String indexName = MysqlUtil.remove(createIndex.getIndex().getName());
+        String indexDefinition = getIndexDefinition(tableName, indexName, connection);
+        if (indexDefinition != null) {
+            return "Add index: `" + tableName + "`.`" + indexName + "`  already exist, " + indexDefinition;
+        }
+        return "Add index: `" + tableName + "`.`" + indexName + "`";
     }
 
     private static String verifyUpdate(Update update, Connection connection) {
         String countSql = generateCountSql(update);
         MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(countSql, connection);
+        if (!sqlRet.isSuccess()) {
+            return "Failed to prediction the affected row," + sqlRet.getRet();
+        }
         String tableName = MysqlUtil.remove(update.getTable().getName());
         int allCount = MysqlUtil.getTableRowCountByShowTableStatus(connection, tableName);
         return "Expected affected row:" + sqlRet.getRet() + ",\n`" + tableName + "`‘s total count(estimate):" + allCount;
@@ -760,6 +728,28 @@ public class MysqlVerifyExecuteUtil {
                 !join.isLeft() &&
                 !join.isRight() &&
                 !join.isInner();
+    }
+
+
+    public static void main(String[] args) {
+        Statement statement = MysqlUtil.parse("CREATE TABLE `house` (\n" +
+                "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
+                "  `name` varchar(512) DEFAULT NULL,\n" +
+                "  `price` int DEFAULT NULL,\n" +
+                "  `type` varchar(64) DEFAULT NULL,\n" +
+                "  `location` varchar(512) DEFAULT NULL,\n" +
+                "  `data` varchar(1024) DEFAULT NULL,\n" +
+                "  PRIMARY KEY (`id`),\n" +
+                "  UNIQUE KEY `x1` (`name`,`price`) COMMENT '111',\n" +
+                "  KEY `x12` (`name`)\n" +
+                ") ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
+        SettingsStorageHelper.DatasourceConfig datasourceConfig = new SettingsStorageHelper.DatasourceConfig();
+        datasourceConfig.setUrl("jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC");
+        datasourceConfig.setUsername("root");
+        datasourceConfig.setPassword("wsd123==");
+        datasourceConfig.setName("111");
+
+        MysqlVerifyExecuteUtil.verifyCreateTable((CreateTable) statement, datasourceConfig.newConnection());
     }
 
 }

@@ -47,7 +47,9 @@ public class MysqlUtil {
         try {
             // 尝试从 DataSource 获取连接
             connection = getDatabaseConnection(datasource);
-
+            if (connection.getCatalog() == null) {
+                throw new IllegalArgumentException("schema must be specified");
+            }
             // 检查 DDL 权限
             return checkWritePermission(connection);
         } catch (Exception e) {
@@ -139,62 +141,68 @@ public class MysqlUtil {
      * @return SqlTable 对象，包含字段信息和索引信息
      * @throws Exception 异常
      */
-    public static SqlTable getTableMeta(Connection connection, String tableName) throws Exception {
+    public static SqlTable getTableMeta(Connection connection, String tableName) {
         tableName = remove(tableName);
         SqlTable table = new SqlTable(tableName);
 
-        // 获取数据库元数据
-        DatabaseMetaData metaData = connection.getMetaData();
+        try {
+            // 获取数据库元数据
+            DatabaseMetaData metaData = connection.getMetaData();
+            String catalog = connection.getCatalog();
+            String schema = connection.getSchema();
 
-        // 获取表字段信息
-        try (ResultSet columns = metaData.getColumns(null, null, tableName, null)) {
-            while (columns.next()) {
-                String columnName = columns.getString("COLUMN_NAME"); // 字段名
-                String columnType = columns.getString("TYPE_NAME");   // 数据类型
-                int columnSize = columns.getInt("COLUMN_SIZE");       // 字段长度
+            // 获取表字段信息
+            try (ResultSet columns = metaData.getColumns(catalog, schema, tableName, null)) {
+                while (columns.next()) {
+                    String columnName = columns.getString("COLUMN_NAME"); // 字段名
+                    String columnType = columns.getString("TYPE_NAME");   // 数据类型
+                    int columnSize = columns.getInt("COLUMN_SIZE");       // 字段长度
 
-                // 添加字段到表
-                table.addField(columnName, columnType, columnSize);
-            }
-        }
-
-        // 获取表索引信息
-        try (ResultSet indices = metaData.getIndexInfo(null, null, tableName, false, false)) {
-            while (indices.next()) {
-                // 索引名
-                String indexName = indices.getString("INDEX_NAME");
-
-                // 如果索引名为空，跳过（一般是 PRIMARY KEY 可能没有 INDEX_NAME）
-                if (indexName == null) {
-                    continue;
+                    // 添加字段到表
+                    table.addField(columnName, columnType, columnSize);
                 }
+            }
 
-                // 获取索引列名
-                String columnName = indices.getString("COLUMN_NAME");
-                if (columnName != null) {
-                    // 查找当前索引是否已经在对象中
-                    SqlTable.Index index = table.getIndices().stream()
-                            .filter(i -> i.getName().equals(indexName))
-                            .findFirst()
-                            .orElse(null);
+            // 获取表索引信息
+            try (ResultSet indices = metaData.getIndexInfo(catalog, schema, tableName, false, false)) {
+                while (indices.next()) {
+                    // 索引名
+                    String indexName = indices.getString("INDEX_NAME");
 
-                    if (index == null) {
-                        // 如果索引不存在，则创建并添加
-                        index = new SqlTable.Index(indexName, new ArrayList<>());
-                        table.getIndices().add(index);
+                    // 如果索引名为空，跳过（一般是 PRIMARY KEY 可能没有 INDEX_NAME）
+                    if (indexName == null) {
+                        continue;
                     }
 
-                    // 将列名加入索引
-                    index.getColumnNames().add(columnName);
+                    // 获取索引列名
+                    String columnName = indices.getString("COLUMN_NAME");
+                    if (columnName != null) {
+                        // 查找当前索引是否已经在对象中
+                        SqlTable.Index index = table.getIndices().stream()
+                                .filter(i -> i.getName().equals(indexName))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (index == null) {
+                            // 如果索引不存在，则创建并添加
+                            index = new SqlTable.Index(indexName, new ArrayList<>());
+                            table.getIndices().add(index);
+                        }
+
+                        // 将列名加入索引
+                        index.getColumnNames().add(columnName);
+                    }
                 }
             }
+
+            // 获取表的近似行数（使用 SHOW TABLE STATUS）
+            int approximateRowCount = getTableRowCountByShowTableStatus(connection, tableName);
+            table.setRowCount(approximateRowCount);
+
+            return table;
+        } catch (Throwable e) {
+            throw new RuntimeException(e.getMessage(), e);
         }
-
-        // 获取表的近似行数（使用 SHOW TABLE STATUS）
-        int approximateRowCount = getTableRowCountByShowTableStatus(connection, tableName);
-        table.setRowCount(approximateRowCount);
-
-        return table;
     }
 
     /**
@@ -206,19 +214,24 @@ public class MysqlUtil {
      */
     public static int getTableRowCountByShowTableStatus(Connection connection, String tableName) {
         tableName = remove(tableName);
-        String sql = "SHOW TABLE STATUS where `name` = ?";
+        String sql = null; // 明确指定 Schema
+        try {
+            sql = "SHOW TABLE STATUS FROM `" + connection.getCatalog() + "` WHERE `name` = ?";
+        } catch (SQLException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setQueryTimeout(30);
-            stmt.setString(1, tableName); // 使用表名匹配
+            stmt.setString(1, tableName);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("Rows"); // 获取 Rows 列的值
+                    return rs.getInt("Rows");
                 }
             }
         } catch (SQLException e) {
             System.err.println("获取表的近似行数失败: " + e.getMessage());
         }
-        return -1; // 如果获取失败，返回 -1（表示未知）
+        return -1;
     }
 
     public static String remove(String xx) {
@@ -369,8 +382,8 @@ public class MysqlUtil {
         datasourceConfig.setPassword("wsd123==");
         datasourceConfig.setName("111");
 
-
-        SqlTable house = getTableMeta(datasourceConfig.newConnection(), "house1");
-        System.out.println(house);
+        MysqlVerifyExecuteUtil.getTableCreateSQL(datasourceConfig.newConnection(), "11");
+//        SqlTable house = getTableMeta(datasourceConfig.newConnection(), "house1");
+//        System.out.println(house);
     }
 }
