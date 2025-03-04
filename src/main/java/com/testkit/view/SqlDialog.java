@@ -1,6 +1,7 @@
 package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments;
 import com.intellij.openapi.editor.event.DocumentAdapter;
@@ -352,7 +353,7 @@ public class SqlDialog extends JDialog {
                             || statement instanceof CreateTable
                             || statement instanceof Update;
                     if (!b) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support Alter or Drop or CreateIndex or CreateTable or Update");
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update");
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
@@ -369,19 +370,28 @@ public class SqlDialog extends JDialog {
                     ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Execute SQL, please wait ...", false) {
                         @Override
                         public void run(@NotNull ProgressIndicator progressIndicator) {
-                            try (Connection connection = datasource.newConnection()) {
-                                table.getModel().setValueAt("", row, 3);
-                                table.getModel().setValueAt("", row, 4);
+                            TableModel tableModel = table.getModel();
 
-                                String verifyDdl = MysqlVerifyExecuteUtil.verifyWriteSQL(finalStatement, connection);
-                                table.getModel().setValueAt(verifyDdl, row, 3);
-                                String rollbackDdl = null;
-                                try {
-                                    rollbackDdl = MysqlVerifyExecuteUtil.rollbackWriteSQL(finalStatement, connection);
-                                    table.getModel().setValueAt(rollbackDdl, row, 4);
-                                } catch (Throwable ex) {
-                                    table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 4);
+                            try (Connection connection = datasource.newConnection()) {
+                                tableModel.setValueAt("", row, 5);
+                                String verifyDdl = tableModel.getValueAt(row, 3).toString();
+                                String rollbackDdl = tableModel.getValueAt(row, 4).toString();
+                                boolean needVerifyed = StringUtils.isAnyBlank(verifyDdl, rollbackDdl);
+                                if (needVerifyed) {
+                                    verifyDdl = null;
+                                    rollbackDdl = null;
+                                    tableModel.setValueAt("", row, 3);
+                                    tableModel.setValueAt("", row, 4);
+                                    verifyDdl = MysqlVerifyExecuteUtil.verifyWriteSQL(finalStatement, connection);
+                                    tableModel.setValueAt(verifyDdl, row, 3);
+                                    try {
+                                        rollbackDdl = MysqlVerifyExecuteUtil.rollbackWriteSQL(finalStatement, connection);
+                                        tableModel.setValueAt(rollbackDdl, row, 4);
+                                    } catch (Throwable ex) {
+                                        tableModel.setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 4);
+                                    }
                                 }
+
                                 String msg = rollbackDdl == null ? ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nGenerate rollback error") : ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nHere's rollback sql:\n" + rollbackDdl);
                                 // 添加确认对话框
                                 int result = JOptionPane.showConfirmDialog(
@@ -393,12 +403,14 @@ public class SqlDialog extends JDialog {
 
                                 if (result != JOptionPane.YES_OPTION) {
                                     // 用户点击了“否”或关闭对话框，不执行 SQL
+                                    tableModel.setValueAt("CANCEL", row, 5);
                                     fireEditingStopped(); // 结束编辑状态
                                     return;
                                 }
                                 MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection);
-                                table.getModel().setValueAt(sqlRet.toString(), row, 5);
+                                tableModel.setValueAt(sqlRet.toString(), row, 5);
                             } catch (RuntimeExceptionWithAttachments edt) {
+                                tableModel.setValueAt("NO EXECUTION", row, 5);
                             } catch (Throwable ex) {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Execute error, " + ex.getMessage());
                             } finally {
@@ -431,7 +443,7 @@ public class SqlDialog extends JDialog {
                             || statement instanceof CreateTable
                             || statement instanceof Update;
                     if (!b) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support Alter or Drop or CreateIndex or CreateTable or Update");
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update");
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
@@ -450,15 +462,17 @@ public class SqlDialog extends JDialog {
                     ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Verify SQL, please wait ...", false) {
                         @Override
                         public void run(@NotNull ProgressIndicator progressIndicator) {
+                            TableModel tableModel = table.getModel();
                             try (Connection connection = datasource.newConnection()) {
-                                table.getModel().setValueAt("", row, 3);
+                                tableModel.setValueAt("", row, 3);
+                                tableModel.setValueAt("", row, 4);
                                 String checkDdl = MysqlVerifyExecuteUtil.verifyWriteSQL(finalStatement, connection);
-                                table.getModel().setValueAt(checkDdl, row, 3);
+                                tableModel.setValueAt(checkDdl, row, 3);
                                 try {
                                     String rollbackDdl = MysqlVerifyExecuteUtil.rollbackWriteSQL(finalStatement, connection);
-                                    table.getModel().setValueAt(rollbackDdl, row, 4);
+                                    tableModel.setValueAt(rollbackDdl, row, 4);
                                 } catch (Throwable ex) {
-                                    table.getModel().setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 4);
+                                    tableModel.setValueAt("Generate rollback error,\n" + ex.getMessage(), row, 4);
                                 }
                             } catch (Throwable ex) {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Verify error, " + ex.getMessage());
@@ -475,7 +489,7 @@ public class SqlDialog extends JDialog {
             panelResults.removeAll();
             panelResults.setLayout(new BorderLayout());
 
-            JBLabel titleField = new JBLabel("Please verify carefully before executing, Now support alter/drop/create/update");
+            JBLabel titleField = new JBLabel("Please verify carefully before executing, Now support MYSQL alter/drop/create/update");
             titleField.setForeground(Color.pink);
             titleField.setFont(new Font("Arial", Font.BOLD, 14));
             titleField.setHorizontalAlignment(SwingConstants.CENTER); // 设置文本居中
@@ -506,43 +520,61 @@ public class SqlDialog extends JDialog {
                     } else {
                         sqls = Collections.emptyList();
                     }
-
-                    // 模拟刷新
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        // 更新表格数据（假设模型为 DefaultTableModel）
-                        // 清空现有数据
-                        model.setRowCount(0);
-                        // 插入新数据
-                        for (String sql : sqls) {
-                            // 填充数据源
-                            for (String ds : datasources2) {
-                                model.addRow(new Object[]{ds, "", sql + ";", "", "", ""});
-                            }
-                            for (String ds : datasources) {
-                                model.addRow(new Object[]{ds, "", sql + ";", "", "", ""});
-                            }
-                        }
-
-                        table.revalidate();
-                        table.repaint();
-                    });
-
+                    refreshExecuteTable(sqls, model, datasources2, datasources, table);
                 }
             });
             panel.add(refreshSqlsButton);
             panel.add(titleField);
-
-
             panelResults.add(panel, BorderLayout.NORTH);
             panelResults.add(new JBScrollPane(table), BorderLayout.CENTER);
             panelResults.revalidate();
             panelResults.repaint();
+
+            String text = inputSqlField.getText();
+            List<String> sqls;
+            if (StringUtils.isNotBlank(text)) {
+                try {
+                    Statements parses = MysqlUtil.parses(text);
+                    sqls = parses.getStatements().stream()
+                            .map(new Function<Statement, String>() {
+                                @Override
+                                public String apply(Statement statement) {
+                                    return statement.toString();
+                                }
+                            }).collect(Collectors.toUnmodifiableList());
+                    refreshExecuteTable(sqls, model, datasources2, datasources, table);
+                } catch (Throwable ex) {
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Refresh execution table error<br>you click refresh button try again<br>" + ex.getMessage());
+                }
+            }
         });
 
         actionResults.add(dataSourceLabel);
         actionResults.add(dataSourceComboBox);
         actionResults.add(button);
         return actionResults;
+    }
+
+    private void refreshExecuteTable(List<String> sqls, DefaultTableModel tableModel, List<String> datasources2, List<String> datasources, JBTable table) {
+        // 模拟刷新
+        ApplicationManager.getApplication().invokeLater(() -> {
+            // 更新表格数据（假设模型为 DefaultTableModel）
+            // 清空现有数据
+            tableModel.setRowCount(0);
+            // 插入新数据
+            for (String sql : sqls) {
+                // 填充数据源
+                for (String ds : datasources2) {
+                    tableModel.addRow(new Object[]{ds, "", sql + ";", "", "", ""});
+                }
+                for (String ds : datasources) {
+                    tableModel.addRow(new Object[]{ds, "", sql + ";", "", "", ""});
+                }
+            }
+
+            table.revalidate();
+            table.repaint();
+        });
     }
 
 
