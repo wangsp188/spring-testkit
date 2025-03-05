@@ -6,6 +6,7 @@ import net.sf.jsqlparser.statement.Statements;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -331,6 +332,167 @@ public class MysqlUtil {
         return rowCount;
     }
 
+    public static String getColumnDefinition(String tableName, String columnName, Connection connection) {
+        // SQL 查询包括 COLUMN_COMMENT 以获取列的注释
+        String query = "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA, COLUMN_COMMENT " +
+                "FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setQueryTimeout(30); // 设置查询超时时间为30秒
+            stmt.setString(1, remove(tableName)); // 设置表名参数
+            stmt.setString(2, remove(columnName)); // 设置列名参数
+            ResultSet rs = stmt.executeQuery(); // 执行查询
+            if (rs.next()) {
+                StringBuilder definition = new StringBuilder();
+                // 添加列名
+                definition.append("`").append(rs.getString("COLUMN_NAME")).append("` ");
+                // 添加列类型
+                definition.append(rs.getString("COLUMN_TYPE")).append(" ");
+                // 添加是否可为空
+                if ("NO".equals(rs.getString("IS_NULLABLE"))) {
+                    definition.append("NOT NULL ");
+                }
+                // 添加默认值
+                String defaultValue = rs.getString("COLUMN_DEFAULT");
+                if (defaultValue != null) {
+                    definition.append("DEFAULT '").append(defaultValue).append("' ");
+                }
+                // 添加额外信息（如自动递增等）
+                String extra = rs.getString("EXTRA");
+                if (extra != null && !extra.isEmpty()) {
+                    definition.append(extra).append(" ");
+                }
+                // 添加列注释
+                String comment = rs.getString("COLUMN_COMMENT");
+                if (comment != null && !comment.isEmpty()) {
+                    definition.append("COMMENT '").append(comment).append("' ");
+                }
+                // 返回生成的列定义字符串，并去除末尾的空格
+                return definition.toString().trim();
+            }
+            // 如果没有找到对应的列，返回 null
+            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
+    static String getIndexDefinition(String tableName, String indexName, Connection connection) {
+        // SQL 查询包括 INDEX_COMMENT 以获取索引的注释
+        String query = "SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, INDEX_TYPE, " +
+                "       NON_UNIQUE, SUB_PART, COLLATION, INDEX_COMMENT " +
+                "FROM information_schema.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() " +
+                "  AND TABLE_NAME = ? " +
+                "  AND INDEX_NAME = ? " +
+                "ORDER BY SEQ_IN_INDEX"; // 确保列顺序正确
+
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, remove(tableName)); // 设置表名参数
+            stmt.setString(2, remove(indexName)); // 设置索引名参数
+            ResultSet rs = stmt.executeQuery(); // 执行查询
+
+            if (!rs.isBeforeFirst()) {
+                return null; // 没有找到索引
+            }
+
+            StringBuilder definition = new StringBuilder();
+            List<String> columns = new ArrayList<>();
+
+            // 处理索引类型修饰符
+            String oriType = null;
+            String indexType = "";
+            String indexComment = null;
+            if (rs.next()) {
+                oriType = rs.getString("INDEX_TYPE").toUpperCase();
+                indexComment = rs.getString("INDEX_COMMENT");
+                switch (oriType) {
+                    case "FULLTEXT":
+                        indexType = "FULLTEXT ";
+                        break;
+                    case "SPATIAL":
+                        indexType = "SPATIAL ";
+                        break;
+                }
+
+                // 处理UNIQUE需要放在类型之后（因为FULLTEXT/SPATIAL不能是UNIQUE）
+                if ("0".equals(rs.getString("NON_UNIQUE"))) {
+                    indexType = "UNIQUE " + indexType;
+                }
+
+                // 处理第一个列
+                columns.add(buildColumnExpression(rs));
+            }
+
+            // 收集剩余列
+            while (rs.next()) {
+                columns.add(buildColumnExpression(rs));
+            }
+
+            definition.append(indexType)
+                    .append("INDEX `").append(indexName).append("` (")
+                    .append(String.join(", ", columns))
+                    .append(")");
+
+            // 处理索引类型声明（如BTREE）
+            if (!"BTREE".equalsIgnoreCase(oriType)) {
+                definition.append(" USING ").append(oriType);
+            }
+
+            // 添加索引注释
+            if (indexComment != null && !indexComment.isEmpty()) {
+                definition.append(" COMMENT '").append(indexComment).append("'");
+            }
+
+            return definition.toString();
+        } catch (SQLException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
+    // 构建单个列的表达式
+    private static String buildColumnExpression(ResultSet rs) throws SQLException {
+        String column = "`" + rs.getString("COLUMN_NAME") + "`";
+
+        // 处理前缀长度
+        String subPart = rs.getString("SUB_PART");
+        if (subPart != null) {
+            column += "(" + subPart + ")";
+        }
+
+        // 处理排序方式 (A=asc, D=desc)
+        String collation = rs.getString("COLLATION");
+        if ("D".equalsIgnoreCase(collation)) {
+            column += " DESC";
+        }
+
+        return column;
+    }
+
+    /**
+     * 从数据库中获取表的创建 SQL
+     *
+     * @param connection 数据库连接
+     * @param tableName  表名
+     * @return 表的创建 SQL，如果失败则返回 null
+     */
+    public static String getTableCreateSQL(Connection connection, String tableName) {
+        String sql = "SHOW CREATE TABLE " + tableName;
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setQueryTimeout(30);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("Create Table");
+            }
+            return null;
+        } catch (SQLException e) {
+            if ("42000".equals(e.getSQLState())) {
+                return null;
+            }
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
 
     public static class SqlRet {
         private boolean success;
@@ -382,7 +544,7 @@ public class MysqlUtil {
         datasourceConfig.setPassword("wsd123==");
         datasourceConfig.setName("111");
 
-        MysqlVerifyExecuteUtil.getTableCreateSQL(datasourceConfig.newConnection(), "11");
+        getTableCreateSQL(datasourceConfig.newConnection(), "11");
 //        SqlTable house = getTableMeta(datasourceConfig.newConnection(), "house1");
 //        System.out.println(house);
     }

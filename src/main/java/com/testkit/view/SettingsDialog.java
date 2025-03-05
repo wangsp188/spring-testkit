@@ -41,8 +41,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
 import java.io.StringReader;
 import java.util.*;
 import java.util.List;
@@ -172,9 +171,6 @@ public class SettingsDialog {
 
         SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
         datasourcePropertiesField.setText(sqlConfig.getProperties());
-        boolean def = SettingsStorageHelper.datasourceTemplateProperties.equals(sqlConfig.getProperties());
-        datasourcePropertiesField.setVisible(def);
-        showDatasourceButton.setIcon(def ? SHOW_ICON : HIDDEN_ICON);
     }
 
     private void init() {
@@ -217,7 +213,6 @@ public class SettingsDialog {
 
         // 设置对话框内容
         dialog.setContentPane(contentPanel);
-
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int width = (int) (screenSize.width * 0.7);

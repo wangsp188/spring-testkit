@@ -34,6 +34,7 @@ import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.update.Update;
+import net.sf.jsqlparser.util.deparser.StatementDeParser;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +46,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.StringWriter;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
@@ -223,7 +225,6 @@ public class SqlDialog extends JDialog {
                     return column == 1; // 只有Operate列可编辑
                 }
             };
-
 
 
             List<String> operateDs = new ArrayList<>();
@@ -432,7 +433,7 @@ public class SqlDialog extends JDialog {
                                 String msg = rollbackDdl == null ? ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nGenerate rollback error") : ("Are you sure you want to execute this SQL?\n\nDatasource:\n" + datasourceName + "\n\nSQL:\n" + sqlText + "\n\nHere's verify:\n" + verifyDdl + "\n\nHere's rollback sql:\n" + rollbackDdl);
                                 // 添加确认对话框
                                 int result = JOptionPane.showConfirmDialog(
-                                        null, // 父组件，可以为 null
+                                        SqlDialog.this, // 父组件，可以为 null
                                         msg, // 提示信息
                                         "Confirm Execution", // 对话框标题
                                         JOptionPane.YES_NO_OPTION // 选项类型
@@ -447,7 +448,7 @@ public class SqlDialog extends JDialog {
                                 MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection);
                                 tableModel.setValueAt(sqlRet.toString(), modelRow, 5);
                             } catch (RuntimeExceptionWithAttachments edt) {
-                                tableModel.setValueAt("NO EXECUTION", modelRow, 5);
+                                tableModel.setValueAt("CANCEL", modelRow, 5);
                             } catch (Throwable ex) {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Execute error, " + ex.getMessage());
                             } finally {
@@ -538,7 +539,7 @@ public class SqlDialog extends JDialog {
 
             JButton refreshSqlsButton = new JButton(AllIcons.Actions.Refresh);
             refreshSqlsButton.setPreferredSize(new Dimension(32, 32));
-            refreshSqlsButton.setToolTipText("Parse SQL");
+            refreshSqlsButton.setToolTipText("Parse SQL & Refresh table");
 //            refreshSqlsButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             refreshSqlsButton.addActionListener(new ActionListener() {
                 @Override
@@ -581,7 +582,7 @@ public class SqlDialog extends JDialog {
                 sorter.setRowFilter(new RowFilter<DefaultTableModel, Integer>() {
                     @Override
                     public boolean include(Entry<? extends DefaultTableModel, ? extends Integer> entry) {
-                        if (selectedDatasources.isEmpty()){
+                        if (selectedDatasources.isEmpty()) {
                             return false;
                         }
                         String rowDatasource = (String) entry.getModel().getValueAt(entry.getIdentifier(), 0);
@@ -621,13 +622,25 @@ public class SqlDialog extends JDialog {
             if (StringUtils.isNotBlank(text)) {
                 try {
                     Statements parses = MysqlUtil.parses(text);
-                    sqls = parses.getStatements().stream()
-                            .map(new Function<Statement, String>() {
-                                @Override
-                                public String apply(Statement statement) {
-                                    return statement.toString();
-                                }
-                            }).collect(Collectors.toUnmodifiableList());
+                    String trim = text.trim();
+                    if (trim.startsWith(";")) {
+                        trim = trim.substring(1);
+                    }
+                    if (trim.endsWith(";")) {
+                        trim = trim.substring(0, trim.length() - 1);
+                    }
+                    if (trim.split(";").length == parses.getStatements().size()) {
+                        sqls = Arrays.asList(trim.split(";"));
+                    } else {
+                        sqls = parses.getStatements().stream()
+                                .map(new Function<Statement, String>() {
+                                    @Override
+                                    public String apply(Statement statement) {
+                                        return statement.toString();
+                                    }
+                                }).collect(Collectors.toUnmodifiableList());
+                    }
+
                     refreshExecuteTable(sqls, model, operateDs, table);
                 } catch (Throwable ex) {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Refresh execution table error<br>you click refresh button try again<br>" + ex.getMessage());
@@ -661,7 +674,7 @@ public class SqlDialog extends JDialog {
     }
 
 
-    private List<Map<String, Object>> explainSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
+    private List<Map<String, String>> explainSql(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
         if (datasourceConfig == null) {
             return new ArrayList<>();
         }
@@ -693,14 +706,15 @@ public class SqlDialog extends JDialog {
                 throw new RuntimeException("The result set does not contain the required EXPLAIN columns!");
             }
 
-            List<Map<String, Object>> explainList = new ArrayList<>();
+            List<Map<String, String>> explainList = new ArrayList<>();
 
             while (resultSet.next()) {
-                HashMap<String, Object> map = new HashMap<>();
+                HashMap<String, String> map = new HashMap<>();
                 for (int i = 0; i < explainColumns.size(); i++) {
                     String colName = explainColumns.get(i);
                     Integer colIdx = columnIndexMapping.get(colName); // 获取实际列索引
-                    map.put(colName, (colIdx != null) ? resultSet.getObject(colIdx) : null);
+                    String value = (colIdx != null) && resultSet.getObject(colIdx) != null ? String.valueOf(resultSet.getObject(colIdx)) : null;
+                    map.put(colName, StringUtils.isBlank(value) ? null : value);
                 }
                 explainList.add(map); // 添加行
             }
@@ -735,7 +749,7 @@ public class SqlDialog extends JDialog {
         gbc.weightx = 1; // 水平权重
         gbc.insets = JBUI.emptyInsets(); // 设置边距
         // 提取数据
-        List<Map<String, Object>> explains;
+        List<Map<String, String>> explains;
         try {
             explains = explainSql(datasourceConfig, sqlText);
             // 1. EXPLAIN 结果展示
@@ -747,9 +761,9 @@ public class SqlDialog extends JDialog {
                 titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
                 // 表格数据转换
-                List<Object[]> resultData = new ArrayList<>();
-                for (Map<String, Object> explain : explains) {
-                    Object[] row = new Object[explainColumns.size()];
+                List<String[]> resultData = new ArrayList<>();
+                for (Map<String, String> explain : explains) {
+                    String[] row = new String[explainColumns.size()];
                     for (int i = 0; i < explainColumns.size(); i++) {
                         row[i] = explain.get(explainColumns.get(i));
                     }
@@ -766,8 +780,77 @@ public class SqlDialog extends JDialog {
                 explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
                 explainTable.setFillsViewportHeight(true);
                 explainTable.getTableHeader().setReorderingAllowed(false);
-                explainTable.setDefaultRenderer(Object.class, new TextAreaCellRenderer(1, Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)));
 
+                // 自定义渲染器
+                explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+                    @Override
+                    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+//                        Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                        JLabel c = new JLabel(value == null ? "" : value.toString());
+                        TableModel tableModel = explainTable.getModel();
+                        String select_type = (String) tableModel.getValueAt(row, 1);
+                        String type = (String) tableModel.getValueAt(row, 3);
+                        String possible_keys = (String) tableModel.getValueAt(row, 4);
+                        String ref = (String) tableModel.getValueAt(row, 7);
+                        String rows = (String) tableModel.getValueAt(row, 8);
+                        String filtered = (String) tableModel.getValueAt(row, 9);
+                        String extra = (String) tableModel.getValueAt(row, 10);
+
+
+                        // Full Table Scan
+                        if ("ALL".equalsIgnoreCase(type) && column == 3) {
+                            c.setForeground(Color.RED);
+                            c.setToolTipText("Full Table Scan<br>The query is performing a full table scan, which can be slow.");
+                        } else if (!"ALL".equalsIgnoreCase(type) && (possible_keys == null || possible_keys.equalsIgnoreCase("NULL")) && column == 4) {
+                            c.setForeground(Color.RED);
+                            c.setToolTipText("Index Not Used<br>No index is being used for this query.");
+                        }
+
+
+                        if (column==1 && ("DEPENDENT SUBQUERY".equalsIgnoreCase(select_type) || "UNCACHEABLE SUBQUERY".equalsIgnoreCase(select_type))) {
+                            c.setForeground(Color.RED);
+                            c.setToolTipText("Subquery Performance Issue<br>This is a dependent or uncacheable subquery, which may impact performance.");
+                        }
+
+                        // Filesort
+                        if (column == 10 && extra != null) {
+                            String extroStr = "";
+                            if(extra.contains("Using filesort")){
+                                extroStr += "Filesort: MySQL is performing a filesort, which can be slow.<br>";
+                            }
+
+                            if (extra.contains("Using temporary")) {
+                                extroStr += "Temporary Table: MySQL is using a temporary table, which may impact performance.<br>";
+                            }
+
+                            if (extra.contains("Using join buffer (Block Nested Loop)")) {
+                                extroStr += "Nested Loop Join: MySQL is using a nested loop join, which may be slow.<br>";
+                            }
+
+                            if(!extroStr.isEmpty()){
+                                c.setForeground(Color.RED);
+                                c.setToolTipText(extroStr);
+                            }
+                        }
+
+                        // High Rows Scanned
+                        try {
+                            int rowsValue = Integer.parseInt(rows);
+                            double filteredValue = Double.parseDouble(filtered);
+                            if (rowsValue > 10000 && column == 8) {
+                                c.setForeground(Color.RED);
+                                c.setToolTipText("High Rows Scanned<br>The query is scanning a large number of rows (" + rowsValue + ").");
+                            } else if (rowsValue<=10000 && rowsValue > 1000 && filteredValue > 70 && column == 9) {
+                                c.setForeground(Color.RED);
+                                c.setToolTipText("High Filtered<br>A high percentage of rows (" + filteredValue + "%) are being filtered.");
+                            }
+                        } catch (NumberFormatException e) {
+                            // 忽略无效的行数
+                        }
+
+                        return c;
+                    }
+                });
 
                 // 将表格和标题添加到垂直容器
                 verticalPanel.add(titleLabel, gbc);
@@ -908,6 +991,8 @@ public class SqlDialog extends JDialog {
         } else if (!ddl && Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
             actionResults.remove(unfoldButton);
         }
+        dataSourceComboBox.revalidate();
+        dataSourceComboBox.repaint();
         actionResults.revalidate();
         actionResults.repaint();
     }
