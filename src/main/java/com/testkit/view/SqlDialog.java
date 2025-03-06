@@ -553,6 +553,14 @@ public class SqlDialog extends JDialog {
                                     .map(new Function<Statement, String>() {
                                         @Override
                                         public String apply(Statement statement) {
+                                            boolean b = statement instanceof Alter
+                                                    || statement instanceof Drop
+                                                    || statement instanceof CreateIndex
+                                                    || statement instanceof CreateTable
+                                                    || statement instanceof Update;
+                                            if (!b) {
+                                                throw new RuntimeException("Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update");
+                                            }
                                             return statement.toString();
                                         }
                                     }).collect(Collectors.toUnmodifiableList());
@@ -568,10 +576,12 @@ public class SqlDialog extends JDialog {
             });
 
             // 第二行：单选按钮组
-            JPanel checkBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
-            checkBoxPanel.add(refreshSqlsButton);
-            List<JCheckBox> datasourceCheckboxes = new ArrayList<>(); // 存储引用以便后续操作
+            JPanel dbBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+            dbBoxPanel.add(refreshSqlsButton);
 
+            JLabel dblabel = new JLabel("DB");
+            dbBoxPanel.add(dblabel);
+            List<JCheckBox> datasourceCheckboxes = new ArrayList<>(); // 存储引用以便后续操作
             // 创建筛选更新方法
             Runnable updateFilter = () -> {
                 List<String> selectedDatasources = datasourceCheckboxes.stream()
@@ -606,11 +616,11 @@ public class SqlDialog extends JDialog {
                         updateFilter.run();
                     }
                 });
-                checkBoxPanel.add(checkBox);
+                dbBoxPanel.add(checkBox);
                 datasourceCheckboxes.add(checkBox); // 保存引用
             }
 
-            panel.add(checkBoxPanel);
+            panel.add(dbBoxPanel);
 
             panelResults.add(panel, BorderLayout.NORTH);
             panelResults.add(new JBScrollPane(table), BorderLayout.CENTER);
@@ -807,7 +817,7 @@ public class SqlDialog extends JDialog {
                         }
 
 
-                        if (column==1 && ("DEPENDENT SUBQUERY".equalsIgnoreCase(select_type) || "UNCACHEABLE SUBQUERY".equalsIgnoreCase(select_type))) {
+                        if (column == 1 && ("DEPENDENT SUBQUERY".equalsIgnoreCase(select_type) || "UNCACHEABLE SUBQUERY".equalsIgnoreCase(select_type))) {
                             c.setForeground(Color.RED);
                             c.setToolTipText("Subquery Performance Issue<br>This is a dependent or uncacheable subquery, which may impact performance.");
                         }
@@ -815,7 +825,7 @@ public class SqlDialog extends JDialog {
                         // Filesort
                         if (column == 10 && extra != null) {
                             String extroStr = "";
-                            if(extra.contains("Using filesort")){
+                            if (extra.contains("Using filesort")) {
                                 extroStr += "Filesort: MySQL is performing a filesort, which can be slow.<br>";
                             }
 
@@ -827,7 +837,7 @@ public class SqlDialog extends JDialog {
                                 extroStr += "Nested Loop Join: MySQL is using a nested loop join, which may be slow.<br>";
                             }
 
-                            if(!extroStr.isEmpty()){
+                            if (!extroStr.isEmpty()) {
                                 c.setForeground(Color.RED);
                                 c.setToolTipText(extroStr);
                             }
@@ -840,7 +850,7 @@ public class SqlDialog extends JDialog {
                             if (rowsValue > 10000 && column == 8) {
                                 c.setForeground(Color.RED);
                                 c.setToolTipText("High Rows Scanned<br>The query is scanning a large number of rows (" + rowsValue + ").");
-                            } else if (rowsValue<=10000 && rowsValue > 1000 && filteredValue > 70 && column == 9) {
+                            } else if (rowsValue <= 10000 && rowsValue > 1000 && filteredValue > 70 && column == 9) {
                                 c.setForeground(Color.RED);
                                 c.setToolTipText("High Filtered<br>A high percentage of rows (" + filteredValue + "%) are being filtered.");
                             }

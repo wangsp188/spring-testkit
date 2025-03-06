@@ -531,6 +531,9 @@ public class MysqlUtil {
 
         @Override
         public String toString() {
+            if (ret == null) {
+                return success ? "SUCCESS" : "FAIL";
+            }
             return (success ? "SUCCESS" : "FAIL")
                     + ",\n" + ret;
         }
