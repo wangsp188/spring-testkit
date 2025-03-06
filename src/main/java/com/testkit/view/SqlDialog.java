@@ -34,7 +34,6 @@ import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.update.Update;
-import net.sf.jsqlparser.util.deparser.StatementDeParser;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -46,7 +45,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.StringWriter;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
@@ -537,6 +535,64 @@ public class SqlDialog extends JDialog {
             panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); // 垂直布局
             panel.add(titleField);
 
+            JPanel dbBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+            JPanel sqlBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+
+            // 创建筛选更新方法
+            Runnable updateFilter = () -> {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        table.revalidate();
+                        table.repaint();
+                        Set<String> dss = new HashSet<>();
+                        Component[] dbComs = dbBoxPanel.getComponents();
+                        for (int i = 1; i < dbComs.length; i++) {
+                            Component component = dbComs[i];
+                            if (!(component instanceof JCheckBox)) {
+                                continue;
+                            }
+                            if (!((JCheckBox) component).isSelected()) {
+                                continue;
+                            }
+                            dss.add(((JCheckBox) component).getText());
+                        }
+
+                        Set<String> sqls = new HashSet<>();
+                        Component[] sqlComs = sqlBoxPanel.getComponents();
+                        for (int i = 1; i < sqlComs.length; i++) {
+                            Component component = sqlComs[i];
+                            if (!(component instanceof JCheckBox)) {
+                                continue;
+                            }
+                            if (!((JCheckBox) component).isSelected()) {
+                                continue;
+                            }
+                            sqls.add(((JCheckBox) component).getToolTipText());
+                        }
+
+                        System.out.println("dss," + dss.size() + ",sqls" + sqls.size());
+                        sorter.setRowFilter(new RowFilter<DefaultTableModel, Integer>() {
+                            @Override
+                            public boolean include(Entry<? extends DefaultTableModel, ? extends Integer> entry) {
+                                if (dss.isEmpty() || sqls.isEmpty()) {
+                                    return false;
+                                }
+                                String rowDatasource = (String) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                                String rowSql = (String) entry.getModel().getValueAt(entry.getIdentifier(), 2);
+                                return dss.contains(rowDatasource) && sqls.contains(rowSql);
+                            }
+                        });
+
+                        table.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(2, 3, 4, 5), dss.size()));
+                        // 在修改数据后触发界面更新
+                        table.revalidate();
+                        table.repaint();
+                    }
+                });
+            };
+
+
             JButton refreshSqlsButton = new JButton(AllIcons.Actions.Refresh);
             refreshSqlsButton.setPreferredSize(new Dimension(32, 32));
             refreshSqlsButton.setToolTipText("Parse SQL & Refresh table");
@@ -571,41 +627,12 @@ public class SqlDialog extends JDialog {
                     } else {
                         sqls = Collections.emptyList();
                     }
-                    refreshExecuteTable(sqls, model, operateDs, table);
+                    refreshExecuteTable(sqls, model, operateDs, table, sqlBoxPanel, updateFilter);
                 }
             });
 
             // 第二行：单选按钮组
-            JPanel dbBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
             dbBoxPanel.add(refreshSqlsButton);
-
-            JLabel dblabel = new JLabel("DB");
-            dbBoxPanel.add(dblabel);
-            List<JCheckBox> datasourceCheckboxes = new ArrayList<>(); // 存储引用以便后续操作
-            // 创建筛选更新方法
-            Runnable updateFilter = () -> {
-                List<String> selectedDatasources = datasourceCheckboxes.stream()
-                        .filter(JCheckBox::isSelected)
-                        .map(AbstractButton::getText)
-                        .collect(Collectors.toList());
-
-                sorter.setRowFilter(new RowFilter<DefaultTableModel, Integer>() {
-                    @Override
-                    public boolean include(Entry<? extends DefaultTableModel, ? extends Integer> entry) {
-                        if (selectedDatasources.isEmpty()) {
-                            return false;
-                        }
-                        String rowDatasource = (String) entry.getModel().getValueAt(entry.getIdentifier(), 0);
-                        return selectedDatasources.contains(rowDatasource);
-                    }
-                });
-
-                table.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(2, 3, 4, 5), selectedDatasources.size()));
-                // 在修改数据后触发界面更新
-                table.repaint();
-                table.revalidate();
-            };
-
 
             for (String datasource : operateDs) {
                 JCheckBox checkBox = new JCheckBox(datasource);
@@ -617,8 +644,9 @@ public class SqlDialog extends JDialog {
                     }
                 });
                 dbBoxPanel.add(checkBox);
-                datasourceCheckboxes.add(checkBox); // 保存引用
             }
+
+            dbBoxPanel.add(sqlBoxPanel);
 
             panel.add(dbBoxPanel);
 
@@ -651,7 +679,7 @@ public class SqlDialog extends JDialog {
                                 }).collect(Collectors.toUnmodifiableList());
                     }
 
-                    refreshExecuteTable(sqls, model, operateDs, table);
+                    refreshExecuteTable(sqls, model, operateDs, table, sqlBoxPanel, updateFilter);
                 } catch (Throwable ex) {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Refresh execution table error<br>you click refresh button try again<br>" + ex.getMessage());
                 }
@@ -664,23 +692,59 @@ public class SqlDialog extends JDialog {
         return actionResults;
     }
 
-    private void refreshExecuteTable(List<String> sqls, DefaultTableModel tableModel, List<String> datasources2, JBTable table) {
-        // 模拟刷新
-        ApplicationManager.getApplication().invokeLater(() -> {
-            // 更新表格数据（假设模型为 DefaultTableModel）
-            // 清空现有数据
-            tableModel.setRowCount(0);
-            // 插入新数据
-            for (String sql : sqls) {
-                // 填充数据源
-                for (String ds : datasources2) {
-                    tableModel.addRow(new Object[]{ds, "", sql + ";", "", "", ""});
-                }
-            }
+    private void refreshExecuteTable(List<String> sqls, DefaultTableModel tableModel, List<String> datasources2, JBTable table, JPanel sqlBoxPanel, Runnable updateFilter) {
+        ApplicationManager.getApplication().runWriteAction(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        // 更新表格数据（假设模型为 DefaultTableModel）
+                        // 清空现有数据
+                        tableModel.setRowCount(0);
+//
+//                        // 移除 sqlBoxPanel 中所有组件的监听器
+//                        for (Component component : sqlBoxPanel.getComponents()) {
+//                            if (component instanceof JCheckBox) {
+//                                JCheckBox checkBox = (JCheckBox) component;
+//                                for (ActionListener listener : checkBox.getActionListeners()) {
+//                                    checkBox.removeActionListener(listener);
+//                                }
+//                            }
+//                        }
 
-            table.revalidate();
-            table.repaint();
-        });
+
+                        sqlBoxPanel.removeAll();
+                        sqlBoxPanel.add(new JLabel("| SQL"));
+                        // 插入新数据
+                        Set<String> disSqls = new HashSet<>();
+                        for (int i = 0; i < sqls.size(); i++) {
+                            String sql = sqls.get(i);
+                            if (!disSqls.add(sqls.get(i))) {
+                                continue;
+                            }
+                            JCheckBox checkBox = new JCheckBox(String.valueOf(i + 1));
+                            checkBox.setSelected(true); // 默认未选中
+                            checkBox.addActionListener(new ActionListener() {
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    updateFilter.run();
+                                }
+                            });
+                            checkBox.setToolTipText(sql + ";");
+                            sqlBoxPanel.add(checkBox);
+                            for (String ds : datasources2) {
+                                tableModel.addRow(new Object[]{ds, "", sql + ";", "", "", ""});
+                            }
+                        }
+
+
+                        updateFilter.run();
+                        table.revalidate();
+                        table.repaint();
+                        sqlBoxPanel.revalidate();
+                        sqlBoxPanel.repaint();
+                    }
+                }
+        );
     }
 
 
