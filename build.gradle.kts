@@ -36,7 +36,7 @@ dependencies {
 intellijPlatform{
     pluginConfiguration{
         ideaVersion {
-            sinceBuild = "230"
+            sinceBuild = "231.*"
             untilBuild = "273.*"
         }
     }
@@ -55,8 +55,8 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("232")
-        untilBuild.set("253.*")
+        sinceBuild.set("231.*")
+        untilBuild.set("273.*")
     }
 
     signPlugin {
