@@ -230,7 +230,7 @@ public class TestkitToolWindow {
         tools.put(PluginToolEnum.SPRING_CACHE, new SpringCacheTool(this));
         tools.put(PluginToolEnum.MAPPER_SQL, new MapperSqlTool(this));
         // 添加 toolBox 到 topPanel
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(), PluginToolEnum.SPRING_CACHE.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode()});
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(),  PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode(),PluginToolEnum.SPRING_CACHE.getCode()});
         toolBox.setPreferredSize(new Dimension(120, 32));
 //        toolBox.setEnabled(false);
         toolBox.addActionListener(e -> onSwitchTool());
