@@ -123,54 +123,63 @@ public class SettingsDialog {
     }
 
     private void refreshSettings() {
-        flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
-        RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
-        String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
-        if (selectedAppName == null) {
-            if (interceptorAppBox.getItemCount() > 0) {
-                interceptorAppBox.setSelectedIndex(0);
-            }
-            if (controllerScriptAppBox.getItemCount() > 0) {
-                controllerScriptAppBox.setSelectedIndex(0);
-            }
-            if (feignScriptAppBox.getItemCount() > 0) {
-                feignScriptAppBox.setSelectedIndex(0);
-            }
-            if (propertiesAppBox.getItemCount() > 0) {
-                // 选择第一个选项
-                propertiesAppBox.setSelectedIndex(0);
-            }
-        } else {
-            if (interceptorAppBox.getItemCount() > 0) {
-                interceptorAppBox.setSelectedItem(selectedAppName);
-            }
-            if (controllerScriptAppBox.getItemCount() > 0) {
-                controllerScriptAppBox.setSelectedItem(selectedAppName);
-            }
-            if (feignScriptAppBox.getItemCount() > 0) {
-                feignScriptAppBox.setSelectedItem(selectedAppName);
-            }
-            if (propertiesAppBox.getItemCount() > 0) {
-                // 选择第一个选项
-                propertiesAppBox.setSelectedItem(selectedAppName);
-            }
-        }
+        SwingUtilities.invokeLater(new Runnable() {
+
+            @Override
+            public void run() {
+                flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
+                RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
+                String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
+                if (selectedAppName == null) {
+                    if (interceptorAppBox.getItemCount() > 0) {
+                        interceptorAppBox.setSelectedIndex(0);
+                    }
+                    if (controllerScriptAppBox.getItemCount() > 0) {
+                        controllerScriptAppBox.setSelectedIndex(0);
+                    }
+                    if (feignScriptAppBox.getItemCount() > 0) {
+                        feignScriptAppBox.setSelectedIndex(0);
+                    }
+                    if (propertiesAppBox.getItemCount() > 0) {
+                        // 选择第一个选项
+                        propertiesAppBox.setSelectedIndex(0);
+                    }
+                } else {
+                    if (interceptorAppBox.getItemCount() > 0) {
+                        interceptorAppBox.setSelectedItem(selectedAppName);
+                    }
+                    if (controllerScriptAppBox.getItemCount() > 0) {
+                        controllerScriptAppBox.setSelectedItem(selectedAppName);
+                    }
+                    if (feignScriptAppBox.getItemCount() > 0) {
+                        feignScriptAppBox.setSelectedItem(selectedAppName);
+                    }
+                    if (propertiesAppBox.getItemCount() > 0) {
+                        // 选择第一个选项
+                        propertiesAppBox.setSelectedItem(selectedAppName);
+                    }
+                }
 
 //        trace
-        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
-        traceToggleButton.setSelected(traceConfig.isEnable());
-        traceOptionsPanel.setVisible(traceConfig.isEnable());
-        traceWebToggleButton.setSelected(traceConfig.isTraceWeb());
-        traceMybatisToggleButton.setSelected(traceConfig.isTraceMybatis());
-        logMybatisToggleButton.setSelected(traceConfig.isLogMybatis());
-        tracePackagesField.setText(traceConfig.getPackages());
-        traceClassSuffixField.setText(traceConfig.getClsSuffix());
-        traceBlackListField.setText(traceConfig.getBlacks());
-        traceWhiteListField.setText(traceConfig.getWhites());
+                SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+                traceToggleButton.setSelected(traceConfig.isEnable());
+                traceOptionsPanel.setVisible(traceConfig.isEnable());
+                traceWebToggleButton.setSelected(traceConfig.isTraceWeb());
+                traceMybatisToggleButton.setSelected(traceConfig.isTraceMybatis());
+                logMybatisToggleButton.setSelected(traceConfig.isLogMybatis());
+                tracePackagesField.setText(traceConfig.getPackages());
+                traceClassSuffixField.setText(traceConfig.getClsSuffix());
+                traceBlackListField.setText(traceConfig.getBlacks());
+                traceWhiteListField.setText(traceConfig.getWhites());
 //        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
 
-        SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-        datasourcePropertiesField.setText(sqlConfig.getProperties());
+//        SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+                datasourcePropertiesField.setText("");
+                datasourcePropertiesField.setVisible(false);
+                showDatasourceButton.setIcon(HIDDEN_ICON);
+            }
+        });
+
     }
 
     private void init() {
@@ -1310,8 +1319,8 @@ public class SettingsDialog {
         gbc.insets = JBUI.emptyInsets(); // 添加内边距以美化布局
 
         JTextArea tipArea = createTips("After configuring the database information, you can use SQL tool\n" +
-                "Configuration desc\n" +
-                "#Multiple database are supported, blew is nam1's config\n" +
+                "Blew is config example\n" +
+                "#Multiple database are supported\n" +
                 "datasource.nam1.url=jdbc:mysql:///test\n" +
                 "datasource.nam1.username=your_account\n" +
                 "datasource.nam1.password=your_pwd");
@@ -1330,6 +1339,14 @@ public class SettingsDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 boolean visible = datasourcePropertiesField.isVisible();
+                String dats = "";
+                if(!visible){
+                    SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+                    if (StringUtils.isNotBlank(sqlConfig.getProperties())) {
+                        dats = sqlConfig.getProperties();
+                    }
+                }
+                datasourcePropertiesField.setText(dats);
                 datasourcePropertiesField.setVisible(!visible);
                 showDatasourceButton.setIcon(!visible ? SHOW_ICON : HIDDEN_ICON);
             }
@@ -1341,6 +1358,7 @@ public class SettingsDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 datasourcePropertiesField.setVisible(true);
+                showDatasourceButton.setIcon(SHOW_ICON);
                 datasourcePropertiesField.setText(SettingsStorageHelper.datasourceTemplateProperties);
             }
         });
@@ -1360,7 +1378,7 @@ public class SettingsDialog {
 
 
 //        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
-        datasourcePropertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.getSqlConfig(toolWindow.getProject()).getProperties(), false);
+        datasourcePropertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), "", false);
         // 布局输入框
         gbc.gridx = 0;
         gbc.gridy = 2;

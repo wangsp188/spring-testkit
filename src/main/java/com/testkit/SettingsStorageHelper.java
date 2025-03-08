@@ -33,8 +33,8 @@ public class SettingsStorageHelper {
     public static final List<String> defBeanAnnotations = Arrays.asList("org.apache.ibatis.annotations.Mapper", "org.springframework.cloud.openfeign.FeignClient");
 
     public static final String defProperties = "logging.level.com.testkit=INFO";
-    public static final String datasourceTemplateProperties = "#local datasource\n" +
-            "datasource.local.url=jdbc:mysql:///test?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC\n" +
+    public static final String datasourceTemplateProperties = "#local_test datasource\n" +
+            "datasource.local.url=jdbc:mysql:///test\n" +
             "datasource.local.username=xx\n" +
             "datasource.local.password=xx";
 
@@ -693,7 +693,6 @@ public class SettingsStorageHelper {
 
     private static SqlConfig copyDefSqlConfig() {
         SqlConfig sqlConfig = new SqlConfig();
-        sqlConfig.setProperties(datasourceTemplateProperties);
         return sqlConfig;
     }
 

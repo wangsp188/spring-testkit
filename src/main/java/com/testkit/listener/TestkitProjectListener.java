@@ -14,6 +14,7 @@ import com.testkit.view.TestkitToolWindow;
 import com.testkit.view.TestkitToolWindowFactory;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,7 +51,7 @@ public class TestkitProjectListener implements ProjectActivity {
     private static void refreshValidDatasources(Project project) {
         try {
             String propertiesStr = SettingsStorageHelper.getSqlConfig(project).getProperties();
-            if (Objects.equals(propertiesStr, SettingsStorageHelper.datasourceTemplateProperties)) {
+            if (StringUtils.isBlank(propertiesStr) || Objects.equals(propertiesStr, SettingsStorageHelper.datasourceTemplateProperties)) {
                 return;
             }
             TestkitToolWindow toolWindow = TestkitToolWindowFactory.getToolWindow(project);

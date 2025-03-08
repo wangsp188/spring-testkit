@@ -620,6 +620,16 @@ public class SqlDialog extends JDialog {
                                             return statement.toString();
                                         }
                                     }).collect(Collectors.toUnmodifiableList());
+                            String trim = text.trim();
+                            if (trim.startsWith(";")) {
+                                trim = trim.substring(1);
+                            }
+                            if (trim.endsWith(";")) {
+                                trim = trim.substring(0, trim.length() - 1);
+                            }
+                            if (trim.split(";").length == parses.getStatements().size()) {
+                                sqls = Arrays.asList(trim.split(";"));
+                            }
                         } catch (Exception ex) {
                             TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), ex.getMessage());
                             return;
@@ -660,28 +670,40 @@ public class SqlDialog extends JDialog {
             if (StringUtils.isNotBlank(text)) {
                 try {
                     Statements parses = MysqlUtil.parses(text);
-                    String trim = text.trim();
-                    if (trim.startsWith(";")) {
-                        trim = trim.substring(1);
+                    if (parses.getStatements().stream().filter(new Predicate<Statement>() {
+                        @Override
+                        public boolean test(Statement statement) {
+                            return !(statement instanceof Alter
+                                    || statement instanceof Drop
+                                    || statement instanceof CreateIndex
+                                    || statement instanceof CreateTable
+                                    || statement instanceof Update);
+                        }
+                    }).findAny().isPresent()) {
+                        sqls = new ArrayList<>();
+                    }else{
+                        String trim = text.trim();
+                        if (trim.startsWith(";")) {
+                            trim = trim.substring(1);
+                        }
+                        if (trim.endsWith(";")) {
+                            trim = trim.substring(0, trim.length() - 1);
+                        }
+                        if (trim.split(";").length == parses.getStatements().size()) {
+                            sqls = Arrays.asList(trim.split(";"));
+                        }else{
+                            sqls = parses.getStatements().stream()
+                                    .map(new Function<Statement, String>() {
+                                        @Override
+                                        public String apply(Statement statement) {
+                                            return statement.toString();
+                                        }
+                                    }).collect(Collectors.toUnmodifiableList());
+                        }
                     }
-                    if (trim.endsWith(";")) {
-                        trim = trim.substring(0, trim.length() - 1);
-                    }
-                    if (trim.split(";").length == parses.getStatements().size()) {
-                        sqls = Arrays.asList(trim.split(";"));
-                    } else {
-                        sqls = parses.getStatements().stream()
-                                .map(new Function<Statement, String>() {
-                                    @Override
-                                    public String apply(Statement statement) {
-                                        return statement.toString();
-                                    }
-                                }).collect(Collectors.toUnmodifiableList());
-                    }
-
                     refreshExecuteTable(sqls, model, operateDs, table, sqlBoxPanel, updateFilter);
                 } catch (Throwable ex) {
-                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Refresh execution table error<br>you click refresh button try again<br>" + ex.getMessage());
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Refresh execution table error<br>" + ex.getMessage());
                 }
             }
         });
@@ -693,25 +715,13 @@ public class SqlDialog extends JDialog {
     }
 
     private void refreshExecuteTable(List<String> sqls, DefaultTableModel tableModel, List<String> datasources2, JBTable table, JPanel sqlBoxPanel, Runnable updateFilter) {
-        ApplicationManager.getApplication().runWriteAction(
+        SwingUtilities.invokeLater(
                 new Runnable() {
                     @Override
                     public void run() {
                         // 更新表格数据（假设模型为 DefaultTableModel）
                         // 清空现有数据
                         tableModel.setRowCount(0);
-//
-//                        // 移除 sqlBoxPanel 中所有组件的监听器
-//                        for (Component component : sqlBoxPanel.getComponents()) {
-//                            if (component instanceof JCheckBox) {
-//                                JCheckBox checkBox = (JCheckBox) component;
-//                                for (ActionListener listener : checkBox.getActionListeners()) {
-//                                    checkBox.removeActionListener(listener);
-//                                }
-//                            }
-//                        }
-
-
                         sqlBoxPanel.removeAll();
                         sqlBoxPanel.add(new JLabel("| SQL"));
                         // 插入新数据
@@ -799,205 +809,210 @@ public class SqlDialog extends JDialog {
     }
 
     private void loadAnalysis(SettingsStorageHelper.DatasourceConfig datasourceConfig, String sqlText) {
-        // 使用 BorderLayout 管理组件布局
-        panelResults.removeAll(); // 清空现有组件
-        panelResults.setLayout(new BorderLayout());
-        // 使用垂直布局容器承载所有内容（EXPLAIN 和 SQL Review 建议）
-        JPanel verticalPanel = new JPanel();
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                // 使用 BorderLayout 管理组件布局
+                panelResults.removeAll(); // 清空现有组件
+                panelResults.setLayout(new BorderLayout());
+                // 使用垂直布局容器承载所有内容（EXPLAIN 和 SQL Review 建议）
+                JPanel verticalPanel = new JPanel();
 //        verticalPanel.setLayout(new BoxLayout(verticalPanel, BoxLayout.Y_AXIS));
-        verticalPanel.setLayout(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.anchor = GridBagConstraints.CENTER; // 居中对齐
-        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
+                verticalPanel.setLayout(new GridBagLayout());
+                GridBagConstraints gbc = new GridBagConstraints();
+                gbc.gridx = 0;
+                gbc.gridy = 0;
+                gbc.anchor = GridBagConstraints.CENTER; // 居中对齐
+                gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
 
-        JLabel goodLuckLabel = new JLabel("Good luck, Analysis support select/update/delete/drop/create", SwingConstants.CENTER);
-        goodLuckLabel.setForeground(Color.decode("#72a96b")); // 设置字体颜色为红色
-        goodLuckLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        verticalPanel.add(goodLuckLabel, gbc);
+                JLabel goodLuckLabel = new JLabel("Good luck, Analysis support select/update/delete/drop/create", SwingConstants.CENTER);
+                goodLuckLabel.setForeground(Color.decode("#72a96b")); // 设置字体颜色为红色
+                goodLuckLabel.setFont(new Font("Arial", Font.BOLD, 14));
+                verticalPanel.add(goodLuckLabel, gbc);
 
-        gbc.gridy = 1;
-        gbc.anchor = GridBagConstraints.NORTHWEST; // 左对齐
-        gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
-        gbc.weightx = 1; // 水平权重
-        gbc.insets = JBUI.emptyInsets(); // 设置边距
-        // 提取数据
-        List<Map<String, String>> explains;
-        try {
-            explains = explainSql(datasourceConfig, sqlText);
-            // 1. EXPLAIN 结果展示
-            if (CollectionUtils.isNotEmpty(explains)) {
-                // 创建标题 JLabel
-                JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
-                titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-                titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
-                titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+                gbc.gridy = 1;
+                gbc.anchor = GridBagConstraints.NORTHWEST; // 左对齐
+                gbc.fill = GridBagConstraints.HORIZONTAL; // 水平填充
+                gbc.weightx = 1; // 水平权重
+                gbc.insets = JBUI.emptyInsets(); // 设置边距
+                // 提取数据
+                List<Map<String, String>> explains;
+                try {
+                    explains = explainSql(datasourceConfig, sqlText);
+                    // 1. EXPLAIN 结果展示
+                    if (CollectionUtils.isNotEmpty(explains)) {
+                        // 创建标题 JLabel
+                        JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
+                        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+                        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+                        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
-                // 表格数据转换
-                List<String[]> resultData = new ArrayList<>();
-                for (Map<String, String> explain : explains) {
-                    String[] row = new String[explainColumns.size()];
-                    for (int i = 0; i < explainColumns.size(); i++) {
-                        row[i] = explain.get(explainColumns.get(i));
-                    }
-                    resultData.add(row);
-                }
+                        // 表格数据转换
+                        List<String[]> resultData = new ArrayList<>();
+                        for (Map<String, String> explain : explains) {
+                            String[] row = new String[explainColumns.size()];
+                            for (int i = 0; i < explainColumns.size(); i++) {
+                                row[i] = explain.get(explainColumns.get(i));
+                            }
+                            resultData.add(row);
+                        }
 
-                // 创建表格
-                JBTable explainTable = new JBTable(new DefaultTableModel(resultData.toArray(new Object[0][]), explainColumns.toArray(new String[0])) {
-                    @Override
-                    public boolean isCellEditable(int row, int column) {
-                        return false; // 禁止所有单元格编辑
-                    }
-                });
-                explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-                explainTable.setFillsViewportHeight(true);
-                explainTable.getTableHeader().setReorderingAllowed(false);
+                        // 创建表格
+                        JBTable explainTable = new JBTable(new DefaultTableModel(resultData.toArray(new Object[0][]), explainColumns.toArray(new String[0])) {
+                            @Override
+                            public boolean isCellEditable(int row, int column) {
+                                return false; // 禁止所有单元格编辑
+                            }
+                        });
+                        explainTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+                        explainTable.setFillsViewportHeight(true);
+                        explainTable.getTableHeader().setReorderingAllowed(false);
 
-                // 自定义渲染器
-                explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-                    @Override
-                    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                        // 自定义渲染器
+                        explainTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+                            @Override
+                            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
 //                        Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                        JLabel c = new JLabel(value == null ? "" : value.toString());
-                        TableModel tableModel = explainTable.getModel();
-                        String select_type = (String) tableModel.getValueAt(row, 1);
-                        String type = (String) tableModel.getValueAt(row, 3);
-                        String possible_keys = (String) tableModel.getValueAt(row, 4);
-                        String ref = (String) tableModel.getValueAt(row, 7);
-                        String rows = (String) tableModel.getValueAt(row, 8);
-                        String filtered = (String) tableModel.getValueAt(row, 9);
-                        String extra = (String) tableModel.getValueAt(row, 10);
+                                JLabel c = new JLabel(value == null ? "" : value.toString());
+                                TableModel tableModel = explainTable.getModel();
+                                String select_type = (String) tableModel.getValueAt(row, 1);
+                                String type = (String) tableModel.getValueAt(row, 3);
+                                String possible_keys = (String) tableModel.getValueAt(row, 4);
+                                String ref = (String) tableModel.getValueAt(row, 7);
+                                String rows = (String) tableModel.getValueAt(row, 8);
+                                String filtered = (String) tableModel.getValueAt(row, 9);
+                                String extra = (String) tableModel.getValueAt(row, 10);
 
 
-                        // Full Table Scan
-                        if ("ALL".equalsIgnoreCase(type) && column == 3) {
-                            c.setForeground(Color.RED);
-                            c.setToolTipText("Full Table Scan<br>The query is performing a full table scan, which can be slow.");
-                        } else if (!"ALL".equalsIgnoreCase(type) && (possible_keys == null || possible_keys.equalsIgnoreCase("NULL")) && column == 4) {
-                            c.setForeground(Color.RED);
-                            c.setToolTipText("Index Not Used<br>No index is being used for this query.");
-                        }
+                                // Full Table Scan
+                                if ("ALL".equalsIgnoreCase(type) && column == 3) {
+                                    c.setForeground(Color.RED);
+                                    c.setToolTipText("Full Table Scan<br>The query is performing a full table scan, which can be slow.");
+                                } else if (!"ALL".equalsIgnoreCase(type) && (possible_keys == null || possible_keys.equalsIgnoreCase("NULL")) && column == 4) {
+                                    c.setForeground(Color.RED);
+                                    c.setToolTipText("Index Not Used<br>No index is being used for this query.");
+                                }
 
 
-                        if (column == 1 && ("DEPENDENT SUBQUERY".equalsIgnoreCase(select_type) || "UNCACHEABLE SUBQUERY".equalsIgnoreCase(select_type))) {
-                            c.setForeground(Color.RED);
-                            c.setToolTipText("Subquery Performance Issue<br>This is a dependent or uncacheable subquery, which may impact performance.");
-                        }
+                                if (column == 1 && ("DEPENDENT SUBQUERY".equalsIgnoreCase(select_type) || "UNCACHEABLE SUBQUERY".equalsIgnoreCase(select_type))) {
+                                    c.setForeground(Color.RED);
+                                    c.setToolTipText("Subquery Performance Issue<br>This is a dependent or uncacheable subquery, which may impact performance.");
+                                }
 
-                        // Filesort
-                        if (column == 10 && extra != null) {
-                            String extroStr = "";
-                            if (extra.contains("Using filesort")) {
-                                extroStr += "Filesort: MySQL is performing a filesort, which can be slow.<br>";
+                                // Filesort
+                                if (column == 10 && extra != null) {
+                                    String extroStr = "";
+                                    if (extra.contains("Using filesort")) {
+                                        extroStr += "Filesort: MySQL is performing a filesort, which can be slow.<br>";
+                                    }
+
+                                    if (extra.contains("Using temporary")) {
+                                        extroStr += "Temporary Table: MySQL is using a temporary table, which may impact performance.<br>";
+                                    }
+
+                                    if (extra.contains("Using join buffer (Block Nested Loop)")) {
+                                        extroStr += "Nested Loop Join: MySQL is using a nested loop join, which may be slow.<br>";
+                                    }
+
+                                    if (!extroStr.isEmpty()) {
+                                        c.setForeground(Color.RED);
+                                        c.setToolTipText(extroStr);
+                                    }
+                                }
+
+                                // High Rows Scanned
+                                try {
+                                    int rowsValue = Integer.parseInt(rows);
+                                    double filteredValue = Double.parseDouble(filtered);
+                                    if (rowsValue > 10000 && column == 8) {
+                                        c.setForeground(Color.RED);
+                                        c.setToolTipText("High Rows Scanned<br>The query is scanning a large number of rows (" + rowsValue + ").");
+                                    } else if (rowsValue <= 10000 && rowsValue > 1000 && filteredValue > 70 && column == 9) {
+                                        c.setForeground(Color.RED);
+                                        c.setToolTipText("High Filtered<br>A high percentage of rows (" + filteredValue + "%) are being filtered.");
+                                    }
+                                } catch (NumberFormatException e) {
+                                    // 忽略无效的行数
+                                }
+
+                                return c;
                             }
+                        });
 
-                            if (extra.contains("Using temporary")) {
-                                extroStr += "Temporary Table: MySQL is using a temporary table, which may impact performance.<br>";
-                            }
-
-                            if (extra.contains("Using join buffer (Block Nested Loop)")) {
-                                extroStr += "Nested Loop Join: MySQL is using a nested loop join, which may be slow.<br>";
-                            }
-
-                            if (!extroStr.isEmpty()) {
-                                c.setForeground(Color.RED);
-                                c.setToolTipText(extroStr);
-                            }
-                        }
-
-                        // High Rows Scanned
-                        try {
-                            int rowsValue = Integer.parseInt(rows);
-                            double filteredValue = Double.parseDouble(filtered);
-                            if (rowsValue > 10000 && column == 8) {
-                                c.setForeground(Color.RED);
-                                c.setToolTipText("High Rows Scanned<br>The query is scanning a large number of rows (" + rowsValue + ").");
-                            } else if (rowsValue <= 10000 && rowsValue > 1000 && filteredValue > 70 && column == 9) {
-                                c.setForeground(Color.RED);
-                                c.setToolTipText("High Filtered<br>A high percentage of rows (" + filteredValue + "%) are being filtered.");
-                            }
-                        } catch (NumberFormatException e) {
-                            // 忽略无效的行数
-                        }
-
-                        return c;
+                        // 将表格和标题添加到垂直容器
+                        verticalPanel.add(titleLabel, gbc);
+                        gbc.gridy++;
+                        verticalPanel.add(new JBScrollPane(explainTable), gbc);
                     }
-                });
+                } catch (Throwable ex) {
+                    JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
+                    titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+                    //优化字体
+                    verticalPanel.add(titleLabel, gbc);
 
-                // 将表格和标题添加到垂直容器
-                verticalPanel.add(titleLabel, gbc);
-                gbc.gridy++;
-                verticalPanel.add(new JBScrollPane(explainTable), gbc);
-            }
-        } catch (Throwable ex) {
-            JLabel titleLabel = new JLabel("EXPLAIN", SwingConstants.LEFT);
-            titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
-            //优化字体
-            verticalPanel.add(titleLabel, gbc);
-
-            JLabel titleLabel1 = new JLabel(ex.getMessage(), SwingConstants.LEFT);
-            titleLabel1.setForeground(Color.pink);
-            //优化字体
-            gbc.gridy++;
-            verticalPanel.add(titleLabel1, gbc);
-        }
-
-        // 2. SQL Review 建议展示
-        List<Suggest> suggests = SqlReviewer.reviewMysql(datasourceConfig, sqlText);
-        if (CollectionUtils.isNotEmpty(suggests)) {
-            // 创建建议标题
-            JLabel suggestTitleLabel = new JLabel("Suggests", SwingConstants.LEFT);
-            suggestTitleLabel.setFont(new Font("Arial", Font.BOLD, 14));
-            suggestTitleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
-
-            // 表格列名
-            String[] suggestColumns = {"Level", "Title", "Detail"};
-
-            // 转换建议数据
-            DefaultTableModel suggestModel = new DefaultTableModel(suggestColumns, 0) {
-                @Override
-                public boolean isCellEditable(int row, int column) {
-                    return false; // 禁止所有单元格编辑
+                    JLabel titleLabel1 = new JLabel(ex.getMessage(), SwingConstants.LEFT);
+                    titleLabel1.setForeground(Color.pink);
+                    //优化字体
+                    gbc.gridy++;
+                    verticalPanel.add(titleLabel1, gbc);
                 }
 
+                // 2. SQL Review 建议展示
+                List<Suggest> suggests = SqlReviewer.reviewMysql(datasourceConfig, sqlText);
+                if (CollectionUtils.isNotEmpty(suggests)) {
+                    // 创建建议标题
+                    JLabel suggestTitleLabel = new JLabel("Suggests", SwingConstants.LEFT);
+                    suggestTitleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+                    suggestTitleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
-            };
-            for (Suggest suggest : suggests) {
-                suggestModel.addRow(new Object[]{
-                        suggest.getRule().getLevel().name(),
-                        suggest.getRule().getTitle(),
-                        suggest.getDetail()
-                });
+                    // 表格列名
+                    String[] suggestColumns = {"Level", "Title", "Detail"};
+
+                    // 转换建议数据
+                    DefaultTableModel suggestModel = new DefaultTableModel(suggestColumns, 0) {
+                        @Override
+                        public boolean isCellEditable(int row, int column) {
+                            return false; // 禁止所有单元格编辑
+                        }
+
+
+                    };
+                    for (Suggest suggest : suggests) {
+                        suggestModel.addRow(new Object[]{
+                                suggest.getRule().getLevel().name(),
+                                suggest.getRule().getTitle(),
+                                suggest.getDetail()
+                        });
+                    }
+
+                    // 创建建议表格
+                    JBTable suggestTable = new JBTable(suggestModel);
+                    suggestTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+                    suggestTable.setFillsViewportHeight(true);
+                    suggestTable.getTableHeader().setReorderingAllowed(false);
+
+                    suggestTable.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(2)));
+
+                    // 设置列宽nm
+                    TableColumnModel columnModel = suggestTable.getColumnModel();
+                    columnModel.getColumn(0).setPreferredWidth(80); // 第一列固定宽度
+                    columnModel.getColumn(1).setPreferredWidth(160); // 第二列固定宽度
+                    columnModel.getColumn(2).setPreferredWidth((panelResults.getWidth() - 250));
+
+                    gbc.gridy++;
+                    // 将建议部分添加到垂直容器
+                    verticalPanel.add(suggestTitleLabel, gbc);
+                    gbc.gridy++;
+                    verticalPanel.add(new JBScrollPane(suggestTable), gbc);
+                }
+
+                // 将垂直容器包裹在滚动面板中（支持整体滚动）
+                JBScrollPane mainScrollPane = new JBScrollPane(verticalPanel);
+                panelResults.add(mainScrollPane, BorderLayout.NORTH);
+                panelResults.revalidate();
+                panelResults.repaint();
             }
-
-            // 创建建议表格
-            JBTable suggestTable = new JBTable(suggestModel);
-            suggestTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-            suggestTable.setFillsViewportHeight(true);
-            suggestTable.getTableHeader().setReorderingAllowed(false);
-
-            suggestTable.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(2)));
-
-            // 设置列宽nm
-            TableColumnModel columnModel = suggestTable.getColumnModel();
-            columnModel.getColumn(0).setPreferredWidth(80); // 第一列固定宽度
-            columnModel.getColumn(1).setPreferredWidth(160); // 第二列固定宽度
-            columnModel.getColumn(2).setPreferredWidth((panelResults.getWidth() - 250));
-
-            gbc.gridy++;
-            // 将建议部分添加到垂直容器
-            verticalPanel.add(suggestTitleLabel, gbc);
-            gbc.gridy++;
-            verticalPanel.add(new JBScrollPane(suggestTable), gbc);
-        }
-
-        // 将垂直容器包裹在滚动面板中（支持整体滚动）
-        JBScrollPane mainScrollPane = new JBScrollPane(verticalPanel);
-        panelResults.add(mainScrollPane, BorderLayout.NORTH);
-        panelResults.revalidate();
-        panelResults.repaint();
+        });
     }
 
 
@@ -1021,54 +1036,59 @@ public class SqlDialog extends JDialog {
     }
 
     public synchronized void refreshDatasources() {
-        String selectedData = (String) dataSourceComboBox.getSelectedItem();
-        dataSourceComboBox.removeAllItems();
-        List<SettingsStorageHelper.DatasourceConfig> validDatasources = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName());
-        List<String> ddlDatasources = RuntimeHelper.getDDLDatasources(toolWindow.getProject().getName());
-        List<String> writeDatasources = RuntimeHelper.getWriteDatasources(toolWindow.getProject().getName());
-        LinkedHashMap<String, List<String>> url2Names = new LinkedHashMap<>();
-        for (SettingsStorageHelper.DatasourceConfig validDatasource : validDatasources) {
-            String url = validDatasource.getUrl();
-            url = url.split("\\?")[0];
-            url2Names.computeIfAbsent(url, new Function<String, List<String>>() {
-                @Override
-                public List<String> apply(String s) {
-                    return new ArrayList<>();
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                String selectedData = (String) dataSourceComboBox.getSelectedItem();
+                dataSourceComboBox.removeAllItems();
+                List<SettingsStorageHelper.DatasourceConfig> validDatasources = RuntimeHelper.getValidDatasources(toolWindow.getProject().getName());
+                List<String> ddlDatasources = RuntimeHelper.getDDLDatasources(toolWindow.getProject().getName());
+                List<String> writeDatasources = RuntimeHelper.getWriteDatasources(toolWindow.getProject().getName());
+                LinkedHashMap<String, List<String>> url2Names = new LinkedHashMap<>();
+                for (SettingsStorageHelper.DatasourceConfig validDatasource : validDatasources) {
+                    String url = validDatasource.getUrl();
+                    url = url.split("\\?")[0];
+                    url2Names.computeIfAbsent(url, new Function<String, List<String>>() {
+                        @Override
+                        public List<String> apply(String s) {
+                            return new ArrayList<>();
+                        }
+                    }).add(validDatasource.getName());
                 }
-            }).add(validDatasource.getName());
-        }
 
-        for (Map.Entry<String, List<String>> listEntry : url2Names.entrySet()) {
-            List<String> optinals = new ArrayList<>(listEntry.getValue());
-            String ddl = findAny(optinals, ddlDatasources);
-            if (ddl != null) {
-                dataSourceComboBox.addItem(ddl);
-                continue;
+                for (Map.Entry<String, List<String>> listEntry : url2Names.entrySet()) {
+                    List<String> optinals = new ArrayList<>(listEntry.getValue());
+                    String ddl = findAny(optinals, ddlDatasources);
+                    if (ddl != null) {
+                        dataSourceComboBox.addItem(ddl);
+                        continue;
+                    }
+
+                    String write = findAny(optinals, writeDatasources);
+                    if (write != null) {
+                        dataSourceComboBox.addItem(write);
+                        continue;
+                    }
+
+                    dataSourceComboBox.addItem(optinals.get(0));
+                }
+
+                if (selectedData != null) {
+                    dataSourceComboBox.setSelectedItem(selectedData);
+                }
+
+                boolean ddl = CollectionUtils.isNotEmpty(ddlDatasources);
+                if (ddl && !Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
+                    actionResults.add(unfoldButton);
+                } else if (!ddl && Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
+                    actionResults.remove(unfoldButton);
+                }
+                dataSourceComboBox.revalidate();
+                dataSourceComboBox.repaint();
+                actionResults.revalidate();
+                actionResults.repaint();
             }
-
-            String write = findAny(optinals, writeDatasources);
-            if (write != null) {
-                dataSourceComboBox.addItem(write);
-                continue;
-            }
-
-            dataSourceComboBox.addItem(optinals.get(0));
-        }
-
-        if (selectedData != null) {
-            dataSourceComboBox.setSelectedItem(selectedData);
-        }
-
-        boolean ddl = CollectionUtils.isNotEmpty(ddlDatasources);
-        if (ddl && !Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
-            actionResults.add(unfoldButton);
-        } else if (!ddl && Arrays.asList(actionResults.getComponents()).contains(unfoldButton)) {
-            actionResults.remove(unfoldButton);
-        }
-        dataSourceComboBox.revalidate();
-        dataSourceComboBox.repaint();
-        actionResults.revalidate();
-        actionResults.repaint();
+        });
     }
 
 

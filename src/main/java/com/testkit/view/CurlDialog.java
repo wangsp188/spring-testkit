@@ -117,11 +117,17 @@ public class CurlDialog extends JDialog {
                     TestkitHelper.alert(window.getProject(), Messages.getErrorIcon(), "Parse curl error,\n" + ex.getMessage());
                     return;
                 }
-                urlField.setText(curlEntity == null || curlEntity.getUrl() == null ? "" : curlEntity.getUrl());
-                methodField.setText(curlEntity == null || curlEntity.getMethod() == null ? "" : curlEntity.getMethod().toString());
-                headersField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getHeaders()));
-                paramsField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getUrlParams()));
-                bodyField.setText(curlEntity == null ? "" : JsonUtil.formatObj(curlEntity.getBody()));
+                CurlEntity finalCurlEntity = curlEntity;
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        urlField.setText(finalCurlEntity == null || finalCurlEntity.getUrl() == null ? "" : finalCurlEntity.getUrl());
+                        methodField.setText(finalCurlEntity == null || finalCurlEntity.getMethod() == null ? "" : finalCurlEntity.getMethod().toString());
+                        headersField.setText(finalCurlEntity == null ? "" : JsonUtil.formatObj(finalCurlEntity.getHeaders()));
+                        paramsField.setText(finalCurlEntity == null ? "" : JsonUtil.formatObj(finalCurlEntity.getUrlParams()));
+                        bodyField.setText(finalCurlEntity == null ? "" : JsonUtil.formatObj(finalCurlEntity.getBody()));
+                    }
+                });
             }
         });
 
