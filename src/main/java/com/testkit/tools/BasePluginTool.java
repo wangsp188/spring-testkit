@@ -6,6 +6,7 @@ import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.psi.*;
 import com.testkit.TestkitHelper;
+import com.testkit.tools.spring_cache.SpringCacheIconProvider;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -483,10 +484,18 @@ public abstract class BasePluginTool {
         gbc.gridy = 0;
         JButton testBtn = new JButton(icon);
         if (icon != disableIcon) {
-            useInterceptor = true;
-            testBtn.setToolTipText("<html>\n" +
-                    "<meta charset=\"UTF-8\">\n" +
-                    "<strong>Interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
+            useInterceptor = icon != SpringCacheIconProvider.CACHEABLE_ICON;
+            if(useInterceptor){
+                testBtn.setToolTipText("<html>\n" +
+                        "<meta charset=\"UTF-8\">\n" +
+                        "<strong>Tool interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
+            }else{
+                testBtn.setIcon(disableIcon);
+                testBtn.setToolTipText("<html>\n" +
+                        "<meta charset=\"UTF-8\">\n" +
+                        "<strong>Tool interceptor已关闭</strong><br>\n" + tooltips + "\n</html>");
+            }
+
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
