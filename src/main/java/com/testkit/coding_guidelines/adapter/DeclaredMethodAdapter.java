@@ -5,6 +5,8 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import org.apache.commons.collections.MapUtils;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,7 +27,7 @@ public class DeclaredMethodAdapter implements ElementGuidelinesAdapter {
     }
 
     @Override
-    public CodingGuidelinesHelper.Doc find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
+    public Collection<CodingGuidelinesHelper.Doc> find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
         if(!(element instanceof PsiMethod)){
             return null;
         }
@@ -37,30 +39,32 @@ public class DeclaredMethodAdapter implements ElementGuidelinesAdapter {
 
         Set<String> keys = docs.keySet();
 
+        LinkedHashSet<CodingGuidelinesHelper.Doc> set = new LinkedHashSet<>();
+
         // 递归查找超类方法
         PsiMethod[] superMethods = psiMethod.findSuperMethods();
         if(superMethods==null || superMethods.length==0){
             try {
                 String key = psiMethod.getContainingClass().getQualifiedName() + "#" + psiMethod.getName();
                 if (keys.contains(key)) {
-                    return docs.get(key);
+                    set.add(docs.get(key));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            return null;
+            return set;
         }
 
         for (PsiMethod superMethod : superMethods) {
             try {
                 String key = superMethod.getContainingClass().getQualifiedName() + "#" + psiMethod.getName();
                 if (keys.contains(key)) {
-                    return docs.get(key);
+                    set.add(docs.get(key));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        return null;
+        return set;
     }
 }

@@ -72,8 +72,8 @@ public class CodingGuidelinesHelper {
             return false;
         }
         for (ElementGuidelinesAdapter adapter : adapters) {
-            Doc doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
-            if (doc != null) {
+            Collection<Doc> doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
+            if (doc != null && !doc.isEmpty()) {
                 return true;
             }
         }
@@ -106,9 +106,9 @@ public class CodingGuidelinesHelper {
         }
         ArrayList<Doc> docs = new ArrayList<>();
         for (ElementGuidelinesAdapter adapter : adapters) {
-            Doc doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
-            if (doc != null) {
-                docs.add(doc);
+            Collection<Doc> doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
+            if (doc != null && !doc.isEmpty()) {
+                docs.addAll(doc);
             }
         }
         return docs;
@@ -707,12 +707,12 @@ public class CodingGuidelinesHelper {
                 return false;
             }
             Doc doc = (Doc) o;
-            return type == doc.type && Objects.equals(href, doc.href);
+            return type == doc.type && Objects.equals(href, doc.href) && Objects.equals(title, doc.title);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(type, href);
+            return Objects.hash(type, href,title);
         }
     }
 }

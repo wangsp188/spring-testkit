@@ -173,8 +173,8 @@ public class SettingsDialog {
                 traceWhiteListField.setText(traceConfig.getWhites());
 //        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
 
-//        SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-                datasourcePropertiesField.setText("");
+                SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+                datasourcePropertiesField.setText(sqlConfig.getProperties()==null?"":sqlConfig.getProperties());
                 datasourcePropertiesField.setVisible(false);
                 showDatasourceButton.setIcon(HIDDEN_ICON);
             }
@@ -1339,14 +1339,6 @@ public class SettingsDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 boolean visible = datasourcePropertiesField.isVisible();
-                String dats = "";
-                if(!visible){
-                    SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-                    if (StringUtils.isNotBlank(sqlConfig.getProperties())) {
-                        dats = sqlConfig.getProperties();
-                    }
-                }
-                datasourcePropertiesField.setText(dats);
                 datasourcePropertiesField.setVisible(!visible);
                 showDatasourceButton.setIcon(!visible ? SHOW_ICON : HIDDEN_ICON);
             }

@@ -5,7 +5,9 @@ import com.intellij.psi.*;
 import com.intellij.psi.util.InheritanceUtil;
 import org.apache.commons.collections.MapUtils;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class ClassTypeAdapter implements ElementGuidelinesAdapter {
 
@@ -23,7 +25,7 @@ public class ClassTypeAdapter implements ElementGuidelinesAdapter {
     }
 
     @Override
-    public CodingGuidelinesHelper.Doc find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
+    public Set<CodingGuidelinesHelper.Doc> find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
         if (MapUtils.isEmpty(docs)) {
             return null;
         }
@@ -40,12 +42,13 @@ public class ClassTypeAdapter implements ElementGuidelinesAdapter {
         if (psiClass == null) {
             return null;
         }
+        LinkedHashSet<CodingGuidelinesHelper.Doc> set = new LinkedHashSet<>();
         for (Map.Entry<String, CodingGuidelinesHelper.Doc> entry : docs.entrySet()) {
             if (InheritanceUtil.isInheritor(psiClass, entry.getKey())) {
-                return entry.getValue();
+                set.add(entry.getValue());
             }
         }
-        return null;
+        return set;
     }
 
 }

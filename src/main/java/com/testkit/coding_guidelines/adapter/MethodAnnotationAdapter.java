@@ -5,6 +5,8 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import org.apache.commons.collections.MapUtils;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Map;
 
 public class MethodAnnotationAdapter implements ElementGuidelinesAdapter {
@@ -24,7 +26,7 @@ public class MethodAnnotationAdapter implements ElementGuidelinesAdapter {
     }
 
     @Override
-    public CodingGuidelinesHelper.Doc find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
+    public Collection<CodingGuidelinesHelper.Doc> find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
         if(!(element instanceof PsiMethod)){
             return null;
         }
@@ -32,14 +34,16 @@ public class MethodAnnotationAdapter implements ElementGuidelinesAdapter {
             return null;
         }
 
+        LinkedHashSet<CodingGuidelinesHelper.Doc> set = new LinkedHashSet<>();
+
         PsiMethod psiMethod = (PsiMethod) element;
         for (Map.Entry<String, CodingGuidelinesHelper.Doc> entry : docs.entrySet()) {
             String annotation = entry.getKey();
             if (psiMethod.hasAnnotation(annotation)) {
-                return entry.getValue();
+                set.add(entry.getValue());
             }
         }
-        return null;
+        return set;
 
     }
 }

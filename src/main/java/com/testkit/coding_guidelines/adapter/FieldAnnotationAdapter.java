@@ -4,6 +4,8 @@ import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.intellij.psi.*;
 import org.apache.commons.collections.MapUtils;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Map;
 
 public class FieldAnnotationAdapter implements ElementGuidelinesAdapter {
@@ -23,7 +25,7 @@ public class FieldAnnotationAdapter implements ElementGuidelinesAdapter {
     }
 
     @Override
-    public CodingGuidelinesHelper.Doc find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
+    public Collection<CodingGuidelinesHelper.Doc> find(PsiElement element, Map<String, CodingGuidelinesHelper.Doc> docs) {
         if(!(element instanceof PsiField)){
             return null;
         }
@@ -31,13 +33,15 @@ public class FieldAnnotationAdapter implements ElementGuidelinesAdapter {
             return null;
         }
 
+        LinkedHashSet<CodingGuidelinesHelper.Doc> set = new LinkedHashSet<>();
+
         PsiField fieldType = (PsiField) element;
         for (Map.Entry<String, CodingGuidelinesHelper.Doc> entry : docs.entrySet()) {
             String annotation = entry.getKey();
             if (fieldType.hasAnnotation(annotation)) {
-                return entry.getValue();
+                set.add(entry.getValue());
             }
         }
-        return null;
+        return set;
     }
 }
