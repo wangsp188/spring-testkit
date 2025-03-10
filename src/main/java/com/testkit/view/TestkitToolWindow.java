@@ -659,15 +659,20 @@ public class TestkitToolWindow {
                 public void run() {
 
                     HashMap<String, RuntimeHelper.AppMeta> map = new HashMap<>();
-                    springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
+                    ApplicationManager.getApplication().runReadAction(new Runnable() {
                         @Override
-                        public void accept(PsiClass psiClass) {
-                            RuntimeHelper.AppMeta appMeta = new RuntimeHelper.AppMeta();
-                            appMeta.setApp(psiClass.getName());
-                            appMeta.setFullName(psiClass.getQualifiedName());
+                        public void run() {
+                            springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
+                                @Override
+                                public void accept(PsiClass psiClass) {
+                                    RuntimeHelper.AppMeta appMeta = new RuntimeHelper.AppMeta();
+                                    appMeta.setApp(psiClass.getName());
+                                    appMeta.setFullName(psiClass.getQualifiedName());
 
-                            appMeta.setModule(ModuleUtil.findModuleForPsiElement(psiClass));
-                            map.put(psiClass.getName(), appMeta);
+                                    appMeta.setModule(ModuleUtil.findModuleForPsiElement(psiClass));
+                                    map.put(psiClass.getName(), appMeta);
+                                }
+                            });
                         }
                     });
 

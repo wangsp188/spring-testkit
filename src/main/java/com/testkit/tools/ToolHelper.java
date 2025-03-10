@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.util.Computable;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.util.JsonUtil;
 import com.intellij.openapi.application.ApplicationManager;
@@ -142,6 +143,7 @@ public class ToolHelper {
             editorTextField.setText(method.getArgs());
             return;
         }
+
         ProgressManager.getInstance().run(new Task.Backgroundable(method.method.getProject(), "init params" + ", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
@@ -150,9 +152,12 @@ public class ToolHelper {
                     public void run() {
                         String oldText = editorTextField.getText();
                         editorTextField.setText("init params ...");
-                        // 在这里执行耗时操作
-                        JSONObject initParams = doInitParams(method.getMethod());
-
+                        JSONObject initParams = ApplicationManager.getApplication().runReadAction(new Computable<JSONObject>() {
+                            @Override
+                            public JSONObject compute() {
+                                return doInitParams(method.getMethod());
+                            }
+                        });
                         try {
                             JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
                             migration(jsonObject, initParams);
