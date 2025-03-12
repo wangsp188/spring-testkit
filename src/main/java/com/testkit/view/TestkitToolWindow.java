@@ -152,6 +152,8 @@ public class TestkitToolWindow {
     }
 
     private JPanel buildHeaderPanel() {
+        // 使用BorderLayout作为主布局
+        JPanel outPanel = new JPanel(new BorderLayout(5, 2));
         // 创建一个新的 JPanel 用于存放第一行的组件
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2)); // 使用 FlowLayout 确保组件的水平排列和固定间距
 
@@ -241,7 +243,7 @@ public class TestkitToolWindow {
 
         // 添加 appBox 到 topPanel
         appBox = new ComboBox<>(new String[]{});
-        appBox.setPreferredSize(new Dimension(150, 30));
+        appBox.setPreferredSize(new Dimension(150, 32));
         Border border = appBox.getBorder();
         appBox.addItemListener(e -> {
             String selectedItem = (String) appBox.getSelectedItem();
@@ -264,7 +266,20 @@ public class TestkitToolWindow {
                 }
             }
         }).start();
-        topPanel.add(appBox);
+
+        // 将左侧按钮组添加到主面板西侧
+        outPanel.add(topPanel, BorderLayout.WEST);
+// 应用标签
+        JPanel rightAppPanel = new JPanel(new BorderLayout(2, 2));
+
+        rightAppPanel.add(appLabel, BorderLayout.WEST);
+        // 设置扩展策略
+        rightAppPanel.add(appBox, BorderLayout.CENTER);
+
+        // 将右侧面板添加到主面板东侧
+        outPanel.add(rightAppPanel, BorderLayout.CENTER);
+
+//        topPanel.add(appBox);
 
         initSettingsDialog();
         initStoreDialog();
@@ -272,7 +287,7 @@ public class TestkitToolWindow {
             // 事件或代码在索引准备好后运行
             findSpringBootApplicationClasses();
         });
-        return topPanel;
+        return outPanel;
     }
 
     private void fillDynamicDoc(DefaultActionGroup actionGroup) {
@@ -684,7 +699,7 @@ public class TestkitToolWindow {
 
                     //当前项目没有有没有配置
                     if (!SettingsStorageHelper.hasAnySettings()) {
-                        TestkitHelper.notify(project,NotificationType.INFORMATION,"For the first time using Testkit\nreview the documentation and import the project configuration");
+                        TestkitHelper.notify(project,NotificationType.INFORMATION,"Welcome to Testkit\nYou can get started quickly with the documentation");
                     }
                 }
             });

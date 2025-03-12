@@ -1165,34 +1165,6 @@ public class FunctionCallTool extends BasePluginTool {
             runButton.setToolTipText("Execute this");
         }
 
-        boolean requestMethod = FunctionCallIconProvider.isRequestMethod(method);
-
-        //判断是http 还是 feign
-        if (FunctionCallIconProvider.isFeign(method)) {
-            List<Component> components = Arrays.asList(actionPanel.getComponents());
-            if (components.contains(controllerCommandButton)) {
-                actionPanel.remove(controllerCommandButton);
-            }
-            if (requestMethod && !components.contains(feignCommandButton)) {
-                actionPanel.add(feignCommandButton);
-            } else if (!requestMethod && components.contains(feignCommandButton)) {
-                actionPanel.remove(feignCommandButton);
-            }
-        } else {
-            //判断panel1是否存在button1
-            List<Component> components = Arrays.asList(actionPanel.getComponents());
-            if (components.contains(feignCommandButton)) {
-                actionPanel.remove(feignCommandButton);
-            }
-            if (requestMethod && !components.contains(controllerCommandButton)) {
-                actionPanel.add(controllerCommandButton);
-            } else if (!requestMethod && components.contains(controllerCommandButton)) {
-                actionPanel.remove(controllerCommandButton);
-            }
-        }
-
-
-        //处理spring-cache
         //判断是http 还是 feign
         if (FunctionCallIconProvider.isSpringCacheMethod(method)) {
             List<Component> components = Arrays.asList(actionPanel.getComponents());
@@ -1219,6 +1191,31 @@ public class FunctionCallTool extends BasePluginTool {
             }
         }
 
+        boolean requestMethod = FunctionCallIconProvider.isRequestMethod(method);
+
+        //判断是http 还是 feign
+        if (FunctionCallIconProvider.isFeign(method)) {
+            List<Component> components = Arrays.asList(actionPanel.getComponents());
+            if (components.contains(controllerCommandButton)) {
+                actionPanel.remove(controllerCommandButton);
+            }
+            if (requestMethod && !components.contains(feignCommandButton)) {
+                actionPanel.add(feignCommandButton);
+            } else if (!requestMethod && components.contains(feignCommandButton)) {
+                actionPanel.remove(feignCommandButton);
+            }
+        } else {
+            //判断panel1是否存在button1
+            List<Component> components = Arrays.asList(actionPanel.getComponents());
+            if (components.contains(feignCommandButton)) {
+                actionPanel.remove(feignCommandButton);
+            }
+            if (requestMethod && !components.contains(controllerCommandButton)) {
+                actionPanel.add(controllerCommandButton);
+            } else if (!requestMethod && components.contains(controllerCommandButton)) {
+                actionPanel.remove(controllerCommandButton);
+            }
+        }
 
         ToolHelper.initParamsTextField(jsonInputField, methodAction);
     }

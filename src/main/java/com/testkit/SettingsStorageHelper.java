@@ -476,8 +476,8 @@ public class SettingsStorageHelper {
     }
 
     public static Map<String, SettingsStorageHelper.ProjectConfig> getPreSettings() {
-//        return new HashMap<>(preSettings);
-        return parsePreSettings();
+        return new HashMap<>(preSettings);
+//        return parsePreSettings();
     }
 
     private static Map<String, SettingsStorageHelper.ProjectConfig> parsePreSettings() {

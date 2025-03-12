@@ -737,7 +737,7 @@ public class ReqStoreDialog {
         c.gridy = 0;
         panelResults.add(panelParamsHeadersBody, c);
 
-        actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT,2,2));
         c.fill = GridBagConstraints.HORIZONTAL;
         c.anchor = GridBagConstraints.LINE_START;
         c.weightx = 1;
@@ -794,11 +794,12 @@ public class ReqStoreDialog {
 
         buildControllerButton();
         buildFeignButton();
+        buildSpringCacheButton();
         return panelResults;
     }
 
 
-    private void buildSpringCacheButton(TestkitToolWindow testkitToolWindow) {
+    private void buildSpringCacheButton() {
         getKeyButton = new JButton(FunctionCallTool.KIcon);
         getKeyButton.setToolTipText("[Spring-cache] Build keys");
         getValButton = new JButton(AllIcons.Actions.Find);

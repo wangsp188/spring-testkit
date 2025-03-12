@@ -533,7 +533,7 @@ public abstract class BasePluginTool {
 
         JButton pointButton = new JButton(AllIcons.General.Locate);
         ComboBox actionComboBox = new ComboBox<>();
-        actionComboBox.setPreferredSize(new Dimension(200, 32));
+        actionComboBox.setPreferredSize(new Dimension(50, 32));
 
         pointButton.addActionListener(new ActionListener() {
             @Override
