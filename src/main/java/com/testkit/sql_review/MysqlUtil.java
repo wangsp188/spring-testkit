@@ -257,7 +257,7 @@ public class MysqlUtil {
         long startTime = System.currentTimeMillis();
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
         try (Statement statement = connection.createStatement()) {
-            statement.setQueryTimeout(30);
+            statement.setQueryTimeout(60);
             // 提交定时取消任务
             ScheduledFuture<?> cancelTask = executor.schedule(() -> {
                 try {
@@ -267,7 +267,7 @@ public class MysqlUtil {
                 } catch (SQLException ex) {
                     System.err.println("Cancel failed: " + ex.getMessage());
                 }
-            }, 32, TimeUnit.SECONDS);
+            }, 62, TimeUnit.SECONDS);
 
             try {
                 boolean isResultSet = statement.execute(sql);
