@@ -424,8 +424,6 @@ public class ReqStorageHelper {
         public void setGroup(String group) {
             this.group = group;
         }
-
-
     }
 
 
@@ -467,6 +465,7 @@ public class ReqStorageHelper {
         private boolean useInterceptor;
         private String argTypes;
         private List<String> argNames;
+        private boolean springCache;
 
         private SubItemType subType;
         private HttpCommandMeta httpMeta;
@@ -535,6 +534,14 @@ public class ReqStorageHelper {
 
         public void setHttpMeta(HttpCommandMeta httpMeta) {
             this.httpMeta = httpMeta;
+        }
+
+        public boolean isSpringCache() {
+            return springCache;
+        }
+
+        public void setSpringCache(boolean springCache) {
+            this.springCache = springCache;
         }
     }
 

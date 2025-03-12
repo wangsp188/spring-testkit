@@ -32,7 +32,6 @@ import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.tools.flexible_test.FlexibleTestTool;
-import com.testkit.tools.spring_cache.SpringCacheTool;
 import com.intellij.ui.components.JBScrollPane;
 import com.testkit.util.HttpUtil;
 import com.intellij.ui.jcef.JBCefBrowser;
@@ -227,10 +226,9 @@ public class TestkitToolWindow {
 //        初始化所有tool的面板，但是不加载
         tools.put(PluginToolEnum.FUNCTION_CALL, new FunctionCallTool(this));
         tools.put(PluginToolEnum.FLEXIBLE_TEST, new FlexibleTestTool(this));
-        tools.put(PluginToolEnum.SPRING_CACHE, new SpringCacheTool(this));
         tools.put(PluginToolEnum.MAPPER_SQL, new MapperSqlTool(this));
         // 添加 toolBox 到 topPanel
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(),  PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode(),PluginToolEnum.SPRING_CACHE.getCode()});
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(),  PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode()});
         toolBox.setPreferredSize(new Dimension(120, 32));
 //        toolBox.setEnabled(false);
         toolBox.addActionListener(e -> onSwitchTool());
@@ -683,6 +681,11 @@ public class TestkitToolWindow {
 //                    更新datasources
                     updateDatasources();
                     TestkitHelper.refresh(project);
+
+                    //当前项目没有有没有配置
+                    if (!SettingsStorageHelper.hasAnySettings()) {
+                        TestkitHelper.notify(project,NotificationType.INFORMATION,"For the first time using Testkit\nreview the documentation and import the project configuration");
+                    }
                 }
             });
         });

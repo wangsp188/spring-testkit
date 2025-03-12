@@ -7,6 +7,9 @@ import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiParameter;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -97,6 +100,10 @@ public class ReqStoreDialog {
     private JButton controllerCommandButton;
 
     private JButton feignCommandButton;
+
+    private JButton getKeyButton;
+    private JButton getValButton;
+    private JButton delValButton;
 
     private JComboBox<ReqStorageHelper.SavedReq> reqsComboBox;
 
@@ -790,9 +797,162 @@ public class ReqStoreDialog {
         return panelResults;
     }
 
+
+    private void buildSpringCacheButton(TestkitToolWindow testkitToolWindow) {
+        getKeyButton = new JButton(FunctionCallTool.KIcon);
+        getKeyButton.setToolTipText("[Spring-cache] Build keys");
+        getValButton = new JButton(AllIcons.Actions.Find);
+        getValButton.setToolTipText("[Spring-cache] Build keys and get values for every key");
+        delValButton = new JButton(AllIcons.Actions.GC);
+        delValButton.setToolTipText("[Spring-cache] Build keys and delete these");
+        //        // 设置按钮大小
+        Dimension buttonSize = new Dimension(30, 30);
+        getKeyButton.setPreferredSize(buttonSize);
+        getValButton.setPreferredSize(buttonSize);
+        delValButton.setPreferredSize(buttonSize);
+
+        getKeyButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                ReqStorageHelper.Item item = selectedItem;
+                String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
+                String jsonInput = jsonInputField.getText();
+                if (item == null || selectedInstance == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+                    return;
+                }
+                RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+                if (visibleApp == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+                    return;
+                }
+                if (item.getType() != ReqStorageHelper.ItemType.function_call) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Spring cache only support function-call");
+                    return;
+                }
+                JSONObject args = new JSONObject();
+                if (StringUtils.isNotBlank(jsonInput)) {
+                    try {
+                        args = JSON.parseObject(jsonInput.trim());
+                    } catch (Throwable e1) {
+                        TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Params must be json object");
+                        return;
+                    }
+                }
+                ReqStorageHelper.CallMethodMeta meta = null;
+                try {
+                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                } catch (Throwable e2) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                    return;
+                }
+                ReqStorageHelper.CallMethodMeta finalMeta = meta;
+                JSONObject finalArgs = args;
+                triggerHttpTask(getKeyButton, FunctionCallTool.KIcon, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        return buildCacheParams("build_cache_key", finalMeta,visibleApp, finalArgs);
+                    }
+                });
+            }
+        });
+
+        getValButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                ReqStorageHelper.Item item = selectedItem;
+                String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
+                String jsonInput = jsonInputField.getText();
+                if (item == null || selectedInstance == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+                    return;
+                }
+                RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+                if (visibleApp == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+                    return;
+                }
+                if (item.getType() != ReqStorageHelper.ItemType.function_call) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Spring cache only support function-call");
+                    return;
+                }
+                JSONObject args = new JSONObject();
+                if (StringUtils.isNotBlank(jsonInput)) {
+                    try {
+                        args = JSON.parseObject(jsonInput.trim());
+                    } catch (Throwable e1) {
+                        TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Params must be json object");
+                        return;
+                    }
+                }
+                ReqStorageHelper.CallMethodMeta meta = null;
+                try {
+                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                } catch (Throwable e2) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                    return;
+                }
+                ReqStorageHelper.CallMethodMeta finalMeta = meta;
+                JSONObject finalArgs = args;
+                triggerHttpTask(getValButton, AllIcons.Actions.Find, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        return buildCacheParams("get_cache",finalMeta,visibleApp, finalArgs);
+                    }
+                });
+            }
+        });
+
+        delValButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                ReqStorageHelper.Item item = selectedItem;
+                String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
+                String jsonInput = jsonInputField.getText();
+                if (item == null || selectedInstance == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+                    return;
+                }
+                RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+                if (visibleApp == null) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+                    return;
+                }
+                if (item.getType() != ReqStorageHelper.ItemType.function_call) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Spring cache only support function-call");
+                    return;
+                }
+                JSONObject args = new JSONObject();
+                if (StringUtils.isNotBlank(jsonInput)) {
+                    try {
+                        args = JSON.parseObject(jsonInput.trim());
+                    } catch (Throwable e1) {
+                        TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Params must be json object");
+                        return;
+                    }
+                }
+                ReqStorageHelper.CallMethodMeta meta = null;
+                try {
+                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                } catch (Throwable e2) {
+                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                    return;
+                }
+                ReqStorageHelper.CallMethodMeta finalMeta = meta;
+                JSONObject finalArgs = args;
+                triggerHttpTask(delValButton, AllIcons.Actions.GC, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        return buildCacheParams("delete_cache",finalMeta,visibleApp, finalArgs);
+                    }
+                });
+            }
+        });
+    }
+
     private void buildControllerButton() {
         controllerCommandButton = new JButton(FunctionCallTool.CONTROLLER_ICON);
-        controllerCommandButton.setToolTipText("Generate controller command");
+        controllerCommandButton.setToolTipText("[Controller] Generate controller command");
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
         controllerCommandButton.addActionListener(new ActionListener() {
             @Override
@@ -986,7 +1146,7 @@ public class ReqStoreDialog {
 
     private void buildFeignButton() {
         feignCommandButton = new JButton(FunctionCallTool.FEIGN_ICON);
-        feignCommandButton.setToolTipText("Generate feign command");
+        feignCommandButton.setToolTipText("[FeignClient] Generate feign command");
         feignCommandButton.setPreferredSize(new Dimension(32, 32));
         feignCommandButton.addActionListener(new ActionListener() {
             @Override
@@ -1322,6 +1482,13 @@ public class ReqStoreDialog {
                 actionPanel.add(visibleAppComboBox);
                 actionPanel.add(useProxyButton);
                 actionPanel.add(executeButton);
+
+                if(item.getType() == ReqStorageHelper.ItemType.function_call && item.metaObj(ReqStorageHelper.CallMethodMeta.class).isSpringCache()){
+                    actionPanel.add(getKeyButton);
+                    actionPanel.add(getValButton);
+                    actionPanel.add(delValButton);
+                }
+
                 if (item.fetchSubType() == ReqStorageHelper.SubItemType.controller) {
                     actionPanel.add(controllerCommandButton);
                 } else if (item.fetchSubType() == ReqStorageHelper.SubItemType.feign_client) {
@@ -1533,6 +1700,27 @@ public class ReqStoreDialog {
         params.put("original", !useProxyButton.isSelected());
         JSONObject req = new JSONObject();
         req.put("method", PluginToolEnum.FUNCTION_CALL.getCode());
+        req.put("params", params);
+
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        req.put("trace", traceConfig.isEnable());
+//        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+        if (meta.isUseInterceptor()) {
+            req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+        }
+        return req;
+    }
+
+    private JSONObject buildCacheParams(String cacheAction,ReqStorageHelper.CallMethodMeta meta, RuntimeHelper.VisibleApp visibleApp, JSONObject args) {
+        JSONObject params = new JSONObject();
+        params.put("typeClass", meta.getTypeClass());
+        params.put("beanName", meta.getBeanName());
+        params.put("methodName", meta.getMethodName());
+        params.put("argTypes", meta.getArgTypes());
+        params.put("args", ToolHelper.adapterParams(meta.getArgNames(), args).toJSONString());
+        params.put("action", cacheAction);
+        JSONObject req = new JSONObject();
+        req.put("method", "spring-cache");
         req.put("params", params);
 
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());

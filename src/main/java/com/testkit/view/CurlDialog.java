@@ -291,7 +291,7 @@ public class CurlDialog extends JDialog {
                                 TestkitHelper.notify(window.getProject(), NotificationType.WARNING, "not find selected tool");
                                 return;
                             }
-                            String templateText = nowTool.getInputEditorTextField().getText();
+                            String templateText = nowTool.getJsonInputField().getText();
                             JSONObject template;
                             try {
                                 template = JSON.parseObject(templateText);
@@ -305,7 +305,7 @@ public class CurlDialog extends JDialog {
                                 return;
                             }
                             updateTemplate(template, parse);
-                            nowTool.getInputEditorTextField().setText(JsonUtil.formatObj(template));
+                            nowTool.getJsonInputField().setText(JsonUtil.formatObj(template));
                             TestkitHelper.notify(window.getProject(), NotificationType.INFORMATION, "use " + labelText + " adapter to input params success");
                         }
                     });

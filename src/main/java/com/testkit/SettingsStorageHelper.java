@@ -7,16 +7,18 @@ import com.testkit.view.SettingsDialog;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang3.StringUtils;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.util.*;
 import java.util.function.Function;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 /**
  * 这是一个本地文件存储器
@@ -273,7 +275,6 @@ public class SettingsStorageHelper {
     }
 
 
-
     static {
         DEF_FEIGN_COMMAND.setScript("import groovy.json.JsonOutput\n" +
                 "import groovy.json.JsonSlurper\n" +
@@ -459,6 +460,8 @@ public class SettingsStorageHelper {
 
     public static final TraceConfig DEF_TRACE_CONFIG = new TraceConfig();
 
+    public static final Map<String, SettingsStorageHelper.ProjectConfig> preSettings;
+
     static {
         DEF_TRACE_CONFIG.setEnable(false);
         DEF_TRACE_CONFIG.setTraceWeb(true);
@@ -468,9 +471,70 @@ public class SettingsStorageHelper {
         DEF_TRACE_CONFIG.setClsSuffix("Controller,Service,Impl,Repository");
         DEF_TRACE_CONFIG.setBlacks("");
         DEF_TRACE_CONFIG.setWhites("");
+        preSettings = parsePreSettings();
 //        DEF_TRACE_CONFIG.setSingleClsDepth(2);
     }
 
+    public static Map<String, SettingsStorageHelper.ProjectConfig> getPreSettings() {
+//        return new HashMap<>(preSettings);
+        return parsePreSettings();
+    }
+
+    private static Map<String, SettingsStorageHelper.ProjectConfig> parsePreSettings() {
+        HashMap<String, SettingsStorageHelper.ProjectConfig> map = new HashMap<>();
+        final String dirPath = "/settings-templates";
+        // 获取资源目录URL（兼容JAR包内和文件系统）
+        URL resourceUrl = SettingsStorageHelper.class.getResource(dirPath);
+        if (resourceUrl == null) {
+            return map;
+        }
+        try {
+            String jarPath = resourceUrl.getPath().split("!")[0].replace("file:", "");
+            jarPath = URLDecoder.decode(jarPath, StandardCharsets.UTF_8.name());
+            try (JarFile jar = new JarFile(jarPath)) {
+                Enumeration<JarEntry> entries = jar.entries();
+
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+                    String entryName = entry.getName();
+
+                    // 匹配目标目录下的.json文件
+                    if (entryName.startsWith("settings-templates/") && entryName.endsWith(".json") &&
+                            !entry.isDirectory()) {
+
+                        try (InputStream stream = jar.getInputStream(entry)) {
+                            String jsonContent = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+                            SettingsStorageHelper.ProjectConfig config = JSON.parseObject(jsonContent, SettingsStorageHelper.ProjectConfig.class);
+                            // 提取纯文件名（处理路径分隔符）
+                            String baseName = entryName.substring(entryName.lastIndexOf('/') + 1)
+                                    .replaceFirst("\\.json$", "");
+
+                            map.put(baseName, config);
+                        }catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+
+            return map;
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return map;
+        }
+    }
+
+    public static boolean hasAnySettings() {
+        String projectPath = System.getProperty("user.home");
+        if (StringUtils.isEmpty(projectPath)) {
+            throw new IllegalArgumentException("Project base path is not set.");
+        }
+        Path configDirPath = Paths.get(projectPath, CONFIG_DIR);
+        File configDir = configDirPath.toFile();
+        return configDir.exists();
+    }
 
     public static boolean isEnableSideServer(Project project) {
         return getConfig(project).isEnableSideServer();

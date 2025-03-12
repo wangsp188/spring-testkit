@@ -1,7 +1,6 @@
 package com.testkit.tools;
 
 public enum PluginToolEnum {
-    SPRING_CACHE("spring-cache"),
     FUNCTION_CALL("function-call"),
     FLEXIBLE_TEST("flexible-test"),
     MAPPER_SQL("mapper-sql")

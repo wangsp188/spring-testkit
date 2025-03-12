@@ -54,7 +54,7 @@ public class FlexibleTestTool extends BasePluginTool {
             throw new RuntimeException("Please select a valid method");
         }
         try {
-            JSONObject.parseObject(inputEditorTextField.getText().trim());
+            JSONObject.parseObject(jsonInputField.getText().trim());
         } catch (Exception e) {
             throw new RuntimeException("Input parameter must be json object");
         }
@@ -75,7 +75,7 @@ public class FlexibleTestTool extends BasePluginTool {
     @Override
     protected void handleStore(String app, String group, String title) {
         PsiMethod method = ((ToolHelper.MethodAction) actionComboBox.getSelectedItem()).getMethod();
-        String text = inputEditorTextField.getText();
+        String text = jsonInputField.getText();
         JSONObject args = JSONObject.parseObject(text);
         PsiClass containingClass = method.getContainingClass();
         // 获取包含这个类的文件
@@ -143,7 +143,7 @@ public class FlexibleTestTool extends BasePluginTool {
                 triggerHttpTask(runButton, AllIcons.Actions.Execute, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        String jsonInput = inputEditorTextField.getDocument().getText();
+                        String jsonInput = jsonInputField.getDocument().getText();
                         if (jsonInput == null || jsonInput.isBlank()) {
                             setOutputText("input parameter is blank");
                             return null;
@@ -238,10 +238,10 @@ public class FlexibleTestTool extends BasePluginTool {
         // 获取当前选中的值
         ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
         if (methodAction == null || methodAction.getMethod() == null || !methodAction.getMethod().isValid()) {
-            inputEditorTextField.setText("{}");
+            jsonInputField.setText("{}");
             return;
         }
-        ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
+        ToolHelper.initParamsTextField(jsonInputField, methodAction);
     }
 
     @Override

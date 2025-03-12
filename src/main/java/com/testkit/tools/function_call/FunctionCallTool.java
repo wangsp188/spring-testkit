@@ -58,11 +58,16 @@ public class FunctionCallTool extends BasePluginTool {
     public static final Icon FEIGN_ICON = IconLoader.getIcon("/icons/feign.svg", FunctionCallTool.class);
 
     public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", FunctionCallTool.class);
+    public static final Icon KIcon = IconLoader.getIcon("/icons/k.svg", FunctionCallTool.class);
 
 
     private JButton controllerCommandButton;
     private JButton feignCommandButton;
     private JButton runButton;
+
+    private JButton getKeyButton;
+    private JButton getValButton;
+    private JButton delValButton;
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
 
     private JToggleButton useProxyButton;
@@ -76,12 +81,87 @@ public class FunctionCallTool extends BasePluginTool {
 
         buildControllerButton(testkitToolWindow);
         buildFeignButton(testkitToolWindow);
+        buildSpringCacheButton(testkitToolWindow);
+    }
+
+    private void buildSpringCacheButton(TestkitToolWindow testkitToolWindow) {
+        getKeyButton = new JButton(KIcon);
+        getKeyButton.setToolTipText("[Spring-cache] Build keys");
+        getValButton = new JButton(AllIcons.Actions.Find);
+        getValButton.setToolTipText("[Spring-cache] Build keys and get values for every key");
+        delValButton = new JButton(AllIcons.Actions.GC);
+        delValButton.setToolTipText("[Spring-cache] Build keys and delete these");
+        //        // 设置按钮大小
+        Dimension buttonSize = new Dimension(30, 30);
+        getKeyButton.setPreferredSize(buttonSize);
+        getValButton.setPreferredSize(buttonSize);
+        delValButton.setPreferredSize(buttonSize);
+
+        getKeyButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
+                if(app==null){
+                    Messages.showMessageDialog(getProject(),
+                            "Failed to find runtime app",
+                            "Error",
+                            Messages.getErrorIcon());
+                    return;
+                }
+                triggerHttpTask(getKeyButton, KIcon, app.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        return handleCacheAction("build_cache_key");
+                    }
+                });
+            }
+        });
+
+        getValButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
+                if(app==null){
+                    Messages.showMessageDialog(getProject(),
+                            "Failed to find runtime app",
+                            "Error",
+                            Messages.getErrorIcon());
+                    return;
+                }
+                triggerHttpTask(getValButton, AllIcons.Actions.Find, app.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        return handleCacheAction("get_cache");
+                    }
+                });
+            }
+        });
+
+        delValButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
+                if(app==null){
+                    Messages.showMessageDialog(getProject(),
+                            "Failed to find runtime app",
+                            "Error",
+                            Messages.getErrorIcon());
+                    return;
+                }
+                triggerHttpTask(delValButton, AllIcons.Actions.GC, app.getSidePort(), new Supplier<JSONObject>() {
+                    @Override
+                    public JSONObject get() {
+                        return handleCacheAction("delete_cache");
+                    }
+                });
+            }
+        });
     }
 
     private void buildControllerButton(TestkitToolWindow testkitToolWindow) {
         controllerCommandButton = new JButton(CONTROLLER_ICON);
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
-        controllerCommandButton.setToolTipText("Generate controller command");
+        controllerCommandButton.setToolTipText("[Controller] Generate controller command");
         controllerCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
@@ -168,7 +248,7 @@ public class FunctionCallTool extends BasePluginTool {
     private void buildFeignButton(TestkitToolWindow testkitToolWindow) {
         feignCommandButton = new JButton(FEIGN_ICON);
         feignCommandButton.setPreferredSize(new Dimension(32, 32));
-        feignCommandButton.setToolTipText("Generate feign command");
+        feignCommandButton.setToolTipText("[FeignClient] Generate feign command");
         feignCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
@@ -263,7 +343,7 @@ public class FunctionCallTool extends BasePluginTool {
             throw new RuntimeException("Please select a valid method");
         }
         try {
-            JSONObject.parseObject(inputEditorTextField.getText().trim());
+            JSONObject.parseObject(jsonInputField.getText().trim());
         } catch (Exception e) {
             throw new RuntimeException("Input parameter must be json object");
         }
@@ -284,7 +364,7 @@ public class FunctionCallTool extends BasePluginTool {
 
     protected void handleStore(String app, String group, String title) {
         PsiMethod method = ((ToolHelper.MethodAction) actionComboBox.getSelectedItem()).getMethod();
-        String text = inputEditorTextField.getText();
+        String text = jsonInputField.getText();
         JSONObject args = null;
         try {
             args = JSONObject.parseObject(text);
@@ -315,11 +395,13 @@ public class FunctionCallTool extends BasePluginTool {
         methodMeta.setArgNames(argNames);
         methodMeta.setArgTypes(JSONObject.toJSONString(argTypes));
         methodMeta.setUseInterceptor(useInterceptor);
+        List<Component> actionComponents = Arrays.asList(actionPanel.getComponents());
+        methodMeta.setSpringCache(actionComponents.contains(getKeyButton));
         ReqStorageHelper.SubItemType subItemType = null;
-        if (Arrays.asList(actionPanel.getComponents()).contains(controllerCommandButton)) {
+        if (actionComponents.contains(controllerCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.controller;
             methodMeta.setHttpMeta(parseControllerMeta(method));
-        } else if (Arrays.asList(actionPanel.getComponents()).contains(feignCommandButton)) {
+        } else if (actionComponents.contains(feignCommandButton)) {
             subItemType = ReqStorageHelper.SubItemType.feign_client;
             methodMeta.setHttpMeta(parseFeignMeta(method));
         }
@@ -622,7 +704,7 @@ public class FunctionCallTool extends BasePluginTool {
     }
 
     private void handleControllerCommand(String env, String script, PsiMethod method) {
-        String jsonParams = inputEditorTextField.getText();
+        String jsonParams = jsonInputField.getText();
         JSONObject inputParams = null;
         try {
             inputParams = JSONObject.parseObject(jsonParams);
@@ -729,7 +811,7 @@ public class FunctionCallTool extends BasePluginTool {
     }
 
     private void handleFeignCommand(String env, String script, PsiMethod method) {
-        String jsonParams = inputEditorTextField.getText();
+        String jsonParams = jsonInputField.getText();
         JSONObject inputParams = null;
         try {
             inputParams = JSONObject.parseObject(jsonParams);
@@ -913,7 +995,7 @@ public class FunctionCallTool extends BasePluginTool {
                 triggerHttpTask(runButton, AllIcons.Actions.Execute, app.getSidePort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        String jsonInput = inputEditorTextField.getDocument().getText();
+                        String jsonInput = jsonInputField.getText();
                         if (jsonInput == null || jsonInput.isBlank()) {
                             setOutputText("input parameter is blank");
                             return null;
@@ -975,6 +1057,62 @@ public class FunctionCallTool extends BasePluginTool {
         return req;
     }
 
+
+
+
+    private JSONObject handleCacheAction(String action) {
+        String jsonInput = jsonInputField.getText();
+        if (jsonInput == null || jsonInput.isBlank()) {
+            setOutputText("input parameter is blank");
+            return null;
+        }
+        JSONObject jsonObject;
+        try {
+            jsonObject = JSONObject.parseObject(jsonInput);
+        } catch (Exception ex) {
+            setOutputText("input parameter must be json obj");
+            return null;
+        }
+        ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+        if (selectedItem==null) {
+            TestkitHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
+            return null;
+        }
+        selectedItem.setArgs(jsonInput);
+        return buildCacheParams(selectedItem.getMethod(), jsonObject, action);
+    }
+
+    private JSONObject buildCacheParams(PsiMethod method, JSONObject args, String action) {
+        JSONObject params = new JSONObject();
+        PsiClass containingClass = method.getContainingClass();
+        String typeClass = containingClass.getQualifiedName();
+        params.put("typeClass", typeClass);
+
+        String beanName = ToolHelper.getBeanNameFromClass(containingClass);
+        params.put("beanName", beanName);
+        params.put("methodName", method.getName());
+
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        String[] argTypes = new String[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            argTypes[i] = parameters[i].getType().getCanonicalText();
+        }
+        params.put("argTypes", JSONObject.toJSONString(argTypes));
+        params.put("args", ToolHelper.adapterParams(method,args).toJSONString());
+        params.put("action", action);
+        JSONObject req = new JSONObject();
+        req.put("method", "spring-cache");
+        req.put("params", params);
+        if(useInterceptor){
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
+            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
+        }
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
+        req.put("trace", traceConfig.isEnable());
+//        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
+        return req;
+    }
+
     @Override
     public boolean needAppBox() {
         return true;
@@ -1012,13 +1150,12 @@ public class FunctionCallTool extends BasePluginTool {
         // 获取当前选中的值
         ToolHelper.MethodAction methodAction = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
         if (methodAction == null || methodAction.getMethod() == null || !methodAction.getMethod().isValid()) {
-            inputEditorTextField.setText("{}");
+            jsonInputField.setText("{}");
             return;
         }
 
         PsiMethod method = methodAction.getMethod();
-        boolean requestMethod = FunctionCallIconProvider.isRequestMethod(method);
-        if (requestMethod && !FunctionCallIconProvider.canInitparams(method)) {
+        if (!FunctionCallIconProvider.canInitparams(method)) {
             //如果存在接口或者超类无法明确类那就设置按钮
             // 新增：检查所有参数都可以直接序列化
             runButton.setIcon(AllIcons.Hierarchy.MethodNotDefined);
@@ -1028,6 +1165,7 @@ public class FunctionCallTool extends BasePluginTool {
             runButton.setToolTipText("Execute this");
         }
 
+        boolean requestMethod = FunctionCallIconProvider.isRequestMethod(method);
 
         //判断是http 还是 feign
         if (FunctionCallIconProvider.isFeign(method)) {
@@ -1053,7 +1191,36 @@ public class FunctionCallTool extends BasePluginTool {
             }
         }
 
-        ToolHelper.initParamsTextField(inputEditorTextField, methodAction);
+
+        //处理spring-cache
+        //判断是http 还是 feign
+        if (FunctionCallIconProvider.isSpringCacheMethod(method)) {
+            List<Component> components = Arrays.asList(actionPanel.getComponents());
+            if (!components.contains(getKeyButton)) {
+                actionPanel.add(getKeyButton);
+            }
+            if (!components.contains(getValButton)) {
+                actionPanel.add(getValButton);
+            }
+            if (!components.contains(delValButton)) {
+                actionPanel.add(delValButton);
+            }
+        } else {
+            //判断panel1是否存在button1
+            List<Component> components = Arrays.asList(actionPanel.getComponents());
+            if (components.contains(getKeyButton)) {
+                actionPanel.remove(getKeyButton);
+            }
+            if (components.contains(getValButton)) {
+                actionPanel.remove(getValButton);
+            }
+            if (components.contains(delValButton)) {
+                actionPanel.remove(delValButton);
+            }
+        }
+
+
+        ToolHelper.initParamsTextField(jsonInputField, methodAction);
     }
 
 

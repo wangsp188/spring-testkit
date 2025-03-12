@@ -6,8 +6,6 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
-import com.intellij.openapi.application.Application;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.util.ui.JBUI;
 import com.testkit.TestkitHelper;
@@ -247,17 +245,50 @@ public class SettingsDialog {
                 dialog.setSize(500, 400);
                 dialog.setLocationRelativeTo(null);
 
+
+                JPanel topPanel = new JPanel(new BorderLayout());
                 // 创建说明文本标签
                 JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here<br>Usually json content exported from other device or project</html>");
 // 启用自动换行
                 instructionLabel.setForeground(new Color(0x72A96B));
                 instructionLabel.setFont(new Font("Arial", Font.BOLD, 13));
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                topPanel.add(instructionLabel,BorderLayout.NORTH);
+
                 // 创建JSON输入框
                 JTextArea jsonInput = new JTextArea();
                 jsonInput.setLineWrap(true);
                 jsonInput.setWrapStyleWord(true);
                 JScrollPane scrollPane = new JScrollPane(jsonInput);
+                //新增选项
+                Map<String, SettingsStorageHelper.ProjectConfig> settings = SettingsStorageHelper.getPreSettings();
+                if(settings!=null && settings.size()>0) {
+                    // 创建单选按钮组（用于互斥）
+                    JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+                    radioPanel.setBorder(BorderFactory.createTitledBorder("pre set settings template"));
+
+                    ButtonGroup buttonGroup = new ButtonGroup();
+                    for (Map.Entry<String, SettingsStorageHelper.ProjectConfig> configEntry : settings.entrySet()) {
+
+                        // 创建单选按钮，显示配置名称
+                        JRadioButton radio = new JRadioButton(configEntry.getKey());
+
+                        // 添加事件监听
+                        radio.addItemListener(new ItemListener() {
+                            @Override
+                            public void itemStateChanged(ItemEvent e) {
+                                if (e.getStateChange() == ItemEvent.SELECTED) {
+                                    // 当选中时，将配置内容写入json输入框
+                                    jsonInput.setText(JSON.toJSONString(configEntry.getValue()));
+                                }
+                            }
+                        });
+                        // 将单选按钮加入组和面板
+                        buttonGroup.add(radio);
+                        radioPanel.add(radio);
+                    }
+                    topPanel.add(radioPanel,BorderLayout.SOUTH);
+                }
 
                 // 创建导入按钮
                 JButton importConfirmButton = new JButton("Import");
@@ -285,8 +316,9 @@ public class SettingsDialog {
                 dialog.setLayout(new BorderLayout());
                 dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                 // 将组件添加到面板
-                dialog.add(instructionLabel, BorderLayout.NORTH);
+                dialog.add(topPanel, BorderLayout.NORTH);
                 dialog.add(scrollPane, BorderLayout.CENTER);
+
                 dialog.add(importConfirmButton, BorderLayout.SOUTH);
                 dialog.setVisible(true);
             }
@@ -601,7 +633,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nAvailable tools: Function-call, flexible-test, spring-cache\nScript language: JAVA (Classes in your project can be used, You can refer to spring-beans using @Autowired)");
+        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nAvailable tools: Function-call, flexible-test\nScript language: JAVA (Classes in your project can be used, You can refer to spring-beans using @Autowired)");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行

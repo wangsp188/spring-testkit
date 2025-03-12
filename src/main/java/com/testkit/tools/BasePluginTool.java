@@ -6,7 +6,6 @@ import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.psi.*;
 import com.testkit.TestkitHelper;
-import com.testkit.tools.spring_cache.SpringCacheIconProvider;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -59,7 +58,7 @@ public abstract class BasePluginTool {
     protected TestkitToolWindow toolWindow;
     protected PluginToolEnum tool;
     protected JPanel panel;  // 为减少内存占用，建议在构造中初始化
-    protected EditorTextField inputEditorTextField;
+    protected EditorTextField jsonInputField;
     protected boolean useInterceptor;
     protected DefaultActionGroup actionGroup;
 
@@ -130,7 +129,7 @@ public abstract class BasePluginTool {
         AnAction copyAction = new AnAction("Copy input to clipboard", "Copy input to clipboard", AllIcons.Actions.Copy) {
             @Override
             public void actionPerformed(AnActionEvent e) {
-                TestkitHelper.copyToClipboard(getProject(), inputEditorTextField.getText(), "Input was copied");
+                TestkitHelper.copyToClipboard(getProject(), jsonInputField.getText(), "Input was copied");
             }
         };
         actionGroup.add(copyAction);
@@ -152,18 +151,18 @@ public abstract class BasePluginTool {
 
         // 创建ActionToolbar
         ActionToolbar actionToolbar = new ActionToolbarImpl("InputToolbar", actionGroup, false);
-        actionToolbar.setTargetComponent(inputEditorTextField);
+        actionToolbar.setTargetComponent(jsonInputField);
         JComponent toolbarComponent = actionToolbar.getComponent();
         toolbarComponent.setLayout(new BoxLayout(toolbarComponent, BoxLayout.Y_AXIS));
 
         // 将工具栏添加到控制面板的左侧
         inputPanel.add(toolbarComponent, BorderLayout.WEST);
 
-        inputEditorTextField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        jsonInputField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
 //        inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
-        JBScrollPane scrollPane = new JBScrollPane(inputEditorTextField);
+        JBScrollPane scrollPane = new JBScrollPane(jsonInputField);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Input"));
-        inputEditorTextField.getDocument().addDocumentListener(new DocumentAdapter() {
+        jsonInputField.getDocument().addDocumentListener(new DocumentAdapter() {
             @Override
             public void documentChanged(DocumentEvent event) {
                 scrollPane.revalidate();
@@ -291,7 +290,7 @@ public abstract class BasePluginTool {
                 });
 
                 // 显示弹出框
-                popup.show(new RelativePoint(inputEditorTextField, new Point(0, 0)));
+                popup.show(new RelativePoint(jsonInputField, new Point(0, 0)));
             }
         };
         actionGroup.add(storeAction);
@@ -484,7 +483,7 @@ public abstract class BasePluginTool {
         gbc.gridy = 0;
         JButton testBtn = new JButton(icon);
         if (icon != disableIcon) {
-            useInterceptor = icon != SpringCacheIconProvider.CACHEABLE_ICON;
+            useInterceptor = true;
             if(useInterceptor){
                 testBtn.setToolTipText("<html>\n" +
                         "<meta charset=\"UTF-8\">\n" +
@@ -661,7 +660,7 @@ public abstract class BasePluginTool {
         }
     }
 
-    public EditorTextField getInputEditorTextField() {
-        return inputEditorTextField;
+    public EditorTextField getJsonInputField() {
+        return jsonInputField;
     }
 }

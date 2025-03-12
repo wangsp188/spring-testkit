@@ -2,11 +2,7 @@ package com.testkit.tools.mapper_sql;
 
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.Computable;
-import com.testkit.TestkitHelper;
 import com.testkit.tools.ToolHelper;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.testkit.util.Container;
@@ -27,11 +23,7 @@ import com.intellij.sql.psi.SqlLanguage;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.intellij.util.ui.JBUI;
-import groovy.lang.GroovyShell;
-import groovy.lang.Script;
 import org.apache.commons.lang3.StringUtils;
-import org.codehaus.groovy.runtime.InvokerHelper;
-import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
@@ -39,7 +31,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.util.HashMap;
 import java.util.function.Supplier;
 
 public class MapperSqlTool extends BasePluginTool {
@@ -116,7 +107,7 @@ public class MapperSqlTool extends BasePluginTool {
                 triggerLocalTask(runButton, AllIcons.Actions.Execute, "Build SQL", new Supplier<String>() {
                     @Override
                     public String get() {
-                        String jsonInput = inputEditorTextField.getDocument().getText();
+                        String jsonInput = jsonInputField.getDocument().getText();
                         if (jsonInput == null || jsonInput.isBlank()) {
                             return "input parameter is blank";
                         }
@@ -216,15 +207,15 @@ public class MapperSqlTool extends BasePluginTool {
         // 获取当前选中的值
         ToolHelper.XmlTagAction xmlTagAction = (ToolHelper.XmlTagAction) actionComboBox.getSelectedItem();
         if (xmlTagAction == null || xmlTagAction.getXmlTag() == null || !xmlTagAction.getXmlTag().isValid()) {
-            inputEditorTextField.setText("{}");
+            jsonInputField.setText("{}");
             return;
         }
         if (xmlTagAction.getArgs() != null) {
-            inputEditorTextField.setText(xmlTagAction.getArgs());
+            jsonInputField.setText(xmlTagAction.getArgs());
             return;
         }
-        String oldText = inputEditorTextField.getText();
-        inputEditorTextField.setText("init params ...");
+        String oldText = jsonInputField.getText();
+        jsonInputField.setText("init params ...");
         String xmlContent = xmlTagAction.getXmlTag().getParent().getContainingFile().getText();
         String statementId = xmlTagAction.getXmlTag().getAttributeValue("id");
 
@@ -243,10 +234,10 @@ public class MapperSqlTool extends BasePluginTool {
                         ToolHelper.migration(jsonObject, initParams);
                     } catch (Throwable e) {
                     }
-                    inputEditorTextField.setText(JsonUtil.formatObj(initParams));
+                    jsonInputField.setText(JsonUtil.formatObj(initParams));
                 } catch (Throwable e) {
                     e.printStackTrace();
-                    inputEditorTextField.setText("init fail, " + e.getMessage());
+                    jsonInputField.setText("init fail, " + e.getMessage());
                 }
             }
         }.execute();

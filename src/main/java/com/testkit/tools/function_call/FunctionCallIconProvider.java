@@ -164,7 +164,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     }
 
     private String isDirectInvoke(PsiMethod psiMethod) {
-        if (FunctionCallIconProvider.isRequestMethod(psiMethod)) {
+        if (FunctionCallIconProvider.isRequestMethod(psiMethod) || FunctionCallIconProvider.isSpringCacheMethod(psiMethod)) {
             return null;
         }
         boolean canInitparams = canInitparams(psiMethod);
@@ -663,5 +663,22 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
 //        }
 
         return false;
+    }
+
+
+    public static boolean isSpringCacheMethod(PsiMethod method) {
+        if (method == null) {
+            return false;
+        }
+
+        PsiModifierList modifierList = method.getModifierList();
+        if (modifierList.hasModifierProperty(PsiModifier.STATIC)) {
+            return false;
+        }
+
+        return modifierList.hasAnnotation("org.springframework.cache.annotation.Cacheable") ||
+                modifierList.hasAnnotation("org.springframework.cache.annotation.CacheEvict") ||
+                modifierList.hasAnnotation("org.springframework.cache.annotation.CachePut") ||
+                modifierList.hasAnnotation("org.springframework.cache.annotation.Caching");
     }
 }
