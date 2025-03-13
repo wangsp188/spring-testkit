@@ -336,11 +336,11 @@ public abstract class BasePluginTool {
                     try {
                         JSONObject result = get();
                         if (cancelReqs.remove(lastReqId)) {
-                            setOutputText("req is cancel, reqId:" + lastReqId, null);
+                            setOutputText("req is cancel\nreqId:" + lastReqId, null);
                         }
                     } catch (Throwable e) {
                         if (cancelReqs.remove(lastReqId)) {
-                            setOutputText("cancel req error, reqId:" + lastReqId + "\n" + ToolHelper.getStackTrace(e), null);
+                            setOutputText("cancel req error\nreqId:" + lastReqId + "\n" + ToolHelper.getStackTrace(e), null);
                         }
                     }
                 }
@@ -366,7 +366,7 @@ public abstract class BasePluginTool {
         String reqId = response.getString("data");
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
-        setOutputText("req is send，reqId:" + reqId, null);
+        setOutputText("req is send\nreqId:" + reqId, null);
 
         ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing " + getTool().getCode() + ", please wait ...", false) {
             @Override
@@ -487,12 +487,12 @@ public abstract class BasePluginTool {
             if(useInterceptor){
                 testBtn.setToolTipText("<html>\n" +
                         "<meta charset=\"UTF-8\">\n" +
-                        "<strong>Tool interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
+                        "<strong>Tool interceptor is enable</strong><br>\n" + tooltips + "\n</html>");
             }else{
                 testBtn.setIcon(disableIcon);
                 testBtn.setToolTipText("<html>\n" +
                         "<meta charset=\"UTF-8\">\n" +
-                        "<strong>Tool interceptor已关闭</strong><br>\n" + tooltips + "\n</html>");
+                        "<strong>Tool interceptor is disable</strong><br>\n" + tooltips + "\n</html>");
             }
 
             testBtn.addActionListener(new ActionListener() {
@@ -503,14 +503,14 @@ public abstract class BasePluginTool {
                         testBtn.setIcon(disableIcon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
-                                "<strong>Tool interceptor已关闭</strong><br>\n" + tooltips + "\n</html>");
+                                "<strong>Tool interceptor is disable</strong><br>\n" + tooltips + "\n</html>");
                         TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is disable in " + getTool().getCode());
                     } else {
                         useInterceptor = true;
                         testBtn.setIcon(icon);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
-                                "<strong>Tool interceptor已打开</strong><br>\n" + tooltips + "\n</html>");
+                                "<strong>Tool interceptor is enable</strong><br>\n" + tooltips + "\n</html>");
                         TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is enable in " + getTool().getCode());
                     }
                 }
@@ -519,7 +519,7 @@ public abstract class BasePluginTool {
             useInterceptor = false;
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
-                    "<strong>不支持Tool interceptor</strong><br>\n" + tooltips + "\n</html>");
+                    "<strong>Unsupport Tool interceptor</strong><br>\n" + tooltips + "\n</html>");
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {

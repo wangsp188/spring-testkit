@@ -269,7 +269,7 @@ public class TestkitToolWindow {
 
         // 将左侧按钮组添加到主面板西侧
         outPanel.add(topPanel, BorderLayout.WEST);
-// 应用标签
+        // 应用标签
         JPanel rightAppPanel = new JPanel(new BorderLayout(2, 2));
 
         rightAppPanel.add(appLabel, BorderLayout.WEST);
@@ -279,7 +279,7 @@ public class TestkitToolWindow {
         // 将右侧面板添加到主面板东侧
         outPanel.add(rightAppPanel, BorderLayout.CENTER);
 
-//        topPanel.add(appBox);
+        //        topPanel.add(appBox);
 
         initSettingsDialog();
         initStoreDialog();

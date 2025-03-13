@@ -104,6 +104,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 
             vmParametersList.addProperty("testkit.project.name", project.getName());
             vmParametersList.addProperty("testkit.app.name", runProfile.getName());
+            vmParametersList.addProperty("testkit.app.env", "local");
 
             String appName = configurationBase.getName();
             String propertiesStr = SettingsStorageHelper.getAppProperties(project, appName);

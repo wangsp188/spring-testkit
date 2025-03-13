@@ -106,8 +106,8 @@ public class FlexibleTestTool extends BasePluginTool {
         JPanel topPanel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,FLEXIBLE_TEST_DISABLE_ICON,"<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
-                "    <li>module test source 下 ${Test Package} 内的 public 函数</li>\n" +
-                "    <li>非static</li>\n" +
+                "    <li>module test source ,public method of  package : ${Test Package}</li>\n" +
+                "    <li>no static</li>\n" +
                 "</ul>",topPanel, new ActionListener() {
 
             @Override

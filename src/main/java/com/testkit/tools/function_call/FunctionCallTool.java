@@ -803,10 +803,10 @@ public class FunctionCallTool extends BasePluginTool {
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            setOutputText("Command generate error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
         } catch (Throwable ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
         }
     }
 
@@ -910,10 +910,10 @@ public class FunctionCallTool extends BasePluginTool {
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            setOutputText("Command generate error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
         } catch (Throwable ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+            setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
         }
     }
 
@@ -938,9 +938,9 @@ public class FunctionCallTool extends BasePluginTool {
         JPanel panel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(FunctionCallIconProvider.FUNCTION_CALL_ICON, FUNCTION_CALL_DISABLE_ICON,
                 "<strong>function-call</strong>\n<ul>\n" +
-                        "    <li>spring bean 的 public 函数</li>\n" +
-                        "    <li>非init/main</li>\n" +
-                        "    <li>非test source</li>\n" +
+                        "    <li>spring bean' public method</li>\n" +
+                        "    <li>not init/main method</li>\n" +
+                        "    <li>not in test source</li>\n" +
                         "</ul>", panel, new ActionListener() {
 
                     @Override

@@ -60,7 +60,7 @@ public class MapperSqlTool extends BasePluginTool {
         JPanel topPanel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(MAPPER_SQL_DISABLE_ICON, MAPPER_SQL_DISABLE_ICON, "<strong>mapper-sql</strong><br>\n" +
                 "<ul>\n" +
-                "    <li>mapper的xml文件内 sql标签</li>\n" +
+                "    <li>sql tag of mapper xml</li>\n" +
                 "    <li>select/insert/update/delete</li>\n" +
                 "</ul>", topPanel, new ActionListener() {
 

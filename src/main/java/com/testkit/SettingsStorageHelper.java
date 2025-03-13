@@ -69,26 +69,26 @@ public class SettingsStorageHelper {
                     "    /**\n" +
                     "     * tool执行前\n" +
                     "     *\n" +
-                    "     * @param appName 哪个应用名 非空\n" +
+                    "     * @param env    环境，可能为空\n" +
                     "     * @param tool   将要执行的tool 非空\n" +
                     "     * @param params 入参 非空\n" +
                     "     * @throws Throwable 抛出异常则阻断tool调用\n" +
                     "     */\n" +
-                    "    public void invokeBefore(String appName, String tool, Map<String, String> params)  throws Throwable{\n" +
+                    "    public void invokeBefore(String env, String tool, Map<String, String> params)  throws Throwable{\n" +
                     "\n" +
                     "    }\n" +
                     "\n" +
                     "    /**\n" +
                     "     * tool执行后\n" +
                     "     *\n" +
-                    "     * @param appName 哪个应用名 非空\n" +
+                    "     * @param env    环境，可能为空\n" +
                     "     * @param tool   将要执行的tool 非空\n" +
                     "     * @param params 入参 非空\n" +
                     "     * @param cost   耗时ms 不包含脚本耗时 可能为空\n" +
                     "     * @param ret    返回内容 可能为空\n" +
                     "     * @param e      抛出的异常 脚本异常也会记录 可能为空\n" +
                     "     */\n" +
-                    "    public void invokeAfter(String appName, String tool, Map<String, String> params, Integer cost, Object ret, Throwable e) {\n" +
+                    "    public void invokeAfter(String env, String tool, Map<String, String> params, Integer cost, Object ret, Throwable e) {\n" +
                     "    }\n" +
                     "\n" +
                     "}";

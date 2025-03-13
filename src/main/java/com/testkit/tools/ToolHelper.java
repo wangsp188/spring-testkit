@@ -21,6 +21,7 @@ import com.intellij.ui.EditorTextField;
 import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.NotNull;
 
+import javax.swing.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -143,7 +144,8 @@ public class ToolHelper {
             editorTextField.setText(method.getArgs());
             return;
         }
-
+        String oldText = editorTextField.getText();
+        editorTextField.setText("init params ...");
         ProgressManager.getInstance().run(new Task.Backgroundable(method.method.getProject(), "init params" + ", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
@@ -169,8 +171,6 @@ public class ToolHelper {
 //                    }
 //                });
 
-                String oldText = editorTextField.getText();
-                editorTextField.setText("init params ...");
                 JSONObject initParams = ApplicationManager.getApplication().runReadAction(new Computable<JSONObject>() {
                     @Override
                     public JSONObject compute() {
@@ -183,8 +183,7 @@ public class ToolHelper {
                 } catch (Throwable e) {
                 }
 
-
-                ApplicationManager.getApplication().runWriteAction(new Runnable() {
+                SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {
                         String jsonString = JsonUtil.formatObj(initParams);
@@ -192,6 +191,13 @@ public class ToolHelper {
                         method.setArgs(jsonString);
                     }
                 });
+
+//                ApplicationManager.getApplication().runWriteAction(new Runnable() {
+//                    @Override
+//                    public void run() {
+//
+//                    }
+//                });
 
             }
         });

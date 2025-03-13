@@ -1134,10 +1134,10 @@ public class ReqStoreDialog {
             setOutputText(ret, null);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+            setOutputText("Command generate error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage(), null);
         } catch (Throwable ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+            setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage(), null);
         }
     }
 
@@ -1328,10 +1328,10 @@ public class ReqStoreDialog {
             setOutputText(ret, null);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error, Please use the classes that come with jdk or groovy, do not use classes in your project, " + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+            setOutputText("Command generate error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage(), null);
         } catch (Throwable ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error," + ex.getClass().getSimpleName() + ", " + ex.getMessage(), null);
+            setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage(), null);
         }
     }
 
@@ -1586,11 +1586,11 @@ public class ReqStoreDialog {
                     try {
                         JSONObject result = get();
                         if (cancelReqs.remove(lastReqId)) {
-                            setOutputText("req is cancel, reqId:" + lastReqId, null);
+                            setOutputText("req is cancel\nreqId:" + lastReqId, null);
                         }
                     } catch (Throwable e) {
                         if (cancelReqs.remove(lastReqId)) {
-                            setOutputText("cancel req error, reqId:" + lastReqId + "\n" + ToolHelper.getStackTrace(e), null);
+                            setOutputText("cancel req error\nreqId:" + lastReqId + "\n" + ToolHelper.getStackTrace(e), null);
                         }
                     }
                 }
@@ -1616,7 +1616,7 @@ public class ReqStoreDialog {
         String reqId = response.getString("data");
         lastReqId = reqId;
         triggerBtn.setIcon(AllIcons.Actions.Suspend);
-        setOutputText("req is send，reqId:" + reqId, null);
+        setOutputText("req is send\nreqId:" + reqId, null);
 
         ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing req, please wait ...", false) {
             @Override
@@ -1635,7 +1635,7 @@ public class ReqStoreDialog {
                             System.out.println("请求已被取消，结果丢弃");
                         } else {
                             if (result == null) {
-                                setOutputText("req is error\n result is null", null);
+                                setOutputText("req is error\nresult is null", null);
                             } else {
                                 List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
                                 });

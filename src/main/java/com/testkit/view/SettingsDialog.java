@@ -594,23 +594,9 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                saveListener.actionPerformed(e);
-//                // 关闭当前窗口
-//                Window window = SwingUtilities.getWindowAncestor(panel);
-//                if (window != null) {
-//                    window.dispose();
-//                }
-//            }
-//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -639,7 +625,7 @@ public class SettingsDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
-        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nAvailable tools: Function-call, flexible-test\nScript language: JAVA (Classes in your project can be used, You can refer to spring-beans using @Autowired)");
+        JTextArea tipArea = createTips("Use the following code to intercept the execution of some tool, it can be turned on or off at any time in the tool panel\nAvailable tools: Function-call, flexible-test\nScript language: JAVA (Classes in your project can be used, You can refer to spring-beans using @Autowired/@Resource)");
         // 添加标签到新行
         gbc.gridx = 0;
         gbc.gridy = 0; // 新的一行
@@ -829,21 +815,10 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(e -> {
-//            saveListener.actionPerformed(e);
-//            // 关闭当前窗口
-//            Window window = SwingUtilities.getWindowAncestor(panel);
-//            if (window != null) {
-//                window.dispose();
-//            }
-//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -861,7 +836,7 @@ public class SettingsDialog {
     private JPanel createControllerOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
+        gbc.insets = JBUI.insets(5); // 添加内边距以美化布局
 
         JTextArea tipArea = createTips("When the method is spring-web requestMapping, we will execute the following script with context\nDefault is return curl-command, of course, you can even make a request through an http function and return the result\nScript language: Groovy(You cannot use classes in your project)");
         // 添加标签到新行
@@ -1053,21 +1028,10 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(e -> {
-//            saveListener.actionPerformed(e);
-//            // 关闭当前窗口
-//            Window window = SwingUtilities.getWindowAncestor(panel);
-//            if (window != null) {
-//                window.dispose();
-//            }
-//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1299,21 +1263,10 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(e -> {
-//            saveListener.actionPerformed(e);
-//            // 关闭当前窗口
-//            Window window = SwingUtilities.getWindowAncestor(panel);
-//            if (window != null) {
-//                window.dispose();
-//            }
-//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1516,23 +1469,9 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(e ->
-//
-//        {
-//            saveListener.actionPerformed(e);
-//            // 关闭当前窗口
-//            Window window = SwingUtilities.getWindowAncestor(panel);
-//            if (window != null) {
-//                window.dispose();
-//            }
-//        });
-
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1894,23 +1833,10 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                saveListener.actionPerformed(e);
-//                // 关闭当前窗口
-//                Window window = SwingUtilities.getWindowAncestor(panel);
-//                if (window != null) {
-//                    window.dispose();
-//                }
-//            }
-//        });
+
 
         // 将按钮添加到按钮面板
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -2038,20 +1964,9 @@ public class SettingsDialog {
         };
         saveButton.addActionListener(saveListener);
 
-        // 关闭按钮
-//        JButton closeButton = new JButton("OK");
-//        closeButton.addActionListener(e -> {
-//            saveListener.actionPerformed(e);
-//            // 关闭当前窗口
-//            Window window = SwingUtilities.getWindowAncestor(panel);
-//            if (window != null) {
-//                window.dispose();
-//            }
-//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(saveButton);
-//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
