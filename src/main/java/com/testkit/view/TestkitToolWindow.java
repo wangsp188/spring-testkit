@@ -525,7 +525,7 @@ public class TestkitToolWindow {
     }
 
     private void openTipsDoc() {
-        String url = "https://gitee.com/wangsp188/shaopeng/blob/master/testkit_doc/spring-testkit.md";
+        String url = "https://gitee.com/wangsp188/spring-testkit/blob/master/how-to-use/spring-testkit.md";
         Object selectedItem = toolBox.getSelectedItem();
 
         if (Desktop.isDesktopSupported()) {
