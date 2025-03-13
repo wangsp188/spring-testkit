@@ -147,34 +147,51 @@ public class ToolHelper {
         ProgressManager.getInstance().run(new Task.Backgroundable(method.method.getProject(), "init params" + ", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
-                ApplicationManager.getApplication().invokeLater(new Runnable() {
+//                ApplicationManager.getApplication().invokeLater(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        String oldText = editorTextField.getText();
+//                        editorTextField.setText("init params ...");
+//                        JSONObject initParams = ApplicationManager.getApplication().runReadAction(new Computable<JSONObject>() {
+//                            @Override
+//                            public JSONObject compute() {
+//                                return doInitParams(method.getMethod());
+//                            }
+//                        });
+//                        try {
+//                            JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
+//                            migration(jsonObject, initParams);
+//                        } catch (Throwable e) {
+//                        }
+//                        String jsonString = JsonUtil.formatObj(initParams);
+//                        editorTextField.setText(jsonString);
+//                        method.setArgs(jsonString);
+//                    }
+//                });
+
+                String oldText = editorTextField.getText();
+                editorTextField.setText("init params ...");
+                JSONObject initParams = ApplicationManager.getApplication().runReadAction(new Computable<JSONObject>() {
+                    @Override
+                    public JSONObject compute() {
+                        return doInitParams(method.getMethod());
+                    }
+                });
+                try {
+                    JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
+                    migration(jsonObject, initParams);
+                } catch (Throwable e) {
+                }
+
+
+                ApplicationManager.getApplication().runWriteAction(new Runnable() {
                     @Override
                     public void run() {
-                        String oldText = editorTextField.getText();
-                        editorTextField.setText("init params ...");
-                        JSONObject initParams = ApplicationManager.getApplication().runReadAction(new Computable<JSONObject>() {
-                            @Override
-                            public JSONObject compute() {
-                                return doInitParams(method.getMethod());
-                            }
-                        });
-                        try {
-                            JSONObject jsonObject = JSONObject.parseObject(oldText.trim());
-                            migration(jsonObject, initParams);
-                        } catch (Throwable e) {
-                        }
                         String jsonString = JsonUtil.formatObj(initParams);
                         editorTextField.setText(jsonString);
                         method.setArgs(jsonString);
                     }
                 });
-
-//                ApplicationManager.getApplication().runWriteAction(new Runnable() {
-//                    @Override
-//                    public void run() {
-//
-//                    }
-//                });
 
             }
         });
