@@ -158,12 +158,16 @@ public class ReqStoreDialog {
 
         // 设置对话框大小和位置
         dialog.setContentPane(contentPanel);
+        resizeDialog();
+
+    }
+
+    private void resizeDialog() {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int width = (int) (screenSize.width * 0.8);
         int height = (int) (screenSize.height * 0.8);
         dialog.setSize(width, height);
         dialog.setLocationRelativeTo(null);
-
     }
 
 
@@ -306,6 +310,7 @@ public class ReqStoreDialog {
         }
 
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            resizeDialog();
             dialog.setVisible(true);
         }
     }

@@ -555,6 +555,7 @@ public class TestkitToolWindow {
 
     public void openCurlDialog() {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            curlDialog.resizeDialog();
             curlDialog.setVisible(true);
         }
     }
@@ -565,6 +566,7 @@ public class TestkitToolWindow {
 
     public void openSqlDialog() {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            sqlDialog.resizeDialog();
             sqlDialog.setVisible(true);
         }
     }

@@ -129,6 +129,10 @@ public class SqlDialog extends JDialog {
 
         add(panelMain);
         pack();
+        resizeDialog();
+    }
+
+    public void resizeDialog() {
         // 设置对话框的大小与显示位置
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         setSize((int) (screenSize.width * 0.7), (int) (screenSize.height * 0.7));

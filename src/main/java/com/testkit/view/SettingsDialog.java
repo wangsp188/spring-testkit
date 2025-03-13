@@ -175,6 +175,8 @@ public class SettingsDialog {
                 datasourcePropertiesField.setText(sqlConfig.getProperties()==null?"":sqlConfig.getProperties());
                 datasourcePropertiesField.setVisible(false);
                 showDatasourceButton.setIcon(HIDDEN_ICON);
+
+                resizeDialog();
             }
         });
 
@@ -221,6 +223,10 @@ public class SettingsDialog {
         // 设置对话框内容
         dialog.setContentPane(contentPanel);
         // 设置对话框的大小与显示位置
+        resizeDialog();
+    }
+
+    private void resizeDialog() {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int width = (int) (screenSize.width * 0.7);
         int height = (int) (screenSize.height * 0.7);
@@ -589,22 +595,22 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                saveListener.actionPerformed(e);
-                // 关闭当前窗口
-                Window window = SwingUtilities.getWindowAncestor(panel);
-                if (window != null) {
-                    window.dispose();
-                }
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                saveListener.actionPerformed(e);
+//                // 关闭当前窗口
+//                Window window = SwingUtilities.getWindowAncestor(panel);
+//                if (window != null) {
+//                    window.dispose();
+//                }
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -824,20 +830,20 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(e -> {
-            saveListener.actionPerformed(e);
-            // 关闭当前窗口
-            Window window = SwingUtilities.getWindowAncestor(panel);
-            if (window != null) {
-                window.dispose();
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(e -> {
+//            saveListener.actionPerformed(e);
+//            // 关闭当前窗口
+//            Window window = SwingUtilities.getWindowAncestor(panel);
+//            if (window != null) {
+//                window.dispose();
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1048,20 +1054,20 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(e -> {
-            saveListener.actionPerformed(e);
-            // 关闭当前窗口
-            Window window = SwingUtilities.getWindowAncestor(panel);
-            if (window != null) {
-                window.dispose();
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(e -> {
+//            saveListener.actionPerformed(e);
+//            // 关闭当前窗口
+//            Window window = SwingUtilities.getWindowAncestor(panel);
+//            if (window != null) {
+//                window.dispose();
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1294,20 +1300,20 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(e -> {
-            saveListener.actionPerformed(e);
-            // 关闭当前窗口
-            Window window = SwingUtilities.getWindowAncestor(panel);
-            if (window != null) {
-                window.dispose();
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(e -> {
+//            saveListener.actionPerformed(e);
+//            // 关闭当前窗口
+//            Window window = SwingUtilities.getWindowAncestor(panel);
+//            if (window != null) {
+//                window.dispose();
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1511,22 +1517,22 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(e ->
-
-        {
-            saveListener.actionPerformed(e);
-            // 关闭当前窗口
-            Window window = SwingUtilities.getWindowAncestor(panel);
-            if (window != null) {
-                window.dispose();
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(e ->
+//
+//        {
+//            saveListener.actionPerformed(e);
+//            // 关闭当前窗口
+//            Window window = SwingUtilities.getWindowAncestor(panel);
+//            if (window != null) {
+//                window.dispose();
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(testButton);
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -1889,22 +1895,22 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                saveListener.actionPerformed(e);
-                // 关闭当前窗口
-                Window window = SwingUtilities.getWindowAncestor(panel);
-                if (window != null) {
-                    window.dispose();
-                }
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                saveListener.actionPerformed(e);
+//                // 关闭当前窗口
+//                Window window = SwingUtilities.getWindowAncestor(panel);
+//                if (window != null) {
+//                    window.dispose();
+//                }
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
@@ -2033,19 +2039,19 @@ public class SettingsDialog {
         saveButton.addActionListener(saveListener);
 
         // 关闭按钮
-        JButton closeButton = new JButton("OK");
-        closeButton.addActionListener(e -> {
-            saveListener.actionPerformed(e);
-            // 关闭当前窗口
-            Window window = SwingUtilities.getWindowAncestor(panel);
-            if (window != null) {
-                window.dispose();
-            }
-        });
+//        JButton closeButton = new JButton("OK");
+//        closeButton.addActionListener(e -> {
+//            saveListener.actionPerformed(e);
+//            // 关闭当前窗口
+//            Window window = SwingUtilities.getWindowAncestor(panel);
+//            if (window != null) {
+//                window.dispose();
+//            }
+//        });
 
         // 将按钮添加到按钮面板
         buttonPanel.add(saveButton);
-        buttonPanel.add(closeButton);
+//        buttonPanel.add(closeButton);
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
