@@ -20,9 +20,9 @@ dependencies {
     implementation("org.mybatis:mybatis:3.5.6")
     implementation("org.apache.commons:commons-lang3:3.14.0")
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
-    implementation(files("libs/spring-testkit_trace-0.0.1.jar"))
-    implementation(files("libs/spring-testkit_side_server-0.0.1.jar"))
-    implementation(files("libs/spring-testkit_agent-0.0.1.jar"))
+    implementation(files("server/testkit-trace/target/testkit-trace-1.0.jar"))
+    implementation(files("server/testkit-starter/target/testkit-starter-1.0.jar"))
+    implementation(files("server/testkit-agent/target/testkit-agent-1.0.jar"))
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
     intellijPlatform{

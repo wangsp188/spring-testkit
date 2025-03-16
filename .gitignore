@@ -63,3 +63,6 @@ bin/
 .DS_Store
 .idea
 .intellijPlatform
+/server/testkit-agent/target
+/server/testkit-trace/target
+/server/testkit-starter/target
