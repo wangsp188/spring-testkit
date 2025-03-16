@@ -72,7 +72,7 @@ public class TestkitSideServer implements DisposableBean {
     public void onApplicationEvent(WebServerInitializedEvent event) throws IOException {
         project = applicationContext.getEnvironment().getProperty("testkit.project.name");
         appName = applicationContext.getEnvironment().getProperty("testkit.app.name");
-        env = applicationContext.getEnvironment().getProperty("testkit.project.env");
+        env = applicationContext.getEnvironment().getProperty("testkit.app.env");
         enableTrace = "true".equals(applicationContext.getEnvironment().getProperty("testkit.trace.enable"));
         String serverPort = applicationContext.getEnvironment().getProperty("server.port");
         port = event.getWebServer().getPort();
