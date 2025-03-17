@@ -19,6 +19,7 @@ import com.intellij.psi.util.InheritanceUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.ui.EditorTextField;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -545,7 +546,21 @@ public class ToolHelper {
 
         for (String annotationName : springAnnotations) {
             if (psiClass.hasAnnotation(annotationName)) {
-                return !psiClass.hasAnnotation("org.aspectj.lang.annotation.Aspect");
+                boolean aspect = psiClass.hasAnnotation("org.aspectj.lang.annotation.Aspect");
+                if(aspect){
+                    return false;
+                }
+                if (psiClass.hasAnnotation("org.springframework.context.annotation.Scope")) {
+                    PsiAnnotation annotation = psiClass.getAnnotation("org.springframework.context.annotation.Scope");
+                    String scopeType = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
+                    if(StringUtils.isBlank(scopeType)){
+                        scopeType = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("scopeName"));
+                    }
+                    if(StringUtils.isNotBlank(scopeType) && !Objects.equals("singleton",scopeType)){
+                        return false;
+                    }
+                }
+                return true;
             }
         }
 

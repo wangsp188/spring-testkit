@@ -240,7 +240,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         }
 
         if (containsSpringInitializationMethod(containingClass, psiMethod)) {
-            return "init_method";
+            return "bean_method";
         }
 
         // 检查是否是main函数
@@ -265,18 +265,18 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     }
 
     private boolean containsSpringInitializationMethod(PsiClass psiClass, PsiMethod psiMethod) {
-        if (psiMethod.hasAnnotation("javax.annotation.PostConstruct")) {
-            return true;
-        }
+//        if (psiMethod.hasAnnotation("javax.annotation.PostConstruct")) {
+//            return true;
+//        }
         if (psiMethod.hasAnnotation("org.springframework.context.annotation.Bean")) {
             return true;
         }
-        if ("afterPropertiesSet".equals(psiMethod.getName()) && psiMethod.getParameterList().isEmpty()) {
-            return true;
-        }
-        if ("destroy".equals(psiMethod.getName()) && psiMethod.getParameterList().isEmpty()) {
-            return true;
-        }
+//        if ("afterPropertiesSet".equals(psiMethod.getName()) && psiMethod.getParameterList().isEmpty()) {
+//            return true;
+//        }
+//        if ("destroy".equals(psiMethod.getName()) && psiMethod.getParameterList().isEmpty()) {
+//            return true;
+//        }
         return false;
     }
 

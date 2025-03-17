@@ -939,7 +939,7 @@ public class FunctionCallTool extends BasePluginTool {
         actionComboBox = addActionComboBox(FunctionCallIconProvider.FUNCTION_CALL_ICON, FUNCTION_CALL_DISABLE_ICON,
                 "<strong>function-call</strong>\n<ul>\n" +
                         "    <li>spring bean' public method</li>\n" +
-                        "    <li>not init/main method</li>\n" +
+                        "    <li>not main/bean method</li>\n" +
                         "    <li>not in test source</li>\n" +
                         "</ul>", panel, new ActionListener() {
 
