@@ -52,49 +52,59 @@ public class ToolHelper {
         if (method == null || !method.isValid()) {
             return null;
         }
-        // 获取类名
-        PsiClass containingClass = method.getContainingClass();
-        String className = containingClass != null ? containingClass.getName() : "UnknownClass";
+        return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+            @Override
+            public String compute() {
+                // 获取类名
+                PsiClass containingClass = method.getContainingClass();
+                String className = containingClass != null ? containingClass.getName() : "UnknownClass";
 
-        // 获取方法名
-        String methodName = method.getName();
+                // 获取方法名
+                String methodName = method.getName();
 
-        // 获取参数列表
-        StringBuilder parameters = new StringBuilder();
-        PsiParameterList parameterList = method.getParameterList();
-        for (PsiParameter parameter : parameterList.getParameters()) {
-            if (parameters.length() > 0) {
-                parameters.append(", ");
+                // 获取参数列表
+                StringBuilder parameters = new StringBuilder();
+                PsiParameterList parameterList = method.getParameterList();
+                for (PsiParameter parameter : parameterList.getParameters()) {
+                    if (parameters.length() > 0) {
+                        parameters.append(", ");
+                    }
+                    parameters.append(parameter.getType().getPresentableText());
+                }
+
+                // 构建完整的方法签名
+                return className + "#" + methodName + "(" + parameters.toString() + ")";
             }
-            parameters.append(parameter.getType().getPresentableText());
-        }
-
-        // 构建完整的方法签名
-        return className + "#" + methodName + "(" + parameters.toString() + ")";
+        });
     }
 
     public static String buildXmlTagKey(XmlTag xmlTag) {
         if (xmlTag == null || !xmlTag.isValid()) {
             return null;
         }
+        return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+            @Override
+            public String compute() {
+                // 获取标签名
+                String tagName = xmlTag.getContainingFile().getName();
 
-        // 获取标签名
-        String tagName = xmlTag.getContainingFile().getName();
+                // 构建标识符，假设我们使用标签名称和某个关键属性进行组合
+                StringBuilder keyBuilder = new StringBuilder(tagName);
 
-        // 构建标识符，假设我们使用标签名称和某个关键属性进行组合
-        StringBuilder keyBuilder = new StringBuilder(tagName);
+                // 假设我们关注某个特定属性，比如 "id"，这个可以根据具体业务规则定制
+                String idAttribute = xmlTag.getAttributeValue("id");
+                if (idAttribute != null) {
+                    keyBuilder.append("#").append(idAttribute);
+                }
 
-        // 假设我们关注某个特定属性，比如 "id"，这个可以根据具体业务规则定制
-        String idAttribute = xmlTag.getAttributeValue("id");
-        if (idAttribute != null) {
-            keyBuilder.append("#").append(idAttribute);
-        }
+                // 当然，你可以根据需要加入更多的信息，比如标签的命名空间或其他属性
+                // String namespace = xmlTag.getNamespace();
+                // keyBuilder.append("(namespace: ").append(namespace).append(")");
 
-        // 当然，你可以根据需要加入更多的信息，比如标签的命名空间或其他属性
-        // String namespace = xmlTag.getNamespace();
-        // keyBuilder.append("(namespace: ").append(namespace).append(")");
+                return keyBuilder.toString();
+            }
+        });
 
-        return keyBuilder.toString();
     }
 
 
@@ -500,11 +510,6 @@ public class ToolHelper {
                 String value = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
                 if (value != null && !value.isEmpty()) {
                     return value;
-                } else {
-                    String className = psiClass.getName();
-                    if (className != null && !className.isEmpty()) {
-                        return Character.toLowerCase(className.charAt(0)) + className.substring(1);
-                    }
                 }
             }
         }

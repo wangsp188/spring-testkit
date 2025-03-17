@@ -280,11 +280,17 @@ public class TestkitSideServer implements DisposableBean {
                 String action = "unknown";
                 switch (req.getMethod()) {
                     case "spring-cache":
-                        biz = params.get("beanName");
+                        biz = params.get("typeClass");
+                        if(biz.contains(".")){
+                            biz = biz.substring(biz.lastIndexOf(".")+1);
+                        }
                         action = params.get("methodName");
                         break;
                     case "function-call":
-                        biz = params.get("beanName");
+                        biz = params.get("typeClass");
+                        if(biz.contains(".")){
+                            biz = biz.substring(biz.lastIndexOf(".")+1);
+                        }
                         action = params.get("methodName");
                         break;
                     case "flexible-test":
