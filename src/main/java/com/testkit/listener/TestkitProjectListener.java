@@ -31,7 +31,7 @@ public class TestkitProjectListener implements ProjectActivity {
                 new Thread(() -> {
                     while (true) {
                         CodingGuidelinesHelper.refreshDoc(project);
-                        TestkitHelper.refresh(project);
+//                        TestkitHelper.refresh(project);
                         //刷新数据库链接
 //                        refreshValidDatasources(project);
                         try {
