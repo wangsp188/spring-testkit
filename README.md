@@ -14,7 +14,7 @@
 - **Trace** - 可视化请求链路
 - **SQL-tool** - Sql-reviewer & DDL-execute
 - **Coding-guidelines** - 角标指引式研发提醒
-- **Realtime-view-value** - 实时观测bean的字段内容
+- **Realtime-view-value** - 实时观测bean的字段值
 - **Curl-parser** - 简易curl解析器
 
 ## 🔨Infra
