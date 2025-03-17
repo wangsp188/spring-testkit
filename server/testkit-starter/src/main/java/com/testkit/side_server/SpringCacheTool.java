@@ -32,9 +32,6 @@ public class SpringCacheTool {
     Method redisCacheGenerateKeyMethod;
     Class<?> redisCacheCls;
 
-    Class<?> colWrapCls;
-    Method colWrapClsAsColMethod;
-
 
     {
         try {
@@ -52,15 +49,6 @@ public class SpringCacheTool {
             redisCacheCls = Class.forName("org.springframework.data.redis.cache.RedisCache");
             redisCacheGenerateKeyMethod = redisCacheCls.getDeclaredMethod("createCacheKey", Object.class);
             redisCacheGenerateKeyMethod.setAccessible(true);
-
-            try {
-                Class<?> cls = Class.forName("com.zoom.contactcenter.cache.v2.redis_v2.CollectionWrapper");
-                colWrapClsAsColMethod = cls.getDeclaredMethod("asCollection");
-                colWrapCls = cls;
-            } catch (Throwable e) {
-            }
-
-
         } catch (Throwable e) {
             e.printStackTrace();
         }
@@ -150,23 +138,6 @@ public class SpringCacheTool {
                     }
                     if ("delete_cache".equals(action)) {
                         cache.evictIfPresent(key);
-                    }
-                    if (colWrapCls != null && colWrapCls.isAssignableFrom(key.getClass())) {
-                        for (Object o : (Collection) colWrapClsAsColMethod.invoke(key)) {
-                            Object invoke = redisCacheGenerateKeyMethod.invoke(cache, o);
-                            if (invoke == null) {
-                                continue;
-                            }
-                            if ("build_cache_key".equals(action)) {
-                                keys.add(KV.build(invoke.toString()));
-                            } else if ("get_cache".equals(action)) {
-                                Cache.ValueWrapper valueWrapper = cache.get(o);
-                                keys.add(KV.build(invoke, valueWrapper == null ? null : valueWrapper.get()));
-                            } else {
-                                keys.add(KV.build(invoke));
-                            }
-                        }
-                        continue;
                     }
                     Object invoke = redisCacheGenerateKeyMethod.invoke(cache, key);
                     if (invoke == null) {
