@@ -4,13 +4,25 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.Computable;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.searches.AnnotatedElementsSearch;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.function.Consumer;
 
 public class TestkitHelper {
 
@@ -71,6 +83,51 @@ public class TestkitHelper {
 
     public static String getPluginName() {
         return pluginName;
+    }
+
+
+    public static HashMap<String, RuntimeHelper.AppMeta> findSpringBootClass(Project project) {
+
+        java.util.List<PsiClass> springBootApplicationClasses = ApplicationManager.getApplication().runReadAction((Computable<java.util.List<PsiClass>>) () -> {
+            List<PsiClass> result = new ArrayList<>();
+
+            // 使用更高效的查询方式
+            JavaPsiFacade facade = JavaPsiFacade.getInstance(project);
+            PsiClass springBootAnnotation = facade.findClass(
+                    "org.springframework.boot.autoconfigure.SpringBootApplication",
+                    GlobalSearchScope.allScope(project)
+            );
+
+            if (springBootAnnotation != null) {
+                Collection<PsiClass> candidates = AnnotatedElementsSearch
+                        .searchPsiClasses(springBootAnnotation, GlobalSearchScope.projectScope(project))
+                        .findAll();
+                result.addAll(candidates);
+            }
+
+            return result;
+        });
+
+
+        HashMap<String, RuntimeHelper.AppMeta> map = new HashMap<>();
+        ApplicationManager.getApplication().runReadAction(new Runnable() {
+            @Override
+            public void run() {
+                springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
+                    @Override
+                    public void accept(PsiClass psiClass) {
+                        RuntimeHelper.AppMeta appMeta = new RuntimeHelper.AppMeta();
+                        appMeta.setApp(psiClass.getName());
+                        appMeta.setFullName(psiClass.getQualifiedName());
+
+                        appMeta.setModule(ModuleUtil.findModuleForPsiElement(psiClass));
+                        map.put(psiClass.getName(), appMeta);
+                    }
+                });
+            }
+        });
+
+        return map;
     }
 
 

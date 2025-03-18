@@ -233,7 +233,12 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         }
 
 
-        if (!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
+        if (!RuntimeHelper.hasAppMeta(psiMethod.getProject().getName())) {
+            if (!FunctionCallIconProvider.isRequestMethod(psiMethod)) {
+                return "no_app_meta";
+            }
+        }
+        if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
             if (!FunctionCallIconProvider.isRequestMethod(psiMethod)) {
                 return "no_side_server";
             }

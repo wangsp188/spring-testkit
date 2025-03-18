@@ -170,7 +170,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
         }
 
         if (!RuntimeHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())) {
-            return "no_side_server";
+            return "no_side_server_app";
         }
 
         // 2. 必须是非静态方法

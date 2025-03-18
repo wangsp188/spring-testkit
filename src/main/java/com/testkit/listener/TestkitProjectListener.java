@@ -1,6 +1,9 @@
 package com.testkit.listener;
 
 import com.alibaba.fastjson.JSON;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -41,6 +44,17 @@ public class TestkitProjectListener implements ProjectActivity {
                         }
                     }
                 }).start();
+
+                ProgressManager.getInstance().run(new Task.Backgroundable(project, "Init project apps", false){
+                    @Override
+                    public void run(@NotNull ProgressIndicator progressIndicator) {
+                        List<RuntimeHelper.AppMeta> apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
+                        RuntimeHelper.updateAppMetas(project.getName(), apps);
+                        System.out.println("Init project line marker,"+project.getName());
+                        TestkitHelper.refresh(project);
+                    }
+                });
+
             } catch (Exception e) {
                 TestkitHelper.notify(project, NotificationType.ERROR, "Schedule refresh failed," + e.getClass().getSimpleName() + ", " + e.getMessage());
             }

@@ -539,7 +539,6 @@ public class ToolHelper {
                 "org.springframework.stereotype.Service",
                 "org.springframework.stereotype.Repository",
                 "org.springframework.stereotype.Controller",
-                "org.apache.ibatis.annotations.Mapper",
                 "org.springframework.web.bind.annotation.RestController",
                 "org.springframework.context.annotation.Configuration",
         };

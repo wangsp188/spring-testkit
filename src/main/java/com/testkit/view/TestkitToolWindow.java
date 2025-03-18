@@ -55,6 +55,7 @@ import java.net.URL;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class TestkitToolWindow {
@@ -647,25 +648,6 @@ public class TestkitToolWindow {
 
     public void findSpringBootApplicationClasses() {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            List<PsiClass> springBootApplicationClasses = ApplicationManager.getApplication().runReadAction((Computable<List<PsiClass>>) () -> {
-                List<PsiClass> result = new ArrayList<>();
-
-                // 使用更高效的查询方式
-                JavaPsiFacade facade = JavaPsiFacade.getInstance(project);
-                PsiClass springBootAnnotation = facade.findClass(
-                        "org.springframework.boot.autoconfigure.SpringBootApplication",
-                        GlobalSearchScope.allScope(project)
-                );
-
-                if (springBootAnnotation != null) {
-                    Collection<PsiClass> candidates = AnnotatedElementsSearch
-                            .searchPsiClasses(springBootAnnotation, GlobalSearchScope.projectScope(project))
-                            .findAll();
-                    result.addAll(candidates);
-                }
-
-                return result;
-            });
 
             // 当所有的操作完成后，更新UI或进一步处理结果
             // 用UI相关的操作需要放在EDT上执行
@@ -673,28 +655,18 @@ public class TestkitToolWindow {
                 @Override
                 public void run() {
 
-                    HashMap<String, RuntimeHelper.AppMeta> map = new HashMap<>();
-                    ApplicationManager.getApplication().runReadAction(new Runnable() {
+                    List<RuntimeHelper.AppMeta> apps = RuntimeHelper.getAppMetas(project.getName());
+                    if(apps==null || apps.isEmpty()){
+                        apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
+                    }
+                    List<String> appNames = apps.stream().map(new Function<RuntimeHelper.AppMeta, String>() {
                         @Override
-                        public void run() {
-                            springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
-                                @Override
-                                public void accept(PsiClass psiClass) {
-                                    RuntimeHelper.AppMeta appMeta = new RuntimeHelper.AppMeta();
-                                    appMeta.setApp(psiClass.getName());
-                                    appMeta.setFullName(psiClass.getQualifiedName());
-
-                                    appMeta.setModule(ModuleUtil.findModuleForPsiElement(psiClass));
-                                    map.put(psiClass.getName(), appMeta);
-                                }
-                            });
+                        public String apply(RuntimeHelper.AppMeta appMeta) {
+                            return appMeta.getApp();
                         }
-                    });
-
-                    RuntimeHelper.updateAppMetas(project.getName(), new ArrayList<>(map.values()));
-                    storeDialog.initApps(new ArrayList<>(map.keySet()));
-                    settingsDialog.initApps(new ArrayList<>(map.keySet()));
-
+                    }).collect(Collectors.toUnmodifiableList());
+                    storeDialog.initApps(appNames);
+                    settingsDialog.initApps(appNames);
 //                    更新datasources
                     updateDatasources();
                     TestkitHelper.refresh(project);
