@@ -15,8 +15,6 @@
             <groupId>com.testkit</groupId>
             <artifactId>trace</artifactId>
             <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${basedir}/../testkit-trace/pom.xml</systemPath>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

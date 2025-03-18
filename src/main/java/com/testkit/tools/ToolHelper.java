@@ -503,8 +503,7 @@ public class ToolHelper {
                             qualifiedName.equals("org.springframework.stereotype.Repository") ||
                             qualifiedName.equals("org.springframework.context.annotation.Configuration") ||
                             qualifiedName.equals("org.springframework.stereotype.Controller") ||
-                            qualifiedName.equals("org.springframework.web.bind.annotation.RestController") ||
-                            qualifiedName.equals("org.apache.ibatis.annotations.Mapper")
+                            qualifiedName.equals("org.springframework.web.bind.annotation.RestController")
                     )) {
 
 

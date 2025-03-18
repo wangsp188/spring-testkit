@@ -101,7 +101,7 @@ public class TestkitSideServer implements DisposableBean {
                     String content = readInputStream(inputStream);
                     Req req = null;
                     try {
-                        req = ReflexUtils.MAPPER.readValue(content, Req.class);
+                        req = ReflexUtils.SIMPLE_MAPPER.readValue(content, Req.class);
                     } catch (JsonProcessingException e) {
                         throw new TestkitException("parse req error," + e.getMessage());
                     }
@@ -137,7 +137,7 @@ public class TestkitSideServer implements DisposableBean {
 
                     String jsonResponse = null;
                     try {
-                        jsonResponse = ReflexUtils.MAPPER.writeValueAsString(ret);
+                        jsonResponse = ReflexUtils.SIMPLE_MAPPER.writeValueAsString(ret);
                     } catch (Throwable e) {
                         //这里对象序列化失败，可以判断
 //                        如果是array则每个对象.toString拼接出来
@@ -172,7 +172,7 @@ public class TestkitSideServer implements DisposableBean {
                                 // 其他情况
                                 ret.setData(String.valueOf(obj));
                             }
-                            jsonResponse = ReflexUtils.MAPPER.writeValueAsString(ret);
+                            jsonResponse = ReflexUtils.SIMPLE_MAPPER.writeValueAsString(ret);
                         } catch (Throwable ex) {
                             throw new TestkitException("ret serialize json error," + ex.getMessage());
                         }
@@ -412,7 +412,7 @@ public class TestkitSideServer implements DisposableBean {
         Ret ret = new Ret();
         ret.setSuccess(false);
         ret.setMessage(message);
-        byte[] bytes = ReflexUtils.MAPPER.writeValueAsBytes(ret);
+        byte[] bytes = ReflexUtils.SIMPLE_MAPPER.writeValueAsBytes(ret);
         exchange.sendResponseHeaders(200, bytes.length); // 405 Method Not Allowed
         OutputStream outputStream = exchange.getResponseBody();
         outputStream.write(bytes);

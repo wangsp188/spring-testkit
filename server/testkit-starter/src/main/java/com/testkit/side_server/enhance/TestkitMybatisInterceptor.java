@@ -273,7 +273,7 @@ public class TestkitMybatisInterceptor implements Interceptor {
             }
         } else if (value instanceof Collection || value instanceof Map) {
             try {
-                return ReflexUtils.MAPPER.writeValueAsString(value);
+                return ReflexUtils.SIMPLE_MAPPER.writeValueAsString(value);
             } catch (Throwable e) {
                 return value.toString();
             }
@@ -281,7 +281,7 @@ public class TestkitMybatisInterceptor implements Interceptor {
             return value.toString();
         }
         try {
-            return ReflexUtils.MAPPER.writeValueAsString(value);
+            return ReflexUtils.SIMPLE_MAPPER.writeValueAsString(value);
         } catch (Throwable e) {
             return value.toString();
         }

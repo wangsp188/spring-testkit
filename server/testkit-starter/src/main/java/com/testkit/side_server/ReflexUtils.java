@@ -1,13 +1,12 @@
 package com.testkit.side_server;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import org.springframework.aop.SpringProxy;
@@ -24,7 +23,6 @@ import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.net.URL;
@@ -39,16 +37,31 @@ public class ReflexUtils {
 
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-    public static final ObjectMapper MAPPER = new ObjectMapper();
+    public static final ObjectMapper PARSER_MAPPER = new ObjectMapper();
+
+    static {
+        SimpleModule module = new SimpleModule();
+        // 注册 Date 反序列化器
+        module.addDeserializer(Date.class, new CustomDateDeserializer());
+        // 自动处理枚举类型，无需自定义注册
+        PARSER_MAPPER.registerModule(module);
+        PARSER_MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        PARSER_MAPPER.disable(MapperFeature.USE_ANNOTATIONS)  // 关闭注解
+                .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY) // 允许直接访问字段
+                .setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE) // 禁用 Getter 方法推断
+                .setVisibility(PropertyAccessor.SETTER, JsonAutoDetect.Visibility.NONE);
+    }
+
+    public static final ObjectMapper SIMPLE_MAPPER = new ObjectMapper();
 
     static {
         SimpleModule module = new SimpleModule();
         // 注册 Date 反序列化器
         module.addDeserializer(Date.class, new CustomDateDeserializer());
         // 配置 ObjectMapper 在序列化时包含 null 值
-        MAPPER.setSerializationInclusion(JsonInclude.Include.ALWAYS);
+        SIMPLE_MAPPER.setSerializationInclusion(JsonInclude.Include.ALWAYS);
         // 自动处理枚举类型，无需自定义注册
-        MAPPER.registerModule(module);
+        SIMPLE_MAPPER.registerModule(module);
     }
 
     private static JdkDynamicCompiler compiler = new JdkDynamicCompiler();
@@ -157,21 +170,23 @@ public class ReflexUtils {
 
 
     public static ReflexBox parse(Class typeClass, String methodName, String methodArgTypesStr, String methodArgsStr) throws JsonProcessingException, NoSuchMethodException, ClassNotFoundException {
-        TypeFactory typeFactory = MAPPER.getTypeFactory();
+        TypeFactory typeFactory = PARSER_MAPPER.getTypeFactory();
 
-        List<String> methodArgTypesList = MAPPER.readValue(methodArgTypesStr, new TypeReference<List<String>>() {
+        List<String> methodArgTypesList = PARSER_MAPPER.readValue(methodArgTypesStr, new TypeReference<List<String>>() {
         });
         // 创建 Class<?>[] 数组
         JavaType[] methodArgTypes = new JavaType[methodArgTypesList.size()];
         for (int i = 0; i < methodArgTypesList.size(); i++) {
-            methodArgTypes[i] = typeFactory.constructFromCanonical(methodArgTypesList.get(i));
+            String canonical = methodArgTypesList.get(i);
+            String resolvedType = convertFullTypeString(canonical);
+            methodArgTypes[i] = typeFactory.constructFromCanonical(resolvedType);
         }
 
         // 获取方法
         Method method = findMethod(typeClass, methodName, methodArgTypes);
         method.setAccessible(true);
 
-        Object[] methodArgsJson = MAPPER.readValue(methodArgsStr, Object[].class);
+        Object[] methodArgsJson = PARSER_MAPPER.readValue(methodArgsStr, Object[].class);
         // 根据方法参数类型将 JSON 字符串解析为对应类型的对象
         Object[] methodArgs = new Object[methodArgTypes.length];
         for (int i = 0; i < methodArgTypes.length; i++) {
@@ -203,10 +218,10 @@ public class ReflexUtils {
                     methodArgs[i] = argJson == null || argJson.toString().isEmpty() ? null : Enum.valueOf(argType.getRawClass().asSubclass(Enum.class), argJson.toString());
                 } else {
                     // 其他类型
-                    methodArgs[i] = MAPPER.readValue(MAPPER.writeValueAsString(argJson), argType);
+                    methodArgs[i] = PARSER_MAPPER.readValue(PARSER_MAPPER.writeValueAsString(argJson), argType);
                 }
             } catch (Throwable e) {
-                throw new TestkitException("can not deserialization param,  index:" + i + ", " + e);
+                throw new TestkitException("can not deserialization param,  index:" + i + "\nThe function-call complex type structure may fail, so you can use the flexible-test function instead\n" + e);
             }
         }
         return new ReflexBox(method, methodArgs);
@@ -688,6 +703,128 @@ public class ReflexUtils {
                 super(message);
             }
         }
+    }
+
+
+
+    private static final Pattern CLASS_PATTERN = Pattern.compile(
+            "\\b([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*[a-zA-Z_$][a-zA-Z\\d_$]*\\b"
+    );
+
+    /**
+     * 将类型字符串中所有类名替换为 JVM 格式
+     * 示例输入：Map<java.lang.String,xxxxAA.A2>
+     * 输出：Map<java.lang.String,xxxxAA$A2>
+     */
+    private static String convertFullTypeString(String originalType) {
+        //先剔除 extends 这种东西
+        originalType = removeWildcards(originalType);
+
+        List<String> fragments = extractClassFragments(originalType);
+        Map<String, String> replacements = new LinkedHashMap<>();
+
+        for (String fragment : fragments) {
+            if (fragment==null) {
+                continue;
+            }
+            String resolved = resolveClassName(fragment);
+            if (!fragment.equals(resolved)) {
+                replacements.put(fragment, resolved);
+            }
+        }
+
+        // 按从长到短的顺序替换，避免部分覆盖（如先替换 a.b 再替换 a）
+        String convertedType = originalType;
+        List<String> sortedKeys = new ArrayList<>(replacements.keySet());
+        sortedKeys.sort((a, b) -> Integer.compare(b.length(), a.length()));
+
+        for (String key : sortedKeys) {
+            convertedType = convertedType.replace(key, replacements.get(key));
+        }
+
+        return convertedType;
+    }
+
+    private static String removeWildcards(String originalType) {
+        // 匹配 <? extends T> 或 <? super T> 并替换为 <T>
+        String step1 = originalType.replaceAll("\\?\\s+(extends|super)\\s+([^,>]+)", "$2");
+        // 匹配单独的 <?> 替换为空字符串
+        String step2 = step1.replaceAll("\\?\\s*", "");
+        return step2;
+    }
+
+    /**
+     * 从类型字符串中提取所有类名片段（含包名）
+     * 示例输入：Map<java.lang.String,xxxxAA.A2>
+     * 输出：["Map", "java.lang.String", "xxxxAA.A2"]
+     */
+    private static List<String> extractClassFragments(String typeString) {
+        List<String> fragments = new ArrayList<>();
+        Matcher matcher = CLASS_PATTERN.matcher(typeString);
+        while (matcher.find()) {
+            String fragment = matcher.group();
+            // 过滤掉泛型中的保留字（如 ? extends）
+            if (!fragment.matches("\\?|extends|super")) {
+                fragments.add(fragment);
+            }
+        }
+        return fragments;
+    }
+
+
+    /**
+     * 将单个类名转换为 JVM 二进制格式
+     * 示例：
+     *   - xxxxAA.A2 → xxxxAA$A2
+     *   - java.lang.String → java.lang.String
+     */
+    private static String convertSingleClassName(String className) {
+        int lastDotIndex = className.lastIndexOf('.');
+        if (lastDotIndex == -1) {
+            return className; // 无包名或嵌套类
+        }
+
+        // 分割包名和类名
+        String packagePart = className.substring(0, lastDotIndex);
+        String classPart = className.substring(lastDotIndex + 1);
+
+        // 检查是否存在嵌套类（假设类名首字母大写）
+        if (Character.isUpperCase(classPart.charAt(0))) {
+            return packagePart + "$" + classPart;
+        } else {
+            return className;
+        }
+    }
+
+    private static boolean isClassLoadable(String className) {
+        try {
+            Class.forName(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 智能转换类名，尝试多种可能直到加载成功
+     */
+    private static String resolveClassName(String originalName) {
+        if (isClassLoadable(originalName)) {
+            return originalName;
+        }
+
+        String currentName = originalName;
+        while (currentName.lastIndexOf('.')>-1){
+            // 分割包名和类名
+            int lastDotIndex = currentName.lastIndexOf('.');
+            String packagePart = currentName.substring(0, lastDotIndex);
+            String classPart = currentName.substring(lastDotIndex + 1);
+            currentName = packagePart + "$" + classPart;
+            if(isClassLoadable(currentName)){
+                return currentName;
+            }
+        }
+        throw new TestkitException("failed parse class: " + originalName);
     }
 
 }

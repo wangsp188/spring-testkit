@@ -58,7 +58,7 @@ class RuntimeAppHelper {
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
                 String content = new String(Files.readAllBytes(configFile.toPath()));
-                return ReflexUtils.MAPPER.readValue(content, new TypeReference<List<String>>() {
+                return ReflexUtils.SIMPLE_MAPPER.readValue(content, new TypeReference<List<String>>() {
                 });
             } catch (IOException e) {
                 e.printStackTrace();
@@ -77,7 +77,7 @@ class RuntimeAppHelper {
             if (runtimes==null) {
                 runtimes = new ArrayList<>();
             }
-            ReflexUtils.MAPPER.writeValue(writer, runtimes);
+            ReflexUtils.SIMPLE_MAPPER.writeValue(writer, runtimes);
         } catch (IOException e) {
             e.printStackTrace();
         }
