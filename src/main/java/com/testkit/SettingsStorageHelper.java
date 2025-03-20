@@ -32,6 +32,8 @@ public class SettingsStorageHelper {
 
     public static final String defFlexibleTestPackage = "flexibletest";
 
+    public static final String remoteAppDemo = "TestApplication:ip1:8080,MyApplication:ip2:8080";
+
     public static final List<String> defBeanAnnotations = Arrays.asList("org.apache.ibatis.annotations.Mapper", "org.springframework.cloud.openfeign.FeignClient");
 
     public static final String defProperties = "logging.level.com.testkit=INFO";
@@ -569,6 +571,10 @@ public class SettingsStorageHelper {
         return getConfig(project).getFlexibleTestPackage();
     }
 
+    public static List<String> getRemoteApps(Project project) {
+        return getConfig(project).getRemoteApps();
+    }
+
     public static List<String> getBeanAnnotations(Project project) {
         return getConfig(project).getBeanAnnotations();
     }
@@ -603,6 +609,15 @@ public class SettingsStorageHelper {
             projectConfig = new ProjectConfig();
         }
         projectConfig.setFlexibleTestPackage(flexibleTestPackage);
+        saveProjectConfig(project, projectConfig);
+    }
+
+    public static void setRemoteApps(Project project, List<String> remoteApps) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        projectConfig.setRemoteApps(remoteApps);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -726,6 +741,7 @@ public class SettingsStorageHelper {
         if (projectConfig == null) {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
+            config.setRemoteApps(new ArrayList<>());
             config.setBeanAnnotations(defBeanAnnotations);
             config.setTraceConfig(copyDefMonitorConfig());
             config.setSqlConfig(copyDefSqlConfig());
@@ -734,6 +750,7 @@ public class SettingsStorageHelper {
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
+        config.setRemoteApps(projectConfig.getRemoteApps()==null?new ArrayList<>():projectConfig.getRemoteApps());
         config.setBeanAnnotations(projectConfig.getBeanAnnotations() == null ? defBeanAnnotations : projectConfig.getBeanAnnotations());
         config.setTraceConfig(projectConfig.getTraceConfig() == null ? copyDefMonitorConfig() : projectConfig.getTraceConfig());
         config.setSqlConfig(projectConfig.getSqlConfig() == null ? copyDefSqlConfig() : projectConfig.getSqlConfig());
@@ -842,6 +859,7 @@ public class SettingsStorageHelper {
 
         private boolean enableSideServer = true;
         private String flexibleTestPackage;
+        private List<String> remoteApps;
         private List<String> beanAnnotations;
         private String script;
         private HttpCommand controllerCommand;
@@ -922,12 +940,21 @@ public class SettingsStorageHelper {
         public void setBeanAnnotations(List<String> beanAnnotations) {
             this.beanAnnotations = beanAnnotations;
         }
+
+        public List<String> getRemoteApps() {
+            return remoteApps;
+        }
+
+        public void setRemoteApps(List<String> remoteApps) {
+            this.remoteApps = remoteApps;
+        }
     }
 
     public static class Config {
 
         private boolean enableSideServer = true;
         private String flexibleTestPackage;
+        private List<String> remoteApps;
         private List<String> beanAnnotations;
         private String script;
         private HttpCommand controllerCommand;
@@ -1006,6 +1033,14 @@ public class SettingsStorageHelper {
 
         public void setBeanAnnotations(List<String> beanAnnotations) {
             this.beanAnnotations = beanAnnotations;
+        }
+
+        public List<String> getRemoteApps() {
+            return remoteApps;
+        }
+
+        public void setRemoteApps(List<String> remoteApps) {
+            this.remoteApps = remoteApps;
         }
     }
 

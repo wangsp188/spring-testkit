@@ -57,7 +57,6 @@ public class FunctionCallTool extends BasePluginTool {
     public static final Icon CONTROLLER_ICON = IconLoader.getIcon("/icons/controller.svg", FunctionCallTool.class);
     public static final Icon FEIGN_ICON = IconLoader.getIcon("/icons/feign.svg", FunctionCallTool.class);
 
-    public static final Icon GENERATE_ICON = IconLoader.getIcon("/icons/generate.svg", FunctionCallTool.class);
     public static final Icon KIcon = IconLoader.getIcon("/icons/k.svg", FunctionCallTool.class);
 
 
@@ -929,7 +928,7 @@ public class FunctionCallTool extends BasePluginTool {
         RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(getProject().getName());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, headerValues,jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues,jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 

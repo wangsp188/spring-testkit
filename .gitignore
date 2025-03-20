@@ -66,3 +66,4 @@ bin/
 /server/testkit-agent/target
 /server/testkit-trace/target
 /server/testkit-starter/target
+/server/testkit-agent/dependency-reduced-pom.xml

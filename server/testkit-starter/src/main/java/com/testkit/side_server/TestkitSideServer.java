@@ -8,6 +8,8 @@ import com.sun.net.httpserver.HttpServer;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationContext;
@@ -21,13 +23,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Configuration
 @Import({FlexibleTestTool.class, FunctionCallTool.class, ViewValueTool.class})
@@ -56,8 +58,6 @@ public class TestkitSideServer implements DisposableBean {
     private String appName;
     private String env;
     private boolean enableTrace;
-    private int port;
-
     private int sidePort;
 
 
@@ -68,24 +68,20 @@ public class TestkitSideServer implements DisposableBean {
     }
 
 
-    @EventListener
-    public void onApplicationEvent(WebServerInitializedEvent event) throws IOException {
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationEvent(ApplicationReadyEvent event) throws IOException {
         project = applicationContext.getEnvironment().getProperty("testkit.project.name");
         appName = applicationContext.getEnvironment().getProperty("testkit.app.name");
         env = applicationContext.getEnvironment().getProperty("testkit.app.env");
         enableTrace = "true".equals(applicationContext.getEnvironment().getProperty("testkit.trace.enable"));
-        String serverPort = applicationContext.getEnvironment().getProperty("server.port");
-        port = event.getWebServer().getPort();
-        if (serverPort != null && !serverPort.isEmpty()) {
-            try {
-                if (port != Integer.parseInt(serverPort)) {
-                    System.err.println("Testkit side_server maybe port is already started in " + server.getAddress().getPort());
-                    return;
-                }
-            } catch (NumberFormatException ignored) {
-            }
+
+        if (applicationContext instanceof WebServerApplicationContext) {
+            int port = ((WebServerApplicationContext) applicationContext).getWebServer().getPort();
+            sidePort = port + 10000;
+            sidePort = findRandomAvailablePort(11030, 11099);
+        } else {
+            sidePort = findRandomAvailablePort(11030, 11099);
         }
-        sidePort = port + 10000;
         server = HttpServer.create(new InetSocketAddress(sidePort), 0);
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", new HttpHandler() {
@@ -193,8 +189,8 @@ public class TestkitSideServer implements DisposableBean {
         new Thread(() -> {
             try {
                 server.start();
-                if (project != null && appName != null) {
-                    RuntimeAppHelper.addApp(project, appName, port, sidePort);
+                if (project != null && appName != null && sidePort > 0) {
+                    RuntimeAppHelper.addApp(project, appName, sidePort);
                 }
 
                 System.err.println("————————————————————————————————————————————————————————————————————\n" +
@@ -219,9 +215,9 @@ public class TestkitSideServer implements DisposableBean {
                         "//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^        //\n" +
                         "//            佛祖保佑         永不宕机     永无BUG                  //\n" +
                         "————————————————————————————————————————————————————————————————————\n" +
-                        "                          Testkit:" + server.getAddress().getPort());
+                        "                          Testkit:" + sidePort);
             } catch (Exception e) {
-                System.err.println("Testkit side_server started fail on port " + server.getAddress().getPort() + " " + e);
+                System.err.println("Testkit side_server started fail on port " + sidePort + " " + e);
             }
         }).start();
     }
@@ -281,15 +277,15 @@ public class TestkitSideServer implements DisposableBean {
                 switch (req.getMethod()) {
                     case "spring-cache":
                         biz = params.get("typeClass");
-                        if(biz.contains(".")){
-                            biz = biz.substring(biz.lastIndexOf(".")+1);
+                        if (biz.contains(".")) {
+                            biz = biz.substring(biz.lastIndexOf(".") + 1);
                         }
                         action = params.get("methodName");
                         break;
                     case "function-call":
                         biz = params.get("typeClass");
-                        if(biz.contains(".")){
-                            biz = biz.substring(biz.lastIndexOf(".")+1);
+                        if (biz.contains(".")) {
+                            biz = biz.substring(biz.lastIndexOf(".") + 1);
                         }
                         action = params.get("methodName");
                         break;
@@ -419,14 +415,78 @@ public class TestkitSideServer implements DisposableBean {
         outputStream.close();
     }
 
+    /**
+     * 检查本地 TCP 端口是否可用（所有网络接口）
+     */
+    public static boolean isTcpPortAvailable(int port) {
+        return isTcpPortAvailable(port, null);
+    }
+
+    /**
+     * 检查指定地址的 TCP 端口是否可用
+     */
+    public static boolean isTcpPortAvailable(int port, String bindAddress) {
+        try (ServerSocket serverSocket = new ServerSocket()) {
+            serverSocket.setReuseAddress(true);
+            InetSocketAddress address = (bindAddress == null) ?
+                    new InetSocketAddress(port) :
+                    new InetSocketAddress(bindAddress, port);
+            serverSocket.bind(address);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 随机获取可用端口（改进版）
+     * @param minPort 最小端口号（包含）
+     * @param maxPort 最大端口号（包含）
+     * @return 找到的可用端口
+     * @throws IllegalStateException 无可用端口时抛出
+     */
+    public static int findRandomAvailablePort(int minPort, int maxPort) {
+        // 参数校验
+        if (minPort < 0 || maxPort > 65535 || minPort > maxPort) {
+            throw new IllegalArgumentException("invalid port range: [" + minPort + ", " + maxPort + "]");
+        }
+
+        // 生成随机顺序的端口列表（延迟计算）
+        List<Integer> shuffledPorts = IntStream.rangeClosed(minPort, maxPort)
+                .boxed()
+                .collect(Collectors.toList());
+        Collections.shuffle(shuffledPorts);
+
+        // 遍历随机序列
+        for (int port : shuffledPorts) {
+            if (isTcpPortAvailable(port)) {
+                return port;
+            }
+        }
+
+        throw new IllegalStateException("can not find available port");
+    }
+
+    /**
+     * 查找指定范围内的可用端口
+     */
+    public static int findAvailablePort(int minPort, int maxPort) {
+        for (int port = minPort; port <= maxPort; port++) {
+            if (isTcpPortAvailable(port)) {
+                return port;
+            }
+        }
+        throw new RuntimeException("No available ports between " + minPort + "-" + maxPort);
+    }
+
     @Override
     public void destroy() throws Exception {
         if (server == null) {
             return;
         }
         server.stop(0);
-        if (project != null && appName != null && port > 0 && sidePort > 0) {
-            RuntimeAppHelper.removeApp(project, appName, port, sidePort);
+        if (project != null && appName != null && sidePort > 0) {
+            RuntimeAppHelper.removeApp(project, appName, sidePort);
         }
         TaskManager.shutdown();
     }

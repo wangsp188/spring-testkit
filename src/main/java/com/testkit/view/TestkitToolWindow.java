@@ -14,7 +14,6 @@ import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
@@ -22,12 +21,9 @@ import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.psi.*;
-import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.search.searches.AnnotatedElementsSearch;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallTool;
@@ -41,7 +37,6 @@ import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.border.Border;
@@ -54,7 +49,6 @@ import java.net.URI;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -248,7 +242,7 @@ public class TestkitToolWindow {
         Border border = appBox.getBorder();
         appBox.addItemListener(e -> {
             String selectedItem = (String) appBox.getSelectedItem();
-            RuntimeHelper.updateSelectedApp(getProject().getName(), selectedItem == null ? null : parseApp(selectedItem));
+            RuntimeHelper.updateSelectedApp(getProject().getName(), selectedItem == null ? null : RuntimeHelper.parseApp(selectedItem));
             appBox.setToolTipText(selectedItem == null ? "" : selectedItem); // 动态更新 ToolTipText
 
             if (selectedItem != null && RuntimeHelper.isMonitor(selectedItem)) {
@@ -261,7 +255,7 @@ public class TestkitToolWindow {
             while (true) {
                 try {
                     refreshVisibleApp();
-                    Thread.sleep(3 * 1000); // 每隔一分钟调用一次
+                    Thread.sleep(5 * 1000); // 每隔一分钟调用一次
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
@@ -455,8 +449,12 @@ public class TestkitToolWindow {
     }
 
     private void refreshVisibleApp() {
-        List<String> newItems = RuntimeHelper.loadProjectRuntimes(project.getName());
-        if (newItems == null) {
+        Set<String> newItems = new LinkedHashSet<>(SettingsStorageHelper.getRemoteApps(project));
+        List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
+        if(localItems!=null){
+            newItems.addAll(localItems);
+        }
+        if (newItems.isEmpty()) {
             return;
         }
 
@@ -474,15 +472,15 @@ public class TestkitToolWindow {
             }
 
             // 获取 visibleApp 实例
-            RuntimeHelper.VisibleApp visibleApp = parseApp(item);
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
             try {
                 // 发送请求获取实时数据
-                Map response = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", requestData, Map.class);
+                Map response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getSidePort() + "/", requestData, Map.class);
                 newMap.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(response.get("data"))));
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
-                RuntimeHelper.removeApp(project.getName(), visibleApp.getAppName(), visibleApp.getPort(), visibleApp.getSidePort());
+                RuntimeHelper.removeApp(project.getName(), visibleApp);
             }
         }
 
@@ -506,8 +504,8 @@ public class TestkitToolWindow {
         appBox.removeAllItems();
         ArrayList<RuntimeHelper.VisibleApp> objects = new ArrayList<>();
         for (String item : newItems) {
-            appBox.addItem(item.substring(0, item.lastIndexOf(":")));
-            objects.add(parseApp(item));
+            objects.add(RuntimeHelper.parseApp(item));
+            appBox.addItem(item);
         }
         RuntimeHelper.updateVisibleApps(project.getName(), objects);
 
@@ -526,7 +524,7 @@ public class TestkitToolWindow {
     }
 
     private void openTipsDoc() {
-        String url = "https://gitee.com/wangsp188/spring-testkit/blob/master/how-to-use/spring-testkit.md";
+        String url = "https://github.com/wangsp188/spring-testkit/blob/master/how-to-use/spring-testkit.md";
         Object selectedItem = toolBox.getSelectedItem();
 
         if (Desktop.isDesktopSupported()) {
@@ -611,24 +609,7 @@ public class TestkitToolWindow {
     }
 
 
-    private @Nullable RuntimeHelper.VisibleApp parseApp(String selectedItem) {
-        String[] split = selectedItem.split(":");
-        if (split.length == 2) {
-            RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
-            visibleApp.setAppName(split[0]);
-            visibleApp.setPort(Integer.parseInt(split[1]));
-            visibleApp.setSidePort(Integer.parseInt(split[1]) + 10000);
-            return visibleApp;
 
-        } else if (split.length == 3) {
-            RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
-            visibleApp.setAppName(split[0]);
-            visibleApp.setPort(Integer.parseInt(split[1]));
-            visibleApp.setSidePort(Integer.parseInt(split[2]));
-            return visibleApp;
-        }
-        throw new IllegalArgumentException("un support app item");
-    }
 
 
     private void initStoreDialog() {

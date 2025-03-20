@@ -1,7 +1,6 @@
 package com.testkit.tools.view_value;
 
 import com.alibaba.fastjson.JSONObject;
-import com.google.protobuf.Message;
 import com.intellij.openapi.ui.Messages;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
@@ -102,7 +101,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             }
                             for (RuntimeHelper.VisibleApp visibleApp : list) {
                                 //显示的一个图标加上标题
-                                AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getPort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getPort(), null) {
+                                AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getSidePort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getSidePort(), null) {
                                     @Override
                                     public void actionPerformed(@NotNull AnActionEvent e) {
                                         handleClick(element, containingClass, psiElement, visibleApp);

@@ -63,6 +63,8 @@ public class SettingsDialog {
 
     private JBTextField beanAnnotationField;
 
+    private JBTextField remoteAppField;
+
     private ComboBox<String> interceptorAppBox;
 
     private ComboBox<String> controllerScriptAppBox;
@@ -126,6 +128,7 @@ public class SettingsDialog {
             @Override
             public void run() {
                 flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
+                remoteAppField.setText(String.join(",",SettingsStorageHelper.getRemoteApps(toolWindow.getProject())));
                 RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
                 String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
                 if (selectedAppName == null) {
@@ -540,6 +543,83 @@ public class SettingsDialog {
         gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
         springOptionsPanel.add(newButton, gbc);
 
+
+
+        remoteAppField = new JBTextField(String.join(",",SettingsStorageHelper.getRemoteApps(toolWindow.getProject())), 20);
+        remoteAppField.getEmptyText().setText("Optional Remote apps; multiple use,split; Example: AppName:ip1:port1,App2:ip2:port2");
+        remoteAppField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateToolTip();
+            }
+
+            private void updateToolTip() {
+                String text = remoteAppField.getText().trim();
+                if (StringUtils.isBlank(text)) {
+                    remoteAppField.setToolTipText("no remote app list");
+                } else {
+                    List<String> validApps = new ArrayList<>();
+                    for (String remoteApp : text.split(",")) {
+                        if (StringUtils.isBlank(remoteApp)) {
+                            continue;
+                        }
+                        try {
+                            RuntimeHelper.parseApp(remoteApp);
+                            validApps.add(remoteApp);
+                        } catch (Exception e) {
+                        }
+                    }
+                    remoteAppField.setToolTipText("valid remote apps is " + JSON.toJSONString(validApps));
+                }
+            }
+        });
+
+        // 输入框
+        JLabel remoteAppLabel = new JLabel("Remote Apps:");
+        remoteAppLabel.setPreferredSize(labelDimension);
+        remoteAppLabel.setLabelFor(remoteAppField); // 关联标签和输入框
+        remoteAppLabel.setToolTipText("Configure the remote apps to invoke the remote service, Example: AppName:ip1:port1,App2:ip2:port2"); // 提示信息
+
+        // 布局输入框和标签
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        springOptionsPanel.add(remoteAppLabel, gbc);
+
+        gbc.gridx = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0; // 让输入框占据剩余空间
+        springOptionsPanel.add(remoteAppField, gbc);
+
+        // 添加新按钮到组合框右边
+        JButton rollbackAppButton = new JButton(AllIcons.Actions.Rollback);
+        rollbackAppButton.setToolTipText("Use demo remote apps");
+        rollbackAppButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                remoteAppField.setText(SettingsStorageHelper.remoteAppDemo);
+            }
+        });
+        gbc.gridx = 3;  // 放在同一行的尾部
+        gbc.gridy = 4;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0;
+        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
+        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
+        springOptionsPanel.add(rollbackAppButton, gbc);
+
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 3;
@@ -589,6 +669,25 @@ public class SettingsDialog {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Bean annotations is refreshed by " + Arrays.asList(annotationFieldText.trim().split(",")));
                 }
 
+                String remoteAppText = remoteAppField.getText().trim();
+                if(remoteAppText.isEmpty()){
+                    SettingsStorageHelper.setRemoteApps(toolWindow.getProject(), null);
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Remote Apps is clean");
+                }else{
+                    List<String> validApps = new ArrayList<>();
+                    for (String remoteApp : remoteAppText.split(",")) {
+                        if (StringUtils.isBlank(remoteApp)) {
+                            continue;
+                        }
+                        try {
+                            RuntimeHelper.parseApp(remoteApp);
+                            validApps.add(remoteApp);
+                        } catch (Exception e2) {
+                        }
+                    }
+                    SettingsStorageHelper.setRemoteApps(toolWindow.getProject(), validApps);
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Remote Apps is refreshed by " + validApps);
+                }
                 TestkitHelper.refresh(toolWindow.getProject());
             }
         };
@@ -893,7 +992,7 @@ public class SettingsDialog {
             private void updateToolTip() {
                 String text = controllerEnvTextField.getText().trim();
                 if (StringUtils.isBlank(text)) {
-                    controllerEnvTextField.setToolTipText("not config env list");
+                    controllerEnvTextField.setToolTipText("no env list");
                 } else {
                     controllerEnvTextField.setToolTipText("env list is " + JSON.toJSONString(text.split(",")));
                 }
@@ -1058,7 +1157,7 @@ public class SettingsDialog {
                     params.put("param1", "v1");
                     HashMap<String, String> headers = new HashMap<>();
                     headers.put("T-header", "1");
-                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), "POST", "/health", params, headers, "{}"});
+                    Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), "POST", "/health", params, headers, "{}"});
                     String ret = build == null ? "" : String.valueOf(build);
                     TestkitHelper.alert(getProject(), Messages.getInformationIcon(), "Test generate function success\n" + ret);
                 } catch (Throwable ex) {

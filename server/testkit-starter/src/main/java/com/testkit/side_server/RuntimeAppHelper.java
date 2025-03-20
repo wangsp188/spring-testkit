@@ -18,7 +18,7 @@ class RuntimeAppHelper {
 
 
 
-    public static void addApp(String project,String appName,Integer port,Integer sidePort){
+    public static void addApp(String project,String appName,Integer sidePort){
         if (project==null || project.isEmpty()) {
             return;
         }
@@ -26,15 +26,15 @@ class RuntimeAppHelper {
         if (runtimes==null) {
             runtimes = new ArrayList<>();
         }
-        if(runtimes.contains(appName+":"+port+":"+sidePort)){
+        if(runtimes.contains(appName+":local:"+sidePort)){
             return;
         }
-        runtimes.add(appName+":"+port+":"+sidePort);
+        runtimes.add(appName+":local:"+sidePort);
 
         storeProjectRuntimes(project, runtimes);
     }
 
-    public static void removeApp(String project,String appName,Integer port,Integer sidePort){
+    public static void removeApp(String project,String appName,Integer sidePort){
         if (project==null || project.isEmpty()) {
             return;
         }
@@ -42,10 +42,10 @@ class RuntimeAppHelper {
         if (runtimes==null) {
             return;
         }
-        if(!runtimes.contains(appName+":"+port+":"+sidePort)){
+        if(!runtimes.contains(appName+":local:"+sidePort)){
             return;
         };
-        runtimes.remove(appName+":"+port+":"+sidePort);
+        runtimes.remove(appName+":local:"+sidePort);
         storeProjectRuntimes(project, runtimes);
     }
 

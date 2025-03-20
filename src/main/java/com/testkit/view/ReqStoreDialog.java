@@ -7,9 +7,6 @@ import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
-import com.intellij.psi.PsiClass;
-import com.intellij.psi.PsiMethod;
-import com.intellij.psi.PsiParameter;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -827,7 +824,7 @@ public class ReqStoreDialog {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
                     return;
                 }
-                RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+                RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
                 if (visibleApp == null) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
                     return;
@@ -873,7 +870,7 @@ public class ReqStoreDialog {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
                     return;
                 }
-                RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+                RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
                 if (visibleApp == null) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
                     return;
@@ -919,7 +916,7 @@ public class ReqStoreDialog {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
                     return;
                 }
-                RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+                RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
                 if (visibleApp == null) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
                     return;
@@ -985,7 +982,7 @@ public class ReqStoreDialog {
                     }
                     for (String env : envs) {
                         //显示的一个图标加上标题
-                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FunctionCallTool.GENERATE_ICON) {
+                        AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FunctionCallTool.FEIGN_ICON) {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 Application application = ApplicationManager.getApplication();
@@ -1142,10 +1139,10 @@ public class ReqStoreDialog {
     }
 
     public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
-        RuntimeHelper.VisibleApp selectedApp = parseApp((String) visibleAppComboBox.getSelectedItem());
+        RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.parseApp((String) visibleAppComboBox.getSelectedItem());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.getPort(), httpMethod, path, params, headerValues, jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
@@ -1356,7 +1353,7 @@ public class ReqStoreDialog {
 
         // 构建新列表
         List<String> newItems = visibleAppList.stream()
-                .map(app -> app.getAppName() + ":" + app.getPort())
+                .map(app -> app.getAppName() +":"+app.getIp()+ ":" + app.getSidePort())
                 .toList();
 
         // 如果列表内容没变，直接返回
@@ -1370,7 +1367,7 @@ public class ReqStoreDialog {
         // 更新列表内容
         visibleAppComboBox.removeAllItems();
         for (RuntimeHelper.VisibleApp visibleApp : visibleAppList) {
-            String item = visibleApp.getAppName() + ":" + visibleApp.getPort();
+            String item = visibleApp.getAppName() +":"+visibleApp.getIp()+ ":" + visibleApp.getSidePort();
             visibleAppComboBox.addItem(item);
         }
 
@@ -1517,7 +1514,7 @@ public class ReqStoreDialog {
             TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
             return;
         }
-        RuntimeHelper.VisibleApp visibleApp = parseApp(selectedInstance);
+        RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
         if (visibleApp == null) {
             TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
             return;
@@ -1672,28 +1669,6 @@ public class ReqStoreDialog {
                 }
             }
         });
-    }
-
-    private RuntimeHelper.VisibleApp parseApp(String selectedItem) {
-        if (selectedItem == null) {
-            return null;
-        }
-        String[] split = selectedItem.split(":");
-        if (split.length == 2) {
-            RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
-            visibleApp.setAppName(split[0]);
-            visibleApp.setPort(Integer.parseInt(split[1]));
-            visibleApp.setSidePort(Integer.parseInt(split[1]) + 10000);
-            return visibleApp;
-
-        } else if (split.length == 3) {
-            RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
-            visibleApp.setAppName(split[0]);
-            visibleApp.setPort(Integer.parseInt(split[1]));
-            visibleApp.setSidePort(Integer.parseInt(split[2]));
-            return visibleApp;
-        }
-        return null;
     }
 
     private JSONObject buildCallMethodParams(ReqStorageHelper.CallMethodMeta meta, RuntimeHelper.VisibleApp visibleApp, JSONObject args) {

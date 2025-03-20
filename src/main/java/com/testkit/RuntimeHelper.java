@@ -69,7 +69,7 @@ public class RuntimeHelper {
         return monitor != null && monitor;
     }
 
-    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls,List<String> writes) {
+    public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls, List<String> writes) {
         if (project == null) {
             return;
         }
@@ -81,7 +81,7 @@ public class RuntimeHelper {
         }
         validDatasources.put(project, datasources);
         ddlDatasources.put(project, ddls);
-        writeDatasources.put(project,writes);
+        writeDatasources.put(project, writes);
     }
 
     public static List<SettingsStorageHelper.DatasourceConfig> getValidDatasources(String project) {
@@ -92,7 +92,7 @@ public class RuntimeHelper {
         return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
     }
 
-    public static SettingsStorageHelper.DatasourceConfig getDatasource(String project,String datasource) {
+    public static SettingsStorageHelper.DatasourceConfig getDatasource(String project, String datasource) {
         if (datasource == null) {
             return null;
         }
@@ -170,23 +170,23 @@ public class RuntimeHelper {
     }
 
 
-    public static void removeApp(String project, String appName, Integer port, Integer sidePort) {
-        if (project == null || project.isEmpty()) {
+    public static void removeApp(String project, VisibleApp app) {
+        if (project == null || project.isEmpty() || app == null) {
             return;
         }
-        doRemoveApp(project, appName, port, sidePort);
+        doRemoveApp(project, app.getAppName(), app.getIp(), app.getSidePort());
     }
 
-    private static void doRemoveApp(String project, String appName, Integer port, Integer sidePort) {
+    private static void doRemoveApp(String project, String appName, String ip, Integer sidePort) {
         List<String> runtimes = loadProjectRuntimes(project);
         if (runtimes == null) {
             return;
         }
-        if (!runtimes.contains(appName + ":" + port + ":" + sidePort)) {
+        if (!runtimes.contains(appName + ":" + ip + ":" + sidePort)) {
             return;
         }
         ;
-        runtimes.remove(appName + ":" + port + ":" + sidePort);
+        runtimes.remove(appName + ":" + ip + ":" + sidePort);
         storeProjectRuntimes(project, runtimes);
     }
 
@@ -208,6 +208,22 @@ public class RuntimeHelper {
         }
 
         return ret;
+    }
+
+
+    public static RuntimeHelper.VisibleApp parseApp(String selectedItem) {
+        if (selectedItem == null || selectedItem.isEmpty()) {
+            return null;
+        }
+        String[] split = selectedItem.split(":");
+        if (split.length != 3) {
+            throw new IllegalArgumentException("un support app item");
+        }
+        RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
+        visibleApp.setAppName(split[0]);
+        visibleApp.setIp(split[1]);
+        visibleApp.setSidePort(Integer.parseInt(split[2]));
+        return visibleApp;
     }
 
     private static void storeProjectRuntimes(String project, List<String> runtimes) {
@@ -282,9 +298,13 @@ public class RuntimeHelper {
 
         private String appName;
 
-        private int port;
+        private String ip;
 
         private int sidePort;
+
+        public boolean judgeIsLocal() {
+            return "local".equals(ip);
+        }
 
         public String getAppName() {
             return appName;
@@ -294,16 +314,20 @@ public class RuntimeHelper {
             this.appName = appName;
         }
 
-        public int getPort() {
-            return port;
-        }
-
-        public void setPort(int port) {
-            this.port = port;
+        public int buildWebPort() {
+            return sidePort > 10000 ? sidePort - 10000 : 8080;
         }
 
         public int getSidePort() {
             return sidePort;
+        }
+
+        public String getIp() {
+            return ip;
+        }
+
+        public void setIp(String ip) {
+            this.ip = ip;
         }
 
         public void setSidePort(int sidePort) {
