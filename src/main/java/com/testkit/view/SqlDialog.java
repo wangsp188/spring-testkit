@@ -412,7 +412,8 @@ public class SqlDialog extends JDialog {
                         public void run(@NotNull ProgressIndicator progressIndicator) {
                             TableModel tableModel = table.getModel();
 
-                            try (Connection connection = datasource.newConnection()) {
+                            Connection connection = null;
+                            try {
                                 tableModel.setValueAt("", modelRow, 5);
                                 String verifyDdl = tableModel.getValueAt(modelRow, 3).toString();
                                 String rollbackDdl = tableModel.getValueAt(modelRow, 4).toString();
@@ -422,6 +423,9 @@ public class SqlDialog extends JDialog {
                                     rollbackDdl = null;
                                     tableModel.setValueAt("", modelRow, 3);
                                     tableModel.setValueAt("", modelRow, 4);
+
+                                    connection = datasource.newConnection();
+
                                     verifyDdl = MysqlVerifyExecuteUtil.verifyWriteSQL(finalStatement, connection);
                                     tableModel.setValueAt(verifyDdl, modelRow, 3);
                                     try {
@@ -447,6 +451,9 @@ public class SqlDialog extends JDialog {
                                     fireEditingStopped(); // 结束编辑状态
                                     return;
                                 }
+                                if (connection == null) {
+                                    connection = datasource.newConnection();
+                                }
                                 MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection);
                                 tableModel.setValueAt(sqlRet.toString(), modelRow, 5);
                             } catch (RuntimeExceptionWithAttachments edt) {
@@ -455,6 +462,12 @@ public class SqlDialog extends JDialog {
                                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Execute error, " + ex.getMessage());
                             } finally {
                                 fireEditingStopped(); // 结束编辑状态
+                                if(connection!=null){
+                                    try {
+                                        connection.close();
+                                    } catch (SQLException ex) {
+                                    }
+                                }
                             }
                         }
                     });
