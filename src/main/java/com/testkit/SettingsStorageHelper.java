@@ -575,6 +575,10 @@ public class SettingsStorageHelper {
         return getConfig(project).getRemoteApps();
     }
 
+    public static boolean isDefaultUseInterceptor(Project project) {
+        return getConfig(project).isDefaultUseInterceptor();
+    }
+
     public static List<String> getBeanAnnotations(Project project) {
         return getConfig(project).getBeanAnnotations();
     }
@@ -618,6 +622,15 @@ public class SettingsStorageHelper {
             projectConfig = new ProjectConfig();
         }
         projectConfig.setRemoteApps(remoteApps);
+        saveProjectConfig(project, projectConfig);
+    }
+
+    public static void setDefaultUseInterceptor(Project project, boolean defaultUse) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        projectConfig.setDefaultUseInterceptor(defaultUse);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -746,6 +759,7 @@ public class SettingsStorageHelper {
             config.setTraceConfig(copyDefMonitorConfig());
             config.setSqlConfig(copyDefSqlConfig());
             config.setEnableSideServer(true);
+            config.setDefaultUseInterceptor(false);
             return config;
         }
         Config config = new Config();
@@ -755,6 +769,7 @@ public class SettingsStorageHelper {
         config.setTraceConfig(projectConfig.getTraceConfig() == null ? copyDefMonitorConfig() : projectConfig.getTraceConfig());
         config.setSqlConfig(projectConfig.getSqlConfig() == null ? copyDefSqlConfig() : projectConfig.getSqlConfig());
         config.setEnableSideServer(projectConfig.isEnableSideServer());
+        config.setDefaultUseInterceptor(projectConfig.isDefaultUseInterceptor());
         return config;
     }
 
@@ -860,6 +875,7 @@ public class SettingsStorageHelper {
         private boolean enableSideServer = true;
         private String flexibleTestPackage;
         private List<String> remoteApps;
+        private boolean defaultUseInterceptor;
         private List<String> beanAnnotations;
         private String script;
         private HttpCommand controllerCommand;
@@ -948,6 +964,14 @@ public class SettingsStorageHelper {
         public void setRemoteApps(List<String> remoteApps) {
             this.remoteApps = remoteApps;
         }
+
+        public boolean isDefaultUseInterceptor() {
+            return defaultUseInterceptor;
+        }
+
+        public void setDefaultUseInterceptor(boolean defaultUseInterceptor) {
+            this.defaultUseInterceptor = defaultUseInterceptor;
+        }
     }
 
     public static class Config {
@@ -955,6 +979,7 @@ public class SettingsStorageHelper {
         private boolean enableSideServer = true;
         private String flexibleTestPackage;
         private List<String> remoteApps;
+        private boolean defaultUseInterceptor;
         private List<String> beanAnnotations;
         private String script;
         private HttpCommand controllerCommand;
@@ -1041,6 +1066,14 @@ public class SettingsStorageHelper {
 
         public void setRemoteApps(List<String> remoteApps) {
             this.remoteApps = remoteApps;
+        }
+
+        public boolean isDefaultUseInterceptor() {
+            return defaultUseInterceptor;
+        }
+
+        public void setDefaultUseInterceptor(boolean defaultUseInterceptor) {
+            this.defaultUseInterceptor = defaultUseInterceptor;
         }
     }
 

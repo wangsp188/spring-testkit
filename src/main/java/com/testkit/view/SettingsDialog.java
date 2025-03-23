@@ -85,6 +85,7 @@ public class SettingsDialog {
     private OnOffButton traceWebToggleButton;
     private OnOffButton traceMybatisToggleButton;
     private OnOffButton logMybatisToggleButton;
+    private OnOffButton defaultInterceptorToggleButton;
     private JBTextField tracePackagesField;
 
     private JBTextField traceClassSuffixField;
@@ -128,7 +129,7 @@ public class SettingsDialog {
             @Override
             public void run() {
                 flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
-                remoteAppField.setText(String.join(",",SettingsStorageHelper.getRemoteApps(toolWindow.getProject())));
+                remoteAppField.setText(String.join(",", SettingsStorageHelper.getRemoteApps(toolWindow.getProject())));
                 RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
                 String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
                 if (selectedAppName == null) {
@@ -175,10 +176,11 @@ public class SettingsDialog {
 //        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
 
                 SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
-                datasourcePropertiesField.setText(sqlConfig.getProperties()==null?"":sqlConfig.getProperties());
+                datasourcePropertiesField.setText(sqlConfig.getProperties() == null ? "" : sqlConfig.getProperties());
                 datasourcePropertiesField.setVisible(false);
                 showDatasourceButton.setIcon(HIDDEN_ICON);
 
+                defaultInterceptorToggleButton.setSelected(SettingsStorageHelper.isDefaultUseInterceptor(toolWindow.getProject()));
                 resizeDialog();
             }
         });
@@ -262,7 +264,7 @@ public class SettingsDialog {
                 instructionLabel.setForeground(new Color(0x72A96B));
                 instructionLabel.setFont(new Font("Arial", Font.BOLD, 13));
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                topPanel.add(instructionLabel,BorderLayout.NORTH);
+                topPanel.add(instructionLabel, BorderLayout.NORTH);
 
                 // 创建JSON输入框
                 JTextArea jsonInput = new JTextArea();
@@ -271,7 +273,7 @@ public class SettingsDialog {
                 JScrollPane scrollPane = new JScrollPane(jsonInput);
                 //新增选项
                 Map<String, SettingsStorageHelper.ProjectConfig> settings = SettingsStorageHelper.getPreSettings();
-                if(settings!=null && settings.size()>0) {
+                if (settings != null && settings.size() > 0) {
                     // 创建单选按钮组（用于互斥）
                     JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
                     radioPanel.setBorder(BorderFactory.createTitledBorder("pre set settings template"));
@@ -296,7 +298,7 @@ public class SettingsDialog {
                         buttonGroup.add(radio);
                         radioPanel.add(radio);
                     }
-                    topPanel.add(radioPanel,BorderLayout.SOUTH);
+                    topPanel.add(radioPanel, BorderLayout.SOUTH);
                 }
 
                 // 创建导入按钮
@@ -544,8 +546,7 @@ public class SettingsDialog {
         springOptionsPanel.add(newButton, gbc);
 
 
-
-        remoteAppField = new JBTextField(String.join(",",SettingsStorageHelper.getRemoteApps(toolWindow.getProject())), 20);
+        remoteAppField = new JBTextField(String.join(",", SettingsStorageHelper.getRemoteApps(toolWindow.getProject())), 20);
         remoteAppField.getEmptyText().setText("Optional Remote apps; multiple use,split; Example: AppName:ip1:port1,App2:ip2:port2");
         remoteAppField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
@@ -670,10 +671,10 @@ public class SettingsDialog {
                 }
 
                 String remoteAppText = remoteAppField.getText().trim();
-                if(remoteAppText.isEmpty()){
+                if (remoteAppText.isEmpty()) {
                     SettingsStorageHelper.setRemoteApps(toolWindow.getProject(), null);
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Remote Apps is clean");
-                }else{
+                } else {
                     List<String> validApps = new ArrayList<>();
                     for (String remoteApp : remoteAppText.split(",")) {
                         if (StringUtils.isBlank(remoteApp)) {
@@ -734,6 +735,37 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
         panel.add(tipArea, gbc);
+
+
+        JLabel defaultInterceptor = new JLabel("Default disable");
+        defaultInterceptorToggleButton = new OnOffButton();
+        boolean defaultUseInterceptor = SettingsStorageHelper.isDefaultUseInterceptor(toolWindow.getProject());
+        if(defaultUseInterceptor){
+            defaultInterceptorToggleButton.setSelected(defaultUseInterceptor);
+            defaultInterceptor.setText(defaultUseInterceptor ? "Default enable" : "Default disable");
+        }
+
+        JPanel defaultInterceptorLabelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
+        defaultInterceptorLabelButtonPanel.add(defaultInterceptor, BorderLayout.WEST);
+        defaultInterceptorLabelButtonPanel.add(defaultInterceptorToggleButton, BorderLayout.EAST);
+
+        defaultInterceptorToggleButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                boolean selected = defaultInterceptorToggleButton.isSelected();
+                defaultInterceptor.setText(selected ? "Default enable" : "Default disable");
+                SettingsStorageHelper.setDefaultUseInterceptor(toolWindow.getProject(), selected);
+                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Tool-interceptor is default " + (selected ? "enable" : "disable")+"<br>Take effect after restart");
+            }
+        });
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0; // Reset weightx
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(defaultInterceptorLabelButtonPanel, gbc);
 
         LanguageTextField interceptorField = new LanguageTextField(JavaLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.defInterceptor, false);
 
@@ -1931,7 +1963,6 @@ public class SettingsDialog {
             }
         };
         saveButton.addActionListener(saveListener);
-
 
 
         // 将按钮添加到按钮面板

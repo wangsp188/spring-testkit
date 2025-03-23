@@ -5,6 +5,7 @@ import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.psi.*;
+import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitToolWindow;
@@ -483,7 +484,7 @@ public abstract class BasePluginTool {
         gbc.gridy = 0;
         JButton testBtn = new JButton(icon);
         if (icon != disableIcon) {
-            useInterceptor = true;
+            useInterceptor = SettingsStorageHelper.isDefaultUseInterceptor(getProject());
             if(useInterceptor){
                 testBtn.setToolTipText("<html>\n" +
                         "<meta charset=\"UTF-8\">\n" +
