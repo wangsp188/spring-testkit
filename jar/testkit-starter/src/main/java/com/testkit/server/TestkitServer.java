@@ -82,7 +82,6 @@ public class TestkitServer {
         } else {
             serverPort = findAvailablePort(30001, 30099);
         }
-        serverPort = findAvailablePort(30001, 30099);
         HttpServer server;
         try {
             server = HttpServer.create(new InetSocketAddress(serverPort), 0);
