@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +29,11 @@ public class ViewValueTool {
         }
     }
 
-    @Autowired
-    private ApplicationContext applicationContext;
+    private ApplicationContext app;
+
+    public ViewValueTool(ApplicationContext app) {
+        this.app = app;
+    }
 
     public Object process(Map<String, String> params) throws Exception {
         String typeClassStr = params.get("typeClass");
@@ -71,7 +74,7 @@ public class ViewValueTool {
         // 如果不是static字段，从Spring context中获取bean
         Object bean = null;
         if (beanName == null || beanName.trim().isEmpty()) {
-            Map<String, ?> beansOfType = applicationContext.getBeansOfType(typeClass);
+            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
             if (beansOfType.isEmpty()) {
                 throw new TestkitException("can not find " + typeClass + " in this spring");
             } else if (beansOfType.size() > 1) {
@@ -80,7 +83,7 @@ public class ViewValueTool {
             bean = beansOfType.values().iterator().next();
         } else {
             try {
-                bean = applicationContext.getBean(beanName, typeClass);
+                bean = app.getBean(beanName, typeClass);
             } catch (BeansException e) {
                 throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
             }

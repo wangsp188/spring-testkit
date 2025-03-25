@@ -1,15 +1,17 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
 import java.util.*;
 
 public class FunctionCallTool {
 
-    @Autowired
-    private ApplicationContext applicationContext;
+    private ApplicationContext app;
+
+    public FunctionCallTool(ApplicationContext app) {
+        this.app = app;
+    }
 
     public Object process(Map<String, String> params) throws Exception {
         // 解析类名、方法名、方法参数类型
@@ -30,7 +32,7 @@ public class FunctionCallTool {
         ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
         Object bean = null;
         if (beanName == null || beanName.trim().isEmpty()) {
-            Map<String, ?> beansOfType = applicationContext.getBeansOfType(typeClass);
+            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
             if (beansOfType.isEmpty()) {
                 throw new TestkitException("can not find " + typeClass + " in this spring");
             } else if (beansOfType.size() > 1) {
@@ -39,7 +41,7 @@ public class FunctionCallTool {
             bean = beansOfType.values().iterator().next();
         } else {
             try {
-                bean = applicationContext.getBean(beanName, typeClass);
+                bean = app.getBean(beanName, typeClass);
             } catch (BeansException e) {
                 throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
             }

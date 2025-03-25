@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import java.util.Map;
 import java.util.concurrent.*;
@@ -37,7 +37,7 @@ class TaskManager {
             e.printStackTrace();
             return Ret.fail("time out");
         }catch (ExecutionException e){
-            return Ret.fail(TestkitSideServer.getNoneTestkitStackTrace(e.getCause()));
+            return Ret.fail(TestkitServer.getNoneTestkitStackTrace(e.getCause()));
         }
     }
 //    / 停止一个任务
@@ -58,11 +58,6 @@ class TaskManager {
         return cancelled;
     }
 
-
-    // 关闭executor  
-    public static void shutdown() {
-        executor.shutdown();
-    }
 
 
     private static final char[] CHAR_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".toCharArray();

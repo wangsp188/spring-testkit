@@ -1,7 +1,6 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Constructor;
@@ -10,9 +9,11 @@ import java.util.*;
 
 public class FlexibleTestTool {
 
-    @Autowired
-    private ApplicationContext ctx;
+    private ApplicationContext app;
 
+    public FlexibleTestTool(ApplicationContext app) {
+        this.app = app;
+    }
 
     public Object process(Map<String, String> params) throws JsonProcessingException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, ClassNotFoundException {
         String code = params.remove("code");
@@ -38,7 +39,7 @@ public class FlexibleTestTool {
             throw new TestkitException(typeClass.getName() + "instance error, class must has none params public constructor," + e);
         }
         try {
-            ReflexUtils.autowireBean(ctx.getAutowireCapableBeanFactory(), instance);
+            ReflexUtils.autowireBean(app.getAutowireCapableBeanFactory(), instance);
         } catch (Throwable e) {
             throw new TestkitException("autowireBean error, " + e);
         }

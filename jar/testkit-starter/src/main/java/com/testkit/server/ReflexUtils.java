@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -796,8 +796,25 @@ public class ReflexUtils {
         }
     }
 
+    private static HashSet<String> baseType = new HashSet<String>(){
+        {
+            add("boolean");
+            add("byte");
+            add("short");
+            add("int");
+            add("long");
+            add("char");
+            add("float");
+            add("double");
+        }
+    };
+
+
     private static boolean isClassLoadable(String className) {
         try {
+            if(baseType.contains(className)){
+                return true;
+            }
             Class.forName(className);
             return true;
         } catch (ClassNotFoundException e) {

@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 public class TestkitException extends RuntimeException {
     public TestkitException(String message) {

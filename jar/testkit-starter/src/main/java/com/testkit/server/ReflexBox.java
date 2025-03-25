@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;

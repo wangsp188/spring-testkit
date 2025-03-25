@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -11,11 +11,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 class RuntimeAppHelper {
 
+    public static final String LOCAL = "local";
+
+
     private static final String APPS_DIR = ".spring-testkit/apps";
 
+    public static boolean needRegister(String env){
+        return Objects.equals(LOCAL, env);
+    }
 
 
     public static void addApp(String project,String appName,Integer sidePort){
@@ -26,10 +33,10 @@ class RuntimeAppHelper {
         if (runtimes==null) {
             runtimes = new ArrayList<>();
         }
-        if(runtimes.contains(appName+":local:"+sidePort)){
+        if(runtimes.contains(appName+":"+LOCAL+":"+sidePort)){
             return;
         }
-        runtimes.add(appName+":local:"+sidePort);
+        runtimes.add(appName+":"+LOCAL+":"+sidePort);
 
         storeProjectRuntimes(project, runtimes);
     }

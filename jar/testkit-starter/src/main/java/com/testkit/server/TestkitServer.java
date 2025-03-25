@@ -1,22 +1,12 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.testkit.trace.TraceInfo;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
+import com.testkit.trace.TraceInfo;
 import org.springframework.boot.web.context.WebServerApplicationContext;
-import org.springframework.boot.web.context.WebServerInitializedEvent;
-import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 
 import java.io.*;
 import java.lang.reflect.Constructor;
@@ -28,61 +18,77 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-@Configuration
-@Import({FlexibleTestTool.class, FunctionCallTool.class, ViewValueTool.class})
-public class TestkitSideServer implements DisposableBean {
+public class TestkitServer {
 
-    @Autowired(required = false)
+    private ApplicationContext app;
+
     private SpringCacheTool springCacheTool;
 
-    @Autowired
     private FlexibleTestTool flexibleTestTool;
 
-    @Autowired
     private FunctionCallTool functionCallTool;
 
-    @Autowired
     private ViewValueTool viewValueTool;
 
-    @Autowired
-    private ApplicationContext applicationContext;
-
-
     private HttpServer server;
-
 
     private String project;
     private String appName;
     private String env;
     private boolean enableTrace;
-    private int sidePort;
 
 
-    @Bean
-    @ConditionalOnBean(CacheManager.class)
-    public SpringCacheTool springCacheTool() {
-        return new SpringCacheTool();
+    public TestkitServer(ApplicationContext app, String project, String appName, String env, boolean enableTrace) {
+        if (RuntimeAppHelper.needRegister(env) && (project == null || project.isEmpty() || appName == null || appName.isEmpty())) {
+            throw new IllegalArgumentException("project/appName can not be empty");
+        }
+        this.app = app;
+        this.springCacheTool = new SpringCacheTool(app);
+        this.flexibleTestTool = new FlexibleTestTool(app);
+        this.functionCallTool = new FunctionCallTool(app);
+        this.viewValueTool = new ViewValueTool(app);
+        this.project = project;
+        this.appName = appName;
+        this.env = env;
+        this.enableTrace = enableTrace;
     }
 
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void onApplicationEvent(ApplicationReadyEvent event) throws IOException {
-        project = applicationContext.getEnvironment().getProperty("testkit.project.name");
-        appName = applicationContext.getEnvironment().getProperty("testkit.app.name");
-        env = applicationContext.getEnvironment().getProperty("testkit.app.env");
-        enableTrace = "true".equals(applicationContext.getEnvironment().getProperty("testkit.trace.enable"));
+    public synchronized int start() {
+        this.server = startHttpServer(app);
+        return this.server.getAddress().getPort();
+    }
 
-        if (applicationContext instanceof WebServerApplicationContext) {
-            int port = ((WebServerApplicationContext) applicationContext).getWebServer().getPort();
-            sidePort = port + 10000;
-            sidePort = findRandomAvailablePort(11030, 11099);
-        } else {
-            sidePort = findRandomAvailablePort(11030, 11099);
+    public synchronized void stop() {
+        if (this.server == null) {
+            return;
         }
-        server = HttpServer.create(new InetSocketAddress(sidePort), 0);
+        int port = this.server.getAddress().getPort();
+        try {
+            this.server.stop(0);
+        } catch (Throwable ignore) {
+        }
+        if (Objects.equals(RuntimeAppHelper.LOCAL, env)) {
+            RuntimeAppHelper.removeApp(project, appName, port);
+        }
+    }
+
+    private HttpServer startHttpServer(ApplicationContext app) {
+        int serverPort = 0;
+        if (app instanceof WebServerApplicationContext) {
+            int port = ((WebServerApplicationContext) app).getWebServer().getPort();
+            serverPort = port + 10000;
+        } else {
+            serverPort = findAvailablePort(30001, 30099);
+        }
+        serverPort = findAvailablePort(30001, 30099);
+        HttpServer server;
+        try {
+            server = HttpServer.create(new InetSocketAddress(serverPort), 0);
+        } catch (IOException e) {
+            throw new RuntimeException("fail to create testkit server", e);
+        }
         server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/", new HttpHandler() {
             @Override
@@ -185,12 +191,11 @@ public class TestkitSideServer implements DisposableBean {
                 }
             }
         });
-
         new Thread(() -> {
             try {
                 server.start();
-                if (project != null && appName != null && sidePort > 0) {
-                    RuntimeAppHelper.addApp(project, appName, sidePort);
+                if (RuntimeAppHelper.needRegister(env)) {
+                    RuntimeAppHelper.addApp(project, appName, server.getAddress().getPort());
                 }
 
                 System.err.println("————————————————————————————————————————————————————————————————————\n" +
@@ -215,12 +220,14 @@ public class TestkitSideServer implements DisposableBean {
                         "//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^        //\n" +
                         "//            佛祖保佑         永不宕机     永无BUG                  //\n" +
                         "————————————————————————————————————————————————————————————————————\n" +
-                        "                          Testkit:" + sidePort);
+                        "                         Testkit:" +  server.getAddress().getPort());
             } catch (Exception e) {
-                System.err.println("Testkit side_server started fail on port " + sidePort + " " + e);
+                System.err.println("Testkit server started fail on port " +  server.getAddress().getPort() + " " + e);
             }
         }).start();
+        return server;
     }
+
 
     private Ret processReq(String reqId, Req req) {
         Class interceptorType = ReflexUtils.compile(req.getInterceptor());
@@ -250,7 +257,7 @@ public class TestkitSideServer implements DisposableBean {
                     throw new TestkitException(interceptorType.getName() + "interceptor error, class must has none params public constructor," + e.getMessage());
                 }
                 try {
-                    ReflexUtils.autowireBean(applicationContext.getAutowireCapableBeanFactory(), interceptorObj);
+                    ReflexUtils.autowireBean(app.getAutowireCapableBeanFactory(), interceptorObj);
                 } catch (Throwable e) {
                     throw new TestkitException("interceptorObj autowireBean error," + e.getMessage());
                 }
@@ -301,9 +308,6 @@ public class TestkitSideServer implements DisposableBean {
             try {
                 switch (req.getMethod()) {
                     case "spring-cache":
-                        if (springCacheTool == null) {
-                            ret = Ret.fail("The selected app not find spring-cache");
-                        }
                         ret = springCacheTool.process(params);
                         break;
                     case "flexible-test":
@@ -335,7 +339,7 @@ public class TestkitSideServer implements DisposableBean {
                 }
             }
         } catch (Throwable e) {
-            System.out.println("TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage());
+            System.err.println("TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage());
             e.printStackTrace();
             error = e;
             return Ret.fail(getNoneTestkitStackTrace(e), profile);
@@ -392,7 +396,7 @@ public class TestkitSideServer implements DisposableBean {
         return sw.toString();
     }
 
-    private String readInputStream(InputStream inputStream) throws IOException {
+    private static String readInputStream(InputStream inputStream) throws IOException {
         StringBuilder result = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             String line;
@@ -403,7 +407,7 @@ public class TestkitSideServer implements DisposableBean {
         return result.toString();
     }
 
-    private void returnError(HttpExchange exchange, String message) throws IOException {
+    private static void returnError(HttpExchange exchange, String message) throws IOException {
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         Ret ret = new Ret();
         ret.setSuccess(false);
@@ -414,6 +418,7 @@ public class TestkitSideServer implements DisposableBean {
         outputStream.write(bytes);
         outputStream.close();
     }
+
 
     /**
      * 检查本地 TCP 端口是否可用（所有网络接口）
@@ -439,35 +444,6 @@ public class TestkitSideServer implements DisposableBean {
     }
 
     /**
-     * 随机获取可用端口（改进版）
-     * @param minPort 最小端口号（包含）
-     * @param maxPort 最大端口号（包含）
-     * @return 找到的可用端口
-     * @throws IllegalStateException 无可用端口时抛出
-     */
-    public static int findRandomAvailablePort(int minPort, int maxPort) {
-        // 参数校验
-        if (minPort < 0 || maxPort > 65535 || minPort > maxPort) {
-            throw new IllegalArgumentException("invalid port range: [" + minPort + ", " + maxPort + "]");
-        }
-
-        // 生成随机顺序的端口列表（延迟计算）
-        List<Integer> shuffledPorts = IntStream.rangeClosed(minPort, maxPort)
-                .boxed()
-                .collect(Collectors.toList());
-        Collections.shuffle(shuffledPorts);
-
-        // 遍历随机序列
-        for (int port : shuffledPorts) {
-            if (isTcpPortAvailable(port)) {
-                return port;
-            }
-        }
-
-        throw new IllegalStateException("can not find available port");
-    }
-
-    /**
      * 查找指定范围内的可用端口
      */
     public static int findAvailablePort(int minPort, int maxPort) {
@@ -479,15 +455,85 @@ public class TestkitSideServer implements DisposableBean {
         throw new RuntimeException("No available ports between " + minPort + "-" + maxPort);
     }
 
-    @Override
-    public void destroy() throws Exception {
-        if (server == null) {
-            return;
-        }
-        server.stop(0);
-        if (project != null && appName != null && sidePort > 0) {
-            RuntimeAppHelper.removeApp(project, appName, sidePort);
-        }
-        TaskManager.shutdown();
+
+    public SpringCacheTool getSpringCacheTool() {
+        return springCacheTool;
     }
+
+    public void setSpringCacheTool(SpringCacheTool springCacheTool) {
+        this.springCacheTool = springCacheTool;
+    }
+
+    public FlexibleTestTool getFlexibleTestTool() {
+        return flexibleTestTool;
+    }
+
+    public void setFlexibleTestTool(FlexibleTestTool flexibleTestTool) {
+        this.flexibleTestTool = flexibleTestTool;
+    }
+
+    public FunctionCallTool getFunctionCallTool() {
+        return functionCallTool;
+    }
+
+    public void setFunctionCallTool(FunctionCallTool functionCallTool) {
+        this.functionCallTool = functionCallTool;
+    }
+
+    public ViewValueTool getViewValueTool() {
+        return viewValueTool;
+    }
+
+    public void setViewValueTool(ViewValueTool viewValueTool) {
+        this.viewValueTool = viewValueTool;
+    }
+
+    public ApplicationContext getApp() {
+        return app;
+    }
+
+    public void setApp(ApplicationContext app) {
+        this.app = app;
+    }
+
+    public HttpServer getServer() {
+        return server;
+    }
+
+    public void setServer(HttpServer server) {
+        this.server = server;
+    }
+
+    public String getProject() {
+        return project;
+    }
+
+    public void setProject(String project) {
+        this.project = project;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public String getEnv() {
+        return env;
+    }
+
+    public void setEnv(String env) {
+        this.env = env;
+    }
+
+    public boolean isEnableTrace() {
+        return enableTrace;
+    }
+
+    public void setEnableTrace(boolean enableTrace) {
+        this.enableTrace = enableTrace;
+    }
+
 }

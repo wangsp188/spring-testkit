@@ -1,4 +1,4 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import java.util.ArrayList;
 import java.util.List;

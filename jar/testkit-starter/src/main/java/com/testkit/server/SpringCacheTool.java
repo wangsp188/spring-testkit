@@ -1,11 +1,9 @@
-package com.testkit.side_server;
+package com.testkit.server;
 
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.interceptor.*;
 import org.springframework.context.ApplicationContext;
-import org.springframework.util.StringUtils;
 
 import java.io.Serializable;
 import java.lang.reflect.Method;
@@ -15,15 +13,21 @@ import java.util.stream.Collectors;
 
 public class SpringCacheTool {
 
-    @Autowired
-    private ApplicationContext applicationContext;
 
-    @Autowired
+    private ApplicationContext app;
+
     private CacheAspectSupport cacheAspectSupport;
 
-
-    @Autowired
     private CacheOperationSource cacheOperationSource;
+
+    public SpringCacheTool(ApplicationContext app) {
+        this.app = app;
+        try {
+            this.cacheAspectSupport = app.getBean(CacheAspectSupport.class);
+            this.cacheOperationSource = app.getBean(CacheOperationSource.class);
+        } catch (Throwable ignore) {
+        }
+    }
 
 
     Method operationContextMethod;
@@ -49,13 +53,14 @@ public class SpringCacheTool {
             redisCacheCls = Class.forName("org.springframework.data.redis.cache.RedisCache");
             redisCacheGenerateKeyMethod = redisCacheCls.getDeclaredMethod("createCacheKey", Object.class);
             redisCacheGenerateKeyMethod.setAccessible(true);
-        } catch (Throwable e) {
-            e.printStackTrace();
+        } catch (Throwable ignore) {
         }
     }
 
     public Object process(Map<String, String> params) throws Exception {
-
+        if (cacheAspectSupport == null || cacheOperationSource == null || operationContextMethod == null || generateKeyMethod == null || getCachesMethod == null) {
+            throw new TestkitException("The selected app not find spring-cache or System incompatibility, please contact the owner");
+        }
         // 解析类名、方法名、方法参数类型
         String typeClassStr = params.get("typeClass");
         String beanName = params.get("beanName");
@@ -74,7 +79,7 @@ public class SpringCacheTool {
         ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
         Object bean = null;
         if (beanName == null || beanName.trim().isEmpty()) {
-            Map<String, ?> beansOfType = applicationContext.getBeansOfType(typeClass);
+            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
             if (beansOfType.isEmpty()) {
                 throw new TestkitException("can not find " + typeClass + " in this spring");
             } else if (beansOfType.size() > 1) {
@@ -83,7 +88,7 @@ public class SpringCacheTool {
             bean = beansOfType.values().iterator().next();
         } else {
             try {
-                bean = applicationContext.getBean(beanName, typeClass);
+                bean = app.getBean(beanName, typeClass);
             } catch (BeansException e) {
                 throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
             }
