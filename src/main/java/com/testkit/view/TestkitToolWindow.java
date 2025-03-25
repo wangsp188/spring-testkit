@@ -454,10 +454,6 @@ public class TestkitToolWindow {
         if(localItems!=null){
             newItems.addAll(localItems);
         }
-        if (newItems.isEmpty()) {
-            return;
-        }
-
         // 用于比较的 map，判断是否有变化
         HashMap<String, Boolean> newMap = new HashMap<>();
         HashMap<String, String> requestData = new HashMap<>();
@@ -476,7 +472,7 @@ public class TestkitToolWindow {
             try {
                 // 发送请求获取实时数据
                 Map response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getSidePort() + "/", requestData, Map.class);
-                newMap.put(item.substring(0, item.lastIndexOf(":")), "true".equals(String.valueOf(response.get("data"))));
+                newMap.put(item, "true".equals(String.valueOf(response.get("data"))));
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();
@@ -496,7 +492,7 @@ public class TestkitToolWindow {
         // 更新 monitorMap
         RuntimeHelper.updateMonitors(newMap);
         // 比较新旧项是否有变化
-        boolean hasChanges = !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
+        boolean hasChanges = !(newItems.isEmpty() && currentItems.isEmpty()) && !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
         if (!hasChanges) {
             return;
         }
