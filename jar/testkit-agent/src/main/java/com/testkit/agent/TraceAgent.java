@@ -165,18 +165,18 @@ public class TraceAgent {
         try {
             CtClass ctClass = classPool.makeClass(new java.io.ByteArrayInputStream(classfileBuffer));
             CtMethod method = ctClass.getDeclaredMethod("pluginAll", new CtClass[]{classPool.get("java.lang.Object")});
-            // 我想在pluginAll最后修改返回值为 new com.testkit.side_server.enhance.TestkitMybatisInterceptor().plugin(当前返回值)
+            // 我想在pluginAll最后修改返回值为 new com.testkit.server.enhance.TestkitMybatisInterceptor().plugin(当前返回值)
             // 修改返回值
             if (logMybatis) {
                 method.insertAfter("{" +
                         "if ($_ instanceof org.apache.ibatis.executor.Executor) {" +
-                        "  $_ = com.testkit.side_server.enhance.TestkitMybatisInterceptor.pluginExecutorWithSql($_);" +
+                        "  $_ = com.testkit.server.enhance.TestkitMybatisInterceptor.pluginExecutorWithSql($_);" +
                         "}" +
                         "}");
             } else {
                 method.insertAfter("{" +
                         "if ($_ instanceof org.apache.ibatis.executor.Executor) {" +
-                        "  $_ = com.testkit.side_server.enhance.TestkitMybatisInterceptor.pluginExecutor($_);" +
+                        "  $_ = com.testkit.server.enhance.TestkitMybatisInterceptor.pluginExecutor($_);" +
                         "}" +
                         "}");
             }

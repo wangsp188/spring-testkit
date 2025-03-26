@@ -55,9 +55,26 @@ public class TestkitServer {
     }
 
 
-    public synchronized int start() {
-        this.server = startHttpServer(app);
-        return this.server.getAddress().getPort();
+    public synchronized void start() {
+        int serverPort = 0;
+        if (app instanceof WebServerApplicationContext) {
+            int port = ((WebServerApplicationContext) app).getWebServer().getPort();
+            serverPort = port + 10000;
+        } else {
+            serverPort = findAvailablePort(30001, 30099);
+        }
+        this.server = startHttpServer(serverPort);
+    }
+
+    public synchronized void start(int port) {
+        if (port <= 1) {
+            throw new IllegalArgumentException("port can not be less than 1");
+        }
+        this.server = startHttpServer(port);
+    }
+
+    public synchronized boolean isRunning() {
+        return this.server != null;
     }
 
     public synchronized void stop() {
@@ -72,16 +89,10 @@ public class TestkitServer {
         if (Objects.equals(RuntimeAppHelper.LOCAL, env)) {
             RuntimeAppHelper.removeApp(project, appName, port);
         }
+        this.server = null;
     }
 
-    private HttpServer startHttpServer(ApplicationContext app) {
-        int serverPort = 0;
-        if (app instanceof WebServerApplicationContext) {
-            int port = ((WebServerApplicationContext) app).getWebServer().getPort();
-            serverPort = port + 10000;
-        } else {
-            serverPort = findAvailablePort(30001, 30099);
-        }
+    private HttpServer startHttpServer(int serverPort) {
         HttpServer server;
         try {
             server = HttpServer.create(new InetSocketAddress(serverPort), 0);
@@ -219,9 +230,10 @@ public class TestkitServer {
                         "//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^        //\n" +
                         "//            佛祖保佑         永不宕机     永无BUG                  //\n" +
                         "————————————————————————————————————————————————————————————————————\n" +
-                        "                         Testkit:" +  server.getAddress().getPort());
+                        "                         Testkit:" + server.getAddress().getPort());
+                System.err.println("Testkit server started success, project:" + project + ", appName:" + appName + ", env:" + env + ", enableTrace:" + enableTrace);
             } catch (Exception e) {
-                System.err.println("Testkit server started fail on port " +  server.getAddress().getPort() + " " + e);
+                System.err.println("Testkit server started fail on port " + server.getAddress().getPort() + " " + e);
             }
         }).start();
         return server;

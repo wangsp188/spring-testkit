@@ -67,3 +67,5 @@ bin/
 /jar/testkit-trace/target
 /jar/testkit-starter/target
 /jar/testkit-agent/dependency-reduced-pom.xml
+/jar/testkit-dig/target
+/jar/testkit-dig-attach/target
