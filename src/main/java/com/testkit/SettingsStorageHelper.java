@@ -3,6 +3,7 @@ package com.testkit;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import com.testkit.sql_review.MysqlUtil;
+import com.testkit.util.HttpUtil;
 import com.testkit.view.SettingsDialog;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang3.StringUtils;
@@ -512,7 +513,7 @@ public class SettingsStorageHelper {
                                     .replaceFirst("\\.json$", "");
 
                             map.put(baseName, config);
-                        }catch (Exception e) {
+                        } catch (Exception e) {
                             e.printStackTrace();
                         }
                     }
@@ -764,7 +765,7 @@ public class SettingsStorageHelper {
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
-        config.setRemoteApps(projectConfig.getRemoteApps()==null?new ArrayList<>():projectConfig.getRemoteApps());
+        config.setRemoteApps(projectConfig.getRemoteApps() == null ? new ArrayList<>() : projectConfig.getRemoteApps());
         config.setBeanAnnotations(projectConfig.getBeanAnnotations() == null ? defBeanAnnotations : projectConfig.getBeanAnnotations());
         config.setTraceConfig(projectConfig.getTraceConfig() == null ? copyDefMonitorConfig() : projectConfig.getTraceConfig());
         config.setSqlConfig(projectConfig.getSqlConfig() == null ? copyDefSqlConfig() : projectConfig.getSqlConfig());
@@ -868,6 +869,18 @@ public class SettingsStorageHelper {
             configDir.mkdirs();
         }
         return new File(configDir, project.getName() + ".json");
+    }
+
+    public static String encodeInterceptor(Project project, String appName) {
+        try {
+            String appScript = SettingsStorageHelper.getAppScript(project, appName);
+            if (appScript == null || appScript.isEmpty()) {
+                return null;
+            }
+            return Base64.getEncoder().encodeToString(appScript.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            return null;
+        }
     }
 
     public static class ProjectConfig {
@@ -1187,13 +1200,10 @@ public class SettingsStorageHelper {
             this.logMybatis = logMybatis;
         }
 
-//        public int getSingleClsDepth() {
-//            return singleClsDepth;
-//        }
-//
-//        public void setSingleClsDepth(int singleClsDepth) {
-//            this.singleClsDepth = singleClsDepth;
-//        }
+        @Override
+        public String toString() {
+            return HttpUtil.encode(JSON.parseObject(JSON.toJSONString(this)));
+        }
     }
 
 

@@ -20,11 +20,6 @@
             <artifactId>javassist</artifactId>
             <version>3.29.2-GA</version> <!-- 使用最新稳定版本 -->
         </dependency>
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-            <version>1.2.83</version>
-        </dependency>
     </dependencies>
 
     <build>
@@ -47,6 +42,10 @@
             <plugin>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.2.4</version>
+                <configuration>
+                    <!-- 关键配置：禁用生成精简POM -->
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                </configuration>
                 <executions>
                     <execution>
                         <phase>package</phase>

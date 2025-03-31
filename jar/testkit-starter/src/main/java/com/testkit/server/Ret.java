@@ -6,43 +6,46 @@ import java.util.Map;
 
 class Ret {
     private boolean success;
-
+    private int cost;
     private String message;
 
     private Object data;
 
-    private List<Map<String,String>> profile;
+    private List<Map<String, String>> profile;
 
-    public static Ret fail(String message) {
+    public static Ret fail(String message,int cost) {
         Ret ret = new Ret();
         ret.success = false;
         ret.message = message;
+        ret.cost = cost;
         return ret;
     }
 
-    public static Ret fail(String message,Map<String,String> profile) {
+    public static Ret fail(String message,int cost, Map<String, String> profile) {
         Ret ret = new Ret();
         ret.success = false;
         ret.message = message;
-        if (profile!=null && !profile.isEmpty()) {
+        if (profile != null && !profile.isEmpty()) {
             ret.profile = new ArrayList<>();
             ret.profile.add(profile);
         }
         return ret;
     }
 
-    public static Ret success(Object data) {
+    public static Ret success(Object data, int cost) {
         Ret ret = new Ret();
         ret.success = true;
         ret.data = data;
+        ret.cost = cost;
         return ret;
     }
 
-    public static Ret success(Object data, Map<String,String> profile) {
+    public static Ret success(Object data, int cost, Map<String, String> profile) {
         Ret ret = new Ret();
         ret.success = true;
         ret.data = data;
-        if (profile!=null && !profile.isEmpty()) {
+        ret.cost = cost;
+        if (profile != null && !profile.isEmpty()) {
             ret.profile = new ArrayList<>();
             ret.profile.add(profile);
         }
@@ -80,5 +83,13 @@ class Ret {
 
     public void setProfile(List<Map<String, String>> profile) {
         this.profile = profile;
+    }
+
+    public int getCost() {
+        return cost;
+    }
+
+    public void setCost(int cost) {
+        this.cost = cost;
     }
 }

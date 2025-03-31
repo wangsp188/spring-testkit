@@ -4,9 +4,11 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
+import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -48,6 +50,9 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public abstract class BasePluginTool {
+
+    public static final Icon JSON_ICON = IconLoader.getIcon("/icons/json.svg", BasePluginTool.class);
+    public static final Icon CMD_ICON = IconLoader.getIcon("/icons/cmd.svg", BasePluginTool.class);
 
 
     protected Set<String> cancelReqs = new HashSet<>(128);
@@ -127,10 +132,10 @@ public abstract class BasePluginTool {
 
 
         // 添加复制按钮的动作
-        AnAction copyAction = new AnAction("Copy input to clipboard", "Copy input to clipboard", AllIcons.Actions.Copy) {
+        AnAction copyAction = new AnAction("Copy input", "Copy input", AllIcons.Actions.Copy) {
             @Override
             public void actionPerformed(AnActionEvent e) {
-                TestkitHelper.copyToClipboard(getProject(), jsonInputField.getText(), "Input was copied");
+                handleCopyInput(e);
             }
         };
         actionGroup.add(copyAction);
@@ -184,6 +189,11 @@ public abstract class BasePluginTool {
 
 
     protected void handleStore(String app, String group, String title) {
+    }
+
+
+    protected void handleCopyInput(AnActionEvent e){
+        TestkitHelper.copyToClipboard(getProject(), jsonInputField.getText(), "Input was copied");
     }
 
     private void fillStoreAction() {

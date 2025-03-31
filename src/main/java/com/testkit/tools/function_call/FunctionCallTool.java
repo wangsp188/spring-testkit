@@ -3,11 +3,13 @@ package com.testkit.tools.function_call;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.intellij.notification.NotificationType;
 import com.testkit.TestkitHelper;
 import com.testkit.ReqStorageHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.tools.ToolHelper;
+import com.testkit.tools.flexible_test.FlexibleTestTool;
 import com.testkit.util.Container;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -47,6 +49,7 @@ import java.util.List;
 import java.util.function.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class FunctionCallTool extends BasePluginTool {
 
@@ -100,7 +103,7 @@ public class FunctionCallTool extends BasePluginTool {
             @Override
             public void actionPerformed(ActionEvent e) {
                 RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
-                if(app==null){
+                if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
                             "Error",
@@ -120,7 +123,7 @@ public class FunctionCallTool extends BasePluginTool {
             @Override
             public void actionPerformed(ActionEvent e) {
                 RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
-                if(app==null){
+                if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
                             "Error",
@@ -140,7 +143,7 @@ public class FunctionCallTool extends BasePluginTool {
             @Override
             public void actionPerformed(ActionEvent e) {
                 RuntimeHelper.VisibleApp app = RuntimeHelper.getSelectedApp(getProject().getName());
-                if(app==null){
+                if (app == null) {
                     Messages.showMessageDialog(getProject(),
                             "Failed to find runtime app",
                             "Error",
@@ -928,7 +931,7 @@ public class FunctionCallTool extends BasePluginTool {
         RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(getProject().getName());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues,jsonBody});
+        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
@@ -1024,6 +1027,137 @@ public class FunctionCallTool extends BasePluginTool {
         return panel;
     }
 
+    @Override
+    protected void handleCopyInput(AnActionEvent e) {
+        String jsonInput = jsonInputField.getText();
+        if (jsonInput == null || jsonInput.isBlank()) {
+            TestkitHelper.notify(getProject(), NotificationType.ERROR, "input parameter is blank");
+            return;
+        }
+        JSONObject jsonObject;
+        try {
+            jsonObject = JSONObject.parseObject(jsonInput);
+        } catch (Exception ex) {
+            TestkitHelper.notify(getProject(), NotificationType.ERROR, "input parameter must be json object");
+            return;
+        }
+        ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+        if (selectedItem == null) {
+            TestkitHelper.notify(getProject(), NotificationType.ERROR, "Please select method");
+            return;
+        }
+
+        //新增drop down
+        DefaultActionGroup copyGroup = new DefaultActionGroup();
+        //显示的一个图标加上标题
+        AnAction copyDirect = new AnAction("Copy the input params", "Copy the input params", JSON_ICON) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                FunctionCallTool.super.handleCopyInput(e);
+            }
+        };
+        copyGroup.add(copyDirect); // 将动作添加到动作组中
+        PsiMethod method = selectedItem.getMethod();
+
+
+        Map<String, String> appInterceptors = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
+            @Override
+            public boolean test(RuntimeHelper.AppMeta appMeta) {
+                return ToolHelper.isDependency(selectedItem.getMethod(), getProject(), appMeta.getModule());
+            }
+        }).collect(Collectors.toMap(new Function<RuntimeHelper.AppMeta, String>() {
+            @Override
+            public String apply(RuntimeHelper.AppMeta appMeta) {
+                return appMeta.getApp();
+            }
+        }, new Function<RuntimeHelper.AppMeta, String>() {
+            @Override
+            public String apply(RuntimeHelper.AppMeta appMeta) {
+                return SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), appMeta.getApp());
+            }
+        }));
+
+
+        if (useInterceptor && !appInterceptors.isEmpty()) {
+            boolean canInitparams = FunctionCallIconProvider.canInitparams(method);
+            boolean springCacheMethod = FunctionCallIconProvider.isSpringCacheMethod(method);
+            for (Map.Entry<String, String> stringStringEntry : appInterceptors.entrySet()) {
+                if (canInitparams) {
+                    AnAction copyCmd = new AnAction("Copy Function-call " + stringStringEntry.getKey() + " Cmd", "Copy Function-call " + stringStringEntry.getKey() + " Cmd", CMD_ICON) {
+                        @Override
+                        public void actionPerformed(@NotNull AnActionEvent e) {
+                            JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FUNCTION_CALL.getCode());
+                            callReq.put("interceptor", stringStringEntry.getValue());
+                            String cmd = PluginToolEnum.FUNCTION_CALL.getCode() + " " + JSONObject.toJSONString(callReq);
+                            TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
+                        }
+                    };
+                    copyGroup.add(copyCmd); // 将动作添加到动作组中
+                }
+
+                if (springCacheMethod) {
+                    HashMap<String, String> map = new HashMap<>();
+                    map.put("Build-key", "build_cache_key");
+                    map.put("Build-key&Get-value", "get_cache");
+                    map.put("Build-key&Del-value", "delete_cache");
+                    for (String cacheAction : Arrays.asList("Build-key", "Build-key&Get-value", "Build-key&Del-value")) {
+                        AnAction copyCmd = new AnAction("Copy " + cacheAction + " " + stringStringEntry.getKey() + " Cmd", "Copy " + cacheAction + " " + stringStringEntry.getKey() + " Cmd", CMD_ICON) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                JSONObject callReq = buildCacheParams(method, jsonObject, map.get(cacheAction));
+                                callReq.put("interceptor", null);
+                                String cms = "spring-cache " + JSONObject.toJSONString(callReq);
+                                TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
+                            }
+                        };
+                        copyGroup.add(copyCmd); // 将动作添加到动作组中
+                    }
+                }
+
+
+            }
+        } else {
+            //如果是普通的函数，则
+            if (FunctionCallIconProvider.canInitparams(method)) {
+                //找出来app及对应的脚本
+                AnAction copyCmd = new AnAction("Copy Function-call Cmd", "Copy Function-call Cmd", CMD_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        JSONObject callReq = buildParams(method, jsonObject, PluginToolEnum.FUNCTION_CALL.getCode());
+                        callReq.put("interceptor", null);
+                        String cms = PluginToolEnum.FUNCTION_CALL.getCode() + " " + JSONObject.toJSONString(callReq);
+                        TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
+                    }
+                };
+                copyGroup.add(copyCmd); // 将动作添加到动作组中
+            }
+
+
+            if (FunctionCallIconProvider.isSpringCacheMethod(method)) {
+                HashMap<String, String> map = new HashMap<>();
+                map.put("Build-key", "build_cache_key");
+                map.put("Build-key&Get-value", "get_cache");
+                map.put("Build-key&Del-value", "delete_cache");
+                for (String cacheAction : Arrays.asList("Build-key", "Build-key&Get-value", "Build-key&Del-value")) {
+                    AnAction copyCmd = new AnAction("Copy " + cacheAction + " Cmd", "Copy " + cacheAction + " Cmd", CMD_ICON) {
+                        @Override
+                        public void actionPerformed(@NotNull AnActionEvent e) {
+                            JSONObject callReq = buildCacheParams(method, jsonObject, map.get(cacheAction));
+                            callReq.put("interceptor", null);
+                            String cms = "spring-cache " + JSONObject.toJSONString(callReq);
+                            TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
+                        }
+                    };
+                    copyGroup.add(copyCmd); // 将动作添加到动作组中
+                }
+            }
+        }
+
+        JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("CopyFunctionCallPopup", copyGroup).getComponent();
+        popupMenu.show(jsonInputField, 0, 0);
+    }
+
+
     private JSONObject buildParams(PsiMethod method, JSONObject args, String action) {
         JSONObject params = new JSONObject();
         PsiClass containingClass = method.getContainingClass();
@@ -1051,12 +1185,10 @@ public class FunctionCallTool extends BasePluginTool {
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (useInterceptor) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
-            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
         }
         return req;
     }
-
-
 
 
     private JSONObject handleCacheAction(String action) {
@@ -1073,8 +1205,8 @@ public class FunctionCallTool extends BasePluginTool {
             return null;
         }
         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
-        if (selectedItem==null) {
-            TestkitHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
+        if (selectedItem == null) {
+            TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Please select method");
             return null;
         }
         selectedItem.setArgs(jsonInput);
@@ -1097,14 +1229,14 @@ public class FunctionCallTool extends BasePluginTool {
             argTypes[i] = parameters[i].getType().getCanonicalText();
         }
         params.put("argTypes", JSONObject.toJSONString(argTypes));
-        params.put("args", ToolHelper.adapterParams(method,args).toJSONString());
+        params.put("args", ToolHelper.adapterParams(method, args).toJSONString());
         params.put("action", action);
         JSONObject req = new JSONObject();
         req.put("method", "spring-cache");
         req.put("params", params);
-        if(useInterceptor){
+        if (useInterceptor) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
-            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
         }
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
         req.put("trace", traceConfig.isEnable());

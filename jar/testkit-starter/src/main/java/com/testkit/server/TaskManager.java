@@ -10,7 +10,7 @@ class TaskManager {
     private static final ExecutorService executor = Executors.newCachedThreadPool();
 
     // 启动任务并返回请求ID  
-    public static String startTask(String reqId,Callable<Ret> task) {
+    public static String startTask(String reqId, Callable<Ret> task) {
         // 生成唯一的请求ID  
         // 将任务包装成FutureTask并提交到 executor
         Future<Ret> future = executor.submit(task);
@@ -24,23 +24,25 @@ class TaskManager {
         // 获取对应的任务  
         Future<Ret> future = taskMap.get(reqId);
         if (future == null) {
-            return Ret.fail("not found task");
+            return Ret.fail("not found task", 0);
         }
 
+        long millis = System.currentTimeMillis();
         try {
             // 等待任务完成并获取结果  
             return future.get(timeout, TimeUnit.SECONDS);  // 任务还没有完成会阻塞直到任务完成
         } catch (InterruptedException e) {
             e.printStackTrace();
-            return Ret.fail("thread interrupted");
-        }catch (TimeoutException e){
+            return Ret.fail("thread interrupted", (int) (System.currentTimeMillis() - millis));
+        } catch (TimeoutException e) {
             e.printStackTrace();
-            return Ret.fail("time out");
-        }catch (ExecutionException e){
-            return Ret.fail(TestkitServer.getNoneTestkitStackTrace(e.getCause()));
+            return Ret.fail("time out", (int) (System.currentTimeMillis() - millis));
+        } catch (ExecutionException e) {
+            return Ret.fail(TestkitServer.getNoneTestkitStackTrace(e.getCause()), (int) (System.currentTimeMillis() - millis));
         }
     }
-//    / 停止一个任务
+
+    //    / 停止一个任务
     public static boolean stopTask(String reqId) {
         // 获取对应的任务
         Future<Ret> future = taskMap.get(reqId);
@@ -57,7 +59,6 @@ class TaskManager {
         }
         return cancelled;
     }
-
 
 
     private static final char[] CHAR_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".toCharArray();

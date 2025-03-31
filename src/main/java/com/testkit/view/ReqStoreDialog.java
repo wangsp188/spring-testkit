@@ -765,7 +765,7 @@ public class ReqStoreDialog {
 
         copyRetButton = new JButton(AllIcons.Actions.Copy);
         copyRetButton.setPreferredSize(new Dimension(32, 32));
-        copyRetButton.setToolTipText("Copy result text");
+        copyRetButton.setToolTipText("Copy output");
         copyRetButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -1687,7 +1687,7 @@ public class ReqStoreDialog {
         req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
-            req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }
@@ -1708,7 +1708,7 @@ public class ReqStoreDialog {
         req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
-            req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }
@@ -1727,7 +1727,7 @@ public class ReqStoreDialog {
         req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
-            req.put("interceptor", SettingsStorageHelper.getAppScript(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), visibleApp.getAppName()));
         }
         return req;
     }

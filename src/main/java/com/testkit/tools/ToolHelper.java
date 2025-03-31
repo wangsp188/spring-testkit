@@ -25,6 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.*;

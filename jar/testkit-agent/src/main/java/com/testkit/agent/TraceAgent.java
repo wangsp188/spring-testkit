@@ -1,17 +1,16 @@
 package com.testkit.agent;
 
-import com.alibaba.fastjson.JSONObject;
 import javassist.*;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.ProtectionDomain;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -22,8 +21,8 @@ public class TraceAgent {
         try {
             String base64Json = URLDecoder.decode(agentArgs, "UTF-8");
             String json = new String(Base64.getDecoder().decode(base64Json), "UTF-8");
-            JSONObject jsonObject = JSONObject.parseObject(json);
-            String packages = jsonObject.getString("packages");
+            Map<String, String> jsonObject = decode(json);
+            String packages = jsonObject.get("packages");
             if (packages != null && !packages.isEmpty()) {
                 config.setPackages(Arrays.stream(packages.split(",")).distinct().map(new Function<String, String>() {
                     @Override
@@ -33,7 +32,7 @@ public class TraceAgent {
                 }).collect(Collectors.toSet()));
             }
 
-            String clsSuffix = jsonObject.getString("clsSuffix");
+            String clsSuffix = jsonObject.get("clsSuffix");
             if (clsSuffix != null && !clsSuffix.isEmpty()) {
                 config.setClsSuffix(Arrays.stream(clsSuffix.split(",")).distinct().map(new Function<String, String>() {
                     @Override
@@ -43,7 +42,7 @@ public class TraceAgent {
                 }).collect(Collectors.toSet()));
             }
 
-            String whites = jsonObject.getString("whites");
+            String whites = jsonObject.get("whites");
             if (whites != null && !whites.isEmpty()) {
                 config.setWhites(Arrays.stream(whites.split(",")).distinct().map(new Function<String, String>() {
                     @Override
@@ -53,7 +52,7 @@ public class TraceAgent {
                 }).collect(Collectors.toSet()));
             }
 
-            String blacks = jsonObject.getString("blacks");
+            String blacks = jsonObject.get("blacks");
             if (blacks != null && !blacks.isEmpty()) {
                 config.setBlacks(Arrays.stream(blacks.split(",")).distinct().map(new Function<String, String>() {
                     @Override
@@ -62,10 +61,10 @@ public class TraceAgent {
                     }
                 }).collect(Collectors.toSet()));
             }
-            config.setTraceWeb(jsonObject.getBooleanValue("traceWeb"));
-            config.setTraceMybatis(jsonObject.getBooleanValue("traceMybatis"));
-            config.setLogMybatis(jsonObject.getBooleanValue("logMybatis"));
-            System.err.println("Testkit trace config: " + JSONObject.toJSONString(config));
+            config.setTraceWeb("true".equals(jsonObject.get("traceWeb")));
+            config.setTraceMybatis("true".equals(jsonObject.get("traceMybatis")));
+            config.setLogMybatis("true".equals(jsonObject.get("logMybatis")));
+            System.err.println("Testkit trace config: " + config);
         } catch (Throwable e) {
             System.err.println("Testkit trace config parse error");
             e.printStackTrace();
@@ -359,7 +358,7 @@ public class TraceAgent {
         method.insertBefore(
                 "_t_t_ = com.testkit.trace.TraceInfo.getCurrent();" +
                         "if (_t_t_ != null) {" +
-                        "    _t_t_ = new com.testkit.trace.TraceInfo(_t_t_,\""+group+"\",\"" + className + "\", \"" + methodName + "\").stepIn();" +
+                        "    _t_t_ = new com.testkit.trace.TraceInfo(_t_t_,\"" + group + "\",\"" + className + "\", \"" + methodName + "\").stepIn();" +
                         "}"
         );
 
@@ -405,6 +404,39 @@ public class TraceAgent {
                         "}",
                 ClassPool.getDefault().get("java.lang.Throwable")
         );
+    }
+
+    // 解码：URL参数字符串 → Map
+    public static Map<String, String> decode(String query) {
+        Map<String, String> params = new HashMap<>();
+        if (query == null || query.isEmpty()) {
+            return params;
+        }
+
+        String[] pairs = query.split("&");
+        for (String pair : pairs) {
+            int idx = pair.indexOf("=");
+            if (idx == -1) {
+                // 处理没有值的参数（如 "key"）
+                String key = decodeComponent(pair);
+                params.put(key, "");
+            } else {
+                // 分割键值对
+                String key = decodeComponent(pair.substring(0, idx));
+                String value = decodeComponent(pair.substring(idx + 1));
+                params.put(key, value);
+            }
+        }
+        return params;
+    }
+
+    // URL组件解码
+    private static String decodeComponent(String s) {
+        try {
+            return URLDecoder.decode(s, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("UTF-8 decoding not supported", e);
+        }
     }
 
 

@@ -1,6 +1,8 @@
 package com.testkit.view;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
+import com.google.gson.JsonObject;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -358,7 +360,7 @@ public class TestkitToolWindow {
 
         // 创建工具栏
         actionGroup = new DefaultActionGroup();
-        AnAction copyAction = new AnAction("Copy output to clipboard", "Copy output to clipboard", AllIcons.Actions.Copy) {
+        AnAction copyAction = new AnAction("Copy output", "Copy output", AllIcons.Actions.Copy) {
             @Override
             public void actionPerformed(AnActionEvent e) {
                 // 调用复制功能
@@ -471,8 +473,9 @@ public class TestkitToolWindow {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
             try {
                 // 发送请求获取实时数据
-                Map response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getSidePort() + "/", requestData, Map.class);
-                newMap.put(item, "true".equals(String.valueOf(response.get("data"))));
+                JSONObject response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getSidePort() + "/", requestData, JSONObject.class);
+                boolean enableTrace = response.getJSONObject("data").getBooleanValue("enableTrace");
+                newMap.put(item, enableTrace);
             } catch (Exception e) {
                 e.printStackTrace();
                 iterator.remove();

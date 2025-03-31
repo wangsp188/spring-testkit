@@ -5,6 +5,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.testkit.trace.TraceInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationContext;
 
@@ -20,6 +22,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
 public class TestkitServer {
+
+    private static Logger logger = LoggerFactory.getLogger(TestkitServer.class);
 
     private ApplicationContext app;
 
@@ -83,7 +87,7 @@ public class TestkitServer {
         }
         int port = this.server.getAddress().getPort();
         try {
-            this.server.stop(0);
+            this.server.stop(3);
         } catch (Throwable ignore) {
         }
         if (Objects.equals(RuntimeAppHelper.LOCAL, env)) {
@@ -107,6 +111,7 @@ public class TestkitServer {
                     returnError(exchange, "un support http method");
                     return;
                 }
+                long millis = System.currentTimeMillis();
                 try {
                     InputStream inputStream = exchange.getRequestBody();
                     // 读取请求的JSON内容
@@ -119,7 +124,16 @@ public class TestkitServer {
                     }
                     Ret ret = null;
                     if ("hello".equals(req.getMethod())) {
-                        ret = Ret.success(enableTrace);
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("enableTrace", enableTrace);
+                        map.put("app", appName);
+                        map.put("env", env);
+                        map.put("ip", LocalIpUtil.getLocalIp());
+                        map.put("port", serverPort);
+                        ret = Ret.success(map, (int) (System.currentTimeMillis() - millis));
+                    } else if ("stop".equals(req.getMethod())) {
+                        stop();
+                        ret = Ret.success(true, (int) (System.currentTimeMillis() - millis));
                     } else if ("get_task_ret".equals(req.getMethod())) {
                         Map<String, String> params = req.getParams();
                         String reqId = params.get("reqId");
@@ -132,7 +146,7 @@ public class TestkitServer {
                     } else if ("stop_task".equals(req.getMethod())) {
                         Map<String, String> params = req.getParams();
                         String reqId = params.get("reqId");
-                        ret = Ret.success(TaskManager.stopTask(reqId));
+                        ret = Ret.success(TaskManager.stopTask(reqId), (int) (System.currentTimeMillis() - millis));
                         System.err.println("Testkit stopReq reqId:" + reqId + " cancel:" + ret.getData());
                     } else {
                         String reqId = TaskManager.generateRandomString(16);
@@ -143,7 +157,7 @@ public class TestkitServer {
                                 return processReq(reqId, finalReq);
                             }
                         });
-                        ret = Ret.success(reqId);
+                        ret = Ret.success(reqId, (int) (System.currentTimeMillis() - millis));
                         System.err.println("Testkit submitReq  method:" + req.getMethod() + " reqId:" + reqId);
                     }
 
@@ -231,9 +245,9 @@ public class TestkitServer {
                         "//            佛祖保佑         永不宕机     永无BUG                  //\n" +
                         "————————————————————————————————————————————————————————————————————\n" +
                         "                         Testkit:" + server.getAddress().getPort());
-                System.err.println("Testkit server started success, project:" + project + ", appName:" + appName + ", env:" + env + ", enableTrace:" + enableTrace);
+                logger.info("Testkit server started success, project:" + project + ", appName:" + appName + ", env:" + env + ", enableTrace:" + enableTrace);
             } catch (Exception e) {
-                System.err.println("Testkit server started fail on port " + server.getAddress().getPort() + " " + e);
+                logger.error("Testkit server started fail on port " + server.getAddress().getPort(), e);
             }
         }).start();
         return server;
@@ -241,7 +255,12 @@ public class TestkitServer {
 
 
     private Ret processReq(String reqId, Req req) {
-        Class interceptorType = ReflexUtils.compile(req.getInterceptor());
+        Class interceptorType = null;
+        try {
+            interceptorType = req.getInterceptor() == null || req.getInterceptor().isEmpty() ? null : ReflexUtils.compile(new String(Base64.getDecoder().decode(req.getInterceptor()), "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new TestkitException("Unsupported utf-8, " + e.getMessage());
+        }
         Object interceptorObj = null;
         Method beforeMethod = null;
         Method afterMethod = null;
@@ -289,7 +308,7 @@ public class TestkitServer {
             }
 
             begin = System.currentTimeMillis();
-            if (req.isTrace()) {
+            if (req.isTrace() && enableTrace) {
                 String biz = "unknown";
                 String action = "unknown";
                 switch (req.getMethod()) {
@@ -333,13 +352,13 @@ public class TestkitServer {
                     default:
                         throw new TestkitException("un support method");
                 }
-                if (req.isTrace()) {
+                if (req.isTrace() && enableTrace) {
                     profile.put("link", testkitTraceInfo.stepOut(ret, null).toProfilerString());
                     profile.put("cost", String.valueOf((System.currentTimeMillis() - begin)));
                 }
-                return Ret.success(ret, profile);
+                return Ret.success(ret, (int) (System.currentTimeMillis() - begin), profile);
             } catch (Throwable e) {
-                if (req.isTrace()) {
+                if (req.isTrace() && enableTrace) {
                     profile.put("link", testkitTraceInfo.stepOut(null, e).toProfilerString());
                     profile.put("cost", String.valueOf((System.currentTimeMillis() - begin)));
                 }
@@ -353,7 +372,7 @@ public class TestkitServer {
             System.err.println("TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage());
             e.printStackTrace();
             error = e;
-            return Ret.fail(getNoneTestkitStackTrace(e), profile);
+            return Ret.fail(getNoneTestkitStackTrace(e), (int) (System.currentTimeMillis() - begin), profile);
         } finally {
             Integer cost = begin == null ? null : Math.toIntExact((System.currentTimeMillis() - begin));
             while (error instanceof InvocationTargetException) {

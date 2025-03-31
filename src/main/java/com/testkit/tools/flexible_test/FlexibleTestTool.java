@@ -1,6 +1,12 @@
 package com.testkit.tools.flexible_test;
 
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.notification.NotificationType;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.ui.JBPopupMenu;
 import com.testkit.TestkitHelper;
 import com.testkit.ReqStorageHelper;
 import com.testkit.RuntimeHelper;
@@ -16,15 +22,18 @@ import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.intellij.util.ui.JBUI;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class FlexibleTestTool extends BasePluginTool {
 
@@ -61,7 +70,7 @@ public class FlexibleTestTool extends BasePluginTool {
         return RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                     @Override
                     public boolean test(RuntimeHelper.AppMeta appMeta) {
-                        return ToolHelper.isDependency(methodAction.getMethod(),getProject(),appMeta.getModule());
+                        return ToolHelper.isDependency(methodAction.getMethod(), getProject(), appMeta.getModule());
                     }
                 }).map(new Function<RuntimeHelper.AppMeta, String>() {
                     @Override
@@ -104,11 +113,11 @@ public class FlexibleTestTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new GridBagLayout());
-        actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,FLEXIBLE_TEST_DISABLE_ICON,"<strong>flexible-test</strong><br>\n" +
+        actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON, FLEXIBLE_TEST_DISABLE_ICON, "<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>module test source ,public method of  package : ${Test Package}</li>\n" +
                 "    <li>no static</li>\n" +
-                "</ul>",topPanel, new ActionListener() {
+                "</ul>", topPanel, new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -157,7 +166,7 @@ public class FlexibleTestTool extends BasePluginTool {
                         }
                         ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
                         if (selectedItem == null) {
-                            TestkitHelper.alert(getProject(),Messages.getErrorIcon(),"Please select method");
+                            TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Please select method");
                             return null;
                         }
                         selectedItem.setArgs(jsonInput);
@@ -166,10 +175,87 @@ public class FlexibleTestTool extends BasePluginTool {
                 });
             }
         });
-        topPanel.add(runButton,gbc);
+        topPanel.add(runButton, gbc);
         return topPanel;
     }
 
+    @Override
+    protected void handleCopyInput(AnActionEvent e) {
+        String jsonInput = jsonInputField.getText();
+        if (jsonInput == null || jsonInput.isBlank()) {
+            TestkitHelper.notify(getProject(), NotificationType.ERROR, "input parameter is blank");
+            return;
+        }
+        JSONObject jsonObject;
+        try {
+            jsonObject = JSONObject.parseObject(jsonInput);
+        } catch (Exception ex) {
+            TestkitHelper.notify(getProject(), NotificationType.ERROR, "input parameter must be json object");
+            return;
+        }
+        ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
+        if (selectedItem == null) {
+            TestkitHelper.notify(getProject(), NotificationType.ERROR, "Please select method");
+            return;
+        }
+
+        DefaultActionGroup copyGroup = new DefaultActionGroup();
+        //显示的一个图标加上标题
+        AnAction copyDirect = new AnAction("Copy the input params", "Copy the input params", JSON_ICON) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                FlexibleTestTool.super.handleCopyInput(e);
+            }
+        };
+        copyGroup.add(copyDirect); // 将动作添加到动作组中
+
+        //找出所有可能依赖的服务
+        Map<String, String> appInterceptors = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
+            @Override
+            public boolean test(RuntimeHelper.AppMeta appMeta) {
+                return ToolHelper.isDependency(selectedItem.getMethod(), getProject(), appMeta.getModule());
+            }
+        }).collect(Collectors.toMap(new Function<RuntimeHelper.AppMeta, String>() {
+            @Override
+            public String apply(RuntimeHelper.AppMeta appMeta) {
+                return appMeta.getApp();
+            }
+        }, new Function<RuntimeHelper.AppMeta, String>() {
+            @Override
+            public String apply(RuntimeHelper.AppMeta appMeta) {
+                return SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), appMeta.getApp());
+            }
+        }));
+
+        if (useInterceptor && !appInterceptors.isEmpty()) {
+            for (Map.Entry<String, String> stringStringEntry : appInterceptors.entrySet()) {
+                AnAction copyCmd = new AnAction("Copy Flexible-test "+stringStringEntry.getKey()+" Cmd", "Copy Flexible-test "+stringStringEntry.getKey()+" Cmd", CMD_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
+                        callReq.put("interceptor", stringStringEntry.getValue());
+                        String cmd = PluginToolEnum.FLEXIBLE_TEST.getCode() + " " + JSONObject.toJSONString(callReq);
+                        TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
+                    }
+                };
+                copyGroup.add(copyCmd); // 将动作添加到动作组中
+            }
+        } else {
+            AnAction copyCmd = new AnAction("Copy Flexible-test Cmd", "Copy Flexible-test Cmd", CMD_ICON) {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent e) {
+                    JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
+                    callReq.put("interceptor", null);
+                    String cmd = PluginToolEnum.FLEXIBLE_TEST.getCode() + " " + JSONObject.toJSONString(callReq);
+                    TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
+                }
+            };
+            copyGroup.add(copyCmd); // 将动作添加到动作组中
+        }
+
+        JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("CopyFlexibleTestPopup", copyGroup).getComponent();
+        popupMenu.show(jsonInputField, 0, 0);
+    }
 
     private JSONObject buildParams(PsiMethod method, JSONObject args, String action) {
         JSONObject params = new JSONObject();
@@ -189,9 +275,9 @@ public class FlexibleTestTool extends BasePluginTool {
         JSONObject req = new JSONObject();
         req.put("method", action);
         req.put("params", params);
-        if(useInterceptor){
+        if (useInterceptor) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
-            req.put("interceptor", SettingsStorageHelper.getAppScript(getProject(), visibleApp==null?null:visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
         }
         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
         req.put("trace", traceConfig.isEnable());
@@ -246,7 +332,7 @@ public class FlexibleTestTool extends BasePluginTool {
 
     @Override
     protected boolean hasActionBox() {
-        return actionComboBox!=null;
+        return actionComboBox != null;
     }
 
     @Override

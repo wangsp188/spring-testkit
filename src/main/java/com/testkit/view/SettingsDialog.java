@@ -886,7 +886,7 @@ public class SettingsDialog {
                         JSONObject req = new JSONObject();
                         req.put("method", "flexible-test");
                         req.put("params", params);
-                        req.put("interceptor", interceptor);
+                        req.put("interceptor", Base64.getEncoder().encodeToString(interceptor.getBytes("UTF-8")));
                         SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
                         req.put("trace", traceConfig.isEnable());
 //                        req.put("singleClsDepth", traceConfig.getSingleClsDepth());

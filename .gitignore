@@ -69,3 +69,4 @@ bin/
 /jar/testkit-agent/dependency-reduced-pom.xml
 /jar/testkit-dig/target
 /jar/testkit-dig-attach/target
+/jar/testkit-dig/src/main/resources/libs/

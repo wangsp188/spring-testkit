@@ -94,7 +94,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                         traceConfig.setPackages(runClass.substring(0,runClass.lastIndexOf("."))); // 或者其他逻辑
                     }
                 }
-                String base64Json = Base64.getEncoder().encodeToString(JSON.toJSONString(traceConfig).getBytes("UTF-8"));
+                String base64Json = Base64.getEncoder().encodeToString(traceConfig.toString().getBytes("UTF-8"));
                 String encodedJson = URLEncoder.encode(base64Json, "UTF-8");
                 javaParameters.getVMParametersList().add("-javaagent:" + pluginPath + File.separator + agentPath+"="+encodedJson);
                 vmParametersList.addProperty("testkit.trace.enable", "true");
