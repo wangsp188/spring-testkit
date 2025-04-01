@@ -1,9 +1,6 @@
 package com.testkit.dig;
 
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.*;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Field;
@@ -14,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,11 +18,10 @@ import java.util.Map;
 public class DigAttach {
 
     private static final String TARGET_CLASS = "com.testkit.server.TestkitServerManage";
-    private static final Logger log = LoggerFactory.getLogger(DigAttach.class);
 
 
     public static void agentmain(String args, Instrumentation inst) {
-        String logPath = System.getProperty("user.dir") + File.separator + "testkit-dig.txt";
+        String logPath = null;
         try {
             System.out.println("Testkit dig accept:" + args);
             Map<String, String> arg = decode(args);
@@ -246,13 +241,13 @@ public class DigAttach {
     }
 
 
-    public static synchronized void logError(String dic, Throwable throwable) {
+    public static synchronized void logError(String logFilePath, Throwable throwable) {
         final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
         try {
             // 1. 确定基础目录
-            Path logPath = (dic == null || dic.trim().isEmpty()) ?
-                    Paths.get(System.getProperty("user.dir"), "testkit-dig.txt") :
-                    Paths.get(dic).normalize();
+            Path logPath = (logFilePath == null || logFilePath.trim().isEmpty()) ?
+                    Paths.get(System.getProperty("java.io.tmpdir"), "testkit-dig.txt") :
+                    Paths.get(logFilePath).normalize();
 
             // 3. 确保父目录 存在
             Files.createDirectories(logPath.getParent());

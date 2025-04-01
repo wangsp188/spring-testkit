@@ -217,7 +217,7 @@ public class TestkitDigGuide {
         map.put("starter", starterJar);
         map.put("ctx", ctx);
         map.put("port", port);
-        String logPath = System.getProperty("user.dir") + File.separator + "testkit-dig.txt";
+        String logPath = System.getProperty("java.io.tmpdir") + File.separator + "testkit-dig.txt";
         map.put("log_path", logPath);
         if (envKey != null) {
             map.put("envKey", envKey);
