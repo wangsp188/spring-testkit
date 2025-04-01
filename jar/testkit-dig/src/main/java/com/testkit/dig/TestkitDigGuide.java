@@ -106,6 +106,35 @@ public class TestkitDigGuide {
         }
     }
 
+    private static String directRequest(int port, Map<String, Object> requestData) throws Exception {
+        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
+        if (result == null) {
+            return RED + "req is error\n result is null" + RESET;
+        } else {
+            if (!result.getBooleanValue("success")) {
+                return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\nreq is error\n" + RED + result.getString("message") + RESET;
+            } else {
+                Object data = result.get("data");
+                if (data == null) {
+                    return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\nnull";
+                } else if (data instanceof String
+                        || data instanceof Byte
+                        || data instanceof Short
+                        || data instanceof Integer
+                        || data instanceof Long
+                        || data instanceof Float
+                        || data instanceof Double
+                        || data instanceof Character
+                        || data instanceof Boolean
+                        || data.getClass().isEnum()) {
+                    return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\n" + data;
+                } else {
+                    return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\n" + JSON.toJSONString(data, SerializerFeature.PrettyFormat);
+                }
+            }
+        }
+    }
+
     private static void startHeartbeatCheck(int port) {
         heartbeatExecutor.scheduleWithFixedDelay(() -> {
             try {
@@ -261,10 +290,6 @@ public class TestkitDigGuide {
         }
     }
 
-    private static void printJvmList(List<VirtualMachineDescriptor> list) {
-
-    }
-
 
     private static void startCommandLoop(BufferedReader br, int port) throws IOException {
         // 启动心跳检测
@@ -322,18 +347,23 @@ public class TestkitDigGuide {
         } else if (cmd.startsWith("view ")) {
             String req = cmd.substring("view ".length());
             String[] split = req.split("#");
-            if (split.length != 2) {
-                throw new IllegalArgumentException("view params must be like className#fieldName");
+            if (split.length == 2) {
+                JSONObject submitRequest = new JSONObject();
+                submitRequest.put("method", "view-value");
+                submitRequest.put("trace", false);
+                JSONObject value = new JSONObject();
+                value.put("typeClass", split[0]);
+                value.put("beanName", null);
+                value.put("fieldName", split[1]);
+                submitRequest.put("params", value);
+                return YELLOW + "[view-field]" + RESET + submitReqAndWaitRet(port, submitRequest);
             }
             JSONObject submitRequest = new JSONObject();
-            submitRequest.put("method", "view-value");
-            submitRequest.put("trace", false);
+            submitRequest.put("method", "property");
             JSONObject value = new JSONObject();
-            value.put("typeClass", split[0]);
-            value.put("beanName", null);
-            value.put("fieldName", split[1]);
+            value.put("property", req);
             submitRequest.put("params", value);
-            return YELLOW + "[view]" + RESET + submitReqAndWaitRet(port, submitRequest);
+            return YELLOW + "[view-property]" + RESET + directRequest(port, submitRequest);
         }
         return RED + "unknown Cmd: " + cmd + RESET;
     }

@@ -1073,7 +1073,8 @@ public class FunctionCallTool extends BasePluginTool {
         }, new Function<RuntimeHelper.AppMeta, String>() {
             @Override
             public String apply(RuntimeHelper.AppMeta appMeta) {
-                return SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), appMeta.getApp());
+                String s = SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), appMeta.getApp());
+                return s == null ? "" : s;
             }
         }));
 
@@ -1087,7 +1088,7 @@ public class FunctionCallTool extends BasePluginTool {
                         @Override
                         public void actionPerformed(@NotNull AnActionEvent e) {
                             JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FUNCTION_CALL.getCode());
-                            callReq.put("interceptor", stringStringEntry.getValue());
+                            callReq.put("interceptor", "".equals(stringStringEntry.getValue()) ? null : stringStringEntry.getValue());
                             String cmd = PluginToolEnum.FUNCTION_CALL.getCode() + " " + JSONObject.toJSONString(callReq);
                             TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
                         }
@@ -1105,7 +1106,7 @@ public class FunctionCallTool extends BasePluginTool {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 JSONObject callReq = buildCacheParams(method, jsonObject, map.get(cacheAction));
-                                callReq.put("interceptor", null);
+                                callReq.put("interceptor", "".equals(stringStringEntry.getValue()) ? null : stringStringEntry.getValue());
                                 String cms = "spring-cache " + JSONObject.toJSONString(callReq);
                                 TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
                             }

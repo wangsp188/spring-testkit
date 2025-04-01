@@ -131,6 +131,10 @@ public class TestkitServer {
                         map.put("ip", LocalIpUtil.getLocalIp());
                         map.put("port", serverPort);
                         ret = Ret.success(map, (int) (System.currentTimeMillis() - millis));
+                    } else if ("property".equals(req.getMethod())) {
+                        Map<String, String> params = req.getParams();
+                        String key = params == null ? null : params.get("property");
+                        ret = Ret.success(key == null ? null : app.getEnvironment().getProperty(key), (int) (System.currentTimeMillis() - millis));
                     } else if ("stop".equals(req.getMethod())) {
                         stop();
                         ret = Ret.success(true, (int) (System.currentTimeMillis() - millis));

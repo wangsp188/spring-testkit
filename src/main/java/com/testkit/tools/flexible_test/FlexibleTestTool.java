@@ -116,7 +116,7 @@ public class FlexibleTestTool extends BasePluginTool {
         actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON, FLEXIBLE_TEST_DISABLE_ICON, "<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>module test source ,public method of  package : ${Test Package}</li>\n" +
-                "    <li>no static</li>\n" +
+                "    <li>not static</li>\n" +
                 "</ul>", topPanel, new ActionListener() {
 
             @Override
@@ -223,17 +223,18 @@ public class FlexibleTestTool extends BasePluginTool {
         }, new Function<RuntimeHelper.AppMeta, String>() {
             @Override
             public String apply(RuntimeHelper.AppMeta appMeta) {
-                return SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), appMeta.getApp());
+                String s = SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), appMeta.getApp());
+                return s == null ? "" : s;
             }
         }));
 
         if (useInterceptor && !appInterceptors.isEmpty()) {
             for (Map.Entry<String, String> stringStringEntry : appInterceptors.entrySet()) {
-                AnAction copyCmd = new AnAction("Copy Flexible-test "+stringStringEntry.getKey()+" Cmd", "Copy Flexible-test "+stringStringEntry.getKey()+" Cmd", CMD_ICON) {
+                AnAction copyCmd = new AnAction("Copy Flexible-test " + stringStringEntry.getKey() + " Cmd", "Copy Flexible-test " + stringStringEntry.getKey() + " Cmd", CMD_ICON) {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
                         JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
-                        callReq.put("interceptor", stringStringEntry.getValue());
+                        callReq.put("interceptor", "".equals(stringStringEntry.getValue()) ? null : stringStringEntry.getValue());
                         String cmd = PluginToolEnum.FLEXIBLE_TEST.getCode() + " " + JSONObject.toJSONString(callReq);
                         TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
                     }
