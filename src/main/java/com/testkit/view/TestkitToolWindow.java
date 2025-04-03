@@ -459,7 +459,7 @@ public class TestkitToolWindow {
         // 用于比较的 map，判断是否有变化
         HashMap<String, Boolean> newMap = new HashMap<>();
         HashMap<String, String> requestData = new HashMap<>();
-        requestData.put("method", "hello");
+        requestData.put("method", "hi");
 
         Iterator<String> iterator = newItems.iterator();
         while (iterator.hasNext()) {

@@ -1,4 +1,4 @@
-package com.testkit.dig;
+package com.testkit.cli;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -17,9 +17,10 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
-public class TestkitDigGuide {
+public class TestkitCLIGuide {
 
     private static final String RESET = "\033[0m";
     private static final String GREEN = "\033[1;32m";  // 亮绿色
@@ -28,6 +29,8 @@ public class TestkitDigGuide {
 
     private static final String LIB_DIR = "libs/";
     public static final String EXIT = "exit";
+    public static final String TESTKIT_CLI_ATTACH_1_0_JAR = "testkit-cli-attach-1.0.jar";
+    public static final String TESTKIT_STARTER_1_0_JAR = "testkit-starter-1.0.jar";
     private static volatile boolean isServerRunning = true;
     private static final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
 
@@ -38,27 +41,49 @@ public class TestkitDigGuide {
         System.setOut(out);
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         int port = 30999;
-        String portPro = System.getProperty("testkit.dig.port");
+        String portPro = System.getProperty("testkit.cli.port");
         if (portPro != null) {
             try {
                 port = Integer.parseInt(portPro);
             } catch (NumberFormatException e) {
-                throw new RuntimeException("testkit.dig.port must be int", e);
+                throw new IllegalArgumentException("testkit.cli.port must be int, now:" + portPro);
             }
         }
+        String ctxProperty = System.getProperty("testkit.cli.ctx", null);
+        if (ctxProperty != null && ctxProperty.split("#").length != 2) {
+            throw new IllegalArgumentException("testkit.cli.ctx must like clsName#fieldName");
+        }
+        System.out.println(RED + "---------------Do not use online server, only technical learning---------------" + RESET);
+        System.out.println(GREEN + "  _________            .__                 ___________              __   __   .__  __   \n" +
+                " /   _____/____________|__| ____    ____   \\__    ___/___   _______/  |_|  | _|__|/  |_ \n" +
+                " \\_____  \\\\____ \\_  __ \\  |/    \\  / ___\\    |    |_/ __ \\ /  ___/\\   __\\  |/ /  \\   __\\\n" +
+                " /        \\  |_> >  | \\/  |   |  \\/ /_/  >   |    |\\  ___/ \\___ \\  |  | |    <|  ||  |  \n" +
+                "/_______  /   __/|__|  |__|___|  /\\___  /    |____| \\___  >____  > |__| |__|_ \\__||__|  \n" +
+                "        \\/|__|                 \\//_____/                \\/     \\/            \\/         " + RESET);
+        System.out.println(RED + "---------------Do not use online server, only technical learning---------------" + RESET);
 
-        System.out.println(GREEN + "___________              __   __   .__  __    ________  .__        \n" +
-                "\\__    ___/___   _______/  |_|  | _|__|/  |_  \\______ \\ |__| ____  \n" +
-                "  |    |_/ __ \\ /  ___/\\   __\\  |/ /  \\   __\\  |    |  \\|  |/ ___\\ \n" +
-                "  |    |\\  ___/ \\___ \\  |  | |    <|  ||  |    |    `   \\  / /_/  >\n" +
-                "  |____| \\___  >____  > |__| |__|_ \\__||__|   /_______  /__\\___  / \n" +
-                "             \\/     \\/            \\/                  \\/  /_____/  " + RESET);
-        AppMeta runningApp = findRunningApp(port);
-        if (runningApp == null) {
-
+        AppMeta runningApp = findRunningApp(port, ctxProperty);
+        AtomicReference<String> ctxAtc = new AtomicReference<>(ctxProperty);
+        if (runningApp != null) {
+            System.out.println(YELLOW + "Current port " + port + " has service" + RESET);
+            if (ctxProperty != null && !runningApp.isTestPass()) {
+                throw new IllegalArgumentException("-Dtestkit.cli.ctx Verification fail on current service, " + JSON.toJSONString(runningApp));
+            }
+            if (ctxProperty == null) {
+                System.out.println(RED + "Alert: Not set -Dtestkit.cli.ctx" + RESET + YELLOW + JSON.toJSONString(runningApp) + RESET);
+            } else if (runningApp.isTestPass()) {
+                System.out.println(YELLOW + JSON.toJSONString(runningApp) + RESET);
+            }
+            System.out.print(GREEN + "Confirm to connect(Y/N)? : " + RESET);
+            String input = br.readLine().trim();
+            if (!"y".equalsIgnoreCase(input)) {
+                System.out.println("Bye~\nYou can modify vmOptions to change port -Dtestkit.cli.port=xx");
+                return;
+            }
+        } else {
             // 加载嵌入的JAR文件
-            File attachJar = getEmbeddedJar("testkit-dig-attach-1.0.jar");
-            File starterJar = getEmbeddedJar("testkit-starter-1.0.jar");
+            File attachJar = getEmbeddedJar(TESTKIT_CLI_ATTACH_1_0_JAR);
+            File starterJar = getEmbeddedJar(TESTKIT_STARTER_1_0_JAR);
             attachJar.deleteOnExit();
             starterJar.deleteOnExit();
             // 列出所有JVM进程4
@@ -67,7 +92,7 @@ public class TestkitDigGuide {
                 @Override
                 public boolean test(VirtualMachineDescriptor virtualMachineDescriptor) {
                     String displayName = virtualMachineDescriptor.displayName();
-                    return !displayName.contains(TestkitDigGuide.class.getName())
+                    return !displayName.contains(TestkitCLIGuide.class.getName())
                             && !displayName.contains("IntelliJ IDEA.app")
                             && !displayName.contains("com.intellij.idea.Main")
                             && !displayName.contains("testkit-dig-1.0.jar")
@@ -79,18 +104,23 @@ public class TestkitDigGuide {
                 return;
             }
 
-            runningApp = tryStartServer(vmList, br, starterJar.getAbsolutePath(), port, attachJar.getAbsolutePath());
+            runningApp = startServerGuide(vmList, br, starterJar.getAbsolutePath(), port, attachJar.getAbsolutePath(), ctxAtc);
+            System.out.println(YELLOW + "Connect success: " + JSON.toJSONString(runningApp) + RESET);
         }
-
-        System.out.println("Connect success: " + JSON.toJSONString(runningApp));
         // 启动交互式命令行
-        startCommandLoop(br, port);
+        startCommandLoop(br, port, ctxAtc.get());
     }
 
 
-    private static AppMeta findRunningApp(int port) {
-        HashMap<String, String> requestData = new HashMap<>();
-        requestData.put("method", "hello");
+    private static AppMeta findRunningApp(int port, String ctx) {
+        JSONObject requestData = new JSONObject();
+        requestData.put("method", "hi");
+        if (ctx != null) {
+            HashMap<Object, Object> map = new HashMap<>();
+            map.put("cls", ctx.split("#")[0]);
+            requestData.put("params", map);
+        }
+
         try {
             JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
             if (!response.getBooleanValue("success")) {
@@ -100,7 +130,7 @@ public class TestkitDigGuide {
         } catch (Exception e) {
             //判断
             if (!HttpUtil.isTcpPortAvailable(port)) {
-                throw new IllegalArgumentException("The port is occupied. pls change vmOptions change port, for example -Dtestkit.dig.port=10086");
+                throw new IllegalArgumentException("The port is occupied. pls change vmOptions change port, for example -Dtestkit.cli.port=10086");
             }
             return null;
         }
@@ -135,10 +165,10 @@ public class TestkitDigGuide {
         }
     }
 
-    private static void startHeartbeatCheck(int port) {
+    private static void startHeartbeatCheck(int port, String ctx) {
         heartbeatExecutor.scheduleWithFixedDelay(() -> {
             try {
-                AppMeta app = findRunningApp(port);
+                AppMeta app = findRunningApp(port, ctx);
                 if (app == null) {
                     System.err.println("[Heartbeat] Server lost, shutting down...");
                     isServerRunning = false;
@@ -149,11 +179,11 @@ public class TestkitDigGuide {
                 isServerRunning = false;
                 System.exit(2);
             }
-        }, 0, 5, TimeUnit.SECONDS);
+        }, 0, 3, TimeUnit.SECONDS);
     }
 
-    private static AppMeta tryStartServer(List<VirtualMachineDescriptor> vmList, BufferedReader br, String starterJar, int port, String attachJar) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException {
-        String pid = System.getProperty("testkit.dig.pid", null);
+    private static AppMeta startServerGuide(List<VirtualMachineDescriptor> vmList, BufferedReader br, String starterJar, int port, String attachJar, AtomicReference<String> textCtx) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException {
+        String pid = System.getProperty("testkit.cli.pid", null);
         Optional<VirtualMachineDescriptor> chooseVm = vmList.stream().filter(new Predicate<VirtualMachineDescriptor>() {
             @Override
             public boolean test(VirtualMachineDescriptor virtualMachineDescriptor) {
@@ -174,7 +204,7 @@ public class TestkitDigGuide {
             int tryTimes = 0;
             do {
                 tryTimes += 1;
-                System.out.println(GREEN + "Please select Jvm:" + RESET);
+                System.out.print(GREEN + "Please select Jvm: " + RESET);
                 String lineNumber = br.readLine();
                 if (EXIT.equalsIgnoreCase(lineNumber)) {
                     throw new IllegalArgumentException("Bye~");
@@ -196,12 +226,12 @@ public class TestkitDigGuide {
         // 附加到目标JVM
         VirtualMachine vm = VirtualMachine.attach(targetVm);
 
-        String ctx = System.getProperty("testkit.dig.ctx", null);
+        String ctx = System.getProperty("testkit.cli.ctx", null);
         if (ctx == null) {
             int tryTimes = 0;
             while (true) {
                 tryTimes += 1;
-                System.out.print(GREEN + "Enter a static attribute of type applicationContext（eg: com.hook.SpringContextUtil#context）: " + RESET);
+                System.out.print(GREEN + "Enter a static attribute of type applicationContext (eg: com.hook.SpringContextUtil#context): " + RESET);
                 String input = br.readLine().trim();
                 if (EXIT.equalsIgnoreCase(input)) {
                     throw new IllegalArgumentException("Bye~");
@@ -213,19 +243,19 @@ public class TestkitDigGuide {
                 if (tryTimes >= 5) {
                     throw new IllegalArgumentException("ctx failed to be entered for five times! Bye~");
                 } else {
-                    System.out.print(GREEN + "Please enter the correct ctx（eg: com.hook.SpringContextUtil#context）: " + RESET);
+                    System.out.print(GREEN + "Please enter the correct ctx (eg: com.hook.SpringContextUtil#context): " + RESET);
                 }
             }
         }
 
 
         String env = null;
-        String envKey = System.getProperty("testkit.dig.envKey", null);
+        String envKey = System.getProperty("testkit.cli.envKey", null);
         if (envKey == null) {
             int tryTimes = 0;
             while (true) {
                 tryTimes += 1;
-                System.out.print(GREEN + "Please enter the current environment（empty means that env is null and cannot be local）: " + RESET);
+                System.out.print(GREEN + "Please enter the current environment (empty means that env is null and cannot be local): " + RESET);
                 String input = br.readLine().trim();
                 if (input.isEmpty() || !input.trim().equals("local")) {
                     env = input.trim();
@@ -237,11 +267,12 @@ public class TestkitDigGuide {
                 if (tryTimes >= 5) {
                     throw new IllegalArgumentException("env failed to be entered for five times！Bye~");
                 } else {
-                    System.out.print(GREEN + "Please enter the correct ctx（empty means that env is null and cannot be local）: " + RESET);
+                    System.out.print(GREEN + "Please enter the correct ctx (empty means that env is null and cannot be local): " + RESET);
                 }
             }
         }
 
+        textCtx.set(ctx);
         HashMap<String, Object> map = new HashMap<>();
         map.put("starter", starterJar);
         map.put("ctx", ctx);
@@ -267,15 +298,19 @@ public class TestkitDigGuide {
 
         long millis = System.currentTimeMillis();
         System.out.println("Wait for connection:" + agentParams);
+        System.out.println("attach log:" + logPath);
         //发起http请求等待链接成功
         while (true) {
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
             }
-            AppMeta runningApp = findRunningApp(port);
+            AppMeta runningApp = findRunningApp(port, ctx);
             if (runningApp != null) {
-                return runningApp;
+                if (runningApp.isTestPass()) {
+                    return runningApp;
+                }
+                throw new RuntimeException("ctx Verification fail on current service, " + JSON.toJSONString(runningApp));
             }
             if (System.currentTimeMillis() - millis > 5_000) {
                 // 一次性读取全部字节后转字符串（适合小文件）
@@ -284,23 +319,26 @@ public class TestkitDigGuide {
                 if (log != null) {
                     throw new RuntimeException("Agent load fail\n" + log);
                 } else {
-                    throw new RuntimeException("Wait timeout, Bye~");
+                    throw new RuntimeException("Wait timeout.");
                 }
             }
         }
     }
 
 
-    private static void startCommandLoop(BufferedReader br, int port) throws IOException {
+    private static void startCommandLoop(BufferedReader br, int port, String ctx) throws IOException {
         // 启动心跳检测
-        startHeartbeatCheck(port);
+        startHeartbeatCheck(port, ctx);
         try {
             while (isServerRunning) {
-//                System.out.print("testkit-dig> ");
                 System.out.print(GREEN + "testkit-dig> " + RESET);
                 String cmd = br.readLine().trim();
                 if ("exit".equalsIgnoreCase(cmd)) {
                     break;
+                }
+                if (cmd.equalsIgnoreCase("hi")) {
+                    System.out.println(YELLOW + "[hi] " + JSON.toJSONString(findRunningApp(port, ctx)) + RESET);
+                    continue;
                 }
                 // 这里需要实现命令分发
                 try {
@@ -317,10 +355,7 @@ public class TestkitDigGuide {
 
     private static String processCommand(String cmd, int port) throws Exception {
         // 示例命令处理
-        if (cmd.equalsIgnoreCase("hello")) {
-            return YELLOW + "[hello] " + JSON.toJSONString(findRunningApp(port)) + RESET;
-            // 调用Agent通信接口
-        } else if (cmd.equalsIgnoreCase("stop")) {
+        if (cmd.equalsIgnoreCase("stop")) {
             HashMap<String, String> requestData = new HashMap<>();
             requestData.put("method", "stop");
             try {
@@ -365,7 +400,7 @@ public class TestkitDigGuide {
             submitRequest.put("params", value);
             return YELLOW + "[view-property]" + RESET + directRequest(port, submitRequest);
         }
-        return RED + "unknown Cmd: " + cmd + RESET;
+        return RED + "Unknown Cmd: " + cmd + RESET;
     }
 
     private static String submitReqAndWaitRet(int port, JSONObject reqObject) throws Exception {
@@ -423,7 +458,7 @@ public class TestkitDigGuide {
 
 
     public static File getEmbeddedJar(String jarName) throws IOException {
-        URL resourceUrl = TestkitDigGuide.class.getClassLoader().getResource(LIB_DIR + jarName);
+        URL resourceUrl = TestkitCLIGuide.class.getClassLoader().getResource(LIB_DIR + jarName);
         if (resourceUrl == null) {
             throw new FileNotFoundException("Embedded JAR not found: " + jarName);
         }
@@ -483,6 +518,7 @@ public class TestkitDigGuide {
         private boolean enableTrace;
         private String app;
         private String env;
+        private boolean testPass;
 
         public String getIp() {
             return ip;
@@ -514,6 +550,14 @@ public class TestkitDigGuide {
 
         public void setEnv(String env) {
             this.env = env;
+        }
+
+        public boolean isTestPass() {
+            return testPass;
+        }
+
+        public void setTestPass(boolean testPass) {
+            this.testPass = testPass;
         }
     }
 }

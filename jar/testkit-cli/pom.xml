@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.testkit</groupId>
-    <artifactId>testkit-dig</artifactId>
+    <artifactId>testkit-cli</artifactId>
     <version>1.0</version>
 
     <properties>
@@ -65,7 +65,7 @@
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
-                                        <Main-Class>com.testkit.dig.TestkitDigGuide</Main-Class>
+                                        <Main-Class>com.testkit.cli.TestkitCLIGuide</Main-Class>
                                         <!-- 添加模块化启动参数 -->
                                         <Add-Opens>jdk.attach/com.sun.tools.attach=ALL-UNNAMED</Add-Opens>
                                     </manifestEntries>

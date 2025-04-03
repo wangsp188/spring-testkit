@@ -1,4 +1,4 @@
 Manifest-Version: 1.0
-Agent-Class: com.testkit.dig.DigAttach
+Agent-Class: com.testkit.cli.TestkitCLIAttach
 Can-Redefine-Classes: true
 Can-Retransform-Classes: true

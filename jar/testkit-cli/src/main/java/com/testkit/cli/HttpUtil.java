@@ -1,4 +1,4 @@
-package com.testkit.dig;
+package com.testkit.cli;
 
 import com.alibaba.fastjson.JSON;
 

@@ -11,7 +11,7 @@
         <module>testkit-trace</module>
         <module>testkit-agent</module>
         <module>testkit-starter</module>
-        <module>testkit-dig-attach</module>
-        <module>testkit-dig</module>
+        <module>testkit-cli-attach</module>
+        <module>testkit-cli</module>
     </modules>
 </project>

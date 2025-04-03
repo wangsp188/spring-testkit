@@ -880,7 +880,7 @@ public class SettingsDialog {
                                 "}";
                         JSONObject params = new JSONObject();
                         params.put("code", code);
-                        params.put("methodName", "hello");
+                        params.put("methodName", "hi");
                         params.put("argTypes", "[\"java.lang.String\",\"java.util.Date\"]");
                         params.put("args", "[\"" + TestkitHelper.getPluginName() + "\"," + System.currentTimeMillis() + "]");
                         JSONObject req = new JSONObject();

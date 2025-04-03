@@ -1,4 +1,4 @@
-package com.testkit.dig;
+package com.testkit.cli;
 
 
 import java.io.*;
@@ -6,24 +6,25 @@ import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-public class DigAttach {
+public class TestkitCLIAttach {
 
     private static final String TARGET_CLASS = "com.testkit.server.TestkitServerManage";
 
 
     public static void agentmain(String args, Instrumentation inst) {
+        List<String> logs = new ArrayList<>();
         String logPath = null;
+        Throwable e = null;
         try {
-            System.out.println("Testkit dig accept:" + args);
+            logs.add("dig args:" + args);
             Map<String, String> arg = decode(args);
             logPath = arg.get("log_path");
             //帮我解析一些，
@@ -47,26 +48,40 @@ public class DigAttach {
             int hashIndex = ctxGuidingDrug.indexOf('#');
             String ctxClsStr = ctxGuidingDrug.substring(0, hashIndex);
             String ctxFieldStr = ctxGuidingDrug.substring(hashIndex + 1);
-            Class appCls = findClassLoadedAnywhere(inst, "org.springframework.context.ApplicationContext");
+            Class appCls = findClassLoadedByApp(inst, "org.springframework.context.ApplicationContext");
             if (appCls == null) {
                 throw new IllegalArgumentException("app Class : org.springframework.context.ApplicationContext not found");
             }
+            logs.add("appCls is load by " + appCls.getClassLoader().getClass().getName());
             Class<?> ctxCls = null;
             try {
                 ctxCls = appCls.getClassLoader().loadClass(ctxClsStr);
-            } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException("ctx class not found", e);
+            } catch (ClassNotFoundException e2) {
+                throw new IllegalArgumentException("ctx class not found", e2);
             }
             // 获取上下文对象
             Field ctxField = ctxCls.getDeclaredField(ctxFieldStr);
+            //判断是否是静态的
+            if (!Modifier.isStatic(ctxField.getModifiers())) {
+                throw new RuntimeException(ctxFieldStr + " must be statis");
+            }
             ctxField.setAccessible(true);
             Object ctx = ctxField.get(null);
+            if (ctx == null) {
+                throw new RuntimeException("ctx is null");
+            }
+            Method isActive = ctx.getClass().getMethod("isActive");
+            if (!Objects.equals(isActive.invoke(ctx), Boolean.TRUE)) {
+                throw new RuntimeException("ctx is not active, pls wait and try again");
+            }
             // 分层加载目标类
-            Class<?> serverManageClass = loadTargetClass(inst, ctxCls, starterJar);
+            Class<?> serverManageClass = loadTargetClass(logs, inst, ctxCls, starterJar);
             // 反射调用核心方法
             invokeServerMethod(appCls, serverManageClass, ctx, env, envKey, port);
         } catch (Throwable t) {
-            logError(logPath, t);
+            e = t;
+        } finally {
+            log(logPath, logs, e);
         }
     }
 
@@ -104,99 +119,93 @@ public class DigAttach {
         }
     }
 
-
-    // 修改后的核心加载逻辑应如下：
-    private static Class<?> loadTargetClass(Instrumentation inst, Class<?> ctxCls, String jarPath)
-            throws Exception {
-
-        // 动态开放模块权限
-        openInternalPackages(inst);
-        Class classLoadedAnywhere = findClassLoadedAnywhere(inst, TARGET_CLASS);
-        if (classLoadedAnywhere != null) {
-            return classLoadedAnywhere;
+    private static Class<?> loadTargetClass(List<String> logs, Instrumentation inst, Class<?> ctxCls, String jarPath) {
+        //1.自己找
+        for (Class<?> clazz : inst.getAllLoadedClasses()) {
+            if (clazz.getName().equals(TARGET_CLASS)) {
+                ClassLoader classLoader = clazz.getClassLoader();
+                if (URLClassLoader.class.isAssignableFrom(classLoader.getClass())
+                        || "org.springframework.boot.loader.launch.LaunchedClassLoader".equals(classLoader.getClass().getName())
+                        || "sun.misc.Launcher$AppClassLoader".equals(classLoader.getClass().getName())
+                        || "jdk.internal.loader.ClassLoaders$AppClassLoader".equals(classLoader.getClass().getName())
+                ) {
+                    logs.add("already have TARGET_CLASS");
+                    return clazz;
+                }
+                break;
+            }
         }
-        // 阶段2：自定义classloader，然后加入jar，加载TARGET_CLASS
-        // 阶段2：创建继承ctxCls类加载器的新类加载器
+
+        // 2.动态添加JAR到类路径加载
         try {
             URL jarUrl = new File(jarPath).toURI().toURL();
+            ClassLoader targetLoader = ctxCls.getClassLoader();
 
-            // 创建继承ctxCls类加载器的子类加载器
-            ClassLoader parentLoader = ctxCls.getClassLoader();
-            URLClassLoader childLoader = new URLClassLoader(
-                    new URL[]{jarUrl},
-                    parentLoader
-            ) {
-                // 可选：若需要打破双亲委派，可重写loadClass逻辑
-//                @Override
-//                public Class<?> loadClass(String name) throws ClassNotFoundException {
-//                    if (TARGET_CLASS.equals(name)) {
-//                        return findClass(name); // 强制优先自己加载目标类
-//                    }
-//                    return super.loadClass(name);
-//                }
-            };
-
-            // 尝试用新类加载器加载目标类
-            return childLoader.loadClass(TARGET_CLASS);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Failed to load class. Please check JAR contents: " + TARGET_CLASS);
-        } catch (MalformedURLException e) {
-            throw new RuntimeException("Invalid JAR path: " + jarPath);
-        }
-    }
-
-    private static void openInternalPackages(Instrumentation inst) throws Exception {
-        // 获取所有需要开放的包
-        String[] internalPackages = {
-                "jdk.internal.loader",
-                "jdk.internal.reflect",
-                "java.lang"
-        };
-
-        // 获取java.base模块
-        Module baseModule = Object.class.getModule();
-        Module agentModule = DigAttach.class.getClassLoader().getUnnamedModule();
-
-        // 动态开放权限
-        for (String pkg : internalPackages) {
-            if (baseModule.getPackages().contains(pkg)) {
-                inst.redefineModule(baseModule,
-                        Collections.emptySet(),
-                        Collections.singletonMap(pkg, Collections.singleton(agentModule)),
-                        Collections.emptyMap(),
-                        Collections.emptySet(),
-                        Collections.emptyMap()
+            addURLToClassLoader(targetLoader, jarUrl);
+            logs.add("add addURLToClassLoader success");
+            return Class.forName(TARGET_CLASS, true, targetLoader);
+        } catch (Throwable e) {
+            logs.add("add addURLToClassLoader fail," + e.getMessage());
+            // 阶段3：创建继承ctxCls类加载器的新类加载器
+            try {
+                URL jarUrl = new File(jarPath).toURI().toURL();
+                // 创建继承ctxCls类加载器的子类加载器
+                ClassLoader parentLoader = ctxCls.getClassLoader();
+                URLClassLoader childLoader = new URLClassLoader(
+                        new URL[]{jarUrl},
+                        parentLoader
                 );
+                return childLoader.loadClass(TARGET_CLASS);
+            } catch (ClassNotFoundException e1) {
+                throw new RuntimeException("Failed to load class. Please check JAR contents: " + TARGET_CLASS);
+            } catch (MalformedURLException e1) {
+                throw new RuntimeException("Invalid JAR path: " + jarPath);
             }
         }
     }
 
 
-    private static void addURLToClassLoader(ClassLoader loader, URL url) throws Exception {
+    private static void addURLToClassLoader(ClassLoader loader, URL jarUrl)
+            throws Exception {
+
+        // JDK8及以下版本处理逻辑
         if (loader instanceof URLClassLoader) {
-            // Java 8及以下方案
+            URLClassLoader urlLoader = (URLClassLoader) loader;
             Method addUrlMethod = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
             addUrlMethod.setAccessible(true);
-            addUrlMethod.invoke(loader, url);
-        } else {
+            addUrlMethod.invoke(urlLoader, jarUrl);
+            return;
+        }
+
+        // JDK9+版本处理逻辑
+        try {
+            Field ucpField;
             try {
-                // Java 9+ 专用方法
-                Class<?> clazz = Class.forName("jdk.internal.loader.BuiltinClassLoader");
-                Field ucpField = clazz.getDeclaredField("ucp");
-                ucpField.setAccessible(true);
-                Object ucp = ucpField.get(loader);
-                Method addURLMethod = ucp.getClass().getDeclaredMethod("addURL", URL.class);
-                addURLMethod.invoke(ucp, url);
-            } catch (ClassNotFoundException | NoSuchFieldException e) {
-                throw new RuntimeException("不支持的类加载器: " + loader.getClass().getName());
+                ucpField = loader.getClass().getDeclaredField("ucp");
+            } catch (NoSuchFieldException e) {
+                // 处理Spring Boot类加载器等特殊情况
+                ucpField = loader.getClass().getSuperclass().getDeclaredField("ucp");
             }
+            ucpField.setAccessible(true);
+            Object ucp = ucpField.get(loader);
+            Method addURLMethod = ucp.getClass().getDeclaredMethod("addURL", URL.class);
+            addURLMethod.setAccessible(true);
+            addURLMethod.invoke(ucp, jarUrl);
+        } catch (NoSuchFieldException | NoSuchMethodException e) {
+            throw new UnsupportedOperationException(
+                    "Unsupported class loader type: " + loader.getClass().getName(), e);
         }
     }
 
-    private static Class findClassLoadedAnywhere(Instrumentation inst, String className) {
+    private static Class findClassLoadedByApp(Instrumentation inst, String className) {
         // 使用Instrumentation检查所有已加载类
         for (Class<?> clazz : inst.getAllLoadedClasses()) {
-            if (clazz.getName().equals(className)) {
+            ClassLoader classLoader = clazz.getClassLoader();
+            if (clazz.getName().equals(className)
+                    && ("org.springframework.boot.loader.launch.LaunchedClassLoader".equals(classLoader.getClass().getName())
+                    || "sun.misc.Launcher$AppClassLoader".equals(classLoader.getClass().getName())
+                    || "jdk.internal.loader.ClassLoaders$AppClassLoader".equals(classLoader.getClass().getName()))
+            ) {
                 return clazz;
             }
         }
@@ -241,7 +250,7 @@ public class DigAttach {
     }
 
 
-    public static synchronized void logError(String logFilePath, Throwable throwable) {
+    public static synchronized void log(String logFilePath, List<String> logs, Throwable throwable) {
         final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
         try {
             // 1. 确定基础目录
@@ -265,15 +274,23 @@ public class DigAttach {
                     StandardOpenOption.APPEND
             )) {
                 String timestamp = LocalDateTime.now().format(formatter);
-                writer.write(String.format(
-                        "[%s] ERROR - %s%nStacktrace:%n",
-                        timestamp, throwable.getMessage()
-                ));
+                writer.write("----" + timestamp + "-----");
 
-                for (StackTraceElement element : throwable.getStackTrace()) {
-                    writer.write("\tat " + element + "\n");
+                for (String log : logs) {
+                    writer.write(log);
+                    writer.write("\n");
                 }
-                writer.write("\n"); // 日志分隔线
+
+                if (throwable != null) {
+                    writer.write(String.format(
+                            "[%s] ERROR - %s%nStacktrace:%n",
+                            timestamp, throwable.getMessage()
+                    ));
+                    for (StackTraceElement element : throwable.getStackTrace()) {
+                        writer.write("\tat " + element + "\n");
+                    }
+                    writer.write("\n"); // 日志分隔线
+                }
                 writer.flush();
             }
             System.out.println("attach err is write to " + logPath + "\n" + getStackTrace(throwable));

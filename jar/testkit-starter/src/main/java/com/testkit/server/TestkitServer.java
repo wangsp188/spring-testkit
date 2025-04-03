@@ -87,7 +87,7 @@ public class TestkitServer {
         }
         int port = this.server.getAddress().getPort();
         try {
-            this.server.stop(3);
+            this.server.stop(1);
         } catch (Throwable ignore) {
         }
         if (Objects.equals(RuntimeAppHelper.LOCAL, env)) {
@@ -123,11 +123,22 @@ public class TestkitServer {
                         throw new TestkitException("parse req error," + e.getMessage());
                     }
                     Ret ret = null;
-                    if ("hello".equals(req.getMethod())) {
+                    if ("hi".equals(req.getMethod())) {
+                        Map<String, String> params = req.getParams();
+                        boolean testPass = true;
+                        String cls = params == null ? null : params.get("cls");
+                        if (cls != null && !cls.isEmpty()) {
+                            try {
+                                Class.forName(cls);
+                            } catch (Throwable e) {
+                                testPass = false;
+                            }
+                        }
                         Map<String, Object> map = new HashMap<>();
                         map.put("enableTrace", enableTrace);
                         map.put("app", appName);
                         map.put("env", env);
+                        map.put("testPass", testPass);
                         map.put("ip", LocalIpUtil.getLocalIp());
                         map.put("port", serverPort);
                         ret = Ret.success(map, (int) (System.currentTimeMillis() - millis));

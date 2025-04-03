@@ -9,6 +9,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.aop.SpringProxy;
 import org.springframework.aop.framework.Advised;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,17 +26,21 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLClassLoader;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ReflexUtils {
-
+    private static final Logger logger = LoggerFactory.getLogger(ReflexUtils.class);
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     public static final ObjectMapper PARSER_MAPPER = new ObjectMapper();
@@ -400,7 +406,127 @@ public class ReflexUtils {
         public JdkDynamicCompiler() {
             compiler = ToolProvider.getSystemJavaCompiler();
             this.parentClassLoader = this.getClass().getClassLoader();
-            this.classpath = System.getProperty("java.class.path");
+            //这个parentClassLoader是spring的类加载器springboot的LaunchedClassLoader
+
+            //在fat-jar启动时这里仅有fat-jar的地址，所以我不能使用tmpPath，我需要解析出fat-jar中的地址拼接起来
+            this.classpath = buildClassPath();
+            logger.info("Testkit JdkDynamicCompiler init," + this.parentClassLoader.getClass() + ", classpath:" + this.classpath);
+        }
+
+
+
+        public static boolean isFatJarClasspath(String classPath) {
+            if (classPath == null){
+                return false;
+            }
+            if(classPath.contains(File.separator+"target"+File.separator+"classes"+File.pathSeparator) || classPath.contains(File.separator+"output"+File.separator+"classes"+File.pathSeparator) ){
+                return false;
+            }
+            return true;
+        }
+
+
+
+        private static String buildClassPath() {
+            String tmpPath = System.getProperty("java.class.path");
+            if(!isFatJarClasspath(tmpPath)){
+                return tmpPath;
+            }
+
+            List<String> entries = new ArrayList<>();
+            // 创建一个共享的临时根目录
+            File sharedTempDir;
+            try {
+                sharedTempDir = Files.createTempDirectory("fat-jar-extract").toFile();
+                sharedTempDir.deleteOnExit(); // 应用退出时删除
+            } catch (IOException e) {
+                logger.warn("Failed to create shared temp directory: " + e.getMessage(), e);
+                return tmpPath; // 如果创建失败，返回原始类路径
+            }
+
+            // 分割类路径
+            String[] paths = tmpPath.split(File.pathSeparator);
+
+            for (String path : paths) {
+                if (!path.endsWith(".jar")) {
+                    entries.add(path); // 保留非JAR路径
+                    continue;
+                }
+
+                File file = new File(path);
+                JarFile jarFile = null;
+                try {
+                    jarFile = new JarFile(file);
+
+                    // 检查是否是Spring Boot fat-jar
+                    if (jarFile.getEntry("BOOT-INF/") == null) {
+                        entries.add(file.getAbsolutePath());
+                        continue;
+                    }
+
+                    // 为当前JAR创建特定目录
+                    String jarName = file.getName().replace(".jar", "");
+                    File jarSpecificDir = new File(sharedTempDir, jarName);
+                    jarSpecificDir.mkdir();
+
+                    // 创建classes目录结构
+                    File bootInfClassesDir = new File(jarSpecificDir, "BOOT-INF/classes");
+                    bootInfClassesDir.mkdirs();
+
+                    // 创建lib目录用于存放解压的库JAR
+                    File libDir = new File(jarSpecificDir, "lib");
+                    libDir.mkdir();
+
+                    // 处理JAR条目
+                    Enumeration<JarEntry> jarEntries = jarFile.entries();
+                    while (jarEntries.hasMoreElements()) {
+                        JarEntry entry = jarEntries.nextElement();
+                        String entryName = entry.getName();
+
+                        try {
+                            if (entryName.startsWith("BOOT-INF/classes/") && !entry.isDirectory()) {
+                                // 处理classes文件
+                                File targetFile = new File(jarSpecificDir, entryName);
+                                if (!targetFile.getParentFile().exists()) {
+                                    targetFile.getParentFile().mkdirs();
+                                }
+
+                                try (InputStream is = jarFile.getInputStream(entry)) {
+                                    Files.copy(is, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                                }
+                            } else if (entryName.startsWith("BOOT-INF/lib/") && entryName.endsWith(".jar")) {
+                                // 处理lib JAR文件
+                                String libJarName = entryName.substring(entryName.lastIndexOf('/') + 1);
+                                File tempFile = new File(libDir, libJarName);
+
+                                try (InputStream is = jarFile.getInputStream(entry)) {
+                                    Files.copy(is, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                                }
+                                entries.add(tempFile.getAbsolutePath());
+                            }
+                        } catch (IOException e) {
+                            logger.warn("Failed to process entry " + entryName + ": " + e.getMessage(), e);
+                        }
+                    }
+
+                    // 添加classes目录到类路径
+                    entries.add(bootInfClassesDir.getAbsolutePath());
+
+                } catch (IOException e) {
+                    logger.warn("Failed to process JAR file " + path + ": " + e.getMessage(), e);
+                    entries.add(path); // 如果处理失败，添加原始路径
+                } finally {
+                    if (jarFile != null) {
+                        try {
+                            jarFile.close();
+                        } catch (IOException e) {
+                            // 忽略关闭错误
+                        }
+                    }
+                }
+            }
+
+            return String.join(File.pathSeparator, entries);
         }
 
         /**
