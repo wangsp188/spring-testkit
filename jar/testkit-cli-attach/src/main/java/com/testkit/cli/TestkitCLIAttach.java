@@ -24,7 +24,7 @@ public class TestkitCLIAttach {
         String logPath = null;
         Throwable e = null;
         try {
-            logs.add("dig args:" + args);
+            logs.add("cli args:" + args);
             Map<String, String> arg = decode(args);
             logPath = arg.get("log-path");
             //帮我解析一些，
@@ -37,11 +37,11 @@ public class TestkitCLIAttach {
             try {
                 port = Integer.parseInt(portStr);
             } catch (Throwable ignored) {
-                throw new IllegalArgumentException("Testkit dig port must be int," + portStr);
+                throw new IllegalArgumentException("Testkit cli port must be int," + portStr);
             }
 
             if (starterJar == null || ctxGuidingDrug == null || port == null) {
-                throw new IllegalArgumentException("Testkit dig params not enough," + args);
+                throw new IllegalArgumentException("Testkit cli params not enough," + args);
             }
 
             // 解析上下文引导信息
@@ -239,7 +239,7 @@ public class TestkitCLIAttach {
             }
         }
         Method method = clazz.getDeclaredMethod(
-                "startDigServer",
+                "startCLIServer",
                 appCls,
                 String.class,
                 int.class
@@ -255,7 +255,7 @@ public class TestkitCLIAttach {
         try {
             // 1. 确定基础目录
             Path logPath = (logFilePath == null || logFilePath.trim().isEmpty()) ?
-                    Paths.get(System.getProperty("java.io.tmpdir"), "testkit-dig.txt") :
+                    Paths.get(System.getProperty("java.io.tmpdir"), "testkit-cli.txt") :
                     Paths.get(logFilePath).normalize();
 
             // 3. 确保父目录 存在

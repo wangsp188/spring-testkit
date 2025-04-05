@@ -46,8 +46,6 @@ public class CLIDialog extends JDialog {
     private void initComponents() {
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
-        mainPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        mainPanel.add(TestkitToolWindow.createTips("Testkit-CLI is a command-line version of the testkit plugin\nSupport for dynamic attach runtime JVM\nThe ability to provide quick testing without intruding into the release process"));
         // 第一部分: 下载按钮和文本
         JPanel downloadPanel = createDownloadPanel();
         mainPanel.add(downloadPanel);
@@ -57,13 +55,15 @@ public class CLIDialog extends JDialog {
         setContentPane(mainPanel);
     }
 
+
+
     private JPanel createCommandGeneratorPanel() {
 //        //我现在想给个生成启动命令的小工具，这些xxx的是需要用户填写的东西，有默认值
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new TitledBorder("Quick connection command"));
+        panel.setBorder(new TitledBorder("Quick start Testkit-CLI"));
 
-        panel.add(TestkitToolWindow.createTips("After downloading the cli, you can launch the tool directly using java -jar. \nThe following parameters are intended only to shorten the boot process of connecting to the jvm"));
+        panel.add(TestkitToolWindow.createTips("The easiest way to start is 'java -jar testkit-cli-1.0.jar' \nThe following parameters are intended only to shorten the boot process of connecting to the jvm"));
         panel.add(Box.createVerticalStrut(15));
 
         SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(toolWindow.getProject());
@@ -77,7 +77,7 @@ public class CLIDialog extends JDialog {
         JLabel wget = new JLabel("<html> ,<code style='color:#e83e8c'> wget </code></html>");
         //我想文本设置为代码风格
         urlPanel.add(wget, BorderLayout.WEST);
-        JBTextField urlField = new JBTextField(cliConfig.getDownloadUrl());
+        JBTextField urlField = new JBTextField(cliConfig.getDownloadUrl(),30);
         urlPanel.add(urlField, BorderLayout.CENTER);
         panel.add(urlPanel);
         urlPanel.setVisible(false);
@@ -96,17 +96,20 @@ public class CLIDialog extends JDialog {
 
         // 端口参数
         JPanel portPanel = new JPanel(new BorderLayout());
-        portPanel.setToolTipText("Port number of the external service");
+        portPanel.setToolTipText("Port number of the side service");
         portPanel.add(new JLabel("<html><code style='color:#e83e8c'>java -Dtestkit.cli.port=</code></html>"), BorderLayout.WEST);
-        JBTextField portField = new JBTextField(String.valueOf(cliConfig.getPort()),5);
+        JBTextField portField = new JBTextField(String.valueOf(cliConfig.getPort()));
+        portField.getEmptyText().setText("Port number of the side service");
+
         portPanel.add(portField, BorderLayout.CENTER);
         panel.add(portPanel);
 
         // 上下文参数
         JPanel ctxPanel = new JPanel(new BorderLayout());
-        ctxPanel.setToolTipText("A static variable in the target jvm that points to ApplicationContext, like com.xx.classname #feildName");
+        ctxPanel.setToolTipText("A static variable in the target jvm that points to ApplicationContext, like com.xx.classname#feildName");
         ctxPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.cli.ctx=</code></html>"), BorderLayout.WEST);
         JBTextField ctxField = new JBTextField("");
+        ctxField.getEmptyText().setText("like com.hook.SpringContextUtil#context points to ApplicationContext");
         ctxPanel.add(ctxField, BorderLayout.CENTER);
         panel.add(ctxPanel);
 
@@ -115,6 +118,7 @@ public class CLIDialog extends JDialog {
         envKeyPanel.setToolTipText("The property key for the deployment environment of the target jvm");
         envKeyPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.cli.env-key=</code></html>"), BorderLayout.WEST);
         JBTextField envKeyField = new JBTextField(cliConfig.getEnvKey());
+        envKeyField.getEmptyText().setText("like spring.profiles.active means the deployment environment of the target jvm");
         envKeyPanel.add(envKeyField, BorderLayout.CENTER);
         panel.add(envKeyPanel);
 
@@ -123,6 +127,7 @@ public class CLIDialog extends JDialog {
         jarPanel.add(new JLabel("<html><code style='color:#e83e8c'>-jar testkit-cli-1.0.jar</code></html>"), BorderLayout.WEST);
         panel.add(jarPanel);
 
+        panel.add(Box.createVerticalStrut(15));
         // 生成按钮和结果显示
         JPanel buttonAndResultPanel = new JPanel(new BorderLayout());
         JButton generateButton = new JButton("Generate Command");
@@ -197,8 +202,9 @@ public class CLIDialog extends JDialog {
     private JPanel createDownloadPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new TitledBorder("Download CLI"));
-
+        panel.setBorder(new TitledBorder("Download Testkit-CLI"));
+        panel.add(TestkitToolWindow.createTips("Testkit-CLI is a command-line version of the testkit plugin\nSupport for dynamic attach runtime JVM\nThe ability to provide quick testing without intruding into the CI/CD process"));
+        panel.add(Box.createVerticalStrut(15));
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton downloadButton = new JButton(downloadIcon);
         downloadButton.setPreferredSize(new Dimension(32, 32));
@@ -241,35 +247,77 @@ public class CLIDialog extends JDialog {
             }
         });
         buttonPanel.add(downloadButton);
-        buttonPanel.add(new JLabel("Download the tool, speed up up up"));
+        buttonPanel.add(new JLabel("Download Testkit-CLI, speed up up up"));
         panel.add(buttonPanel);
         return panel;
     }
 
     private void downloadFile(String name) {
-        // 假设有一个本地文件需要下载
-        File sourceFile = new File(PathManager.getPluginsPath() + File.separator + TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + name);
-        if (!sourceFile.exists()) {
-            TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Can not find " + name + "\npls contact with author");
+        // 1. 构建源文件路径（使用Path更安全）
+        Path sourcePath = Paths.get(
+                PathManager.getPluginsPath(),
+                TestkitHelper.PLUGIN_ID,
+                "lib",
+                name
+        );
+        // 检查源文件是否存在
+        if (!Files.exists(sourcePath)) {
+            TestkitHelper.alert(
+                    toolWindow.getProject(),
+                    Messages.getErrorIcon(),
+                    "Can not find " + name + "\nPls contact with author"
+            );
             return;
         }
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        fileChooser.setDialogTitle("Download Testkit-CLI");
 
-        int result = fileChooser.showSaveDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedDirectory = fileChooser.getSelectedFile();
-            File targetFile = new File(selectedDirectory, name);
+        //获取当前桌面目录，并判断是否存在name的file，如果存在则弹出提示是否覆盖
+        //将sourceFile copy到桌面
+        // 2. 获取桌面路径（跨平台兼容）
+        Path desktopPath = Paths.get(
+                System.getProperty("user.home"),
+                "Desktop"
+        );
 
-            try {
-                Path source = Paths.get(sourceFile.getAbsolutePath());
-                Path target = Paths.get(targetFile.getAbsolutePath());
-                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-                TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), "The file has been successfully downloaded: " + targetFile.getAbsolutePath());
-            } catch (IOException e) {
-                TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), "File download failure\n" + e.getMessage());
+        // 3. 构建目标文件路径
+        Path targetPath = desktopPath.resolve(name);
+
+        try {
+            // 4. 检查目标文件是否存在
+            if (Files.exists(targetPath)) {
+                // 弹窗确认覆盖（使用IDE的DialogWrapper）
+                int result = Messages.showYesNoDialog(
+                        toolWindow.getProject(),
+                        "File \"" + name + "\" already exists on Desktop. Override?",
+                        "File Exists",
+                        Messages.getQuestionIcon()
+                );
+
+                if (result != Messages.YES) {
+                    return; // 用户取消操作
+                }
             }
+
+            // 5. 执行复制（自动覆盖）
+            Files.copy(
+                    sourcePath,
+                    targetPath,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            // 6. 提示成功
+            TestkitHelper.alert(
+                    toolWindow.getProject(),
+                    Messages.getInformationIcon(),
+                    "File saved to Desktop: " + targetPath
+            );
+
+        } catch (Throwable e) {
+            // 处理IO异常（如权限不足、磁盘空间不足等）
+            TestkitHelper.alert(
+                    toolWindow.getProject(),
+                    Messages.getErrorIcon(),
+                    "Failed to save file: " + e.getMessage()
+            );
         }
     }
 

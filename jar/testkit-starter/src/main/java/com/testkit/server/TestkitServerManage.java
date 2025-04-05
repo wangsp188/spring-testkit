@@ -10,7 +10,7 @@ public class TestkitServerManage {
 
     private static TestkitServer pluginServer;
 
-    private static final Map<Integer, TestkitServer> digServers = new HashMap<>();
+    private static final Map<Integer, TestkitServer> CLIServers = new HashMap<>();
 
     public static boolean hasPluginServer() {
         return pluginServer != null;
@@ -20,12 +20,12 @@ public class TestkitServerManage {
         return pluginServer;
     }
 
-    public static boolean hasDigServer(Integer port) {
-        return digServers.get(port) != null;
+    public static boolean hasCLIServer(Integer port) {
+        return CLIServers.get(port) != null;
     }
 
-    public static TestkitServer findDigServer(Integer port) {
-        return digServers.get(port);
+    public static TestkitServer findCLIServer(Integer port) {
+        return CLIServers.get(port);
     }
 
 
@@ -44,11 +44,11 @@ public class TestkitServerManage {
     }
 
 
-    public synchronized static TestkitServer startDigServer(ApplicationContext app, String env, int port) {
+    public synchronized static TestkitServer startCLIServer(ApplicationContext app, String env, int port) {
         if (app == null) {
             throw new TestkitException("app can not be null");
         }
-        TestkitServer exist = findDigServer(port);
+        TestkitServer exist = findCLIServer(port);
         if (exist != null) {
             System.err.println("already has a testkit server, exist project:" + exist.getProject() + ", appName:" + exist.getAppName() + ", env:" + exist.getEnv() + ", enableTrace:" + exist.isEnableTrace());
             if (!exist.isRunning()) {
@@ -56,9 +56,9 @@ public class TestkitServerManage {
             }
             return exist;
         }
-        TestkitServer tempServer = new TestkitServer(app, "remote-dig", getStartupClass(app), env, false);
+        TestkitServer tempServer = new TestkitServer(app, "remote-cli", getStartupClass(app), env, false);
         tempServer.start(port);
-        return TestkitServerManage.digServers.put(port, tempServer);
+        return TestkitServerManage.CLIServers.put(port, tempServer);
     }
 
 
