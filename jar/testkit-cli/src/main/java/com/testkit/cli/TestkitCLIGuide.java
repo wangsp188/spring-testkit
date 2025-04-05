@@ -463,8 +463,12 @@ public class TestkitCLIGuide {
             throw new FileNotFoundException("Embedded JAR not found: " + jarName);
         }
 
-        // 创建临时文件（自动清理）
-        Path tempFile = Files.createTempFile("testkit-", ".jar");
+        // 创建 testkit 临时目录（自动递归创建）
+        Path testkitDir = Paths.get(System.getProperty("java.io.tmpdir"), "testkit-cli");
+        Files.createDirectories(testkitDir);  // 如果目录已存在则直接返回
+
+        // 在 testkit 目录下创建临时文件（自动清理）
+        Path tempFile = Files.createTempFile(testkitDir, "testkit-", ".jar");
         tempFile.toFile().deleteOnExit();
 
         try (InputStream in = resourceUrl.openStream()) {
