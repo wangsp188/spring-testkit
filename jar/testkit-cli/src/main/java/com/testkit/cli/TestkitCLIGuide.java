@@ -95,7 +95,7 @@ public class TestkitCLIGuide {
                     return !displayName.contains(TestkitCLIGuide.class.getName())
                             && !displayName.contains("IntelliJ IDEA.app")
                             && !displayName.contains("com.intellij.idea.Main")
-                            && !displayName.contains("testkit-dig-1.0.jar")
+                            && !displayName.contains("testkit-cli-1.0.jar")
                             ;
                 }
             }).toList();
