@@ -14,6 +14,7 @@ import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.intellij.util.Function;
+import com.testkit.view.TestkitToolWindow;
 import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,8 +29,6 @@ public class CodingGuidelinesIconProvider implements LineMarkerProvider {
     public static final Icon DOC_ICON = IconLoader.getIcon("/icons/doc.svg", CodingGuidelinesIconProvider.class);
 
     public static final Icon MARKDOWN_ICON = IconLoader.getIcon("/icons/markdown.svg", CodingGuidelinesIconProvider.class);
-    public static final Icon URL_ICON = IconLoader.getIcon("/icons/url.svg", CodingGuidelinesIconProvider.class);
-
 
 
     @Nullable
@@ -71,7 +70,7 @@ public class CodingGuidelinesIconProvider implements LineMarkerProvider {
                             DefaultActionGroup actionGroup = new DefaultActionGroup(); // 创建一个动作组
                             for (CodingGuidelinesHelper.Doc doc : docs) {
                                 //显示的一个图标加上标题
-                                AnAction documentation = new AnAction(doc.getTitle(), doc.getTitle(), doc.getType() == CodingGuidelinesHelper.DocType.url ? URL_ICON : MARKDOWN_ICON) {
+                                AnAction documentation = new AnAction(doc.getTitle(), doc.getTitle(), doc.getType() == CodingGuidelinesHelper.DocType.url ? TestkitToolWindow.BROWSER_ICON : MARKDOWN_ICON) {
                                     @Override
                                     public void actionPerformed(@NotNull AnActionEvent e) {
                                         CodingGuidelinesHelper.navigateToDocumentation(doc);

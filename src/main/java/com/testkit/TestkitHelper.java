@@ -26,6 +26,7 @@ import java.util.function.Consumer;
 
 public class TestkitHelper {
 
+    public static final String PLUGIN_ID = "spring-testkit";
     private static final String pluginName = "Spring-Testkit";
 
     public static void notify(Project project, NotificationType type, String content) {

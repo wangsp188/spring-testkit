@@ -40,7 +40,7 @@ public class TestkitCLIGuide {
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8.name());
         System.setOut(out);
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-        int port = 30999;
+        int port = 10168;
         String portPro = System.getProperty("testkit.cli.port");
         if (portPro != null) {
             try {
@@ -250,7 +250,7 @@ public class TestkitCLIGuide {
 
 
         String env = null;
-        String envKey = System.getProperty("testkit.cli.envKey", null);
+        String envKey = System.getProperty("testkit.cli.env-key", null);
         if (envKey == null) {
             int tryTimes = 0;
             while (true) {
@@ -278,9 +278,9 @@ public class TestkitCLIGuide {
         map.put("ctx", ctx);
         map.put("port", port);
         String logPath = System.getProperty("java.io.tmpdir") + File.separator + "testkit-dig.txt";
-        map.put("log_path", logPath);
+        map.put("log-path", logPath);
         if (envKey != null) {
-            map.put("envKey", envKey);
+            map.put("env-key", envKey);
         } else {
             map.put("env", (env == null ? "" : env));
         }

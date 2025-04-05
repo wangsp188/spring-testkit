@@ -2,7 +2,6 @@ package com.testkit.view;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.google.gson.JsonObject;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -56,6 +55,7 @@ import java.util.stream.Collectors;
 
 public class TestkitToolWindow {
 
+    public static final Icon BROWSER_ICON = IconLoader.getIcon("/icons/browser.svg", CodingGuidelinesIconProvider.class);
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
 
@@ -74,6 +74,7 @@ public class TestkitToolWindow {
     private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
     private SqlDialog sqlDialog;
+    private CLIDialog cliDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
@@ -137,6 +138,16 @@ public class TestkitToolWindow {
         // Bottom panel for output
         JComponent bottomPanel = createOutputPanel(project);
         windowContent.add(bottomPanel, gbc);
+    }
+
+    public static JTextArea createTips(String content) {
+        JTextArea tipArea = new JTextArea(content);
+        tipArea.setToolTipText(content);
+        tipArea.setEditable(false); // 不可编辑
+        tipArea.setOpaque(false);
+        tipArea.setForeground(new Color(0x72A96B));
+        tipArea.setFont(new Font("Arial", Font.BOLD, 13)); // 设置字体
+        return tipArea;
     }
 
     public BasePluginTool getNowTool() {
@@ -219,6 +230,7 @@ public class TestkitToolWindow {
 
         curlDialog = new CurlDialog(this);
         sqlDialog = new SqlDialog(this);
+        cliDialog = new CLIDialog(this);
 
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
@@ -338,7 +350,7 @@ public class TestkitToolWindow {
         if (preSetDoc == null) {
             return;
         }
-        Icon icon = preSetDoc.getType() == CodingGuidelinesHelper.DocType.markdown ? CodingGuidelinesIconProvider.MARKDOWN_ICON : CodingGuidelinesIconProvider.URL_ICON;
+        Icon icon = preSetDoc.getType() == CodingGuidelinesHelper.DocType.markdown ? CodingGuidelinesIconProvider.MARKDOWN_ICON : BROWSER_ICON;
         subActionGroup.add(new AnAction(preSetDoc.getTitle() == null ? "unknown" : preSetDoc.getTitle(), null, icon) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
@@ -555,6 +567,12 @@ public class TestkitToolWindow {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             curlDialog.resizeDialog();
             curlDialog.setVisible(true);
+        }
+    }
+
+    public void openCliDialog() {
+        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            cliDialog.setVisible(true);
         }
     }
 

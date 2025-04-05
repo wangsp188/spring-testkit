@@ -1,5 +1,6 @@
 package com.testkit.view;
 
+import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -136,7 +137,20 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
+        // 添加第二个按钮
+        AnAction cli = new AnAction("Testkit-Cli", "Testkit-Cli", BasePluginTool.CMD_ICON) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        testkitToolWindow.openCliDialog();
+                    }
+                });
+            }
+        };
+
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,cli));
     }
 }

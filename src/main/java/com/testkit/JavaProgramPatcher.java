@@ -64,7 +64,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 
             if (SettingsStorageHelper.isEnableSideServer(project)) {
                 // 相对路径到你的 JAR 包
-                String relativeJarPath = "spring-testkit" + File.separator + "lib" + File.separator + "testkit-starter-1.0.jar";
+                String relativeJarPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-starter-1.0.jar";
                 String springStarterJarPath = pluginPath + File.separator + relativeJarPath;
                 // 添加 Jar 到 classpath
                 javaParameters.getClassPath().add(springStarterJarPath);
@@ -72,7 +72,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             }
 
 
-            String linkJarPath = "spring-testkit" + File.separator + "lib" + File.separator + "testkit-trace-1.0.jar";
+            String linkJarPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-trace-1.0.jar";
 //            增加ajar到
             javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
 
@@ -80,7 +80,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
             if (traceConfig.isEnable()) {
                 //            增加参数 -javaagent:/Users/dexwang/sourcecode/java/spring-fling_side_server/agent/target/agent-1.0-SNAPSHOT.jar
-                String agentPath = "spring-testkit" + File.separator + "lib" + File.separator + "testkit-agent-1.0.jar";
+                String agentPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-agent-1.0.jar";
 
                 traceConfig = JSON.parseObject(JSON.toJSONString(traceConfig), SettingsStorageHelper.TraceConfig.class);
                 if (traceConfig.judgeIsAppThreePackage()) {

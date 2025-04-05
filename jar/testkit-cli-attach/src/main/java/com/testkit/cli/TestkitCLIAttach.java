@@ -26,12 +26,12 @@ public class TestkitCLIAttach {
         try {
             logs.add("dig args:" + args);
             Map<String, String> arg = decode(args);
-            logPath = arg.get("log_path");
+            logPath = arg.get("log-path");
             //帮我解析一些，
             String starterJar = arg.get("starter");
             String ctxGuidingDrug = arg.get("ctx");
             String env = arg.get("env");
-            String envKey = arg.get("envKey");
+            String envKey = arg.get("env-key");
             Integer port = null;
             String portStr = arg.get("port");
             try {

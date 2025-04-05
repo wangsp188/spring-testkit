@@ -37,6 +37,8 @@ public class SettingsStorageHelper {
 
     public static final List<String> defBeanAnnotations = Arrays.asList("org.apache.ibatis.annotations.Mapper", "org.springframework.cloud.openfeign.FeignClient");
 
+    public static final String defDownloadCliUrl = "https://github.com/wangsp188/spring-testkit/blob/master/how-to-use/testkit-cli-1.0.zip";
+
     public static final String defProperties = "logging.level.com.testkit=INFO";
     public static final String datasourceTemplateProperties = "#local_test datasource\n" +
             "datasource.local.url=jdbc:mysql:///test\n" +
@@ -480,7 +482,6 @@ public class SettingsStorageHelper {
 
     public static Map<String, SettingsStorageHelper.ProjectConfig> getPreSettings() {
         return new HashMap<>(preSettings);
-//        return parsePreSettings();
     }
 
     private static Map<String, SettingsStorageHelper.ProjectConfig> parsePreSettings() {
@@ -565,6 +566,20 @@ public class SettingsStorageHelper {
             projectConfig = new ProjectConfig();
         }
         projectConfig.setSqlConfig(config);
+        saveProjectConfig(project, projectConfig);
+    }
+
+    public static CliConfig getCliConfig(Project project) {
+        return getConfig(project).getCliConfig();
+    }
+
+
+    public static void saveCliConfig(Project project, CliConfig config) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        projectConfig.setCliConfig(config);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -761,6 +776,7 @@ public class SettingsStorageHelper {
             config.setSqlConfig(copyDefSqlConfig());
             config.setEnableSideServer(true);
             config.setDefaultUseInterceptor(false);
+            config.setCliConfig(copyDefCliConfig());
             return config;
         }
         Config config = new Config();
@@ -769,6 +785,7 @@ public class SettingsStorageHelper {
         config.setBeanAnnotations(projectConfig.getBeanAnnotations() == null ? defBeanAnnotations : projectConfig.getBeanAnnotations());
         config.setTraceConfig(projectConfig.getTraceConfig() == null ? copyDefMonitorConfig() : projectConfig.getTraceConfig());
         config.setSqlConfig(projectConfig.getSqlConfig() == null ? copyDefSqlConfig() : projectConfig.getSqlConfig());
+        config.setCliConfig(projectConfig.getCliConfig() == null ? copyDefCliConfig() : projectConfig.getCliConfig());
         config.setEnableSideServer(projectConfig.isEnableSideServer());
         config.setDefaultUseInterceptor(projectConfig.isDefaultUseInterceptor());
         return config;
@@ -791,6 +808,17 @@ public class SettingsStorageHelper {
     private static SqlConfig copyDefSqlConfig() {
         SqlConfig sqlConfig = new SqlConfig();
         return sqlConfig;
+    }
+
+    private static CliConfig copyDefCliConfig() {
+        CliConfig cliConfig = new CliConfig();
+        cliConfig.setDownloadUrl(defDownloadCliUrl == null ? "" : defDownloadCliUrl);
+        if (defDownloadCliUrl != null && !defDownloadCliUrl.isEmpty()) {
+            cliConfig.setDownloadFirst(true);
+        }
+        cliConfig.setPort(10168);
+        cliConfig.setEnvKey("spring.profiles.active");
+        return cliConfig;
     }
 
 
@@ -897,6 +925,7 @@ public class SettingsStorageHelper {
         private Map<String, Config> appConfigs;
         private TraceConfig traceConfig;
         private SqlConfig sqlConfig;
+        private CliConfig cliConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -985,6 +1014,14 @@ public class SettingsStorageHelper {
         public void setDefaultUseInterceptor(boolean defaultUseInterceptor) {
             this.defaultUseInterceptor = defaultUseInterceptor;
         }
+
+        public CliConfig getCliConfig() {
+            return cliConfig;
+        }
+
+        public void setCliConfig(CliConfig cliConfig) {
+            this.cliConfig = cliConfig;
+        }
     }
 
     public static class Config {
@@ -1000,6 +1037,7 @@ public class SettingsStorageHelper {
         private String properties;
         private TraceConfig traceConfig;
         private SqlConfig sqlConfig;
+        private CliConfig cliConfig;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -1087,6 +1125,14 @@ public class SettingsStorageHelper {
 
         public void setDefaultUseInterceptor(boolean defaultUseInterceptor) {
             this.defaultUseInterceptor = defaultUseInterceptor;
+        }
+
+        public CliConfig getCliConfig() {
+            return cliConfig;
+        }
+
+        public void setCliConfig(CliConfig cliConfig) {
+            this.cliConfig = cliConfig;
         }
     }
 
@@ -1271,6 +1317,55 @@ public class SettingsStorageHelper {
 
         public void setProperties(String properties) {
             this.properties = properties;
+        }
+    }
+
+    public static class CliConfig {
+
+        private boolean downloadFirst;
+        private String downloadUrl;
+        private Integer port;
+        private String ctx;
+        private String envKey;
+
+        public boolean isDownloadFirst() {
+            return downloadFirst;
+        }
+
+        public void setDownloadFirst(boolean downloadFirst) {
+            this.downloadFirst = downloadFirst;
+        }
+
+        public String getDownloadUrl() {
+            return downloadUrl;
+        }
+
+        public void setDownloadUrl(String downloadUrl) {
+            this.downloadUrl = downloadUrl;
+        }
+
+        public Integer getPort() {
+            return port;
+        }
+
+        public void setPort(Integer port) {
+            this.port = port;
+        }
+
+        public String getCtx() {
+            return ctx;
+        }
+
+        public void setCtx(String ctx) {
+            this.ctx = ctx;
+        }
+
+        public String getEnvKey() {
+            return envKey;
+        }
+
+        public void setEnvKey(String envKey) {
+            this.envKey = envKey;
         }
     }
 
