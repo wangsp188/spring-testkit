@@ -206,7 +206,6 @@ public class CLIDialog extends JDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 //弹出一个选项框，一个是本地下载，另一个是跳转到对应连接
-                String url = "https://github.com/wangsp188/spring-testkit/blob/master/how-to-use/testkit-cli-1.0.zip";
                 //新增drop down
                 DefaultActionGroup copyGroup = new DefaultActionGroup();
                 //显示的一个图标加上标题
@@ -219,21 +218,23 @@ public class CLIDialog extends JDialog {
                     }
                 };
                 copyGroup.add(copyDirect); // 将动作添加到动作组中
-
-                //显示的一个图标加上标题
-                AnAction browserDirect = new AnAction("Open browser download Latest", "Open browser download Latest", TestkitToolWindow.BROWSER_ICON) {
-                    @Override
-                    public void actionPerformed(AnActionEvent e) {
-                        //使用默认浏览器打开
-                        try {
-                            URI uri = new URI(url);
-                            Desktop.getDesktop().browse(uri);
-                        } catch (Exception e2) {
-                            TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Open browse fail<br>You can Manual opening<br>" + url);
+                String url = null;
+                if(url!=null){
+                    //显示的一个图标加上标题
+                    AnAction browserDirect = new AnAction("Open browser download Latest", "Open browser download Latest", TestkitToolWindow.BROWSER_ICON) {
+                        @Override
+                        public void actionPerformed(AnActionEvent e) {
+                            //使用默认浏览器打开
+                            try {
+                                URI uri = new URI(url);
+                                Desktop.getDesktop().browse(uri);
+                            } catch (Exception e2) {
+                                TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Open browse fail<br>You can Manual opening<br>" + url);
+                            }
                         }
-                    }
-                };
-                copyGroup.add(browserDirect); // 将动作添加到动作组中
+                    };
+                    copyGroup.add(browserDirect); // 将动作添加到动作组中
+                }
 
                 JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("CopyFunctionCallPopup", copyGroup).getComponent();
                 popupMenu.show(downloadButton, 32, 0);
