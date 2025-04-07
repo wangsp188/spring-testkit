@@ -518,19 +518,20 @@ public class SqlDialog extends JDialog {
                         @Override
                         public void run(@NotNull ProgressIndicator progressIndicator) {
                             TableModel tableModel = table.getModel();
+                            tableModel.setValueAt("", modelRow, 3);
+                            tableModel.setValueAt("", modelRow, 4);
                             try (Connection connection = datasource.newConnection()) {
-                                tableModel.setValueAt("", modelRow, 3);
-                                tableModel.setValueAt("", modelRow, 4);
                                 String checkDdl = MysqlVerifyExecuteUtil.verifyWriteSQL(finalStatement, connection);
                                 tableModel.setValueAt(checkDdl, modelRow, 3);
                                 try {
                                     String rollbackDdl = MysqlVerifyExecuteUtil.rollbackWriteSQL(finalStatement, connection);
                                     tableModel.setValueAt(rollbackDdl, modelRow, 4);
                                 } catch (Throwable ex) {
-                                    tableModel.setValueAt("Generate rollback error,\n" + ex.getMessage(), modelRow, 4);
+                                    tableModel.setValueAt("Generate rollback error\n" + ex.getMessage(), modelRow, 4);
                                 }
                             } catch (Throwable ex) {
-                                TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Verify error, " + ex.getMessage());
+                                tableModel.setValueAt("Verify error\n" + ex.getMessage(), modelRow, 3);
+                                TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Verify error\n" + ex.getMessage());
                             } finally {
                                 fireEditingStopped(); // 结束编辑状态
                             }

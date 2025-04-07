@@ -380,7 +380,7 @@ public class ReqStorageHelper {
             if (type != ItemType.function_call) {
                 return null;
             }
-            return metaObj(CallMethodMeta.class).getSubType();
+            return metaObj(FunctionCallMeta.class).getSubType();
         }
 
         public JSONObject getMeta() {
@@ -457,7 +457,7 @@ public class ReqStorageHelper {
     }
 
 
-    public static class CallMethodMeta {
+    public static class FunctionCallMeta {
 
         private String typeClass;
         private String beanName;

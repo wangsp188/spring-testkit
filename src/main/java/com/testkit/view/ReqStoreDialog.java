@@ -842,14 +842,14 @@ public class ReqStoreDialog {
                         return;
                     }
                 }
-                ReqStorageHelper.CallMethodMeta meta = null;
+                ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
                     return;
                 }
-                ReqStorageHelper.CallMethodMeta finalMeta = meta;
+                ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
                 triggerHttpTask(getKeyButton, FunctionCallTool.KIcon, visibleApp.getSidePort(), new Supplier<JSONObject>() {
                     @Override
@@ -888,14 +888,14 @@ public class ReqStoreDialog {
                         return;
                     }
                 }
-                ReqStorageHelper.CallMethodMeta meta = null;
+                ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
                     return;
                 }
-                ReqStorageHelper.CallMethodMeta finalMeta = meta;
+                ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
                 triggerHttpTask(getValButton, AllIcons.Actions.Find, visibleApp.getSidePort(), new Supplier<JSONObject>() {
                     @Override
@@ -934,14 +934,14 @@ public class ReqStoreDialog {
                         return;
                     }
                 }
-                ReqStorageHelper.CallMethodMeta meta = null;
+                ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
                     return;
                 }
-                ReqStorageHelper.CallMethodMeta finalMeta = meta;
+                ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
                 triggerHttpTask(delValButton, AllIcons.Actions.GC, visibleApp.getSidePort(), new Supplier<JSONObject>() {
                     @Override
@@ -964,8 +964,8 @@ public class ReqStoreDialog {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a app and item");
                     return;
                 }
-                ReqStorageHelper.CallMethodMeta callMethodMeta = selectedItem.metaObj(ReqStorageHelper.CallMethodMeta.class);
-                if (callMethodMeta.getSubType() != ReqStorageHelper.SubItemType.controller || callMethodMeta.getHttpMeta() == null) {
+                ReqStorageHelper.FunctionCallMeta functionCallMeta = selectedItem.metaObj(ReqStorageHelper.FunctionCallMeta.class);
+                if (functionCallMeta.getSubType() != ReqStorageHelper.SubItemType.controller || functionCallMeta.getHttpMeta() == null) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
                     return;
                 }
@@ -993,7 +993,7 @@ public class ReqStoreDialog {
                                         application.runReadAction(new Runnable() {
                                             @Override
                                             public void run() {
-                                                handleControllerCommand(env, script, callMethodMeta.getHttpMeta());
+                                                handleControllerCommand(env, script, functionCallMeta.getHttpMeta());
                                             }
                                         });
                                     }
@@ -1016,7 +1016,7 @@ public class ReqStoreDialog {
                             application.runReadAction(new Runnable() {
                                 @Override
                                 public void run() {
-                                    handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), callMethodMeta.getHttpMeta());
+                                    handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), functionCallMeta.getHttpMeta());
                                 }
                             });
                         }
@@ -1158,8 +1158,8 @@ public class ReqStoreDialog {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a app and item");
                     return;
                 }
-                ReqStorageHelper.CallMethodMeta callMethodMeta = selectedItem.metaObj(ReqStorageHelper.CallMethodMeta.class);
-                if (callMethodMeta.getSubType() != ReqStorageHelper.SubItemType.feign_client || callMethodMeta.getHttpMeta() == null) {
+                ReqStorageHelper.FunctionCallMeta functionCallMeta = selectedItem.metaObj(ReqStorageHelper.FunctionCallMeta.class);
+                if (functionCallMeta.getSubType() != ReqStorageHelper.SubItemType.feign_client || functionCallMeta.getHttpMeta() == null) {
                     TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
                     return;
                 }
@@ -1187,7 +1187,7 @@ public class ReqStoreDialog {
                                         application.runReadAction(new Runnable() {
                                             @Override
                                             public void run() {
-                                                handleFeignCommand(env, script, callMethodMeta.getHttpMeta());
+                                                handleFeignCommand(env, script, functionCallMeta.getHttpMeta());
                                             }
                                         });
                                     }
@@ -1210,7 +1210,7 @@ public class ReqStoreDialog {
                             application.runReadAction(new Runnable() {
                                 @Override
                                 public void run() {
-                                    handleFeignCommand(null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), callMethodMeta.getHttpMeta());
+                                    handleFeignCommand(null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), functionCallMeta.getHttpMeta());
                                 }
                             });
                         }
@@ -1486,7 +1486,7 @@ public class ReqStoreDialog {
                 actionPanel.add(useProxyButton);
                 actionPanel.add(executeButton);
 
-                if(item.getType() == ReqStorageHelper.ItemType.function_call && item.metaObj(ReqStorageHelper.CallMethodMeta.class).isSpringCache()){
+                if(item.getType() == ReqStorageHelper.ItemType.function_call && item.metaObj(ReqStorageHelper.FunctionCallMeta.class).isSpringCache()){
                     actionPanel.add(getKeyButton);
                     actionPanel.add(getValButton);
                     actionPanel.add(delValButton);
@@ -1532,9 +1532,9 @@ public class ReqStoreDialog {
                             throw new RuntimeException("Params must be json object");
                         }
                     }
-                    ReqStorageHelper.CallMethodMeta meta = null;
+                    ReqStorageHelper.FunctionCallMeta meta = null;
                     try {
-                        meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.CallMethodMeta.class);
+                        meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
                     } catch (Throwable e) {
                         throw new RuntimeException("Meta must be json object");
                     }
@@ -1671,7 +1671,7 @@ public class ReqStoreDialog {
         });
     }
 
-    private JSONObject buildCallMethodParams(ReqStorageHelper.CallMethodMeta meta, RuntimeHelper.VisibleApp visibleApp, JSONObject args) {
+    private JSONObject buildCallMethodParams(ReqStorageHelper.FunctionCallMeta meta, RuntimeHelper.VisibleApp visibleApp, JSONObject args) {
         JSONObject params = new JSONObject();
         params.put("typeClass", meta.getTypeClass());
         params.put("beanName", meta.getBeanName());
@@ -1692,7 +1692,7 @@ public class ReqStoreDialog {
         return req;
     }
 
-    private JSONObject buildCacheParams(String cacheAction,ReqStorageHelper.CallMethodMeta meta, RuntimeHelper.VisibleApp visibleApp, JSONObject args) {
+    private JSONObject buildCacheParams(String cacheAction, ReqStorageHelper.FunctionCallMeta meta, RuntimeHelper.VisibleApp visibleApp, JSONObject args) {
         JSONObject params = new JSONObject();
         params.put("typeClass", meta.getTypeClass());
         params.put("beanName", meta.getBeanName());

@@ -9,7 +9,6 @@ import com.testkit.ReqStorageHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.tools.ToolHelper;
-import com.testkit.tools.flexible_test.FlexibleTestTool;
 import com.testkit.util.Container;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
@@ -389,8 +388,7 @@ public class FunctionCallTool extends BasePluginTool {
         ReqStorageHelper.SavedReq savedReq = new ReqStorageHelper.SavedReq();
         savedReq.setTitle(StringUtils.isBlank(title) ? "undefined" : title);
         savedReq.setArgs(args);
-
-        ReqStorageHelper.CallMethodMeta methodMeta = new ReqStorageHelper.CallMethodMeta();
+        ReqStorageHelper.FunctionCallMeta methodMeta = new ReqStorageHelper.FunctionCallMeta();
         methodMeta.setTypeClass(typeClass);
         methodMeta.setBeanName(beanName);
         methodMeta.setMethodName(method.getName());
@@ -940,7 +938,7 @@ public class FunctionCallTool extends BasePluginTool {
         JPanel panel = new JPanel(new GridBagLayout());
         actionComboBox = addActionComboBox(FunctionCallIconProvider.FUNCTION_CALL_ICON, FUNCTION_CALL_DISABLE_ICON,
                 "<strong>function-call</strong>\n<ul>\n" +
-                        "    <li>spring bean' public method</li>\n" +
+                        "    <li>spring bean method</li>\n" +
                         "    <li>not main/bean method</li>\n" +
                         "    <li>not in test source</li>\n" +
                         "</ul>", panel, new ActionListener() {

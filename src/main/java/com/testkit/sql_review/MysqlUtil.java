@@ -112,14 +112,14 @@ public class MysqlUtil {
             Class.forName("com.mysql.cj.jdbc.Driver");
             String url = datasourceConfig.getUrl();
             if (!url.contains("?")) {
-                url += "?connectTimeout=5000&socketTimeout=30000";
+                url += "?connectTimeout=5000&socketTimeout=600000";
             } else {
                 if (!url.contains("connectTimeout=")) {
                     url += "&connectTimeout=5000";
                 }
 
                 if (!url.contains("socketTimeout=")) {
-                    url += "&socketTimeout=30000";
+                    url += "&socketTimeout=600000";
                 }
             }
 
@@ -257,7 +257,7 @@ public class MysqlUtil {
         long startTime = System.currentTimeMillis();
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
         try (Statement statement = connection.createStatement()) {
-            statement.setQueryTimeout(60);
+            statement.setQueryTimeout(600);
             // 提交定时取消任务
             ScheduledFuture<?> cancelTask = executor.schedule(() -> {
                 try {

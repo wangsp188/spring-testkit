@@ -200,7 +200,13 @@ public class ReflexUtils {
                 JavaType argType = methodArgTypes[i];
                 Object argJson = methodArgsJson[i];
                 if (argType.hasRawClass(String.class)) {
-                    methodArgs[i] = argJson;
+                    if (argJson == null || argJson instanceof String) {
+                        methodArgs[i] = argJson;
+                    } else if (isPrimitiveOrWrapper(argJson)) {
+                        methodArgs[i] = String.valueOf(argJson);
+                    } else {
+                        methodArgs[i] = PARSER_MAPPER.writeValueAsString(argJson);
+                    }
                 } else if (argType.hasRawClass(Integer.class) || argType.isPrimitive() && argType.getRawClass() == int.class) {
                     methodArgs[i] = argJson == null || argJson.toString().isEmpty() ? (argType.getRawClass() == int.class ? 0 : null) : Integer.valueOf(Integer.parseInt(argJson.toString()));
                 } else if (argType.hasRawClass(Long.class) || argType.isPrimitive() && argType.getRawClass() == long.class) {
@@ -231,6 +237,22 @@ public class ReflexUtils {
             }
         }
         return new ReflexBox(method, methodArgs);
+    }
+
+    private static boolean isPrimitiveOrWrapper(Object obj) {
+        if (obj == null){
+            return false;
+        }
+        Class<?> cls = obj.getClass();
+        return cls.isPrimitive() ||
+                cls == Boolean.class ||
+                cls == Character.class ||
+                cls == Byte.class ||
+                cls == Short.class ||
+                cls == Integer.class ||
+                cls == Long.class ||
+                cls == Float.class ||
+                cls == Double.class;
     }
 
     private static Method findMethod(Class<?> typeClass, String methodName, JavaType[] methodArgTypes) throws NoSuchMethodException, ClassNotFoundException {

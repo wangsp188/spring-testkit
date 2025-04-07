@@ -155,6 +155,9 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
             return "disable_side_server";
         }
+        if (!psiMethod.getModifierList().hasModifierProperty(PsiModifier.PUBLIC)) {
+            return "not_public";
+        }
 
 //        VirtualFile testSourceRoot = getTestSourceRoot(module);
 //        if (testSourceRoot == null) {
@@ -196,10 +199,13 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     }
 
     private String isBeanMethod(PsiModifierList modifierList) {
-        // 1. 检查方法是否为 public
-        if (!modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
-            return "not_public";
+        if (modifierList==null) {
+            return "npe";
         }
+        // 1. 检查方法是否为 public
+//        if (!modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
+//            return "not_public";
+//        }
 
         // 3. 获取方法和类
         PsiElement parent = modifierList.getParent();

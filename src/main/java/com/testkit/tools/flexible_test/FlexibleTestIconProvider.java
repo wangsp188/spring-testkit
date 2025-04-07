@@ -66,8 +66,8 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
     private String isTest(PsiModifierList modifierList) {
 
         // 1. 必须是个public的函数
-        if (modifierList == null || !modifierList.hasModifierProperty(PsiModifier.PUBLIC)) {
-            return "not_public";
+        if (modifierList == null) {
+            return "npe";
         }
 
         // 2. 必须是非静态方法
