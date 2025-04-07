@@ -37,7 +37,7 @@ public class SettingsStorageHelper {
 
     public static final List<String> defBeanAnnotations = Arrays.asList("org.apache.ibatis.annotations.Mapper", "org.springframework.cloud.openfeign.FeignClient");
 
-    public static final String defDownloadCliUrl = "";
+    public static final String defDownloadCliUrl = "https://raw.githubusercontent.com/wangsp188/spring-testkit/refs/heads/master/how-to-use/testkit-cli-1.0.jar";
 
     public static final String defProperties = "logging.level.com.testkit=INFO";
     public static final String datasourceTemplateProperties = "#local_test datasource\n" +

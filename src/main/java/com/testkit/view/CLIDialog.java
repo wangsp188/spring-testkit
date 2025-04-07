@@ -224,7 +224,7 @@ public class CLIDialog extends JDialog {
                     }
                 };
                 copyGroup.add(copyDirect); // 将动作添加到动作组中
-                String url = null;
+                String url = "https://raw.githubusercontent.com/wangsp188/spring-testkit/refs/heads/master/how-to-use/testkit-cli-1.0.jar";
                 if(url!=null){
                     //显示的一个图标加上标题
                     AnAction browserDirect = new AnAction("Open browser download Latest", "Open browser download Latest", TestkitToolWindow.BROWSER_ICON) {
