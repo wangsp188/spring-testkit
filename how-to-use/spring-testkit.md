@@ -99,6 +99,9 @@ doc：[Idea 离线安装插件 Idea 安装离线插件_idea离线安装插件-CS
 
 Demo: [testkit-cli.mp4](testkit-cli.mp4)
 
+自由配置快速连接命令：
+![testkit-cli.png](testkit-cli.png)
+
 # 静态工具
 > <font style="color:rgb(230, 69, 147);">不依赖运行态项目的工具</font>
 
