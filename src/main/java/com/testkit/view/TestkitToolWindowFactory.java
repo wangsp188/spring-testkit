@@ -137,20 +137,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
-        // 添加第二个按钮
-        AnAction cli = new AnAction("Testkit-Cli", "Testkit-Cli", BasePluginTool.CMD_ICON) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        testkitToolWindow.openCliDialog();
-                    }
-                });
-            }
-        };
-
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,cli));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql));
     }
 }

@@ -34,6 +34,16 @@ public class RuntimeHelper {
     private static final Map<String, List<String>> ddlDatasources = new HashMap<>();
     private static final Map<String, List<String>> writeDatasources = new HashMap<>();
 
+    private static boolean enableMapperSql = false;
+
+
+    public static boolean isEnableMapperSql() {
+        return enableMapperSql;
+    }
+
+    public static void setEnableMapperSql(boolean enableMapperSql) {
+        RuntimeHelper.enableMapperSql = enableMapperSql;
+    }
 
     public static VisibleApp getSelectedApp(String project) {
         if (project == null) {

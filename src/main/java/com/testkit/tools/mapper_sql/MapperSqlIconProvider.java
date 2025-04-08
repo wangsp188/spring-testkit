@@ -1,5 +1,7 @@
 package com.testkit.tools.mapper_sql;
 
+import com.testkit.RuntimeHelper;
+import com.testkit.SettingsStorageHelper;
 import com.testkit.view.TestkitToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
@@ -31,6 +33,9 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
         }
         XmlTag tag = (XmlTag) element;
         if(!isSqlTag(tag)){
+            return null;
+        }
+        if (!RuntimeHelper.isEnableMapperSql()) {
             return null;
         }
         return new LineMarkerInfo<>(

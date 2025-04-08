@@ -30,13 +30,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 public class CLIDialog extends JDialog {
-    private static final Icon downloadIcon = IconLoader.getIcon("/icons/download.svg", CLIDialog.class);
+    public static final Icon downloadIcon = IconLoader.getIcon("/icons/download.svg", CLIDialog.class);
 
 
     private TestkitToolWindow toolWindow;
 
     public CLIDialog(TestkitToolWindow toolWindow) {
-        super((Frame) null, "Testkit CLI", true);
+        super((Frame) null, "Testkit-CLI", true);
         this.toolWindow = toolWindow;
         initComponents();
         pack();
@@ -46,12 +46,13 @@ public class CLIDialog extends JDialog {
     private void initComponents() {
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.add(Box.createVerticalStrut(5));
         // 第一部分: 下载按钮和文本
         JPanel downloadPanel = createDownloadPanel();
         mainPanel.add(downloadPanel);
         mainPanel.add(Box.createVerticalStrut(15));
         mainPanel.add(createCommandGeneratorPanel());
-
+        mainPanel.add(Box.createVerticalStrut(15));
         setContentPane(mainPanel);
     }
 
@@ -61,22 +62,19 @@ public class CLIDialog extends JDialog {
 //        //我现在想给个生成启动命令的小工具，这些xxx的是需要用户填写的东西，有默认值
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new TitledBorder("Quick start Testkit-CLI"));
-
-        panel.add(TestkitToolWindow.createTips("The easiest way to start is 'java -jar testkit-cli-1.0.jar' \nThe following parameters are intended only to shorten the boot process of connecting to the jvm"));
-        panel.add(Box.createVerticalStrut(15));
+        panel.setBorder(new TitledBorder("Shortening the boot process"));
 
         SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(toolWindow.getProject());
         // 下载选项
         JPanel downloadOptionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JCheckBox downloadCheckBox = new JCheckBox("Download first");
+        JCheckBox downloadCheckBox = new JCheckBox("Download on demand");
+        downloadCheckBox.setToolTipText("Upload testkit-cli to a file server and download it on demand at the time of use for a fast experience");
         downloadOptionPanel.add(downloadCheckBox);
-
         // 下载URL输入框
         JPanel urlPanel = new JPanel(new BorderLayout());
-        JLabel wget = new JLabel("<html> ,<code style='color:#e83e8c'> wget </code></html>");
+        JLabel curlLabel = new JLabel("<html> ,<code style='color:#e83e8c'> curl </code></html>");
         //我想文本设置为代码风格
-        urlPanel.add(wget, BorderLayout.WEST);
+        urlPanel.add(curlLabel, BorderLayout.WEST);
         JBTextField urlField = new JBTextField(cliConfig.getDownloadUrl(),30);
         urlPanel.add(urlField, BorderLayout.CENTER);
         panel.add(urlPanel);
@@ -147,7 +145,7 @@ public class CLIDialog extends JDialog {
             if (downloadCheckBox.isSelected()) {
                 command.append("if [ ! -f \"" + jarName + "\" ]; then\n" +
                         "    echo \"" + jarName + " not found. Downloading...\"\n" +
-                        "    wget \"" + downUrl + "\" -O \"" + jarName + "\"\n" +
+                        "    curl -o \"" + jarName + "\" \"" + downUrl + "\"\n" +
                         "    \n" +
                         "    if [ $? -ne 0 ]; then\n" +
                         "        echo \"Download failed.\"\n" +
@@ -199,12 +197,43 @@ public class CLIDialog extends JDialog {
         return panel;
     }
 
+    private static JPanel createCMDPanel() {
+//        //我现在想给个生成启动命令的小工具，这些xxx的是需要用户填写的东西，有默认值
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.add(createCmd("hi", "Gets the current connection information"));
+        panel.add(createCmd("stop", "Stop the Testkit-Server"));
+        panel.add(createCmd("view", "View config, eg: view server.port  or view test.ServiceA#field1"));
+        panel.add(createCmd("function-call", "Equivalent to function-call of plugin"));
+        panel.add(createCmd("flexible-test", "Equivalent to flexible-test of plugin"));
+        return panel;
+    }
+
+
+    public static JDialog createCMDDialog(){
+        JDialog jDialog = new JDialog((Frame) null, "Testkit-CLI CMD list", true);
+        jDialog.setContentPane(createCMDPanel());
+        jDialog.pack();
+        jDialog.setLocationRelativeTo(null);
+        return jDialog;
+    }
+
+
+    private static JPanel createCmd(String cmd,String desc){
+        JPanel hi = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JLabel comp = new JLabel(cmd);
+        comp.setPreferredSize(new Dimension(80, 32));
+        hi.add(comp);
+
+        JLabel comp2 = new JLabel(desc);
+        comp2.setFont(new Font("Arial", Font.BOLD, 13));
+        hi.add(comp2);
+        return hi;
+    }
+
     private JPanel createDownloadPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new TitledBorder("Download Testkit-CLI"));
-        panel.add(TestkitToolWindow.createTips("Testkit-CLI is a command-line version of the testkit plugin\nSupport for dynamic attach runtime JVM\nThe ability to provide quick testing without intruding into the CI/CD process"));
-        panel.add(Box.createVerticalStrut(15));
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton downloadButton = new JButton(downloadIcon);
         downloadButton.setPreferredSize(new Dimension(32, 32));
@@ -215,7 +244,7 @@ public class CLIDialog extends JDialog {
                 //新增drop down
                 DefaultActionGroup copyGroup = new DefaultActionGroup();
                 //显示的一个图标加上标题
-                AnAction copyDirect = new AnAction("Download from local plugin", "Download from local plugin", AllIcons.Modules.SourceRoot) {
+                AnAction copyDirect = new AnAction("Download to Desktop", "Download to Desktop", AllIcons.Modules.SourceRoot) {
                     @Override
                     public void actionPerformed(AnActionEvent e) {
                         //新增一个本地下载功能，用户选择目录将指定文件下载到目标目录
@@ -247,7 +276,11 @@ public class CLIDialog extends JDialog {
             }
         });
         buttonPanel.add(downloadButton);
-        buttonPanel.add(new JLabel("Download Testkit-CLI, speed up up up"));
+        buttonPanel.add(new JLabel("Quick start is Downloading and execute "));
+        JLabel comp = new JLabel("'java -jar testkit-cli-1.0.jar'");
+        comp.setForeground(new Color(0x72A96B));
+        comp.setFont(new Font("Arial", Font.BOLD, 13));
+        buttonPanel.add(comp);
         panel.add(buttonPanel);
         return panel;
     }

@@ -807,6 +807,7 @@ public class SettingsStorageHelper {
 
     private static SqlConfig copyDefSqlConfig() {
         SqlConfig sqlConfig = new SqlConfig();
+        sqlConfig.setEnableMapperSql(true);
         return sqlConfig;
     }
 
@@ -1299,7 +1300,7 @@ public class SettingsStorageHelper {
 
 
     public static class SqlConfig {
-
+        private boolean enableMapperSql = true;
         private String properties;
 
 
@@ -1317,6 +1318,14 @@ public class SettingsStorageHelper {
 
         public void setProperties(String properties) {
             this.properties = properties;
+        }
+
+        public boolean isEnableMapperSql() {
+            return enableMapperSql;
+        }
+
+        public void setEnableMapperSql(boolean enableMapperSql) {
+            this.enableMapperSql = enableMapperSql;
         }
     }
 

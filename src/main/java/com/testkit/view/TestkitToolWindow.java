@@ -74,7 +74,6 @@ public class TestkitToolWindow {
     private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
     private SqlDialog sqlDialog;
-    private CLIDialog cliDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
@@ -230,8 +229,6 @@ public class TestkitToolWindow {
 
         curlDialog = new CurlDialog(this);
         sqlDialog = new SqlDialog(this);
-        cliDialog = new CLIDialog(this);
-
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
 //        初始化所有tool的面板，但是不加载
@@ -567,12 +564,6 @@ public class TestkitToolWindow {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             curlDialog.resizeDialog();
             curlDialog.setVisible(true);
-        }
-    }
-
-    public void openCliDialog() {
-        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
-            cliDialog.setVisible(true);
         }
     }
 

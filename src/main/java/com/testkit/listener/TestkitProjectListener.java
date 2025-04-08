@@ -50,6 +50,7 @@ public class TestkitProjectListener implements ProjectActivity {
                     public void run(@NotNull ProgressIndicator progressIndicator) {
                         List<RuntimeHelper.AppMeta> apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
                         RuntimeHelper.updateAppMetas(project.getName(), apps);
+                        RuntimeHelper.setEnableMapperSql(SettingsStorageHelper.getSqlConfig(project).isEnableMapperSql());
                         System.out.println("Init project line marker,"+project.getName());
                         TestkitHelper.refresh(project);
                     }

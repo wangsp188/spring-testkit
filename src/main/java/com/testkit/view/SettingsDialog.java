@@ -12,6 +12,7 @@ import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.sql_review.MysqlUtil;
+import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.util.HttpUtil;
 import com.intellij.icons.AllIcons;
@@ -86,6 +87,7 @@ public class SettingsDialog {
     private OnOffButton traceMybatisToggleButton;
     private OnOffButton logMybatisToggleButton;
     private OnOffButton defaultInterceptorToggleButton;
+    private OnOffButton mapperSqlToggleButton;
     private JBTextField tracePackagesField;
 
     private JBTextField traceClassSuffixField;
@@ -621,6 +623,51 @@ public class SettingsDialog {
         gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
         springOptionsPanel.add(rollbackAppButton, gbc);
 
+        //cli相关
+        JLabel testkitCLILabel = new JLabel("Testkit-CLI:");
+        testkitCLILabel.setPreferredSize(labelDimension);
+
+        JPanel cliPanel = new JPanel(new FlowLayout(FlowLayout.LEFT,0,5));
+        JButton openCLIButton = new JButton(BasePluginTool.CMD_ICON);
+        openCLIButton.setToolTipText("To use Testkit-CLI");
+        openCLIButton.setPreferredSize(new Dimension(32, 32));
+        openCLIButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                new CLIDialog(toolWindow).setVisible(true);
+            }
+        });
+
+        JButton docButton = new JButton(AllIcons.General.Information);
+        docButton.setPreferredSize(new Dimension(32,32));
+        docButton.setToolTipText("CMD list");
+        docButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                CLIDialog.createCMDDialog().setVisible(true);
+            }
+        });
+        JLabel comp1 = new JLabel("Testkit-CLI can dynamically attached the runtime JVM, provide quick testing capabilities");
+        comp1.setForeground(new Color(0x72A96B));
+        comp1.setFont(new Font("Arial", Font.BOLD, 13));
+        cliPanel.add(openCLIButton);
+        cliPanel.add(docButton);
+        cliPanel.add(comp1);
+
+        // 布局输入框和标签
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        springOptionsPanel.add(testkitCLILabel, gbc);
+
+        gbc.gridx = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridwidth = 2; // 让输入框占据剩余空间
+        springOptionsPanel.add(cliPanel, gbc);
+
+
         gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 3;
@@ -730,14 +777,14 @@ public class SettingsDialog {
         JLabel defaultInterceptor = new JLabel("Default disable");
         defaultInterceptorToggleButton = new OnOffButton();
         boolean defaultUseInterceptor = SettingsStorageHelper.isDefaultUseInterceptor(toolWindow.getProject());
-        if(defaultUseInterceptor){
+        if (defaultUseInterceptor) {
             defaultInterceptorToggleButton.setSelected(defaultUseInterceptor);
             defaultInterceptor.setText(defaultUseInterceptor ? "Default enable" : "Default disable");
         }
 
         JPanel defaultInterceptorLabelButtonPanel = new JPanel(new BorderLayout()); // 左对齐，5px 垂直和水平间隔
-        defaultInterceptorLabelButtonPanel.add(defaultInterceptor, BorderLayout.WEST);
-        defaultInterceptorLabelButtonPanel.add(defaultInterceptorToggleButton, BorderLayout.EAST);
+        defaultInterceptorLabelButtonPanel.add(defaultInterceptorToggleButton, BorderLayout.WEST);
+        defaultInterceptorLabelButtonPanel.add(defaultInterceptor, BorderLayout.EAST);
 
         defaultInterceptorToggleButton.addActionListener(new ActionListener() {
             @Override
@@ -745,7 +792,7 @@ public class SettingsDialog {
                 boolean selected = defaultInterceptorToggleButton.isSelected();
                 defaultInterceptor.setText(selected ? "Default enable" : "Default disable");
                 SettingsStorageHelper.setDefaultUseInterceptor(toolWindow.getProject(), selected);
-                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Tool-interceptor is default " + (selected ? "enable" : "disable")+"<br>Take effect after restart");
+                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Tool-interceptor is default " + (selected ? "enable" : "disable") + "<br>Take effect after restart");
             }
         });
 
@@ -1445,6 +1492,29 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.NORTH;
         panel.add(tipArea, gbc);
+
+
+        SettingsStorageHelper.SqlConfig sqlConfig1 = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+
+        JLabel mapperSql = new JLabel("Mapper-sql " + (sqlConfig1.isEnableMapperSql() ? "enable" : "disable"));
+        mapperSqlToggleButton = new OnOffButton();
+        mapperSqlToggleButton.setSelected(sqlConfig1.isEnableMapperSql());
+
+        mapperSqlToggleButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                boolean selected = mapperSqlToggleButton.isSelected();
+                mapperSql.setText("Mapper-sql " + (selected ? "enable" : "disable"));
+                SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
+                sqlConfig.setEnableMapperSql(selected);
+                SettingsStorageHelper.setSqlConfig(toolWindow.getProject(), sqlConfig);
+                RuntimeHelper.setEnableMapperSql(selected);
+                //删除select
+                TestkitHelper.refresh(toolWindow.getProject());
+                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Mapper-sql is " + (selected ? "enable" : "disable"));
+            }
+        });
+
         showDatasourceButton = new JButton(HIDDEN_ICON);
         showDatasourceButton.setToolTipText("Show/hidden config");
         showDatasourceButton.addActionListener(new ActionListener() {
@@ -1471,6 +1541,8 @@ public class SettingsDialog {
         JPanel button1Panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0)); // 左对齐，按钮间距5
         button1Panel.add(showDatasourceButton);
         button1Panel.add(resetButton);
+        button1Panel.add(mapperSqlToggleButton);
+        button1Panel.add(mapperSql);
 
         gbc.gridy = 1;
         gbc.weightx = 0;
