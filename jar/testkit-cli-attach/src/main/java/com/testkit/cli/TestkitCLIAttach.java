@@ -203,6 +203,7 @@ public class TestkitCLIAttach {
             ClassLoader classLoader = clazz.getClassLoader();
             if (clazz.getName().equals(className)
                     && ("org.springframework.boot.loader.launch.LaunchedClassLoader".equals(classLoader.getClass().getName())
+                    || "org.springframework.boot.loader.LaunchedURLClassLoader".equals(classLoader.getClass().getName())
                     || "sun.misc.Launcher$AppClassLoader".equals(classLoader.getClass().getName())
                     || "jdk.internal.loader.ClassLoaders$AppClassLoader".equals(classLoader.getClass().getName()))
             ) {

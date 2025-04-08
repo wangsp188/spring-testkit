@@ -77,6 +77,28 @@ doc：[Idea 离线安装插件 Idea 安装离线插件_idea离线安装插件-CS
 
 ![img.png](customized-properties.png)
 
+### Testkit-CLI
+> 在不侵入系统的CI/CD流程的情况下动态attach运行时jvm提供快速调试的能力
+> 
+> 类Arthas使用体验
+> 
+> 命令列表
+> `hi` : 查看当前target服务信息
+> 
+> `view`: 查看property 或者 bean的字段值
+> 
+> `function-call`: 类插件函数调用
+> 
+> `flexible-test`: 类插件灵活测试
+> 
+> `exit`: 临时退出命令行(挂载服务保留)
+> 
+> `stop`: 停止挂载服务命令
+
+客户端下载：[testkit-cli-1.0.jar](testkit-cli-1.0.jar)
+
+Demo: [testkit-cli.mp4](testkit-cli.mp4)
+
 # 静态工具
 > <font style="color:rgb(230, 69, 147);">不依赖运行态项目的工具</font>
 
@@ -118,4 +140,6 @@ doc：[Idea 离线安装插件 Idea 安装离线插件_idea离线安装插件-CS
 
 # 修订记录
 2025.3.8 公测
+
+2025.4.8 testkit-cli
 
