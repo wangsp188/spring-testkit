@@ -106,7 +106,7 @@ public class CLIDialog extends JDialog {
         JPanel ctxPanel = new JPanel(new BorderLayout());
         ctxPanel.setToolTipText("A static variable in the target jvm that points to ApplicationContext, like com.xx.classname#feildName");
         ctxPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.cli.ctx=</code></html>"), BorderLayout.WEST);
-        JBTextField ctxField = new JBTextField("");
+        JBTextField ctxField = new JBTextField(cliConfig.getCtx() == null ? "" : cliConfig.getCtx());
         ctxField.getEmptyText().setText("like com.hook.SpringContextUtil#context points to ApplicationContext");
         ctxPanel.add(ctxField, BorderLayout.CENTER);
         panel.add(ctxPanel);

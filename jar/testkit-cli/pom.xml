@@ -21,18 +21,19 @@
             <artifactId>fastjson</artifactId>
             <version>1.2.83</version>
         </dependency>
+        <dependency>
+            <groupId>com.testkit</groupId>
+            <artifactId>testkit-cli-attach</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.testkit</groupId>
+            <artifactId>testkit-starter</artifactId>
+            <version>1.0</version>
+        </dependency>
     </dependencies>
 
     <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <includes>
-                    <include>**/*.jar</include> <!-- 打包所有嵌入的JAR -->
-                </includes>
-                <filtering>false</filtering>
-            </resource>
-        </resources>
         <plugins>
             <!-- 1. 配置编译器插件以支持模块化 -->
             <plugin>
@@ -48,6 +49,54 @@
                 </configuration>
             </plugin>
 
+            <!-- 替换shade插件为assembly插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                            <!-- 可选：排除某些依赖 -->
+                            <!--<excludeArtifactIds>artifact.to.exclude</excludeArtifactIds>-->
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- 将lib目录复制到classes目录 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-libs</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/lib</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.directory}/lib</directory>
+                                    <includes>
+                                        <include>**/*.jar</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- 2. 使用 Shade 插件打包可执行 JAR -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

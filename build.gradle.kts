@@ -43,6 +43,24 @@ intellijPlatform{
     }
 }
 
+tasks.register<Exec>("buildMavenDependencies") {
+    description = "执行Maven命令构建依赖项"
+
+    // 设置工作目录为jar目录
+    workingDir("${rootDir}/jar")
+
+    // 根据操作系统选择适当的命令
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+        commandLine("cmd", "/c", "mvn clean package")
+    } else {
+        commandLine("sh", "-c", "mvn clean package")
+    }
+
+    // 输出命令执行结果
+    doLast {
+        println("Maven构建完成")
+    }
+}
 
 
 tasks {
@@ -69,4 +87,12 @@ tasks {
     publishPlugin {
         token.set(System.getenv("PUBLISH_TOKEN"))
     }
+}
+
+tasks.named("runIde") {
+    dependsOn("buildMavenDependencies")
+}
+
+tasks.named("buildPlugin") {
+    dependsOn("buildMavenDependencies")
 }

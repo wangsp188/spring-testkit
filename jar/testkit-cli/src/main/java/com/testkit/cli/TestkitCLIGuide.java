@@ -27,7 +27,7 @@ public class TestkitCLIGuide {
     private static final String YELLOW = "\033[1;33m"; // 亮黄色
     private static final String RED = "\033[1;31m";    // 亮红色
 
-    private static final String LIB_DIR = "libs/";
+    private static final String LIB_DIR = "lib/";
     public static final String EXIT = "exit";
     public static final String TESTKIT_CLI_ATTACH_1_0_JAR = "testkit-cli-attach-1.0.jar";
     public static final String TESTKIT_STARTER_1_0_JAR = "testkit-starter-1.0.jar";
