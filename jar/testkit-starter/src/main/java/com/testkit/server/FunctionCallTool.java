@@ -3,9 +3,10 @@ package com.testkit.server;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 
+import java.text.MessageFormat;
 import java.util.*;
 
-public class FunctionCallTool {
+public class FunctionCallTool implements TestkitTool {
 
     private ApplicationContext app;
 
@@ -13,7 +14,13 @@ public class FunctionCallTool {
         this.app = app;
     }
 
-    public Object process(Map<String, String> params) throws Exception {
+    @Override
+    public String method() {
+        return "function-call";
+    }
+
+    @Override
+    public PrepareRet prepare(Map<String, String> params) throws Exception {
         // 解析类名、方法名、方法参数类型
         String typeClassStr = params.get("typeClass");
         String beanName = params.get("beanName");
@@ -53,7 +60,20 @@ public class FunctionCallTool {
                 throw new TestkitException("find original obj fail，" + e);
             }
         }
-        return reflexBox.execute(bean);
+        String finalBeanName = beanName != null ? beanName : app.getBeanNamesForType(typeClass)[0];
+        Object finalBean = bean;
+        return new PrepareRet() {
+            @Override
+            public String confirm() {
+                String beanStr = typeClassStr + "(" + finalBeanName+")"+(original ? (TestkitTool.RED+"[original]"+TestkitTool.RESET) : (TestkitTool.YELLOW+"[proxy]"+TestkitTool.RESET));
+                return MessageFormat.format(TestkitTool.RED+"Can you confirm execute function-call?\n"+TestkitTool.RESET+TestkitTool.GREEN+"Bean: {0}\n"+TestkitTool.RESET+TestkitTool.YELLOW+"Method: {1}\n"+TestkitTool.RESET+"{2}",beanStr,reflexBox.buildMethodStr(),reflexBox.buildArgStr());
+            }
+
+            @Override
+            public Object execute() throws Exception {
+                return reflexBox.execute(finalBean);
+            }
+        };
     }
 
 

@@ -11,7 +11,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-public class ViewValueTool {
+public class ViewValueTool implements TestkitTool {
 
     private static final List<Class> springTypes = new ArrayList<>();
 
@@ -35,7 +35,13 @@ public class ViewValueTool {
         this.app = app;
     }
 
-    public Object process(Map<String, String> params) throws Exception {
+    @Override
+    public String method() {
+        return "view-value";
+    }
+
+    @Override
+    public PrepareRet prepare(Map<String, String> params) throws Exception {
         String typeClassStr = params.get("typeClass");
         String beanName = params.get("beanName");
         String fieldName = params.get("fieldName");
@@ -69,7 +75,18 @@ public class ViewValueTool {
         // 检查字段是否为static  
         if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
             // 如果是static字段，直接从类获取  
-            return adapter(field.get(null), isSpringInjected);
+            Field finalField1 = field;
+            return new PrepareRet() {
+                @Override
+                public String confirm() {
+                    return null;
+                }
+
+                @Override
+                public Object execute() throws Exception {
+                    return adapter(finalField1.get(null), isSpringInjected);
+                }
+            };
         }
         // 如果不是static字段，从Spring context中获取bean
         Object bean = null;
@@ -94,9 +111,18 @@ public class ViewValueTool {
         if (!typeClass.isAssignableFrom(targetObject.getClass())) {
             throw new TestkitException("bean is not type of " + typeClassStr);
         }
+        Field finalField2 = field;
+        return new PrepareRet() {
+            @Override
+            public String confirm() {
+                return null;
+            }
 
-        // 获取字段的值并返回
-        return adapter(field.get(targetObject), isSpringInjected);
+            @Override
+            public Object execute() throws Exception {
+                return adapter(finalField2.get(targetObject), isSpringInjected);
+            }
+        };
     }
 
 

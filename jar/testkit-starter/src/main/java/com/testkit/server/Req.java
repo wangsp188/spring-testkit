@@ -6,6 +6,8 @@ class Req {
 
     private String method;
 
+    private boolean prepare;
+
     private String interceptor;
 
     private boolean trace = true;
@@ -45,4 +47,11 @@ class Req {
         this.trace = trace;
     }
 
+    public boolean isPrepare() {
+        return prepare;
+    }
+
+    public void setPrepare(boolean prepare) {
+        this.prepare = prepare;
+    }
 }

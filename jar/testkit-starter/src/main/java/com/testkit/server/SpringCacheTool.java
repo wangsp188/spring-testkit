@@ -7,11 +7,12 @@ import org.springframework.context.ApplicationContext;
 
 import java.io.Serializable;
 import java.lang.reflect.Method;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class SpringCacheTool {
+public class SpringCacheTool implements TestkitTool {
 
 
     private ApplicationContext app;
@@ -57,7 +58,13 @@ public class SpringCacheTool {
         }
     }
 
-    public Object process(Map<String, String> params) throws Exception {
+    @Override
+    public String method() {
+        return "spring-cache";
+    }
+
+    @Override
+    public PrepareRet prepare(Map<String, String> params) throws Exception{
         if (cacheAspectSupport == null || cacheOperationSource == null || operationContextMethod == null || generateKeyMethod == null || getCachesMethod == null) {
             throw new TestkitException("The selected app not find spring-cache or System incompatibility, please contact the owner");
         }
@@ -76,6 +83,9 @@ public class SpringCacheTool {
         } catch (ClassNotFoundException e) {
             throw new TestkitException("can not find class: " + typeClassStr + ", please check");
         }
+        if (!cacheOperationSource.isCandidateClass(typeClass)) {
+            throw new TestkitException("typeClass is not Cache");
+        }
         ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
         Object bean = null;
         if (beanName == null || beanName.trim().isEmpty()) {
@@ -93,17 +103,27 @@ public class SpringCacheTool {
                 throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
             }
         }
-        return buildKey(typeClass, reflexBox.getMethod(), bean, reflexBox.getArgs(), action);
+        Class<?> finalTypeClass = typeClass;
+        Object finalBean = bean;
+        return new PrepareRet() {
+            @Override
+            public String confirm() throws Exception{
+                if(!"delete_cache".equals(action)){
+                    return null;
+                }
+                //构建key
+                return MessageFormat.format(TestkitTool.RED+"Can you confirm to delete cache?\n"+TestkitTool.RESET+TestkitTool.YELLOW+"Keys: \n{0}",prepareDelKey(finalTypeClass, reflexBox.getMethod(), finalBean, reflexBox.getArgs()));
+            }
+
+            @Override
+            public Object execute() throws Exception {
+                return doAction(finalTypeClass, reflexBox.getMethod(), finalBean, reflexBox.getArgs(), action);
+            }
+        };
     }
 
 
-    public List buildKey(Class typeClass, Method method, Object obj, Object[] args, String action) throws Exception {
-        if (operationContextMethod == null || generateKeyMethod == null) {
-            throw new TestkitException("operationContextMethod or generateKeyMethod is null");
-        }
-        if (!cacheOperationSource.isCandidateClass(typeClass)) {
-            throw new TestkitException("typeClass is not Cache");
-        }
+    public List doAction(Class typeClass, Method method, Object obj, Object[] args, String action) throws Exception {
         Collection<CacheOperation> cacheOperations = cacheOperationSource.getCacheOperations(method, typeClass);
         if (cacheOperations == null || cacheOperations.isEmpty()) {
             return new ArrayList<>();
@@ -229,6 +249,70 @@ public class SpringCacheTool {
                 HashMap<Object, Object> map = new HashMap<>();
                 map.put("operation", s);
                 map.put("deleteKeys", value.stream().map(KV::getKey).collect(Collectors.toList()));
+                return map;
+            }
+        }).filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
+
+    public List prepareDelKey(Class typeClass, Method method, Object obj, Object[] args) throws Exception {
+        Collection<CacheOperation> cacheOperations = cacheOperationSource.getCacheOperations(method, typeClass);
+        if (cacheOperations == null || cacheOperations.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Map<String, List>> keyMap = new ArrayList<>();
+        for (CacheOperation cacheOperation : cacheOperations) {
+            Object cachectx = operationContextMethod.invoke(cacheAspectSupport, cacheOperation, method, args, obj, typeClass);
+            Object key = generateKeyMethod.invoke(cacheAspectSupport, cachectx, null);
+            if (key == null || (key instanceof Optional && !((Optional<?>) key).isPresent()) || String.valueOf(key).isEmpty()) {
+                continue;
+            }
+            Collection<Cache> caches = (Collection<Cache>) getCachesMethod.invoke(cachectx);
+            List<Object> keys = new ArrayList<>();
+            if (cacheOperation instanceof CacheableOperation) {
+                for (Cache cache : caches) {
+                    if (!redisCacheCls.isAssignableFrom(cache.getClass())) {
+                        throw new TestkitException("un support cacheType, only support RedisCache");
+                    }
+                    Object invoke = redisCacheGenerateKeyMethod.invoke(cache, key);
+                    if (invoke == null) {
+                        continue;
+                    }
+                    keys.add(invoke);
+                }
+            } else if (cacheOperation instanceof CacheEvictOperation || cacheOperation instanceof CachePutOperation) {
+                for (Cache cache : caches) {
+                    if (!redisCacheCls.isAssignableFrom(cache.getClass())) {
+                        throw new TestkitException("un support cacheType, only support RedisCache");
+                    }
+                    Object invoke = redisCacheGenerateKeyMethod.invoke(cache, key);
+                    if (invoke == null) {
+                        continue;
+                    }
+                    keys.add(invoke);
+                }
+            } else {
+                throw new TestkitException("un support cacheOperation");
+            }
+            HashMap<String, List> map = new HashMap<>();
+            map.put(cacheOperation.getClass().getSimpleName(), keys);
+            keyMap.add(map);
+        }
+        return keyMap.stream().map(new Function<Map<String, List>, Object>() {
+            @Override
+            public Object apply(Map<String, List> stringListMap) {
+                //取出map的第一个key
+                String s = stringListMap.keySet().stream().findFirst().orElse(null);
+                if (s == null) {
+                    return null;
+                }
+                List value = stringListMap.get(s);
+                if (value == null) {
+                    return null;
+                }
+                HashMap<Object, Object> map = new HashMap<>();
+                map.put("operation", s);
+                map.put("deleteKeys", value);
                 return map;
             }
         }).filter(Objects::nonNull).collect(Collectors.toList());

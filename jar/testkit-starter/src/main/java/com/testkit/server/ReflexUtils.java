@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 
 public class ReflexUtils {
     private static final Logger logger = LoggerFactory.getLogger(ReflexUtils.class);
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     public static final ObjectMapper PARSER_MAPPER = new ObjectMapper();
 
@@ -239,7 +239,7 @@ public class ReflexUtils {
         return new ReflexBox(method, methodArgs);
     }
 
-    private static boolean isPrimitiveOrWrapper(Object obj) {
+    public static boolean isPrimitiveOrWrapper(Object obj) {
         if (obj == null){
             return false;
         }

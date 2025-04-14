@@ -5,9 +5,10 @@ import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.text.MessageFormat;
 import java.util.*;
 
-public class FlexibleTestTool {
+public class FlexibleTestTool implements TestkitTool {
 
     private ApplicationContext app;
 
@@ -15,7 +16,13 @@ public class FlexibleTestTool {
         this.app = app;
     }
 
-    public Object process(Map<String, String> params) throws JsonProcessingException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, ClassNotFoundException {
+    @Override
+    public String method() {
+        return "flexible-test";
+    }
+
+    @Override
+    public PrepareRet prepare(Map<String, String> params) throws JsonProcessingException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, ClassNotFoundException {
         String code = params.remove("code");
         String methodName = params.get("methodName");
         String methodArgTypesStr = params.get("argTypes");
@@ -45,7 +52,18 @@ public class FlexibleTestTool {
         }
 
         ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
-        return reflexBox.execute(instance);
+        Object finalInstance = instance;
+        return new PrepareRet() {
+            @Override
+            public String confirm() {
+                return MessageFormat.format(TestkitTool.RED+"Can you confirm execute flexible-test?\n"+TestkitTool.RESET+TestkitTool.YELLOW+"Method: {0}\n"+TestkitTool.RESET+"{1}"+TestkitTool.GREEN+"\nCode:\n"+TestkitTool.RESET+"{2}",reflexBox.buildMethodStr(),reflexBox.buildArgStr(),code);
+            }
+
+            @Override
+            public Object execute() throws Exception{
+                return reflexBox.execute(finalInstance);
+            }
+        };
     }
 
 }

@@ -1,5 +1,7 @@
 package com.testkit.server;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 
@@ -7,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TestkitServerManage {
+    private static Logger logger = LoggerFactory.getLogger(TestkitServerManage.class);
+
 
     private static TestkitServer pluginServer;
 
@@ -50,13 +54,13 @@ public class TestkitServerManage {
         }
         TestkitServer exist = findCLIServer(port);
         if (exist != null) {
-            System.err.println("already has a testkit server, exist project:" + exist.getProject() + ", appName:" + exist.getAppName() + ", env:" + exist.getEnv() + ", enableTrace:" + exist.isEnableTrace());
+            logger.warn("already has a testkit server, exist project:" + exist.getProject() + ", appName:" + exist.getAppName() + ", env:" + exist.getEnv() + ", enableTrace:" + exist.isEnableTrace());
             if (!exist.isRunning()) {
                 exist.start(port);
             }
             return exist;
         }
-        TestkitServer tempServer = new TestkitServer(app, "remote-cli", getStartupClass(app), env, false);
+        TestkitServer tempServer = new TestkitServer(app, RuntimeAppHelper.TESTKIT_CLI_PROJECT, getStartupClass(app), env, false);
         tempServer.start(port);
         return TestkitServerManage.CLIServers.put(port, tempServer);
     }

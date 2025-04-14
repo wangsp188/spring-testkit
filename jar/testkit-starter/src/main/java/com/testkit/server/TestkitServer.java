@@ -27,13 +27,10 @@ public class TestkitServer {
 
     private ApplicationContext app;
 
-    private SpringCacheTool springCacheTool;
+    private Map<String, TestkitTool> tools = new HashMap<>();
 
-    private FlexibleTestTool flexibleTestTool;
 
-    private FunctionCallTool functionCallTool;
-
-    private ViewValueTool viewValueTool;
+    private boolean loadByCli;
 
     private HttpServer server;
 
@@ -44,14 +41,23 @@ public class TestkitServer {
 
 
     public TestkitServer(ApplicationContext app, String project, String appName, String env, boolean enableTrace) {
-        if (RuntimeAppHelper.needRegister(env) && (project == null || project.isEmpty() || appName == null || appName.isEmpty())) {
+        this.loadByCli = RuntimeAppHelper.loadByTestkitCli(project);
+        if (!this.loadByCli && (project == null || project.isEmpty() || appName == null || appName.isEmpty())) {
             throw new IllegalArgumentException("project/appName can not be empty");
         }
         this.app = app;
-        this.springCacheTool = new SpringCacheTool(app);
-        this.flexibleTestTool = new FlexibleTestTool(app);
-        this.functionCallTool = new FunctionCallTool(app);
-        this.viewValueTool = new ViewValueTool(app);
+        SpringCacheTool springCacheTool = new SpringCacheTool(app);
+        tools.put(springCacheTool.method(), springCacheTool);
+
+        FlexibleTestTool flexibleTestTool = new FlexibleTestTool(app);
+        tools.put(flexibleTestTool.method(), flexibleTestTool);
+
+        FunctionCallTool functionCallTool = new FunctionCallTool(app);
+        tools.put(functionCallTool.method(), functionCallTool);
+
+        ViewValueTool viewValueTool = new ViewValueTool(app);
+        tools.put(viewValueTool.method(), viewValueTool);
+
         this.project = project;
         this.appName = appName;
         this.env = env;
@@ -108,10 +114,9 @@ public class TestkitServer {
             @Override
             public void handle(HttpExchange exchange) throws IOException {
                 if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    returnError(exchange, "un support http method");
+                    returnError(exchange, "Un support http method, "+exchange.getRequestMethod());
                     return;
                 }
-                long millis = System.currentTimeMillis();
                 try {
                     InputStream inputStream = exchange.getRequestBody();
                     // 读取请求的JSON内容
@@ -122,101 +127,12 @@ public class TestkitServer {
                     } catch (JsonProcessingException e) {
                         throw new TestkitException("parse req error," + e.getMessage());
                     }
-                    Ret ret = null;
-                    if ("hi".equals(req.getMethod())) {
-                        Map<String, String> params = req.getParams();
-                        boolean testPass = true;
-                        String cls = params == null ? null : params.get("cls");
-                        if (cls != null && !cls.isEmpty()) {
-                            try {
-                                Class.forName(cls);
-                            } catch (Throwable e) {
-                                testPass = false;
-                            }
-                        }
-                        Map<String, Object> map = new HashMap<>();
-                        map.put("enableTrace", enableTrace);
-                        map.put("app", appName);
-                        map.put("env", env);
-                        map.put("testPass", testPass);
-                        map.put("ip", LocalIpUtil.getLocalIp());
-                        map.put("port", serverPort);
-                        ret = Ret.success(map, (int) (System.currentTimeMillis() - millis));
-                    } else if ("property".equals(req.getMethod())) {
-                        Map<String, String> params = req.getParams();
-                        String key = params == null ? null : params.get("property");
-                        ret = Ret.success(key == null ? null : app.getEnvironment().getProperty(key), (int) (System.currentTimeMillis() - millis));
-                    } else if ("stop".equals(req.getMethod())) {
-                        stop();
-                        ret = Ret.success(true, (int) (System.currentTimeMillis() - millis));
-                    } else if ("get_task_ret".equals(req.getMethod())) {
-                        Map<String, String> params = req.getParams();
-                        String reqId = params.get("reqId");
-                        String timeoutStr = params.get("timeout");
-                        int timeout = 86400;
-                        if (timeoutStr != null && !timeoutStr.isEmpty()) {
-                            timeout = Integer.parseInt(timeoutStr);
-                        }
-                        ret = TaskManager.getResult(reqId, timeout);
-                    } else if ("stop_task".equals(req.getMethod())) {
-                        Map<String, String> params = req.getParams();
-                        String reqId = params.get("reqId");
-                        ret = Ret.success(TaskManager.stopTask(reqId), (int) (System.currentTimeMillis() - millis));
-                        System.err.println("Testkit stopReq reqId:" + reqId + " cancel:" + ret.getData());
-                    } else {
-                        String reqId = TaskManager.generateRandomString(16);
-                        Req finalReq = req;
-                        TaskManager.startTask(reqId, new Callable<Ret>() {
-                            @Override
-                            public Ret call() throws Exception {
-                                return processReq(reqId, finalReq);
-                            }
-                        });
-                        ret = Ret.success(reqId, (int) (System.currentTimeMillis() - millis));
-                        System.err.println("Testkit submitReq  method:" + req.getMethod() + " reqId:" + reqId);
-                    }
-
+                    Ret ret = handlerReq(req, serverPort);
                     String jsonResponse = null;
                     try {
                         jsonResponse = ReflexUtils.SIMPLE_MAPPER.writeValueAsString(ret);
                     } catch (Throwable e) {
-                        //这里对象序列化失败，可以判断
-//                        如果是array则每个对象.toString拼接出来
-//                        如果是collection则每个对象.toString拼接出来
-//                        如果是map，则key和val都toSTring
-                        try {
-                            Object obj = ret.getData();
-                            obj = obj == null ? "null" : obj;
-                            if (obj.getClass().isArray()) {
-                                // 如果是array
-                                Object[] array = (Object[]) obj;
-                                for (int i = 0; i < array.length; i++) {
-                                    array[i] = String.valueOf(array[i]);
-                                }
-                            } else if (obj instanceof Collection) {
-                                // 如果是collection
-                                Collection<?> collection = (Collection<?>) obj;
-                                Collection<String> newCollection = new ArrayList<>();
-                                for (Object element : collection) {
-                                    newCollection.add(String.valueOf(element));
-                                }
-                                ret.setData(newCollection);
-                            } else if (obj instanceof Map) {
-                                // 如果是map
-                                Map<?, ?> map = (Map<?, ?>) obj;
-                                Map<String, String> newMap = new HashMap<>();
-                                for (Map.Entry<?, ?> entry : map.entrySet()) {
-                                    newMap.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
-                                }
-                                ret.setData(newMap);
-                            } else {
-                                // 其他情况
-                                ret.setData(String.valueOf(obj));
-                            }
-                            jsonResponse = ReflexUtils.SIMPLE_MAPPER.writeValueAsString(ret);
-                        } catch (Throwable ex) {
-                            throw new TestkitException("ret serialize json error," + ex.getMessage());
-                        }
+                        jsonResponse = revealSeria(ret);
                     }
                     exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
                     exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
@@ -224,8 +140,7 @@ public class TestkitServer {
                     outputStream.write(jsonResponse.getBytes());
                     outputStream.close();
                 } catch (Throwable e) {
-                    System.err.println("server error" + e);
-                    e.printStackTrace();
+                    log("testkit-server error",e);
                     returnError(exchange, getNoneTestkitStackTrace(e));
                 }
             }
@@ -233,43 +148,172 @@ public class TestkitServer {
         new Thread(() -> {
             try {
                 server.start();
-                if (RuntimeAppHelper.needRegister(env)) {
+                if (RuntimeAppHelper.loadByTestkitCli(env)) {
                     RuntimeAppHelper.addApp(project, appName, server.getAddress().getPort());
                 }
-
-                System.err.println("————————————————————————————————————————————————————————————————————\n" +
-                        "//                          _ooOoo_                               //\n" +
-                        "//                         o8888888o                              //\n" +
-                        "//                         88\" . \"88                              //\n" +
-                        "//                         (| ^_^ |)                              //\n" +
-                        "//                         O\\  =  /O                              //\n" +
-                        "//                      ____/`---'\\____                           //\n" +
-                        "//                    .'  \\\\|     |//  `.                         //\n" +
-                        "//                   /  \\\\|||  :  |||//  \\                        //\n" +
-                        "//                  /  _||||| -:- |||||-  \\                       //\n" +
-                        "//                  |   | \\\\\\  -  /// |   |                       //\n" +
-                        "//                  | \\_|  ''\\---/''  |   |                       //\n" +
-                        "//                  \\  .-\\__  `-`  ___/-. /                       //\n" +
-                        "//                ___`. .'  /--.--\\  `. . ___                     //\n" +
-                        "//              .\"\" '<  `.___\\_<|>_/___.'  >'\"\".                  //\n" +
-                        "//            | | :  `- \\`.;`\\ _ /`;.`/ - ` : | |                 //\n" +
-                        "//            \\  \\ `-.   \\_ __\\ /__ _/   .-` /  /                 //\n" +
-                        "//      ========`-.____`-.___\\_____/___.-`____.-'========         //\n" +
-                        "//                           `=---='                              //\n" +
-                        "//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^        //\n" +
-                        "//            佛祖保佑         永不宕机     永无BUG                  //\n" +
-                        "————————————————————————————————————————————————————————————————————\n" +
-                        "                         Testkit:" + server.getAddress().getPort());
+                if(!loadByCli){
+                    System.err.println("————————————————————————————————————————————————————————————————————\n" +
+                            "//                          _ooOoo_                               //\n" +
+                            "//                         o8888888o                              //\n" +
+                            "//                         88\" . \"88                              //\n" +
+                            "//                         (| ^_^ |)                              //\n" +
+                            "//                         O\\  =  /O                              //\n" +
+                            "//                      ____/`---'\\____                           //\n" +
+                            "//                    .'  \\\\|     |//  `.                         //\n" +
+                            "//                   /  \\\\|||  :  |||//  \\                        //\n" +
+                            "//                  /  _||||| -:- |||||-  \\                       //\n" +
+                            "//                  |   | \\\\\\  -  /// |   |                       //\n" +
+                            "//                  | \\_|  ''\\---/''  |   |                       //\n" +
+                            "//                  \\  .-\\__  `-`  ___/-. /                       //\n" +
+                            "//                ___`. .'  /--.--\\  `. . ___                     //\n" +
+                            "//              .\"\" '<  `.___\\_<|>_/___.'  >'\"\".                  //\n" +
+                            "//            | | :  `- \\`.;`\\ _ /`;.`/ - ` : | |                 //\n" +
+                            "//            \\  \\ `-.   \\_ __\\ /__ _/   .-` /  /                 //\n" +
+                            "//      ========`-.____`-.___\\_____/___.-`____.-'========         //\n" +
+                            "//                           `=---='                              //\n" +
+                            "//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^        //\n" +
+                            "//            佛祖保佑         永不宕机     永无BUG                  //\n" +
+                            "————————————————————————————————————————————————————————————————————\n" +
+                            "                         Testkit:" + server.getAddress().getPort());
+                }
                 logger.info("Testkit server started success, project:" + project + ", appName:" + appName + ", env:" + env + ", enableTrace:" + enableTrace);
             } catch (Exception e) {
-                logger.error("Testkit server started fail on port " + server.getAddress().getPort(), e);
+                log("Testkit server started fail on port " + server.getAddress().getPort(),e);
             }
         }).start();
         return server;
     }
 
+    private void log(String msg, Throwable e) {
+        if (e == null) {
+            if (loadByCli) {
+                logger.info(msg);
+            }else{
+                System.err.println(msg);
+            }
+            return;
+        }
+        if (loadByCli) {
+            logger.error(msg, e);
+        } else {
+            System.err.println(msg + e);
+            e.printStackTrace();
+        }
+    }
 
-    private Ret processReq(String reqId, Req req) {
+    private Ret handlerReq(Req req, int serverPort) throws Exception {
+        long begin = System.currentTimeMillis();
+        if ("hi".equals(req.getMethod())) {
+            Map<String, String> params = req.getParams();
+            boolean testPass = true;
+            String cls = params == null ? null : params.get("cls");
+            if (cls != null && !cls.isEmpty()) {
+                try {
+                    Class.forName(cls);
+                } catch (Throwable e) {
+                    testPass = false;
+                }
+            }
+            Map<String, Object> map = new HashMap<>();
+            map.put("enableTrace", enableTrace);
+            map.put("app", appName);
+            map.put("env", env);
+            map.put("testPass", testPass);
+            map.put("ip", LocalIpUtil.getLocalIp());
+            map.put("loadByCli", loadByCli);
+            map.put("port", serverPort);
+            return Ret.success(map, (int) (System.currentTimeMillis() - begin));
+        }
+        if ("property".equals(req.getMethod())) {
+            Map<String, String> params = req.getParams();
+            String key = params == null ? null : params.get("property");
+            return Ret.success(key == null ? null : app.getEnvironment().getProperty(key), (int) (System.currentTimeMillis() - begin));
+        }
+        if ("stop".equals(req.getMethod())) {
+            stop();
+            return Ret.success(true, (int) (System.currentTimeMillis() - begin));
+        }
+        if ("get_task_ret".equals(req.getMethod())) {
+            Map<String, String> params = req.getParams();
+            String reqId = params.get("reqId");
+            String timeoutStr = params.get("timeout");
+            int timeout = 86400;
+            if (timeoutStr != null && !timeoutStr.isEmpty()) {
+                timeout = Integer.parseInt(timeoutStr);
+            }
+            return TaskManager.getResult(reqId, timeout);
+        }
+        if ("stop_task".equals(req.getMethod())) {
+            Map<String, String> params = req.getParams();
+            String reqId = params.get("reqId");
+            Ret ret = Ret.success(TaskManager.stopTask(reqId), (int) (System.currentTimeMillis() - begin));
+            log("Testkit stopReq reqId:" + reqId + " cancel:" + ret.getData(),null);
+            return ret;
+        }
+        TestkitTool testkitTool = tools.get(req.getMethod());
+        if (testkitTool==null) {
+            throw new TestkitException("Un support method, "+ req.getMethod());
+        }
+        if(req.isPrepare()){
+            PrepareRet prepare = testkitTool.prepare(req.getParams());
+            return Ret.success(prepare.confirm(),(int) (System.currentTimeMillis() - begin));
+        }
+        String reqId = TaskManager.generateRandomString(16);
+        TaskManager.startTask(reqId, new Callable<Ret>() {
+            @Override
+            public Ret call() throws Exception {
+                return processReq(testkitTool,reqId, req);
+            }
+        });
+        Ret ret = Ret.success(reqId, (int) (System.currentTimeMillis() - begin));
+        log("Testkit submitReq  method:" + req.getMethod() + " reqId:" + reqId,null);
+        return ret;
+    }
+
+    private static String revealSeria(Ret ret) {
+        String jsonResponse;
+        //这里对象序列化失败，可以判断
+//                        如果是array则每个对象.toString拼接出来
+//                        如果是collection则每个对象.toString拼接出来
+//                        如果是map，则key和val都toSTring
+        try {
+            Object obj = ret.getData();
+            obj = obj == null ? "null" : obj;
+            if (obj.getClass().isArray()) {
+                // 如果是array
+                Object[] array = (Object[]) obj;
+                for (int i = 0; i < array.length; i++) {
+                    array[i] = String.valueOf(array[i]);
+                }
+            } else if (obj instanceof Collection) {
+                // 如果是collection
+                Collection<?> collection = (Collection<?>) obj;
+                Collection<String> newCollection = new ArrayList<>();
+                for (Object element : collection) {
+                    newCollection.add(String.valueOf(element));
+                }
+                ret.setData(newCollection);
+            } else if (obj instanceof Map) {
+                // 如果是map
+                Map<?, ?> map = (Map<?, ?>) obj;
+                Map<String, String> newMap = new HashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    newMap.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+                }
+                ret.setData(newMap);
+            } else {
+                // 其他情况
+                ret.setData(String.valueOf(obj));
+            }
+            jsonResponse = ReflexUtils.SIMPLE_MAPPER.writeValueAsString(ret);
+        } catch (Throwable ex) {
+            throw new TestkitException("ret serialize json error," + ex.getMessage());
+        }
+        return jsonResponse;
+    }
+
+
+    private Ret processReq(TestkitTool testkitTool, String reqId, Req req) {
         Class interceptorType = null;
         try {
             interceptorType = req.getInterceptor() == null || req.getInterceptor().isEmpty() ? null : ReflexUtils.compile(new String(Base64.getDecoder().decode(req.getInterceptor()), "UTF-8"));
@@ -314,7 +358,7 @@ public class TestkitServer {
         params.put("req_id", reqId);
         Object ret = null;
         Throwable error = null;
-        Long begin = null;
+        Long begin = System.currentTimeMillis();
         TraceInfo testkitTraceInfo = null;
         Map<String, String> profile = new HashMap<>();
         try {
@@ -324,49 +368,13 @@ public class TestkitServer {
 
             begin = System.currentTimeMillis();
             if (req.isTrace() && enableTrace) {
-                String biz = "unknown";
-                String action = "unknown";
-                switch (req.getMethod()) {
-                    case "spring-cache":
-                        biz = params.get("typeClass");
-                        if (biz.contains(".")) {
-                            biz = biz.substring(biz.lastIndexOf(".") + 1);
-                        }
-                        action = params.get("methodName");
-                        break;
-                    case "function-call":
-                        biz = params.get("typeClass");
-                        if (biz.contains(".")) {
-                            biz = biz.substring(biz.lastIndexOf(".") + 1);
-                        }
-                        action = params.get("methodName");
-                        break;
-                    case "flexible-test":
-                        biz = "dynamic_code";
-                        action = params.get("methodName");
-                        break;
-                }
-
-                testkitTraceInfo = TraceInfo.buildRoot(reqId, req.getMethod(), biz, action).stepIn();
-                profile.put("req_id", testkitTraceInfo.getReqid());
+                testkitTraceInfo = startTrace(reqId, req, params, profile);
             }
             try {
-                switch (req.getMethod()) {
-                    case "spring-cache":
-                        ret = springCacheTool.process(params);
-                        break;
-                    case "flexible-test":
-                        ret = flexibleTestTool.process(params);
-                        break;
-                    case "function-call":
-                        ret = functionCallTool.process(params);
-                        break;
-                    case "view-value":
-                        ret = viewValueTool.process(params);
-                        break;
-                    default:
-                        throw new TestkitException("un support method");
-                }
+                PrepareRet prepare = testkitTool.prepare(params);
+
+                begin = System.currentTimeMillis();
+                ret = prepare.execute();
                 if (req.isTrace() && enableTrace) {
                     profile.put("link", testkitTraceInfo.stepOut(ret, null).toProfilerString());
                     profile.put("cost", String.valueOf((System.currentTimeMillis() - begin)));
@@ -380,12 +388,11 @@ public class TestkitServer {
                 throw e;
             } finally {
                 if (profile.containsKey("link")) {
-                    System.err.println("TRACE_PROFILER - " + profile.get("link"));
+                    log("TRACE_PROFILER - " + profile.get("link"), null);
                 }
             }
         } catch (Throwable e) {
-            System.err.println("TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage());
-            e.printStackTrace();
+            log("TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage(),e);
             error = e;
             return Ret.fail(getNoneTestkitStackTrace(e), (int) (System.currentTimeMillis() - begin), profile);
         } finally {
@@ -393,15 +400,45 @@ public class TestkitServer {
             while (error instanceof InvocationTargetException) {
                 error = ((InvocationTargetException) error).getTargetException();
             }
-            System.err.println("TESTKIT_DETAIL tool:" + req.getMethod() + " cost:" + cost + " params:" + params + " ret:" + ret + " e:" + error);
+            log("TESTKIT_DETAIL tool:" + req.getMethod() + " cost:" + cost + " params:" + params + " ret:" + ret + " e:" + error,null);
             if (afterMethod != null) {
                 try {
                     afterMethod.invoke(interceptorObj, env, req.getMethod(), params, cost, ret, error);
                 } catch (Throwable e) {
-                    System.out.println("TESTKIT interceptor invokeAfter error, errorType:" + e.getClass().getName() + ", " + e.getMessage());
+                    log("TESTKIT interceptor invokeAfter error, errorType:" + e.getClass().getName() + ", " + e.getMessage(),e);
                 }
             }
         }
+    }
+
+    private static TraceInfo startTrace(String reqId, Req req, Map<String, String> params, Map<String, String> profile) {
+        TraceInfo testkitTraceInfo;
+        String biz = "unknown";
+        String action = "unknown";
+        switch (req.getMethod()) {
+            case "spring-cache":
+                biz = params.get("typeClass");
+                if (biz.contains(".")) {
+                    biz = biz.substring(biz.lastIndexOf(".") + 1);
+                }
+                action = params.get("methodName");
+                break;
+            case "function-call":
+                biz = params.get("typeClass");
+                if (biz.contains(".")) {
+                    biz = biz.substring(biz.lastIndexOf(".") + 1);
+                }
+                action = params.get("methodName");
+                break;
+            case "flexible-test":
+                biz = "dynamic_code";
+                action = params.get("methodName");
+                break;
+        }
+
+        testkitTraceInfo = TraceInfo.buildRoot(reqId, req.getMethod(), biz, action).stepIn();
+        profile.put("req_id", testkitTraceInfo.getReqid());
+        return testkitTraceInfo;
     }
 
     public static String getNoneTestkitStackTrace(Throwable throwable) {
@@ -501,54 +538,6 @@ public class TestkitServer {
     }
 
 
-    public SpringCacheTool getSpringCacheTool() {
-        return springCacheTool;
-    }
-
-    public void setSpringCacheTool(SpringCacheTool springCacheTool) {
-        this.springCacheTool = springCacheTool;
-    }
-
-    public FlexibleTestTool getFlexibleTestTool() {
-        return flexibleTestTool;
-    }
-
-    public void setFlexibleTestTool(FlexibleTestTool flexibleTestTool) {
-        this.flexibleTestTool = flexibleTestTool;
-    }
-
-    public FunctionCallTool getFunctionCallTool() {
-        return functionCallTool;
-    }
-
-    public void setFunctionCallTool(FunctionCallTool functionCallTool) {
-        this.functionCallTool = functionCallTool;
-    }
-
-    public ViewValueTool getViewValueTool() {
-        return viewValueTool;
-    }
-
-    public void setViewValueTool(ViewValueTool viewValueTool) {
-        this.viewValueTool = viewValueTool;
-    }
-
-    public ApplicationContext getApp() {
-        return app;
-    }
-
-    public void setApp(ApplicationContext app) {
-        this.app = app;
-    }
-
-    public HttpServer getServer() {
-        return server;
-    }
-
-    public void setServer(HttpServer server) {
-        this.server = server;
-    }
-
     public String getProject() {
         return project;
     }
@@ -580,5 +569,6 @@ public class TestkitServer {
     public void setEnableTrace(boolean enableTrace) {
         this.enableTrace = enableTrace;
     }
+
 
 }

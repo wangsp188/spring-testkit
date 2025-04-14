@@ -16,12 +16,13 @@ import java.util.Objects;
 class RuntimeAppHelper {
 
     public static final String LOCAL = "local";
+    public static final String TESTKIT_CLI_PROJECT = "testkit-cli";
 
 
     private static final String APPS_DIR = ".spring-testkit/apps";
 
-    public static boolean needRegister(String env){
-        return Objects.equals(LOCAL, env);
+    public static boolean loadByTestkitCli(String project){
+        return Objects.equals(TESTKIT_CLI_PROJECT, project);
     }
 
 

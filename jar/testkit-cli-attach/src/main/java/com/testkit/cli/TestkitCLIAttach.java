@@ -30,7 +30,6 @@ public class TestkitCLIAttach {
             //帮我解析一些，
             String starterJar = arg.get("starter");
             String ctxGuidingDrug = arg.get("ctx");
-            String env = arg.get("env");
             String envKey = arg.get("env-key");
             Integer port = null;
             String portStr = arg.get("port");
@@ -40,7 +39,7 @@ public class TestkitCLIAttach {
                 throw new IllegalArgumentException("Testkit cli port must be int," + portStr);
             }
 
-            if (starterJar == null || ctxGuidingDrug == null || port == null) {
+            if (starterJar == null || ctxGuidingDrug == null || envKey == null || envKey.isEmpty()) {
                 throw new IllegalArgumentException("Testkit cli params not enough," + args);
             }
 
@@ -77,7 +76,7 @@ public class TestkitCLIAttach {
             // 分层加载目标类
             Class<?> serverManageClass = loadTargetClass(logs, inst, ctxCls, starterJar);
             // 反射调用核心方法
-            invokeServerMethod(appCls, serverManageClass, ctx, env, envKey, port);
+            invokeServerMethod(appCls, serverManageClass, ctx,envKey, port);
         } catch (Throwable t) {
             e = t;
         } finally {
@@ -213,31 +212,30 @@ public class TestkitCLIAttach {
         return null;
     }
 
-    private static void invokeServerMethod(Class appCls, Class<?> clazz, Object ctx, String env, String envKey, int port)
+    private static void invokeServerMethod(Class appCls, Class<?> clazz, Object ctx, String envKey, int port)
             throws Exception {
 
-        if (env == null && envKey != null) {
-            try {
-                // 获取getEnvironment方法（无参数）
-                Method getEnvMethod = appCls.getMethod("getEnvironment");
+        String env = null;
+        try {
+            // 获取getEnvironment方法（无参数）
+            Method getEnvMethod = appCls.getMethod("getEnvironment");
 
-                // 调用getEnvironment方法获取环境对象
-                Object environment = getEnvMethod.invoke(ctx);
+            // 调用getEnvironment方法获取环境对象
+            Object environment = getEnvMethod.invoke(ctx);
 
-                // 获取getProperty方法（String参数）
-                Method getPropertyMethod = environment.getClass()
-                        .getMethod("getProperty", String.class);
+            // 获取getProperty方法（String参数）
+            Method getPropertyMethod = environment.getClass()
+                    .getMethod("getProperty", String.class);
 
-                // 调用getProperty方法获取配置值
-                env = (String) getPropertyMethod.invoke(environment, envKey);
-            } catch (NoSuchMethodException e) {
-                throw new RuntimeException("Spring environment method does not exist, please confirm the Spring version (requires 4.0+)", e);
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException("Method access permission is abnormal. Check SecurityManager configuration", e);
-            } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                throw new RuntimeException("Method call exception: " + cause.getMessage(), cause);
-            }
+            // 调用getProperty方法获取配置值
+            env = (String) getPropertyMethod.invoke(environment, envKey);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException("Spring environment method does not exist, please confirm the Spring version (requires 4.0+)", e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Method access permission is abnormal. Check SecurityManager configuration", e);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            throw new RuntimeException("Method call exception: " + cause.getMessage(), cause);
         }
         Method method = clazz.getDeclaredMethod(
                 "startCLIServer",

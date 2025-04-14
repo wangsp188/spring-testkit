@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
-public class TestkitCLIGuide {
+public class TestkitCLI {
 
     private static final String RESET = "\033[0m";
     private static final String GREEN = "\033[1;32m";  // 亮绿色
@@ -92,7 +92,7 @@ public class TestkitCLIGuide {
                 @Override
                 public boolean test(VirtualMachineDescriptor virtualMachineDescriptor) {
                     String displayName = virtualMachineDescriptor.displayName();
-                    return !displayName.contains(TestkitCLIGuide.class.getName())
+                    return !displayName.contains(TestkitCLI.class.getName())
                             && !displayName.contains("IntelliJ IDEA.app")
                             && !displayName.contains("com.intellij.idea.Main")
                             && !displayName.contains("testkit-cli-1.0.jar")
@@ -249,25 +249,24 @@ public class TestkitCLIGuide {
         }
 
 
-        String env = null;
         String envKey = System.getProperty("testkit.cli.env-key", null);
         if (envKey == null) {
             int tryTimes = 0;
             while (true) {
                 tryTimes += 1;
-                System.out.print(GREEN + "Please enter the current environment (empty means that env is null and cannot be local): " + RESET);
+                System.out.print(GREEN + "Please enter the property key for the deploy environment in the target JVM: " + RESET);
                 String input = br.readLine().trim();
-                if (input.isEmpty() || !input.trim().equals("local")) {
-                    env = input.trim();
-                    if (env.equals("null") || env.isEmpty()) {
-                        env = null;
-                    }
+                if (EXIT.equalsIgnoreCase(input)) {
+                    throw new IllegalArgumentException("Bye~");
+                }
+                if (!input.isEmpty()) {
+                    envKey = input;
                     break;
                 }
                 if (tryTimes >= 5) {
-                    throw new IllegalArgumentException("env failed to be entered for five times！Bye~");
+                    throw new IllegalArgumentException("env-key failed to be entered for five times！Bye~");
                 } else {
-                    System.out.print(GREEN + "Please enter the correct ctx (empty means that env is null and cannot be local): " + RESET);
+                    System.out.print(GREEN + "Please enter the property key for the deploy environment in the target JVM: " + RESET);
                 }
             }
         }
@@ -277,14 +276,9 @@ public class TestkitCLIGuide {
         map.put("starter", starterJar);
         map.put("ctx", ctx);
         map.put("port", port);
-        String logPath = System.getProperty("java.io.tmpdir") + File.separator + "testkit-dig.txt";
+        String logPath = System.getProperty("java.io.tmpdir") + File.separator + "testkit-cli.txt";
         map.put("log-path", logPath);
-        if (envKey != null) {
-            map.put("env-key", envKey);
-        } else {
-            map.put("env", (env == null ? "" : env));
-        }
-
+        map.put("env-key", envKey);
         String agentParams = encode(map);
         try {
             vm.loadAgent(attachJar, agentParams);
@@ -330,19 +324,39 @@ public class TestkitCLIGuide {
         // 启动心跳检测
         startHeartbeatCheck(port, ctx);
         try {
+            AtomicReference<String> confirmCmd = new AtomicReference<>();
             while (isServerRunning) {
-                System.out.print(GREEN + "testkit-dig> " + RESET);
+                System.out.print(GREEN + "testkit-cli> " + RESET);
                 String cmd = br.readLine().trim();
-                if ("exit".equalsIgnoreCase(cmd)) {
+                if (EXIT.equalsIgnoreCase(cmd)) {
                     break;
                 }
                 if (cmd.equalsIgnoreCase("hi")) {
+                    confirmCmd.set(null);
                     System.out.println(YELLOW + "[hi] " + JSON.toJSONString(findRunningApp(port, ctx)) + RESET);
                     continue;
                 }
+                // 处理确认输入
+                if (confirmCmd.get() != null) {
+                    if (cmd.trim().equalsIgnoreCase("Y")) {
+                        try {
+                            String ret = processCommand(confirmCmd.get(), port, false,confirmCmd);
+                            System.out.println(ret);
+                        } catch (Exception e) {
+                            System.out.println(RED + e.getMessage() + RESET);
+                        } finally {
+                            confirmCmd.set(null);
+                        }
+                    } else {
+                        confirmCmd.set(null);
+                        System.out.println(YELLOW + "Operation cancel" + RESET);
+                    }
+                    continue;
+                }
+
                 // 这里需要实现命令分发
                 try {
-                    String ret = processCommand(cmd, port);
+                    String ret = processCommand(cmd, port, true, confirmCmd);
                     System.out.println(ret);
                 } catch (Exception e) {
                     System.out.println(RED + e.getMessage() + RESET);
@@ -353,7 +367,8 @@ public class TestkitCLIGuide {
         }
     }
 
-    private static String processCommand(String cmd, int port) throws Exception {
+    private static String processCommand(String cmd, int port, boolean prepare, AtomicReference<String> confirmCmd) throws Exception {
+        confirmCmd.set(null);
         // 示例命令处理
         if (cmd.equalsIgnoreCase("stop")) {
             HashMap<String, String> requestData = new HashMap<>();
@@ -367,19 +382,41 @@ public class TestkitCLIGuide {
             } catch (Exception e) {
                 return RED + "[stop] " + e.getMessage() + RESET;
             }
-        } else if (cmd.startsWith("function-call ")) {
+        }
+        if (cmd.startsWith("function-call ")) {
             String req = cmd.substring("function-call ".length());
             JSONObject reqObject = JSON.parseObject(req);
+            if (prepare) {
+                reqObject.put("prepare", true);
+                String confirmMsg = directRequest(port, reqObject);
+                confirmCmd.set(cmd);
+                return YELLOW + "[function-call]" + RESET + confirmMsg;
+            }
             return YELLOW + "[function-call]" + RESET + submitReqAndWaitRet(port, reqObject);
-        } else if (cmd.startsWith("flexible-test ")) {
+        }
+        if (cmd.startsWith("flexible-test ")) {
             String req = cmd.substring("flexible-test ".length());
             JSONObject reqObject = JSON.parseObject(req);
+            if (prepare) {
+                reqObject.put("prepare", true);
+                String confirmMsg = directRequest(port, reqObject);
+                confirmCmd.set(cmd);
+                return YELLOW + "[flexible-test]" + RESET + confirmMsg;
+            }
             return YELLOW + "[flexible-test]" + RESET + submitReqAndWaitRet(port, reqObject);
-        } else if (cmd.startsWith("spring-cache ")) {
+        }
+        if (cmd.startsWith("spring-cache ")) {
             String req = cmd.substring("spring-cache ".length());
             JSONObject reqObject = JSON.parseObject(req);
+            if ("delete_cache".equals(reqObject.getJSONObject("params").getString("action")) && prepare) {
+                reqObject.put("prepare", true);
+                String confirmMsg = directRequest(port, reqObject);
+                confirmCmd.set(cmd);
+                return YELLOW + "[spring-cache]" + RESET + confirmMsg;
+            }
             return YELLOW + "[spring-cache]" + RESET + submitReqAndWaitRet(port, reqObject);
-        } else if (cmd.startsWith("view ")) {
+        }
+        if (cmd.startsWith("view ")) {
             String req = cmd.substring("view ".length());
             String[] split = req.split("#");
             if (split.length == 2) {
@@ -458,7 +495,7 @@ public class TestkitCLIGuide {
 
 
     public static File getEmbeddedJar(String jarName) throws IOException {
-        URL resourceUrl = TestkitCLIGuide.class.getClassLoader().getResource(LIB_DIR + jarName);
+        URL resourceUrl = TestkitCLI.class.getClassLoader().getResource(LIB_DIR + jarName);
         if (resourceUrl == null) {
             throw new FileNotFoundException("Embedded JAR not found: " + jarName);
         }
@@ -523,6 +560,7 @@ public class TestkitCLIGuide {
         private String app;
         private String env;
         private boolean testPass;
+        private boolean loadByCli;
 
         public String getIp() {
             return ip;
@@ -562,6 +600,14 @@ public class TestkitCLIGuide {
 
         public void setTestPass(boolean testPass) {
             this.testPass = testPass;
+        }
+
+        public boolean isLoadByCli() {
+            return loadByCli;
+        }
+
+        public void setLoadByCli(boolean loadByCli) {
+            this.loadByCli = loadByCli;
         }
     }
 }
