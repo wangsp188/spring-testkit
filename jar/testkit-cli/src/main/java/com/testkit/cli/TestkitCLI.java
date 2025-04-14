@@ -390,7 +390,7 @@ public class TestkitCLI {
                 reqObject.put("prepare", true);
                 String confirmMsg = directRequest(port, reqObject);
                 confirmCmd.set(cmd);
-                return YELLOW + "[function-call]" + RESET + confirmMsg;
+                return YELLOW + "[function-call]" + RESET + confirmMsg+"\n"+GREEN+"Confirm execution? (Y/N): "+RESET;
             }
             return YELLOW + "[function-call]" + RESET + submitReqAndWaitRet(port, reqObject);
         }
@@ -401,7 +401,7 @@ public class TestkitCLI {
                 reqObject.put("prepare", true);
                 String confirmMsg = directRequest(port, reqObject);
                 confirmCmd.set(cmd);
-                return YELLOW + "[flexible-test]" + RESET + confirmMsg;
+                return YELLOW + "[flexible-test]" + RESET + confirmMsg+"\n"+GREEN+"Confirm execution? (Y/N): "+RESET;
             }
             return YELLOW + "[flexible-test]" + RESET + submitReqAndWaitRet(port, reqObject);
         }
@@ -412,7 +412,7 @@ public class TestkitCLI {
                 reqObject.put("prepare", true);
                 String confirmMsg = directRequest(port, reqObject);
                 confirmCmd.set(cmd);
-                return YELLOW + "[spring-cache]" + RESET + confirmMsg;
+                return YELLOW + "[spring-cache]" + RESET + confirmMsg+"\n"+GREEN+"Confirm execution? (Y/N): "+RESET;
             }
             return YELLOW + "[spring-cache]" + RESET + submitReqAndWaitRet(port, reqObject);
         }
