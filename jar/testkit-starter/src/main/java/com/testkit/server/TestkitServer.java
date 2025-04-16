@@ -148,10 +148,8 @@ public class TestkitServer {
         new Thread(() -> {
             try {
                 server.start();
-                if (RuntimeAppHelper.loadByTestkitCli(env)) {
-                    RuntimeAppHelper.addApp(project, appName, server.getAddress().getPort());
-                }
                 if(!loadByCli){
+                    RuntimeAppHelper.addApp(project, appName, server.getAddress().getPort());
                     System.err.println("————————————————————————————————————————————————————————————————————\n" +
                             "//                          _ooOoo_                               //\n" +
                             "//                         o8888888o                              //\n" +
