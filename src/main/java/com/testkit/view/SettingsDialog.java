@@ -628,13 +628,58 @@ public class SettingsDialog {
         testkitCLILabel.setPreferredSize(labelDimension);
 
         JPanel cliPanel = new JPanel(new FlowLayout(FlowLayout.LEFT,0,5));
+        JButton downloadCLIButton = new JButton(CLIDialog.downloadIcon);
+        downloadCLIButton.setToolTipText("To download Testkit-CLI");
+        downloadCLIButton.setPreferredSize(new Dimension(32, 32));
+        downloadCLIButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                new CLIDialog(toolWindow).setVisible(true);
+            }
+        });
         JButton openCLIButton = new JButton(BasePluginTool.CMD_ICON);
-        openCLIButton.setToolTipText("To use Testkit-CLI");
+        openCLIButton.setToolTipText("Copy quick start Testkit-CLI Commond");
         openCLIButton.setPreferredSize(new Dimension(32, 32));
         openCLIButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                new CLIDialog(toolWindow).setVisible(true);
+                SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(toolWindow.getProject());
+                StringBuilder command = new StringBuilder("");
+                String jarName = "testkit-cli-1.0.jar";
+                String downUrl = cliConfig.getDownloadUrl();
+                if (cliConfig.isDownloadFirst()) {
+                    command.append("if [ ! -f \"" + jarName + "\" ]; then\n" +
+                            "    echo \"" + jarName + " not found. Downloading...\"\n" +
+                            "    curl -o \"" + jarName + "\" \"" + downUrl + "\"\n" +
+                            "    \n" +
+                            "    if [ $? -ne 0 ]; then\n" +
+                            "        echo \"Download failed.\"\n" +
+                            "        exit 1\n" +
+                            "    fi\n" +
+                            "    echo \"Download completed.\"\n" +
+                            "fi\n");
+                }
+                command.append("java ");
+                Integer port = cliConfig.getPort();
+                if (port!=null) {
+                    command.append("-Dtestkit.cli.port=").append(port).append(" ");
+                }
+
+                String ctxFieldText = cliConfig.getCtx();
+                if (!ctxFieldText.trim().isEmpty()) {
+                    if (ctxFieldText.trim().split("#").length != 2) {
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "ctx must like com.xx.className#feildName");
+                        return;
+                    }
+                    command.append("-Dtestkit.cli.ctx=").append(ctxFieldText.trim()).append(" ");
+                }
+
+                String envKeyText = cliConfig.getEnvKey();
+                if (!envKeyText.isEmpty()) {
+                    command.append("-Dtestkit.cli.env-key=").append(envKeyText).append(" ");
+                }
+                command.append("-jar testkit-cli-1.0.jar");
+                TestkitHelper.copyToClipboard(toolWindow.getProject(), command.toString(), "CMD copy success");
             }
         });
 
@@ -650,8 +695,9 @@ public class SettingsDialog {
         JLabel comp1 = new JLabel("Testkit-CLI can dynamically attached the runtime JVM, provide quick testing capabilities");
         comp1.setForeground(new Color(0x72A96B));
         comp1.setFont(new Font("Arial", Font.BOLD, 13));
-        cliPanel.add(openCLIButton);
+        cliPanel.add(downloadCLIButton);
         cliPanel.add(docButton);
+        cliPanel.add(openCLIButton);
         cliPanel.add(comp1);
 
         // 布局输入框和标签
@@ -929,7 +975,7 @@ public class SettingsDialog {
 //                        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
                         String reqId;
                         try {
-                            JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", req, JSONObject.class);
+                            JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", req, JSONObject.class);
                             if (submitRes == null) {
                                 TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\nFailed to submit req\nsubmitRes is null");
                                 return;
@@ -950,7 +996,7 @@ public class SettingsDialog {
                         params.put("reqId", reqId);
                         getRetReq.put("params", params);
 
-                        JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", getRetReq, JSONObject.class);
+                        JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", getRetReq, JSONObject.class);
                         if (result == null || !result.getBooleanValue("success")) {
                             TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\n" + (result == null ? "result is null" : result.getString("message")));
                             return;

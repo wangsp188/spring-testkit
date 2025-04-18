@@ -851,7 +851,7 @@ public class ReqStoreDialog {
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
-                triggerHttpTask(getKeyButton, FunctionCallTool.KIcon, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+                triggerHttpTask(getKeyButton, FunctionCallTool.KIcon, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return buildCacheParams("build_cache_key", finalMeta,visibleApp, finalArgs);
@@ -897,7 +897,7 @@ public class ReqStoreDialog {
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
-                triggerHttpTask(getValButton, AllIcons.Actions.Find, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+                triggerHttpTask(getValButton, AllIcons.Actions.Find, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return buildCacheParams("get_cache",finalMeta,visibleApp, finalArgs);
@@ -943,7 +943,7 @@ public class ReqStoreDialog {
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
-                triggerHttpTask(delValButton, AllIcons.Actions.GC, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+                triggerHttpTask(delValButton, AllIcons.Actions.GC, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return buildCacheParams("delete_cache",finalMeta,visibleApp, finalArgs);
@@ -1353,7 +1353,7 @@ public class ReqStoreDialog {
 
         // 构建新列表
         List<String> newItems = visibleAppList.stream()
-                .map(app -> app.getAppName() +":"+app.getIp()+ ":" + app.getSidePort())
+                .map(app -> app.getAppName() +":"+app.getIp()+ ":" + app.getTestkitPort())
                 .toList();
 
         // 如果列表内容没变，直接返回
@@ -1367,7 +1367,7 @@ public class ReqStoreDialog {
         // 更新列表内容
         visibleAppComboBox.removeAllItems();
         for (RuntimeHelper.VisibleApp visibleApp : visibleAppList) {
-            String item = visibleApp.getAppName() +":"+visibleApp.getIp()+ ":" + visibleApp.getSidePort();
+            String item = visibleApp.getAppName() +":"+visibleApp.getIp()+ ":" + visibleApp.getTestkitPort();
             visibleAppComboBox.addItem(item);
         }
 
@@ -1520,7 +1520,7 @@ public class ReqStoreDialog {
             return;
         }
 
-        triggerHttpTask(executeButton, AllIcons.Actions.Execute, visibleApp.getSidePort(), new Supplier<JSONObject>() {
+        triggerHttpTask(executeButton, AllIcons.Actions.Execute, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
             @Override
             public JSONObject get() {
                 if (item.getType() == ReqStorageHelper.ItemType.function_call) {

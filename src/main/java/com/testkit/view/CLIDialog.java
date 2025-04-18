@@ -128,7 +128,7 @@ public class CLIDialog extends JDialog {
         panel.add(Box.createVerticalStrut(15));
         // 生成按钮和结果显示
         JPanel buttonAndResultPanel = new JPanel(new BorderLayout());
-        JButton generateButton = new JButton("Generate Command");
+        JButton generateButton = new JButton("Copy Command & Save");
         buttonAndResultPanel.add(generateButton, BorderLayout.WEST);
         panel.add(buttonAndResultPanel);
 

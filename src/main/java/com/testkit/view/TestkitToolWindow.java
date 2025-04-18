@@ -482,7 +482,7 @@ public class TestkitToolWindow {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
             try {
                 // 发送请求获取实时数据
-                JSONObject response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getSidePort() + "/", requestData, JSONObject.class);
+                JSONObject response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getTestkitPort() + "/", requestData, JSONObject.class);
                 boolean enableTrace = response.getJSONObject("data").getBooleanValue("enableTrace");
                 newMap.put(item, enableTrace);
             } catch (Exception e) {

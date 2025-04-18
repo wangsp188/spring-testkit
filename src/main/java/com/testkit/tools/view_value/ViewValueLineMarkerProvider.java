@@ -95,13 +95,13 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                 public boolean test(RuntimeHelper.VisibleApp visibleApp) {
                                     return Objects.equals(app, visibleApp.getAppName());
                                 }
-                            }).toList();
+                            }).distinct().toList();
                             if (CollectionUtils.isEmpty(list)) {
                                 continue;
                             }
                             for (RuntimeHelper.VisibleApp visibleApp : list) {
                                 //显示的一个图标加上标题
-                                AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getSidePort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getSidePort(), null) {
+                                AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getTestkitPort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getTestkitPort(), null) {
                                     @Override
                                     public void actionPerformed(@NotNull AnActionEvent e) {
                                         handleClick(element, containingClass, psiElement, visibleApp);
@@ -222,7 +222,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
                             submitRequest.put("params", value);
 
-                            JSONObject submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", submitRequest, JSONObject.class);
+                            JSONObject submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class);
                             if (submitRet == null || !submitRet.getBooleanValue("success") || submitRet.getString("data") == null) {
                                 TestkitHelper.notify(element.getProject(), NotificationType.ERROR, "submit req error \n" + submitRet.getString("message"));
                                 return;
@@ -235,7 +235,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             params.put("reqId", reqId);
                             map.put("params", params);
 
-                            JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getSidePort() + "/", map, JSONObject.class);
+                            JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", map, JSONObject.class);
                             if (result == null) {
                                 TestkitHelper.notify(element.getProject(), NotificationType.ERROR, "req is error\n result is null");
                             } else if (!result.getBooleanValue("success")) {

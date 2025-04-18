@@ -149,7 +149,7 @@ public class FlexibleTestTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerHttpTask(runButton, AllIcons.Actions.Execute, app.getSidePort(), new Supplier<JSONObject>() {
+                triggerHttpTask(runButton, AllIcons.Actions.Execute, app.getTestkitPort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         String jsonInput = jsonInputField.getDocument().getText();

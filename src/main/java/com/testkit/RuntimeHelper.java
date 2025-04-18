@@ -184,7 +184,7 @@ public class RuntimeHelper {
         if (project == null || project.isEmpty() || app == null) {
             return;
         }
-        doRemoveApp(project, app.getAppName(), app.getIp(), app.getSidePort());
+        doRemoveApp(project, app.getAppName(), app.getIp(), app.getTestkitPort());
     }
 
     private static void doRemoveApp(String project, String appName, String ip, Integer sidePort) {
@@ -232,7 +232,7 @@ public class RuntimeHelper {
         RuntimeHelper.VisibleApp visibleApp = new RuntimeHelper.VisibleApp();
         visibleApp.setAppName(split[0]);
         visibleApp.setIp(split[1]);
-        visibleApp.setSidePort(Integer.parseInt(split[2]));
+        visibleApp.setTestkitPort(Integer.parseInt(split[2]));
         return visibleApp;
     }
 
@@ -310,7 +310,7 @@ public class RuntimeHelper {
 
         private String ip;
 
-        private int sidePort;
+        private int testkitPort;
 
         public boolean judgeIsLocal() {
             return "local".equals(ip);
@@ -325,11 +325,11 @@ public class RuntimeHelper {
         }
 
         public int buildWebPort() {
-            return sidePort > 10000 ? sidePort - 10000 : 8080;
+            return testkitPort > 10000 ? testkitPort - 10000 : 8080;
         }
 
-        public int getSidePort() {
-            return sidePort;
+        public int getTestkitPort() {
+            return testkitPort;
         }
 
         public String getIp() {
@@ -340,8 +340,22 @@ public class RuntimeHelper {
             this.ip = ip;
         }
 
-        public void setSidePort(int sidePort) {
-            this.sidePort = sidePort;
+        public void setTestkitPort(int testkitPort) {
+            this.testkitPort = testkitPort;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()){
+                return false;
+            }
+            VisibleApp that = (VisibleApp) o;
+            return testkitPort == that.testkitPort && Objects.equals(appName, that.appName) && Objects.equals(ip, that.ip);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(appName, ip, testkitPort);
         }
     }
 }
