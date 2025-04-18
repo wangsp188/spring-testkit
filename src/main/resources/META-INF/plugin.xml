@@ -48,6 +48,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <depends>org.intellij.groovy</depends>
+    <depends>com.intellij.modules.json</depends>
     <depends optional="true" config-file="database.xml">com.intellij.database</depends>
     <!--    <depends>com.intellij.spring.boot</depends>-->
 
