@@ -1,0 +1,9 @@
+<idea-plugin>
+    <!-- 在此定义与数据库插件相关的扩展点 -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- 例如：注册数据库相关的服务或组件 -->
+    </extensions>
+    <actions>
+        <!-- 可选依赖相关的动作 -->
+    </actions>
+</idea-plugin>

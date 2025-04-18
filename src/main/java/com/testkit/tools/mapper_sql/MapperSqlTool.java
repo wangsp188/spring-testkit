@@ -1,6 +1,7 @@
 package com.testkit.tools.mapper_sql;
 
 import com.alibaba.fastjson.JSONObject;
+import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.Computable;
 import com.testkit.tools.ToolHelper;
@@ -19,7 +20,6 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.xml.XmlTag;
-import com.intellij.sql.psi.SqlLanguage;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.intellij.util.ui.JBUI;
@@ -144,16 +144,22 @@ public class MapperSqlTool extends BasePluginTool {
                                 return sql;
                             }
 
-                            Container<String> formattedSql = new Container<>();
-                            WriteCommandAction.runWriteCommandAction(getProject(), () -> {
-                                PsiFile psiFile = PsiFileFactory.getInstance(getProject()).createFileFromText("temp.sql", SqlLanguage.INSTANCE, sql);
-                                CodeStyleManager.getInstance(getProject()).reformat(psiFile);
-                                Document formattedDocument = PsiDocumentManager.getInstance(getProject()).getDocument(psiFile);
-                                if (formattedDocument != null) {
-                                    formattedSql.set(formattedDocument.getText());
-                                }
-                            });
-                            return formattedSql.get();
+                            try {
+                                Language language = (Language) Class.forName("com.intellij.sql.psi.SqlLanguage").getDeclaredField("INSTANCE").get(null);
+                                Container<String> formattedSql = new Container<>();
+                                WriteCommandAction.runWriteCommandAction(getProject(), () -> {
+                                    PsiFile psiFile = PsiFileFactory.getInstance(getProject()).createFileFromText("temp.sql", language, sql);
+                                    CodeStyleManager.getInstance(getProject()).reformat(psiFile);
+                                    Document formattedDocument = PsiDocumentManager.getInstance(getProject()).getDocument(psiFile);
+                                    if (formattedDocument != null) {
+                                        formattedSql.set(formattedDocument.getText());
+                                    }
+                                });
+                                return formattedSql.get();
+                            } catch (Throwable e) {
+                                return sql;
+                            }
+
                         } catch (Exception ex) {
                             throw new RuntimeException(ex);
                         }

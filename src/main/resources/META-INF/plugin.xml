@@ -48,8 +48,8 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <depends>org.intellij.groovy</depends>
-    <depends>com.intellij.spring.boot</depends>
-    <depends>com.intellij.database</depends>
+    <depends optional="true" config-file="database.xml">com.intellij.database</depends>
+    <!--    <depends>com.intellij.spring.boot</depends>-->
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->

@@ -27,9 +27,9 @@ dependencies {
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
     intellijPlatform{
-        create("IU","2023.2")
-//        "Git4Idea"
-        bundledPlugins(listOf("com.intellij.java","com.intellij.spring.boot","com.intellij.database","org.intellij.groovy"))
+        create("IC","2023.2")
+//        "Git4Idea","com.intellij.spring.boot","com.intellij.database"
+        bundledPlugins(listOf("com.intellij.java","org.intellij.groovy"))
     }
 }
 

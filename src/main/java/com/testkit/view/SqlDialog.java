@@ -1,11 +1,13 @@
 package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.lang.Language;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.AbstractTableCellEditor;
@@ -21,7 +23,6 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.IconLoader;
-import com.intellij.sql.psi.SqlLanguage;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
@@ -140,7 +141,12 @@ public class SqlDialog extends JDialog {
     }
 
     private JBScrollPane buildInputPane() {
-        inputSqlField = new LanguageTextField(SqlLanguage.INSTANCE, toolWindow.getProject(), "", false);
+        Language language = PlainTextLanguage.INSTANCE;
+        try {
+            language = (Language) Class.forName("com.intellij.sql.psi.SqlLanguage").getDeclaredField("INSTANCE").get(null);
+        } catch (Throwable e) {
+        }
+        inputSqlField = new LanguageTextField(language, toolWindow.getProject(), "", false);
         JBScrollPane scrollPane = new JBScrollPane(inputSqlField);
         scrollPane.setBorder(BorderFactory.createTitledBorder("SQL Input"));
 
