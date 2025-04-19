@@ -96,7 +96,7 @@ public class CLIDialog extends JDialog {
         JPanel portPanel = new JPanel(new BorderLayout());
         portPanel.setToolTipText("Port number of the side service");
         portPanel.add(new JLabel("<html><code style='color:#e83e8c'>java -Dtestkit.cli.port=</code></html>"), BorderLayout.WEST);
-        JBTextField portField = new JBTextField(String.valueOf(cliConfig.getPort()));
+        JBTextField portField = new JBTextField(cliConfig.getPort()==null?"10168":String.valueOf(cliConfig.getPort()));
         portField.getEmptyText().setText("Port number of the side service");
 
         portPanel.add(portField, BorderLayout.CENTER);
@@ -115,7 +115,7 @@ public class CLIDialog extends JDialog {
         JPanel envKeyPanel = new JPanel(new BorderLayout());
         envKeyPanel.setToolTipText("The property key for the deployment environment of the target jvm");
         envKeyPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.cli.env-key=</code></html>"), BorderLayout.WEST);
-        JBTextField envKeyField = new JBTextField(cliConfig.getEnvKey());
+        JBTextField envKeyField = new JBTextField(cliConfig.getEnvKey()==null?"spring.profiles.active":cliConfig.getEnvKey());
         envKeyField.getEmptyText().setText("like spring.profiles.active means the deployment environment of the target jvm");
         envKeyPanel.add(envKeyField, BorderLayout.CENTER);
         panel.add(envKeyPanel);
@@ -128,45 +128,26 @@ public class CLIDialog extends JDialog {
         panel.add(Box.createVerticalStrut(15));
         // 生成按钮和结果显示
         JPanel buttonAndResultPanel = new JPanel(new BorderLayout());
-        JButton generateButton = new JButton("Copy Command & Save");
+        JButton generateButton = new JButton("Save & Copy Command");
         buttonAndResultPanel.add(generateButton, BorderLayout.WEST);
         panel.add(buttonAndResultPanel);
 
         // 添加生成按钮的动作
         generateButton.addActionListener(e -> {
-            if (downloadCheckBox.isSelected() && urlField.getText().isEmpty()) {
+            if (downloadCheckBox.isSelected() && urlField.getText().isBlank()) {
                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "pls set download url");
                 return;
             }
-
-            StringBuilder command = new StringBuilder("");
-            String jarName = "testkit-cli-1.0.jar";
-            String downUrl = urlField.getText().trim();
-            if (downloadCheckBox.isSelected()) {
-                command.append("if [ ! -f \"" + jarName + "\" ]; then\n" +
-                        "    echo \"" + jarName + " not found. Downloading...\"\n" +
-                        "    curl -o \"" + jarName + "\" \"" + downUrl + "\"\n" +
-                        "    \n" +
-                        "    if [ $? -ne 0 ]; then\n" +
-                        "        echo \"Download failed.\"\n" +
-                        "        exit 1\n" +
-                        "    fi\n" +
-                        "    echo \"Download completed.\"\n" +
-                        "fi\n");
-            }
-            command.append("java ");
+            Integer port = null;
             String portText = portField.getText();
             try {
-                Integer port = Integer.parseInt(portText.trim());
+                port = Integer.parseInt(portText.trim());
                 if (port < 1 && port > 99999) {
                     throw new IllegalArgumentException("port must be port");
                 }
             } catch (Throwable ex) {
                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "must be available port ");
                 return;
-            }
-            if (!portText.isEmpty()) {
-                command.append("-Dtestkit.cli.port=").append(portText.trim()).append(" ");
             }
 
             String ctxFieldText = ctxField.getText();
@@ -175,23 +156,16 @@ public class CLIDialog extends JDialog {
                     TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "ctx must like com.xx.className#feildName");
                     return;
                 }
-                command.append("-Dtestkit.cli.ctx=").append(ctxFieldText.trim()).append(" ");
             }
-
-            String envKeyText = envKeyField.getText().trim();
-            if (!envKeyText.isEmpty()) {
-                command.append("-Dtestkit.cli.env-key=").append(envKeyText).append(" ");
-            }
-            command.append("-jar testkit-cli-1.0.jar");
 
             SettingsStorageHelper.CliConfig config = new SettingsStorageHelper.CliConfig();
             config.setDownloadFirst(downloadCheckBox.isSelected());
-            config.setDownloadUrl(urlField.getText());
-            config.setPort(Integer.parseInt(portText.trim()));
-            config.setCtx(ctxFieldText);
-            config.setEnvKey(envKeyText);
+            config.setDownloadUrl(urlField.getText().isBlank()?null:urlField.getText().trim());
+            config.setPort(port);
+            config.setCtx(ctxFieldText.trim().isBlank()?null:ctxFieldText.trim());
+            config.setEnvKey(envKeyField.getText().trim().isBlank()?null:envKeyField.getText().trim());
             SettingsStorageHelper.saveCliConfig(toolWindow.getProject(), config);
-            TestkitHelper.copyToClipboard(toolWindow.getProject(), command.toString(), "Command generated & saved!");
+            TestkitHelper.copyToClipboard(toolWindow.getProject(), config.buildCommand(), "Command generated & saved!");
         });
 
         return panel;

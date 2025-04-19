@@ -644,42 +644,12 @@ public class SettingsDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(toolWindow.getProject());
-                StringBuilder command = new StringBuilder("");
-                String jarName = "testkit-cli-1.0.jar";
-                String downUrl = cliConfig.getDownloadUrl();
-                if (cliConfig.isDownloadFirst()) {
-                    command.append("if [ ! -f \"" + jarName + "\" ]; then\n" +
-                            "    echo \"" + jarName + " not found. Downloading...\"\n" +
-                            "    curl -o \"" + jarName + "\" \"" + downUrl + "\"\n" +
-                            "    \n" +
-                            "    if [ $? -ne 0 ]; then\n" +
-                            "        echo \"Download failed.\"\n" +
-                            "        exit 1\n" +
-                            "    fi\n" +
-                            "    echo \"Download completed.\"\n" +
-                            "fi\n");
+                String text = cliConfig.buildCommand();
+                if (text != null) {
+                    TestkitHelper.copyToClipboard(toolWindow.getProject(), text, "CMD copy success");
+                } else {
+                    TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Pls save config first");
                 }
-                command.append("java ");
-                Integer port = cliConfig.getPort();
-                if (port!=null) {
-                    command.append("-Dtestkit.cli.port=").append(port).append(" ");
-                }
-
-                String ctxFieldText = cliConfig.getCtx();
-                if (!ctxFieldText.trim().isEmpty()) {
-                    if (ctxFieldText.trim().split("#").length != 2) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "ctx must like com.xx.className#feildName");
-                        return;
-                    }
-                    command.append("-Dtestkit.cli.ctx=").append(ctxFieldText.trim()).append(" ");
-                }
-
-                String envKeyText = cliConfig.getEnvKey();
-                if (!envKeyText.isEmpty()) {
-                    command.append("-Dtestkit.cli.env-key=").append(envKeyText).append(" ");
-                }
-                command.append("-jar testkit-cli-1.0.jar");
-                TestkitHelper.copyToClipboard(toolWindow.getProject(), command.toString(), "CMD copy success");
             }
         });
 
@@ -1761,6 +1731,7 @@ public class SettingsDialog {
             config.setUrl(configMap.get("url"));
             config.setUsername(configMap.get("username"));
             config.setPassword(configMap.get("password"));
+            config.setGroup(configMap.get("group") == null || String.valueOf(configMap.get("group")).isBlank()?"empty" :configMap.get("group"));
             config.setName(name);
             datasourceConfigs.add(config);
         }

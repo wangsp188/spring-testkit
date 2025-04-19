@@ -2,6 +2,7 @@ package com.testkit;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
+import com.intellij.openapi.ui.Messages;
 import com.testkit.sql_review.MysqlUtil;
 import com.testkit.util.HttpUtil;
 import com.testkit.view.SettingsDialog;
@@ -1255,7 +1256,7 @@ public class SettingsStorageHelper {
 
 
     public static class DatasourceConfig {
-
+        private String group;
         private String name;
         private String url;
         private String username;
@@ -1295,6 +1296,14 @@ public class SettingsStorageHelper {
 
         public void setName(String name) {
             this.name = name;
+        }
+
+        public String getGroup() {
+            return group;
+        }
+
+        public void setGroup(String group) {
+            this.group = group;
         }
     }
 
@@ -1336,6 +1345,42 @@ public class SettingsStorageHelper {
         private Integer port;
         private String ctx;
         private String envKey;
+
+
+        public String buildCommand(){
+            StringBuilder command = new StringBuilder("");
+            if (downloadFirst && downloadUrl!=null && !downloadUrl.isBlank()) {
+                String jarName = "testkit-cli-1.0.jar";
+                command.append("if [ ! -f \"" + jarName + "\" ]; then\n" +
+                        "    echo \"" + jarName + " not found. Downloading...\"\n" +
+                        "    curl -o \"" + jarName + "\" \"" + downloadUrl + "\"\n" +
+                        "    \n" +
+                        "    if [ $? -ne 0 ]; then\n" +
+                        "        echo \"Download failed.\"\n" +
+                        "        exit 1\n" +
+                        "    fi\n" +
+                        "    echo \"Download completed.\"\n" +
+                        "fi\n");
+            }
+            command.append("java ");
+            if (port!=null && port>0) {
+                command.append("-Dtestkit.cli.port=").append(port).append(" ");
+            }
+
+            if (ctx!=null && ctx.trim().split("#").length == 2) {
+                command.append("-Dtestkit.cli.ctx=").append(ctx.trim()).append(" ");
+            }
+
+            if (envKey!=null && !envKey.trim().isBlank()) {
+                command.append("-Dtestkit.cli.env-key=").append(envKey.trim()).append(" ");
+            }
+
+            command.append("-jar ");
+            if(downloadFirst && downloadUrl!=null && !downloadUrl.isBlank()){
+                command.append("testkit-cli-1.0.jar");
+            }
+            return command.toString();
+        }
 
         public boolean isDownloadFirst() {
             return downloadFirst;

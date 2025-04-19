@@ -264,9 +264,77 @@ public class SqlDialog extends JDialog {
                     continue;
                 }
             }
+            operateDs.sort(String::compareTo);
+
             if (CollectionUtils.isEmpty(operateDs)) {
                 setMsg("No Datasource has Write/DDL permission");
                 return;
+            }
+
+            Map<String, List<SettingsStorageHelper.DatasourceConfig>> groupDatas = operateDs.stream().map(new Function<String, SettingsStorageHelper.DatasourceConfig>() {
+                        @Override
+                        public SettingsStorageHelper.DatasourceConfig apply(String s) {
+                            return RuntimeHelper.getDatasource(toolWindow.getProject().getName(), s);
+                        }
+                    }).filter(Objects::nonNull)
+                    .collect(Collectors.groupingBy(
+                            SettingsStorageHelper.DatasourceConfig::getGroup,
+                            LinkedHashMap::new,  // 保持插入顺序
+                            Collectors.toList()
+                    ));
+
+            List<String> selectDs = null;
+            if(groupDatas.size()==1){
+                selectDs = operateDs;
+            }else {
+                // 创建单选面板
+                JPanel radioPanel = new JPanel(new GridLayout(0, 1)); // 垂直排列
+                ButtonGroup group = new ButtonGroup();
+
+                // 添加单选框
+                List<String> groupNames = new ArrayList<>(groupDatas.keySet());
+                JRadioButton[] radios = new JRadioButton[groupNames.size()];
+                for (int i = 0; i < groupNames.size(); i++) {
+                    radios[i] = new JRadioButton(groupNames.get(i));
+                    group.add(radios[i]);
+                    radioPanel.add(radios[i]);
+                }
+
+                // 默认选择第一个
+                if (radios.length > 0) {
+                    radios[0].setSelected(true);
+                }
+
+                // 弹窗设置
+                int result = JOptionPane.showConfirmDialog(
+                        unfoldButton,
+                        radioPanel,
+                        "Select Group",
+                        JOptionPane.OK_CANCEL_OPTION,
+                        JOptionPane.PLAIN_MESSAGE
+                );
+
+                if (result != JOptionPane.OK_OPTION) {
+                    return;
+                }
+
+                // 获取选中值
+                String selectGroup = Arrays.stream(radios)
+                        .filter(AbstractButton::isSelected)
+                        .findFirst()
+                        .map(AbstractButton::getText)
+                        .orElse(null);
+
+
+                if (selectGroup == null) {
+                    return;
+                }
+                List<SettingsStorageHelper.DatasourceConfig> selectDs1 = groupDatas.get(selectGroup);
+                if (selectDs1==null) {
+                    setMsg("Not find data source of "+selectGroup);
+                    return;
+                }
+                selectDs = selectDs1.stream().map(SettingsStorageHelper.DatasourceConfig::getName).toList();
             }
 
 
@@ -286,7 +354,7 @@ public class SqlDialog extends JDialog {
             columnModel.getColumn(3).setPreferredWidth((panelResults.getWidth() - 237) / 4);
             columnModel.getColumn(4).setPreferredWidth((panelResults.getWidth() - 237) / 4);
             columnModel.getColumn(5).setPreferredWidth((panelResults.getWidth() - 237) / 4);
-            table.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(2, 3, 4, 5), operateDs.size()));
+            table.setDefaultRenderer(Object.class, new TextAreaCellRenderer(3, Set.of(2, 3, 4, 5), selectDs.size()));
             // 添加点击复制功能
             table.addMouseListener(new MouseAdapter() {
                 @Override
@@ -621,6 +689,7 @@ public class SqlDialog extends JDialog {
             refreshSqlsButton.setPreferredSize(new Dimension(32, 32));
             refreshSqlsButton.setToolTipText("Parse SQL & Refresh table");
 //            refreshSqlsButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            List<String> finalSelectDs = selectDs;
             refreshSqlsButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -661,14 +730,14 @@ public class SqlDialog extends JDialog {
                     } else {
                         sqls = Collections.emptyList();
                     }
-                    refreshExecuteTable(sqls, model, operateDs, table, sqlBoxPanel, updateFilter);
+                    refreshExecuteTable(sqls, model, finalSelectDs, table, sqlBoxPanel, updateFilter);
                 }
             });
 
             // 第二行：单选按钮组
             dbBoxPanel.add(refreshSqlsButton);
 
-            for (String datasource : operateDs) {
+            for (String datasource : selectDs) {
                 JCheckBox checkBox = new JCheckBox(datasource);
                 checkBox.setSelected(true); // 默认未选中
                 checkBox.addActionListener(new ActionListener() {
@@ -725,7 +794,7 @@ public class SqlDialog extends JDialog {
                                     }).collect(Collectors.toUnmodifiableList());
                         }
                     }
-                    refreshExecuteTable(sqls, model, operateDs, table, sqlBoxPanel, updateFilter);
+                    refreshExecuteTable(sqls, model, selectDs, table, sqlBoxPanel, updateFilter);
                 } catch (Throwable ex) {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, "Refresh execution table error<br>" + ex.getMessage());
                 }
