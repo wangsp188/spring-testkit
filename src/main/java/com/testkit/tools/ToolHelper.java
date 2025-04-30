@@ -492,29 +492,34 @@ public class ToolHelper {
 
 
     public static String getBeanNameFromClass(PsiClass psiClass) {
-        PsiModifierList modifierList = psiClass.getModifierList();
-        if (modifierList == null) {
-            return null;
-        }
-        for (PsiAnnotation annotation : modifierList.getAnnotations()) {
-            String qualifiedName = annotation.getQualifiedName();
-            if (qualifiedName != null &&
-                    (qualifiedName.equals("org.springframework.stereotype.Component") ||
-                            qualifiedName.equals("org.springframework.stereotype.Service") ||
-                            qualifiedName.equals("org.springframework.stereotype.Repository") ||
-                            qualifiedName.equals("org.springframework.context.annotation.Configuration") ||
-                            qualifiedName.equals("org.springframework.stereotype.Controller") ||
-                            qualifiedName.equals("org.springframework.web.bind.annotation.RestController")
-                    )) {
-
-
-                String value = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
-                if (value != null && !value.isEmpty()) {
-                    return value;
+        return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+            @Override
+            public String compute() {
+                PsiModifierList modifierList = psiClass.getModifierList();
+                if (modifierList == null) {
+                    return null;
                 }
+                for (PsiAnnotation annotation : modifierList.getAnnotations()) {
+                    String qualifiedName = annotation.getQualifiedName();
+                    if (qualifiedName != null &&
+                            (qualifiedName.equals("org.springframework.stereotype.Component") ||
+                                    qualifiedName.equals("org.springframework.stereotype.Service") ||
+                                    qualifiedName.equals("org.springframework.stereotype.Repository") ||
+                                    qualifiedName.equals("org.springframework.context.annotation.Configuration") ||
+                                    qualifiedName.equals("org.springframework.stereotype.Controller") ||
+                                    qualifiedName.equals("org.springframework.web.bind.annotation.RestController")
+                            )) {
+
+
+                        String value = ToolHelper.getAnnotationValueText(annotation.findAttributeValue("value"));
+                        if (value != null && !value.isEmpty()) {
+                            return value;
+                        }
+                    }
+                }
+                return null;
             }
-        }
-        return null;
+        });
     }
 
     public static String getStackTrace(Throwable throwable) {

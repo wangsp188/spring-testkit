@@ -358,30 +358,30 @@ public abstract class BasePluginTool {
             }.execute();
             return;
         }
-        // 发起任务请求，获取请求ID
-        JSONObject response = null;
-        try {
-            JSONObject request = submit.get();
-            if (request == null) {
-                return;
-            }
-            response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class);
-        } catch (Throwable e) {
-            setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
-            return;
-        }
-        if (response == null || !response.getBooleanValue("success") || response.getString("data") == null) {
-            setOutputText("submit req error \n" + response.getString("message"), null);
-            return;
-        }
-        String reqId = response.getString("data");
-        lastReqId = reqId;
-        triggerBtn.setIcon(AllIcons.Actions.Suspend);
-        setOutputText("req is send\nreqId:" + reqId, null);
-
         ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing " + getTool().getCode() + ", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
+                // 发起任务请求，获取请求ID
+                JSONObject response = null;
+                try {
+                    JSONObject request = submit.get();
+                    if (request == null) {
+                        return;
+                    }
+                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class);
+                } catch (Throwable e) {
+                    setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
+                    return;
+                }
+                if (response == null || !response.getBooleanValue("success") || response.getString("data") == null) {
+                    setOutputText("submit req error \n" + response.getString("message"), null);
+                    return;
+                }
+                String reqId = response.getString("data");
+                lastReqId = reqId;
+                triggerBtn.setIcon(AllIcons.Actions.Suspend);
+                setOutputText("req is send\nreqId:" + reqId, null);
+
                 try {
                     HashMap<String, Object> map = new HashMap<>();
                     map.put("method", "get_task_ret");
