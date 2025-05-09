@@ -510,5 +510,18 @@ public class TraceAgent {
         public void setLogMybatis(boolean logMybatis) {
             this.logMybatis = logMybatis;
         }
+
+        @Override
+        public String toString() {
+            return "TraceConfig{" +
+                    "traceWeb=" + traceWeb +
+                    ", traceMybatis=" + traceMybatis +
+                    ", logMybatis=" + logMybatis +
+                    ", packages=" + packages +
+                    ", clsSuffix=" + clsSuffix +
+                    ", whites=" + whites +
+                    ", blacks=" + blacks +
+                    '}';
+        }
     }
 }
