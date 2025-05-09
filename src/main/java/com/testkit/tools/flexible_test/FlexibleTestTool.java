@@ -6,7 +6,9 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.JBPopupMenu;
+import com.intellij.openapi.util.Computable;
 import com.testkit.TestkitHelper;
 import com.testkit.ReqStorageHelper;
 import com.testkit.RuntimeHelper;
@@ -259,31 +261,36 @@ public class FlexibleTestTool extends BasePluginTool {
     }
 
     private JSONObject buildParams(PsiMethod method, JSONObject args, String action) {
-        JSONObject params = new JSONObject();
-        PsiClass containingClass = method.getContainingClass();
-        // 获取包含这个类的文件
-        PsiFile file = containingClass.getContainingFile();
-        params.put("code", file.getText());
-        params.put("methodName", method.getName());
+        return ApplicationManager.getApplication().runReadAction(new Computable<JSONObject>() {
+            @Override
+            public JSONObject compute() {
+                JSONObject params = new JSONObject();
+                PsiClass containingClass = method.getContainingClass();
+                // 获取包含这个类的文件
+                PsiFile file = containingClass.getContainingFile();
+                params.put("code", file.getText());
+                params.put("methodName", method.getName());
 
-        PsiParameter[] parameters = method.getParameterList().getParameters();
-        String[] argTypes = new String[parameters.length];
-        for (int i = 0; i < parameters.length; i++) {
-            argTypes[i] = parameters[i].getType().getCanonicalText();
-        }
-        params.put("argTypes", JSONObject.toJSONString(argTypes));
-        params.put("args", ToolHelper.adapterParams(method, args).toJSONString());
-        JSONObject req = new JSONObject();
-        req.put("method", action);
-        req.put("params", params);
-        if (useInterceptor) {
-            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
-            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
-        }
-        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
-        req.put("trace", traceConfig.isEnable());
+                PsiParameter[] parameters = method.getParameterList().getParameters();
+                String[] argTypes = new String[parameters.length];
+                for (int i = 0; i < parameters.length; i++) {
+                    argTypes[i] = parameters[i].getType().getCanonicalText();
+                }
+                params.put("argTypes", JSONObject.toJSONString(argTypes));
+                params.put("args", ToolHelper.adapterParams(method, args).toJSONString());
+                JSONObject req = new JSONObject();
+                req.put("method", action);
+                req.put("params", params);
+                if (useInterceptor) {
+                    RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(getProject().getName());
+                    req.put("interceptor", SettingsStorageHelper.encodeInterceptor(getProject(), visibleApp == null ? null : visibleApp.getAppName()));
+                }
+                SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(getProject());
+                req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
-        return req;
+                return req;
+            }
+        });
     }
 
     @Override
