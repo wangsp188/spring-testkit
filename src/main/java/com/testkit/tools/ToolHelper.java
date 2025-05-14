@@ -654,6 +654,11 @@ public class ToolHelper {
                 if (object instanceof Number) {
                     entry.setValue(object);
                 }
+            }else if (value instanceof Boolean) {
+                Object object = from.get(entry.getKey());
+                if (object instanceof Boolean) {
+                    entry.setValue(object);
+                }
             }
         }
     }
