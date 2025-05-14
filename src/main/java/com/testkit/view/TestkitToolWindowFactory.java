@@ -1,5 +1,9 @@
 package com.testkit.view;
 
+import com.intellij.icons.AllIcons;
+import com.intellij.notification.NotificationType;
+import com.testkit.TestkitHelper;
+import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
@@ -137,7 +141,21 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
+        // 添加第三个个按钮
+        AnAction refresh = new AnAction("Refresh", "Refresh", AllIcons.Actions.Refresh) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                try {
+                    CodingGuidelinesHelper.refreshDoc(project);
+                    TestkitHelper.refresh(project);
+                    TestkitHelper.notify(project, NotificationType.INFORMATION, "Refresh success");
+                } catch (Exception ex) {
+                    TestkitHelper.notify(project, NotificationType.ERROR, "Refresh failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                }
+            }
+        };
+
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,refresh));
     }
 }

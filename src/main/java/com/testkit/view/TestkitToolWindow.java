@@ -202,24 +202,6 @@ public class TestkitToolWindow {
 
                     }
                 });
-                actionGroup.add(new AnAction("Refresh coding-guidelines", null, CodingGuidelinesIconProvider.DOC_ICON) {
-                    @Override
-                    public void actionPerformed(@NotNull AnActionEvent e) {
-                        Application application = ApplicationManager.getApplication();
-                        application.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    CodingGuidelinesHelper.refreshDoc(project);
-                                    TestkitHelper.refresh(project);
-                                    TestkitHelper.notify(project, NotificationType.INFORMATION, "Refresh coding-guidelines success");
-                                } catch (Exception ex) {
-                                    TestkitHelper.notify(project, NotificationType.ERROR, "Refresh coding-guidelines failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
-                                }
-                            }
-                        });
-                    }
-                });
                 fillDynamicDoc(actionGroup);
                 JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("TipsPopup", actionGroup).getComponent();
                 popupMenu.show(tipsButton, 0, tipsButton.getHeight());

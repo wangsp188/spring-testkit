@@ -639,24 +639,19 @@ public class ToolHelper {
                 if (object instanceof JSONObject) {
                     migration((JSONObject) object, (JSONObject) value);
                 }
-            } else if (value instanceof String && value.equals("")) {
+            }else if (value instanceof JSONArray) {
+                Object object = from.get(entry.getKey());
+                if (object instanceof JSONArray) {
+                    entry.setValue(object);
+                }
+            } else if (value instanceof String) {
                 Object object = from.get(entry.getKey());
                 if (object instanceof String) {
                     entry.setValue(object);
                 }
-            } else if (value instanceof Integer && value.equals(0)) {
+            } else if (value instanceof Number) {
                 Object object = from.get(entry.getKey());
-                if (object instanceof Integer) {
-                    entry.setValue(object);
-                }
-            } else if (value instanceof Long && value.equals(0L)) {
-                Object object = from.get(entry.getKey());
-                if (object instanceof Long) {
-                    entry.setValue(object);
-                }
-            } else if (value instanceof Double && value.equals(0.0)) {
-                Object object = from.get(entry.getKey());
-                if (object instanceof Double) {
+                if (object instanceof Number) {
                     entry.setValue(object);
                 }
             }

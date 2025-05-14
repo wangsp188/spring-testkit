@@ -31,19 +31,17 @@ public class TestkitProjectListener implements ProjectActivity {
     public @Nullable Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
         DumbService.getInstance(project).smartInvokeLater(() -> {
             try {
-                new Thread(() -> {
-                    while (true) {
-                        CodingGuidelinesHelper.refreshDoc(project);
+//                new Thread(() -> {
+//                    while (true) {
+//                        CodingGuidelinesHelper.refreshDoc(project);
 //                        TestkitHelper.refresh(project);
-                        //刷新数据库链接
-//                        refreshValidDatasources(project);
-                        try {
-                            Thread.sleep(24 * 3600 * 1000);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                }).start();
+//                        try {
+//                            Thread.sleep(24 * 3600 * 1000);
+//                        } catch (InterruptedException e) {
+//                            throw new RuntimeException(e);
+//                        }
+//                    }
+//                }).start();
 
                 ProgressManager.getInstance().run(new Task.Backgroundable(project, "Init project apps", false){
                     @Override
