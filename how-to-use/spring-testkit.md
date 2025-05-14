@@ -12,7 +12,7 @@ doc：[Idea 离线安装插件 Idea 安装离线插件_idea离线安装插件-CS
 
 版本：`2023.2+`
 
-插件：[spring-testkit-1.0.zip](spring-testkit-1.0.zip)
+插件：[spring-testkit-1.0.zip](spring-testkit-1.0514.zip)
 
 # 运行时工具
 > 依赖运行时项目才可用的工具
