@@ -146,6 +146,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             @Override
             public void actionPerformed(AnActionEvent e) {
                 try {
+                    testkitToolWindow.findSpringBootApplicationClasses();
                     CodingGuidelinesHelper.refreshDoc(project);
                     TestkitHelper.refresh(project);
                     TestkitHelper.notify(project, NotificationType.INFORMATION, "Refresh success");
