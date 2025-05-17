@@ -30,7 +30,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.util.Function;
 import com.intellij.openapi.module.Module;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -52,11 +51,12 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
     @Override
     public void collectSlowLineMarkers(List<? extends PsiElement> elements, Collection<? super LineMarkerInfo<?>> result) {
         for (PsiElement element : elements) {
-            if (element instanceof PsiMethod) {
-                PsiMethod method = (PsiMethod) element;
+            // 仅处理方法名标识符（叶子节点）
+            if (element instanceof PsiIdentifier && element.getParent() instanceof PsiMethod) {
+                PsiMethod method = (PsiMethod) element.getParent();
                 String beanMethod = isBeanMethod(method.getModifierList());
                 if (beanMethod == null) {
-                    result.addAll(createLineMarkers(method));
+                    result.addAll(createLineMarkers((PsiIdentifier) element));
                 } else {
                     System.out.println("not_support_call, " + beanMethod + ":" + method.getContainingClass() + "#" + method.getName());
                 }
@@ -80,30 +80,30 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
             "java.util.Map"
     );
 
-    private ArrayList<LineMarkerInfo<?>> createLineMarkers(PsiMethod psiMethod) {
-        ArrayList<LineMarkerInfo<?>> lineMarkers = new ArrayList<>();
-
+    private ArrayList<LineMarkerInfo<PsiIdentifier>> createLineMarkers(PsiIdentifier identifierElement) {
+        PsiMethod psiMethod = (PsiMethod) identifierElement.getParent();
+        ArrayList<LineMarkerInfo<PsiIdentifier>> lineMarkers = new ArrayList<>();
         String directInvoke = isDirectInvoke(psiMethod);
         if (directInvoke == null) {
             // 添加第一个图标
-            LineMarkerInfo<PsiElement> callMethodMarker = new LineMarkerInfo<>(
-                    psiMethod,
-                    psiMethod.getTextRange(),
+            LineMarkerInfo<PsiIdentifier> callMethodMarker = new LineMarkerInfo<>(
+                    identifierElement,
+                    identifierElement.getTextRange(),
                     FUNCTION_CALL_ICON,
-                    new Function<PsiElement, String>() {
+                    new Function<PsiIdentifier, String>() {
                         @Override
-                        public String fun(PsiElement element) {
+                        public String fun(PsiIdentifier element) {
                             return "Call this function";
                         }
                     },
-                    new GutterIconNavigationHandler<PsiElement>() {
+                    new GutterIconNavigationHandler<PsiIdentifier>() {
                         @Override
-                        public void navigate(MouseEvent e, PsiElement elt) {
+                        public void navigate(MouseEvent e, PsiIdentifier elt) {
                             if (GraphicsEnvironment.isHeadless()) {
                                 throw new HeadlessException("Cannot display UI elements in a headless environment.");
                             }
                             Project project = elt.getProject();
-                            TestkitToolWindowFactory.switch2Tool(project, PluginToolEnum.FUNCTION_CALL, elt);
+                            TestkitToolWindowFactory.switch2Tool(project, PluginToolEnum.FUNCTION_CALL, elt.getParent());
                         }
                     },
                     GutterIconRenderer.Alignment.RIGHT
@@ -116,24 +116,24 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         String createTest = isCreateTest(psiMethod);
         if (createTest == null) {
             // 添加第二个图标
-            LineMarkerInfo<PsiElement> generateTestMarker = new LineMarkerInfo<>(
-                    psiMethod,
-                    psiMethod.getTextRange(),
+            LineMarkerInfo<PsiIdentifier> generateTestMarker = new LineMarkerInfo<>(
+                    identifierElement,
+                    identifierElement.getTextRange(),
                     FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,
-                    new Function<PsiElement, String>() {
+                    new Function<PsiIdentifier, String>() {
                         @Override
-                        public String fun(PsiElement element) {
+                        public String fun(PsiIdentifier element) {
                             return "Generate and open test class for this method";
                         }
                     },
-                    new GutterIconNavigationHandler<PsiElement>() {
+                    new GutterIconNavigationHandler<PsiIdentifier>() {
                         @Override
-                        public void navigate(MouseEvent e, PsiElement elt) {
+                        public void navigate(MouseEvent e, PsiIdentifier elt) {
                             if (GraphicsEnvironment.isHeadless()) {
                                 throw new HeadlessException("Cannot display UI elements in a headless environment.");
                             }
                             Project project = elt.getProject();
-                            generateAndOpenTestClass(project, (PsiMethod) elt);
+                            generateAndOpenTestClass(project, (PsiMethod) elt.getParent());
                         }
                     },
                     GutterIconRenderer.Alignment.RIGHT

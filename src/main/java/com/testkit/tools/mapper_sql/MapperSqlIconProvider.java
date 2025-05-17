@@ -1,5 +1,7 @@
 package com.testkit.tools.mapper_sql;
 
+import com.intellij.psi.xml.XmlToken;
+import com.intellij.psi.xml.XmlTokenType;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.view.TestkitToolWindowFactory;
@@ -27,11 +29,23 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
 
     @Nullable
     @Override
-    public LineMarkerInfo<PsiElement> getLineMarkerInfo(@NotNull PsiElement element) {
-        if (!(element instanceof XmlTag)) {
+    public LineMarkerInfo<XmlToken> getLineMarkerInfo(@NotNull PsiElement element) {
+        // 仅在 XML 标签名称的 Token 上注册
+        if (!(element instanceof XmlToken)) {
             return null;
         }
-        XmlTag tag = (XmlTag) element;
+
+        XmlToken token = (XmlToken) element;
+        if (token.getTokenType() != XmlTokenType.XML_NAME) {
+            return null; // 仅处理标签名称的 Token
+        }
+
+        PsiElement parent = token.getParent();
+        if (!(parent instanceof XmlTag)) {
+            return null;
+        }
+
+        XmlTag tag = (XmlTag) parent;
         if(!isSqlTag(tag)){
             return null;
         }
@@ -39,23 +53,23 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
             return null;
         }
         return new LineMarkerInfo<>(
-                tag,
-                tag.getTextRange(),
+                token,
+                token.getTextRange(),
                 MAPPER_SQL_ICON,
-                new Function<PsiElement, String>() {
+                new Function<XmlToken, String>() {
                     @Override
-                    public String fun(PsiElement element) {
+                    public String fun(XmlToken element) {
                         return "Build SQL";
                     }
                 },
-                new GutterIconNavigationHandler() {
+                new GutterIconNavigationHandler<XmlToken>() {
                     @Override
-                    public void navigate(MouseEvent e, PsiElement elt) {
+                    public void navigate(MouseEvent e, XmlToken elt) {
                         if (GraphicsEnvironment.isHeadless()) {
                             throw new HeadlessException("Cannot display UI elements in a headless environment.");
                         }
                         Project project = elt.getProject();
-                        TestkitToolWindowFactory.switch2Tool(project, PluginToolEnum.MAPPER_SQL, elt);
+                        TestkitToolWindowFactory.switch2Tool(project, PluginToolEnum.MAPPER_SQL, elt.getParent());
                     }
                 },
                 GutterIconRenderer.Alignment.RIGHT

@@ -4,6 +4,9 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
+import com.intellij.psi.*;
+import com.intellij.psi.xml.XmlToken;
+import com.intellij.psi.xml.XmlTokenType;
 import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.adapter.*;
 import com.testkit.tools.mapper_sql.MapperSqlIconProvider;
@@ -13,10 +16,6 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiClass;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiField;
-import com.intellij.psi.PsiMethod;
 import com.intellij.psi.xml.XmlTag;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
@@ -51,7 +50,7 @@ public class CodingGuidelinesHelper {
 
 
     public static boolean hasDoc(PsiElement element) {
-        if (element instanceof XmlTag && MapperSqlIconProvider.isSqlTag((XmlTag) element)) {
+        if (element instanceof XmlToken && ((XmlToken) element).getTokenType() == XmlTokenType.XML_NAME && element.getParent() instanceof  XmlTag && MapperSqlIconProvider.isSqlTag((XmlTag) element.getParent())) {
             Map<DocScope, Doc> docScopeDocMap = scopeDocs.get(element.getProject());
             return docScopeDocMap != null && docScopeDocMap.get(DocScope.sql) != null;
         }
@@ -61,18 +60,21 @@ public class CodingGuidelinesHelper {
             return false;
         }
 
+        if(!(element instanceof PsiIdentifier)){
+            return false;
+        }
         List<ElementGuidelinesAdapter> adapters = null;
-        if (element instanceof PsiClass) {
+        if (element.getParent() instanceof PsiClass) {
             adapters = classSources;
-        } else if (element instanceof PsiMethod) {
+        } else if (element.getParent() instanceof PsiMethod) {
             adapters = methodSources;
-        } else if (element instanceof PsiField) {
+        } else if (element.getParent()  instanceof PsiField) {
             adapters = fieldSources;
         } else {
             return false;
         }
         for (ElementGuidelinesAdapter adapter : adapters) {
-            Collection<Doc> doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
+            Collection<Doc> doc = adapter.find(element.getParent(), sourceMap.get(adapter.getDocSource()));
             if (doc != null && !doc.isEmpty()) {
                 return true;
             }
@@ -83,7 +85,7 @@ public class CodingGuidelinesHelper {
 
 
     public static List<Doc> findDoc(PsiElement element) {
-        if (element instanceof XmlTag && MapperSqlIconProvider.isSqlTag((XmlTag) element)) {
+        if (element instanceof XmlToken && ((XmlToken) element).getTokenType() == XmlTokenType.XML_NAME && element.getParent() instanceof  XmlTag && MapperSqlIconProvider.isSqlTag((XmlTag) element.getParent())) {
             Doc scopeDoc = CodingGuidelinesHelper.getScopeDoc(element.getProject(), DocScope.sql);
             if (scopeDoc == null) {
                 return Collections.emptyList();
@@ -94,19 +96,22 @@ public class CodingGuidelinesHelper {
         if (MapUtils.isEmpty(sourceMap)) {
             return null;
         }
+        if(!(element instanceof PsiIdentifier)){
+            return null;
+        }
         List<ElementGuidelinesAdapter> adapters = null;
-        if (element instanceof PsiClass) {
+        if (element.getParent() instanceof PsiClass) {
             adapters = classSources;
-        } else if (element instanceof PsiMethod) {
+        } else if (element.getParent() instanceof PsiMethod) {
             adapters = methodSources;
-        } else if (element instanceof PsiField) {
+        } else if (element.getParent() instanceof PsiField) {
             adapters = fieldSources;
         } else {
             return null;
         }
         ArrayList<Doc> docs = new ArrayList<>();
         for (ElementGuidelinesAdapter adapter : adapters) {
-            Collection<Doc> doc = adapter.find(element, sourceMap.get(adapter.getDocSource()));
+            Collection<Doc> doc = adapter.find(element.getParent(), sourceMap.get(adapter.getDocSource()));
             if (doc != null && !doc.isEmpty()) {
                 docs.addAll(doc);
             }

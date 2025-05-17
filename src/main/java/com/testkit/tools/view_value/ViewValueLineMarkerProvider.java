@@ -40,11 +40,22 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
 
     @Override
-    public LineMarkerInfo<?> getLineMarkerInfo(PsiElement element) {
-        if (!(element instanceof PsiField)) {
+    public LineMarkerInfo<PsiIdentifier> getLineMarkerInfo(PsiElement element) {
+        // 仅在字段名的标识符（叶子元素）上注册
+        if (!(element instanceof PsiIdentifier)) {
             return null;
         }
-        PsiField field = (PsiField) element;
+
+        // 获取字段名的标识符
+        PsiIdentifier identifier = (PsiIdentifier) element;
+        PsiElement parent = identifier.getParent();
+
+        // 检查父元素是否为 PsiField
+        if (!(parent instanceof PsiField)) {
+            return null;
+        }
+
+        PsiField field = (PsiField) parent;
         String verifyMsg = test(field);
         if (verifyMsg != null) {
             System.out.println("not_support_view-value, " + verifyMsg + element);
@@ -56,23 +67,23 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
         // 返回LineMarkerInfo
         return new LineMarkerInfo<>(
-                element,
-                element.getTextRange(),
+                identifier,
+                identifier.getTextRange(),
                 icon,
                 elem -> "View the field value",
-                new GutterIconNavigationHandler<PsiElement>() {
+                new GutterIconNavigationHandler<PsiIdentifier>() {
                     @Override
-                    public void navigate(MouseEvent mouseEvent, PsiElement psiElement) {
-                        PsiClass containingClass = ((PsiField) psiElement).getContainingClass();
+                    public void navigate(MouseEvent mouseEvent, PsiIdentifier psiElement) {
+                        PsiClass containingClass = ((PsiField)psiElement.getParent()).getContainingClass();
                         if (containingClass == null) {
-                            TestkitHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find class");
+                            TestkitHelper.notify(psiElement.getProject(), NotificationType.WARNING, "Can't find class");
                             return;
                         }
-                        String projectName = element.getProject().getName();
+                        String projectName = psiElement.getProject().getName();
                         List<String> projectAppList = RuntimeHelper.getAppMetas(projectName).stream().filter(new Predicate<RuntimeHelper.AppMeta>() {
                                     @Override
                                     public boolean test(RuntimeHelper.AppMeta appMeta) {
-                                        return ToolHelper.isDependency(element, element.getProject(), appMeta.getModule());
+                                        return ToolHelper.isDependency(psiElement.getParent(), psiElement.getProject(), appMeta.getModule());
                                     }
                                 }).map(new Function<RuntimeHelper.AppMeta, String>() {
                                     @Override
@@ -82,7 +93,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                 })
                                 .toList();
                         if (CollectionUtils.isEmpty(projectAppList)) {
-                            TestkitHelper.notify(element.getProject(), NotificationType.WARNING, "Can't find app, please wait Index build complete");
+                            TestkitHelper.notify(psiElement.getProject(), NotificationType.WARNING, "Can't find app, please wait Index build complete");
                             return;
                         }
 
@@ -104,7 +115,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                 AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getTestkitPort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getTestkitPort(), null) {
                                     @Override
                                     public void actionPerformed(@NotNull AnActionEvent e) {
-                                        handleClick(element, containingClass, psiElement, visibleApp);
+                                        handleClick(containingClass, (PsiField) psiElement.getParent(), visibleApp);
                                     }
                                 };
                                 controllerActionGroup.add(documentation); // 将动作添加到动作组中
@@ -113,7 +124,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
 
                         if (controllerActionGroup.getChildrenCount() == 0) {
-                            TestkitHelper.alert(element.getProject(), Messages.getWarningIcon(), "Can't find runtime app");
+                            TestkitHelper.alert(psiElement.getProject(), Messages.getWarningIcon(), "Can't find runtime app");
                             return;
                         }
 
@@ -204,8 +215,8 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
         return null;
     }
 
-    private static void handleClick(PsiElement element, PsiClass containingClass, PsiElement psiElement, RuntimeHelper.VisibleApp visibleApp) {
-        ProgressManager.getInstance().run(new Task.Backgroundable(element.getProject(), "Processing view-value, please wait ...", false) {
+    private static void handleClick(PsiClass containingClass, PsiField psiField, RuntimeHelper.VisibleApp visibleApp) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(psiField.getProject(), "Processing view-value, please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
                 ApplicationManager.getApplication().runReadAction(new Runnable() {
@@ -218,13 +229,13 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             JSONObject value = new JSONObject();
                             value.put("typeClass", containingClass.getQualifiedName());
                             value.put("beanName", ToolHelper.getBeanNameFromClass(containingClass));
-                            value.put("fieldName", ((PsiField) psiElement).getName());
+                            value.put("fieldName", psiField.getName());
 
                             submitRequest.put("params", value);
 
                             JSONObject submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class);
                             if (submitRet == null || !submitRet.getBooleanValue("success") || submitRet.getString("data") == null) {
-                                TestkitHelper.notify(element.getProject(), NotificationType.ERROR, "submit req error \n" + submitRet.getString("message"));
+                                TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "submit req error \n" + submitRet.getString("message"));
                                 return;
                             }
 
@@ -237,13 +248,13 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
                             JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", map, JSONObject.class);
                             if (result == null) {
-                                TestkitHelper.notify(element.getProject(), NotificationType.ERROR, "req is error\n result is null");
+                                TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "req is error\n result is null");
                             } else if (!result.getBooleanValue("success")) {
-                                TestkitHelper.notify(element.getProject(), NotificationType.ERROR, "req is error\n" + result.getString("message"));
+                                TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "req is error\n" + result.getString("message"));
                             } else {
                                 Object data = result.get("data");
                                 if (data == null) {
-                                    TestkitHelper.showMessageWithCopy(element.getProject(), "null");
+                                    TestkitHelper.showMessageWithCopy(psiField.getProject(), "null");
                                 } else if (data instanceof String
                                         || data instanceof Byte
                                         || data instanceof Short
@@ -254,13 +265,13 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                         || data instanceof Character
                                         || data instanceof Boolean
                                         || data.getClass().isEnum()) {
-                                    TestkitHelper.showMessageWithCopy(element.getProject(), data.toString());
+                                    TestkitHelper.showMessageWithCopy(psiField.getProject(), data.toString());
                                 } else {
-                                    TestkitHelper.showMessageWithCopy(element.getProject(), JsonUtil.formatObj(data));
+                                    TestkitHelper.showMessageWithCopy(psiField.getProject(), JsonUtil.formatObj(data));
                                 }
                             }
                         } catch (Throwable ex) {
-                            TestkitHelper.notify(element.getProject(), NotificationType.ERROR, "wait ret is error\n" + ToolHelper.getStackTrace(ex));
+                            TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "wait ret is error\n" + ToolHelper.getStackTrace(ex));
                         }
                     }
                 });

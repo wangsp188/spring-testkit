@@ -28,35 +28,35 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
 
     @Nullable
     @Override
-    public LineMarkerInfo<PsiElement> getLineMarkerInfo(@NotNull PsiElement element) {
-        if (!(element instanceof PsiMethod)) {
+    public LineMarkerInfo<PsiIdentifier> getLineMarkerInfo(@NotNull PsiElement element) {
+        if (!(element instanceof PsiIdentifier && element.getParent() instanceof PsiMethod)) {
             return null;
         }
-
-        PsiMethod method = (PsiMethod) element;
+        PsiIdentifier  identifier = (PsiIdentifier) element;
+        PsiMethod method = (PsiMethod) identifier.getParent();
         String test = isTest(method.getModifierList());
         if (test != null) {
             System.out.println("not_support_test, " + test + ":" + method.getContainingClass() + "#" + method.getName());
             return null;
         }
-        return new LineMarkerInfo<>(
-                method,
-                method.getTextRange(),
+        return new LineMarkerInfo<PsiIdentifier>(
+                identifier,
+                identifier.getTextRange(),
                 FLEXIBLE_TEST_ICON,
-                new Function<PsiElement, String>() {
+                new Function<PsiIdentifier, String>() {
                     @Override
-                    public String fun(PsiElement element) {
+                    public String fun(PsiIdentifier element) {
                         return "Call this function";
                     }
                 },
-                new GutterIconNavigationHandler() {
+                new GutterIconNavigationHandler<PsiIdentifier>() {
                     @Override
-                    public void navigate(MouseEvent e, PsiElement elt) {
+                    public void navigate(MouseEvent e, PsiIdentifier elt) {
                         if (GraphicsEnvironment.isHeadless()) {
                             throw new HeadlessException("Cannot display UI elements in a headless environment.");
                         }
                         Project project = elt.getProject();
-                        TestkitToolWindowFactory.switch2Tool(project, PluginToolEnum.FLEXIBLE_TEST, elt);
+                        TestkitToolWindowFactory.switch2Tool(project, PluginToolEnum.FLEXIBLE_TEST, elt.getParent());
                     }
                 },
                 GutterIconRenderer.Alignment.RIGHT
