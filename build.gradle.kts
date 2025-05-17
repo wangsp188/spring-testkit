@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.testkit"
-version = "1.0514"
+version = "1.0517"
 
 repositories {
     mavenCentral()
