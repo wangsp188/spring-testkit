@@ -5,6 +5,7 @@ import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.util.IconLoader;
+import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.psi.*;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -629,7 +630,17 @@ public abstract class BasePluginTool {
 
             actionComboBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
             if (actionListener != null) {
-                actionListener.actionPerformed(e);
+                try {
+                    ApplicationManager.getApplication().runWriteIntentReadAction(new ThrowableComputable<Object, Throwable>() {
+                        @Override
+                        public Object compute() throws Throwable {
+                            actionListener.actionPerformed(e);
+                            return null;
+                        }
+                    });
+                } catch (Throwable ex) {
+                    throw new RuntimeException(ex);
+                }
             }
         });
         gbc.fill = GridBagConstraints.HORIZONTAL;
