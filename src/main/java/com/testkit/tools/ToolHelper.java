@@ -58,7 +58,16 @@ public class ToolHelper {
             public String compute() {
                 // 获取类名
                 PsiClass containingClass = method.getContainingClass();
-                String className = containingClass != null ? containingClass.getName() : "UnknownClass";
+                String className = "UnknownClass";
+                if(containingClass != null){
+                    className = containingClass.getName();
+                    if(containingClass.getQualifiedName().contains(".")){
+                        String packageName = containingClass.getQualifiedName().substring(0,containingClass.getQualifiedName().lastIndexOf("."));
+                        if(packageName.contains(".")){
+                            className = packageName.substring(packageName.lastIndexOf(".")+1)+"/"+className;
+                        }
+                    }
+                }
 
                 // 获取方法名
                 String methodName = method.getName();
@@ -118,6 +127,13 @@ public class ToolHelper {
             public String compute() {
                 // 获取标签名
                 String tagName = xmlTag.getContainingFile().getName();
+                if (xmlTag.getContainingFile().getVirtualFile().getPath().contains("/")) {
+                    String dic =  xmlTag.getContainingFile().getVirtualFile().getPath().substring(0,xmlTag.getContainingFile().getVirtualFile().getPath().lastIndexOf("/"));
+                    if(dic.contains("/")){
+                        tagName = dic.substring(dic.lastIndexOf("/")+1)+"/"+tagName;
+                    }
+                }
+
 
                 // 构建标识符，假设我们使用标签名称和某个关键属性进行组合
                 StringBuilder keyBuilder = new StringBuilder(tagName);
