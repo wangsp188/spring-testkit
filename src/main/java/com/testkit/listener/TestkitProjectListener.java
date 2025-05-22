@@ -51,6 +51,7 @@ public class TestkitProjectListener implements ProjectActivity {
                         RuntimeHelper.setEnableMapperSql(SettingsStorageHelper.getSqlConfig(project).isEnableMapperSql());
                         System.out.println("Init project line marker,"+project.getName());
                         TestkitHelper.refresh(project);
+                        CodingGuidelinesHelper.refreshDoc(project);
                     }
                 });
 

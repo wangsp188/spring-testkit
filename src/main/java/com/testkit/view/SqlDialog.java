@@ -1144,21 +1144,26 @@ public class SqlDialog extends JDialog {
                     }).add(validDatasource.getName());
                 }
 
+                List<String> finalList = new ArrayList<>();
                 for (Map.Entry<String, List<String>> listEntry : url2Names.entrySet()) {
                     List<String> optinals = new ArrayList<>(listEntry.getValue());
                     String ddl = findAny(optinals, ddlDatasources);
                     if (ddl != null) {
-                        dataSourceComboBox.addItem(ddl);
+                        finalList.add(ddl);
                         continue;
                     }
 
                     String write = findAny(optinals, writeDatasources);
                     if (write != null) {
-                        dataSourceComboBox.addItem(write);
+                        finalList.add(write);
                         continue;
                     }
 
-                    dataSourceComboBox.addItem(optinals.get(0));
+                    finalList.add(optinals.get(0));
+                }
+                finalList.sort(String::compareTo);
+                for (String s : finalList) {
+                    dataSourceComboBox.addItem(s);
                 }
 
                 if (selectedData != null) {

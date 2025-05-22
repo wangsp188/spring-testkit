@@ -45,6 +45,10 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
             return null;
         }
 
+        if (isEndTagName(token)) {
+            return null;
+        }
+
         XmlTag tag = (XmlTag) parent;
         if(!isSqlTag(tag)){
             return null;
@@ -74,6 +78,21 @@ public class MapperSqlIconProvider implements LineMarkerProvider {
                 },
                 GutterIconRenderer.Alignment.RIGHT
         );
+    }
+
+    public static boolean isEndTagName(XmlToken token) {
+        if (token==null) {
+            return false;
+        }
+        // 获取当前 Token 的前一个兄弟元素
+        PsiElement prevSibling = token.getPrevSibling();
+
+        // 结束标签的名称前会有 "</" 符号
+        if (prevSibling instanceof XmlToken) {
+            XmlToken prevToken = (XmlToken) prevSibling;
+            return prevToken.getTokenType() == XmlTokenType.XML_END_TAG_START; // XML_END_TAG_START 对应 "</"
+        }
+        return false;
     }
 
     public static boolean isSqlTag(XmlTag tag) {

@@ -627,8 +627,14 @@ public abstract class BasePluginTool {
                 }
             }
 
+            String tooltip = "";
+            if(selectedItem instanceof ToolHelper.MethodAction){
+                tooltip = ToolHelper.buildMethodKey(((ToolHelper.MethodAction) selectedItem).getMethod());
+            }else if(selectedItem instanceof ToolHelper.XmlTagAction){
+                tooltip = ToolHelper.buildXmlTagKey(((ToolHelper.XmlTagAction) selectedItem).getXmlTag());
+            }
 
-            actionComboBox.setToolTipText(selectedItem == null ? "" : selectedItem.toString()); // 动态更新 ToolTipText
+            actionComboBox.setToolTipText(tooltip); // 动态更新 ToolTipText
             if (actionListener != null) {
                 try {
                     ApplicationManager.getApplication().runWriteIntentReadAction(new ThrowableComputable<Object, Throwable>() {

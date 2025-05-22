@@ -50,7 +50,7 @@ public class CodingGuidelinesHelper {
 
 
     public static boolean hasDoc(PsiElement element) {
-        if (element instanceof XmlToken && ((XmlToken) element).getTokenType() == XmlTokenType.XML_NAME && element.getParent() instanceof  XmlTag && MapperSqlIconProvider.isSqlTag((XmlTag) element.getParent())) {
+        if (element instanceof XmlToken && ((XmlToken) element).getTokenType() == XmlTokenType.XML_NAME && element.getParent() instanceof  XmlTag && !MapperSqlIconProvider.isEndTagName((XmlToken) element) && MapperSqlIconProvider.isSqlTag((XmlTag) element.getParent())) {
             Map<DocScope, Doc> docScopeDocMap = scopeDocs.get(element.getProject());
             return docScopeDocMap != null && docScopeDocMap.get(DocScope.sql) != null;
         }
@@ -85,7 +85,7 @@ public class CodingGuidelinesHelper {
 
 
     public static List<Doc> findDoc(PsiElement element) {
-        if (element instanceof XmlToken && ((XmlToken) element).getTokenType() == XmlTokenType.XML_NAME && element.getParent() instanceof  XmlTag && MapperSqlIconProvider.isSqlTag((XmlTag) element.getParent())) {
+        if (element instanceof XmlToken && ((XmlToken) element).getTokenType() == XmlTokenType.XML_NAME && element.getParent() instanceof  XmlTag && !MapperSqlIconProvider.isEndTagName((XmlToken) element) && MapperSqlIconProvider.isSqlTag((XmlTag) element.getParent())) {
             Doc scopeDoc = CodingGuidelinesHelper.getScopeDoc(element.getProject(), DocScope.sql);
             if (scopeDoc == null) {
                 return Collections.emptyList();

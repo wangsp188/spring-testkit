@@ -1278,7 +1278,7 @@ public class FunctionCallTool extends BasePluginTool {
 
         // 检查下拉框中是否已经包含当前方法的名称
         for (int i = 0; i < actionComboBox.getItemCount(); i++) {
-            if (actionComboBox.getItemAt(i).toString().equals(ToolHelper.buildMethodKey(method))) {
+            if (Objects.equals(ToolHelper.buildMethodKey(actionComboBox.getItemAt(i).getMethod()),ToolHelper.buildMethodKey(method))) {
                 actionComboBox.setSelectedIndex(i);
                 return;
             }

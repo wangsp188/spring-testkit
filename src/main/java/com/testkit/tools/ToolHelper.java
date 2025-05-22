@@ -25,7 +25,6 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -50,7 +49,7 @@ public class ToolHelper {
     }
 
 
-    public static String buildMethodKey(PsiMethod method) {
+    public static String buildMethodName(PsiMethod method) {
         if (method == null || !method.isValid()) {
             return null;
         }
@@ -80,7 +79,37 @@ public class ToolHelper {
         });
     }
 
-    public static String buildXmlTagKey(XmlTag xmlTag) {
+    public static String buildMethodKey(PsiMethod method) {
+        if (method == null || !method.isValid()) {
+            return null;
+        }
+        return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+            @Override
+            public String compute() {
+                // 获取类名
+                PsiClass containingClass = method.getContainingClass();
+                String className = containingClass != null ? containingClass.getQualifiedName() : "UnknownClass";
+
+                // 获取方法名
+                String methodName = method.getName();
+
+                // 获取参数列表
+                StringBuilder parameters = new StringBuilder();
+                PsiParameterList parameterList = method.getParameterList();
+                for (PsiParameter parameter : parameterList.getParameters()) {
+                    if (parameters.length() > 0) {
+                        parameters.append(", ");
+                    }
+                    parameters.append(parameter.getType().getCanonicalText());
+                }
+
+                // 构建完整的方法签名
+                return className + "#" + methodName + "(" + parameters.toString() + ")";
+            }
+        });
+    }
+
+    public static String buildXmlTagName(XmlTag xmlTag) {
         if (xmlTag == null || !xmlTag.isValid()) {
             return null;
         }
@@ -102,6 +131,31 @@ public class ToolHelper {
                 // 当然，你可以根据需要加入更多的信息，比如标签的命名空间或其他属性
                 // String namespace = xmlTag.getNamespace();
                 // keyBuilder.append("(namespace: ").append(namespace).append(")");
+
+                return keyBuilder.toString();
+            }
+        });
+
+    }
+
+    public static String buildXmlTagKey(XmlTag xmlTag) {
+        if (xmlTag == null || !xmlTag.isValid()) {
+            return null;
+        }
+        return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
+            @Override
+            public String compute() {
+                // 获取标签名
+                String tagName = xmlTag.getContainingFile().getVirtualFile().getPath();
+
+                // 构建标识符，假设我们使用标签名称和某个关键属性进行组合
+                StringBuilder keyBuilder = new StringBuilder(tagName);
+
+                // 假设我们关注某个特定属性，比如 "id"，这个可以根据具体业务规则定制
+                String idAttribute = xmlTag.getAttributeValue("id");
+                if (idAttribute != null) {
+                    keyBuilder.append("#").append(idAttribute);
+                }
 
                 return keyBuilder.toString();
             }
@@ -730,7 +784,7 @@ public class ToolHelper {
             if (method == null) {
                 return "unknown";
             }
-            String s = buildMethodKey(method);
+            String s = buildMethodName(method);
             return s == null ? "invalid" : s;
         }
 
@@ -756,7 +810,7 @@ public class ToolHelper {
             if (xmlTag == null) {
                 return "unknown";
             }
-            String s = buildXmlTagKey(xmlTag);
+            String s = buildXmlTagName(xmlTag);
             return s == null ? "invalid" : s;
         }
 

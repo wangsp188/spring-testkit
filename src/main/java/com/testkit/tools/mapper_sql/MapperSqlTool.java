@@ -197,7 +197,7 @@ public class MapperSqlTool extends BasePluginTool {
 
         // 检查下拉框中是否已经包含当前方法的名称
         for (int i = 0; i < actionComboBox.getItemCount(); i++) {
-            if (actionComboBox.getItemAt(i).toString().equals(ToolHelper.buildXmlTagKey(xmlTag))) {
+            if (actionComboBox.getItemAt(i).toString().equals(ToolHelper.buildXmlTagName(xmlTag))) {
                 actionComboBox.setSelectedIndex(i);
                 return;
             }
