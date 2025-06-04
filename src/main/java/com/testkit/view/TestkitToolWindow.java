@@ -2,12 +2,23 @@ package com.testkit.view;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.TypeReference;
+import com.intellij.openapi.actionSystem.impl.ActionButton;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.ui.awt.RelativePoint;
+import com.intellij.ui.components.JBTextField;
+import com.intellij.util.ui.JBUI;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesIconProvider;
 import com.testkit.sql_review.MysqlUtil;
+import com.testkit.tools.ToolHelper;
 import com.testkit.tools.mapper_sql.MapperSqlTool;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
@@ -32,8 +43,11 @@ import com.testkit.tools.flexible_test.FlexibleTestTool;
 import com.intellij.ui.components.JBScrollPane;
 import com.testkit.util.HttpUtil;
 import com.intellij.ui.jcef.JBCefBrowser;
+import com.testkit.util.JsonUtil;
+import kotlinx.html.A;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefLoadHandlerAdapter;
@@ -67,7 +81,7 @@ public class TestkitToolWindow {
     private JButton settingsButton;
     private JComboBox<String> toolBox;
 
-    private JLabel appLabel;
+    private JPanel appPanel;
     private JComboBox<String> appBox;
 
     private SettingsDialog settingsDialog;
@@ -225,9 +239,180 @@ public class TestkitToolWindow {
         topPanel.add(toolBox);
 
 
+        appPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        ActionButton addBtn = new ActionButton(new AnAction("No automatic refresh or remote link ?", null, AllIcons.General.InlineAdd) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                // 创建面板
+                JPanel panel = new JPanel();
+                panel.setLayout(new GridBagLayout());
+                panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+                GridBagConstraints gbc = new GridBagConstraints();
+                gbc.fill = GridBagConstraints.HORIZONTAL;
+                gbc.insets = JBUI.insets(5);
+
+                List<RuntimeHelper.AppMeta> appMetas = RuntimeHelper.getAppMetas(project.getName());
+                if (CollectionUtils.isEmpty(appMetas)) {
+                    TestkitHelper.alert(project,Messages.getErrorIcon(),"No app metas found, Pls wait index refresh");
+                    return;
+                }
+
+                // 创建下拉框
+                String[] options = appMetas.stream().map(RuntimeHelper.AppMeta::getApp).toArray(String[]::new);
+                ComboBox<String> comboBox = new ComboBox<>(options);
+
+                // 创建两个文本框
+                JBTextField hostField = new JBTextField("localhost");
+                hostField.getEmptyText().setText("Which host connect to?");
+                hostField.setEditable(true);
+                hostField.setEnabled(true);
+                hostField.setFocusable(true);
+                JBTextField portField = new JBTextField("18080");
+                portField.getEmptyText().setText("It is generally ${tomcat_port}+10000");
+                portField.setEditable(true);
+                portField.setEnabled(true);
+                portField.setFocusable(true);
+
+                // 创建提交按钮
+                JButton testButton = new JButton("Test");
+                JButton saveButton = new JButton("Add connection");
+
+                // 添加组件到面板
+                gbc.gridx = 0;
+                gbc.gridy = 0;
+                JLabel appLabel = new JLabel("App:");
+                appLabel.setLabelFor(comboBox);
+                appLabel.setToolTipText("Which app domain you want connect to");
+                panel.add(appLabel, gbc);
+                gbc.gridx = 1;
+                panel.add(comboBox, gbc);
+
+                gbc.gridx = 0;
+                gbc.gridy = 1;
+                JLabel hostLabel = new JLabel("Host:");
+                panel.add(hostLabel, gbc);
+                gbc.gridx = 1;
+                panel.add(hostField, gbc);
+
+                gbc.gridx = 0;
+                gbc.gridy = 2;
+                JLabel portLabel = new JLabel("Testkit Port:");
+                portLabel.setToolTipText("The port occupied by testkit startup is generally the project tomcat port +10000");
+                panel.add(portLabel, gbc);
+                gbc.gridx = 1;
+                panel.add(portField, gbc);
+
+                gbc.gridx = 0;
+                gbc.gridy = 3;
+//                gbc.gridwidth = 2;
+                panel.add(testButton, gbc);
+                gbc.gridx = 1;
+                panel.add(saveButton, gbc);
+
+                // 创建弹出框
+                JBPopupFactory popupFactory = JBPopupFactory.getInstance();
+                JBPopup popup = popupFactory.createComponentPopupBuilder(panel, portField)
+                        .setRequestFocus(true)
+                        .setFocusable(true)
+                        .setTitle("Temporary configure the connector")
+                        .setMovable(true)
+                        .setResizable(false)
+                        .createPopup();
+
+
+                // 添加提交按钮事件
+                testButton.addActionListener(actionEvent -> {
+                    String selectedApp = (String) comboBox.getSelectedItem();
+                    String hostStr = hostField.getText().trim();
+                    String portStr = portField.getText().trim();
+                    if (selectedApp == null) {
+                        TestkitHelper.notify(project, NotificationType.ERROR, "Select app to connect to");
+                        return;
+                    }
+                    if (StringUtils.isBlank(hostStr) || !StringUtils.isNumeric(portStr)) {
+                        TestkitHelper.notify(project, NotificationType.ERROR,"host and port must be not null, port must be Numeric");
+                        return;
+                    }
+
+                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing test connection " + hostStr+":"+portStr + ", please wait ...", false) {
+                        @Override
+                        public void run(ProgressIndicator indicator) {
+                            String host = hostStr.equals("localhost") || hostStr.equals("127.0.0.1") ? "local" : hostStr;
+                            try {
+                                HashMap<String, String> requestData = new HashMap<>();
+                                requestData.put("method", "hi");
+                                // 发送请求获取实时数据
+                                JSONObject response = HttpUtil.sendPost("http://"+(host.equals("local")?"localhost":host)+":" + portStr + "/", requestData, JSONObject.class);
+                                String app = response.getJSONObject("data").getString("app");
+                                if (!Objects.equals(selectedApp,app)) {
+                                    TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+host+":"+portStr+" success<br>but app not match,expect is "+selectedApp+", got "+app);
+                                    return;
+                                }
+                                TestkitHelper.notify(project,NotificationType.INFORMATION,"Connected success<br>"+selectedApp+":"+host+":"+portStr);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+selectedApp+":"+host+":"+portStr+" failed<br>"+e.getMessage());
+                            }
+                        }
+                    });
+                });
+
+                // 添加提交按钮事件
+                saveButton.addActionListener(actionEvent -> {
+                    String selectedApp = (String) comboBox.getSelectedItem();
+                    String hostStr = hostField.getText().trim();
+                    String portStr = portField.getText().trim();
+                    if (selectedApp == null) {
+                        TestkitHelper.notify(project,NotificationType.ERROR, "Select app to connect to");
+                        return;
+                    }
+                    if (StringUtils.isBlank(hostStr) || !StringUtils.isNumeric(portStr)) {
+                        TestkitHelper.notify(project,NotificationType.ERROR,"host and port must be not null, port must be Numeric");
+                        return;
+                    }
+
+                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing test connection " + hostStr+":"+portStr + ", please wait ...", false) {
+                        @Override
+                        public void run(ProgressIndicator indicator) {
+                            String host = hostStr.equals("localhost") || hostStr.equals("127.0.0.1") ? "local" : hostStr;
+                            try {
+                                HashMap<String, String> requestData = new HashMap<>();
+                                requestData.put("method", "hi");
+                                // 发送请求获取实时数据
+                                JSONObject response = HttpUtil.sendPost("http://"+(host.equals("local")?"localhost":host)+":" + portStr + "/", requestData, JSONObject.class);
+                                String app = response.getJSONObject("data").getString("app");
+                                if (!Objects.equals(selectedApp,app)) {
+                                    TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+host+":"+portStr+" success<br>but app not match, expect is "+selectedApp+", got "+app);
+                                    return;
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+selectedApp+":"+host+":"+portStr+" failed<br>"+e.getMessage());
+                                return;
+                            }
+                            List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+                            if (tempApps.contains(selectedApp+":"+host+":"+portStr)) {
+                                TestkitHelper.notify(project,NotificationType.WARNING,selectedApp+":"+host+":"+portStr+"already exists in "+tempApps);
+                                return;
+                            }
+                            tempApps.add(selectedApp+":"+host+":"+portStr);
+                            RuntimeHelper.setTempApps(project.getName(), tempApps);
+                            TestkitHelper.notify(project,NotificationType.INFORMATION,"Add connection success<br>"+selectedApp+":"+host+":"+portStr);
+                        }
+                    });
+
+                });
+
+                // 显示弹出框
+                popup.show(new RelativePoint(appPanel, new Point(0, 0)));
+            }
+        },null,"1",new Dimension(16, 32));
         // 添加 VisibleApp Label
-        appLabel = new JLabel("RuntimeApp:");
-        topPanel.add(appLabel);
+        JLabel appLabel = new JLabel("RuntimeApp:");
+        appPanel.add(appLabel);
+        appPanel.add(addBtn);
+
+        topPanel.add(appPanel);
 
         // 添加 appBox 到 topPanel
         appBox = new ComboBox<>(new String[]{});
@@ -260,7 +445,7 @@ public class TestkitToolWindow {
         // 应用标签
         JPanel rightAppPanel = new JPanel(new BorderLayout(2, 2));
 
-        rightAppPanel.add(appLabel, BorderLayout.WEST);
+        rightAppPanel.add(appPanel, BorderLayout.WEST);
         // 设置扩展策略
         rightAppPanel.add(appBox, BorderLayout.CENTER);
 
@@ -447,6 +632,10 @@ public class TestkitToolWindow {
         if(localItems!=null){
             newItems.addAll(localItems);
         }
+        List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+        if (tempApps != null) {
+            newItems.addAll(tempApps);
+        }
         // 用于比较的 map，判断是否有变化
         HashMap<String, Boolean> newMap = new HashMap<>();
         HashMap<String, String> requestData = new HashMap<>();
@@ -583,7 +772,7 @@ public class TestkitToolWindow {
             return;
         }
 
-        appLabel.setVisible(tool.needAppBox());
+        appPanel.setVisible(tool.needAppBox());
         appBox.setVisible(tool.needAppBox());
         whitePanel.setVisible(false);
         // 隐藏所有工具面板，并显示选中工具面板

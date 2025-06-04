@@ -33,6 +33,7 @@ public class RuntimeHelper {
     private static final Map<String, List<SettingsStorageHelper.DatasourceConfig>> validDatasources = new HashMap<>();
     private static final Map<String, List<String>> ddlDatasources = new HashMap<>();
     private static final Map<String, List<String>> writeDatasources = new HashMap<>();
+    private static final Map<String, List<String>> tempApps = new HashMap<>();
 
     private static boolean enableMapperSql = false;
 
@@ -178,6 +179,26 @@ public class RuntimeHelper {
         }
         appMetas.put(project, metas);
     }
+
+    public static List<String> getTempApps(String project) {
+        if (project == null) {
+            return new  ArrayList<>();
+        }
+        List<String> tempApp = tempApps.get(project);
+        return tempApp == null ? new ArrayList<>() : new ArrayList<>(tempApp);
+    }
+
+    public static void setTempApps(String project,List<String> apps) {
+        if (project == null) {
+            return ;
+        }
+        if (CollectionUtils.isEmpty(apps)) {
+            tempApps.remove(project);
+        }else{
+            tempApps.put(project, apps);
+        }
+    }
+
 
 
     public static void removeApp(String project, VisibleApp app) {
