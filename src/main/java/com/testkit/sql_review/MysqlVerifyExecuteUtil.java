@@ -6,7 +6,9 @@ import net.sf.jsqlparser.statement.alter.Alter;
 import net.sf.jsqlparser.statement.alter.AlterExpression;
 import net.sf.jsqlparser.statement.create.index.CreateIndex;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
+import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
+import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.update.Update;
 
@@ -19,6 +21,9 @@ import java.util.Objects;
 public class MysqlVerifyExecuteUtil {
 
     public static String rollbackWriteSQL(Statement statement, Connection connection) throws RuntimeException {
+        if (statement == null) {
+            return "Unsupported Insert";
+        }
         if (statement instanceof Alter) {
             return rollbackAlterTable((Alter) statement, connection);
         } else if (statement instanceof Drop) {
@@ -29,6 +34,8 @@ public class MysqlVerifyExecuteUtil {
             return rollbackCreateIndex((CreateIndex) statement);
         } else if (statement instanceof Update) {
             return "Unsupported SQL type: " + statement.getClass().getSimpleName();
+        } else if (statement instanceof Delete) {
+            return "Unsupported SQL type: " + statement.getClass().getSimpleName();
         } else {
             throw new UnsupportedOperationException("Unsupported SQL type: " + statement.getClass().getSimpleName());
         }
@@ -36,6 +43,9 @@ public class MysqlVerifyExecuteUtil {
 
 
     public static String verifyWriteSQL(Statement statement, Connection connection) {
+        if (statement == null) {
+            return "Unsupported Insert";
+        }
         if (statement instanceof Alter) {
             return verifyAlterTable((Alter) statement, connection);
         } else if (statement instanceof Drop) {
@@ -46,6 +56,8 @@ public class MysqlVerifyExecuteUtil {
             return verifyCreateIndex((CreateIndex) statement, connection);
         } else if (statement instanceof Update) {
             return verifyUpdate((Update) statement, connection);
+        }else if (statement instanceof Delete) {
+            return verifyDelete((Delete) statement, connection);
         } else {
             throw new UnsupportedOperationException("Unsupported SQL type: " + statement.getClass().getSimpleName());
         }
@@ -513,11 +525,22 @@ public class MysqlVerifyExecuteUtil {
 
     private static String verifyUpdate(Update update, Connection connection) {
         String countSql = generateCountSql(update);
-        MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(countSql, connection);
+        MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(countSql, connection,true);
         if (!sqlRet.isSuccess()) {
             return "Failed to prediction the affected row," + sqlRet.getRet();
         }
         String tableName = MysqlUtil.remove(update.getTable().getName());
+        int allCount = MysqlUtil.getTableRowCountByShowTableStatus(connection, tableName);
+        return "Expected affected row:" + sqlRet.getRet() + ",\n`" + tableName + "`‘s total count(estimate):" + allCount;
+    }
+
+    private static String verifyDelete(Delete delete, Connection connection) {
+        String countSql = generateCountSql(delete);
+        MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(countSql, connection,true);
+        if (!sqlRet.isSuccess()) {
+            return "Failed to prediction the affected row," + sqlRet.getRet();
+        }
+        String tableName = MysqlUtil.remove(delete.getTable().getName());
         int allCount = MysqlUtil.getTableRowCountByShowTableStatus(connection, tableName);
         return "Expected affected row:" + sqlRet.getRet() + ",\n`" + tableName + "`‘s total count(estimate):" + allCount;
     }
@@ -551,6 +574,25 @@ public class MysqlVerifyExecuteUtil {
         // 处理 LIMIT（MySQL 特性）
         if (update.getLimit() != null) {
             countSql.append(" LIMIT ").append(update.getLimit().getRowCount());
+        }
+
+        return countSql.toString();
+    }
+
+    public static String generateCountSql(Delete delete) {
+        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM ");
+
+        // 1. 添加主表
+        countSql.append(delete.getTable());
+
+        // 3. 添加 WHERE 条件
+        if (delete.getWhere() != null) {
+            countSql.append(" WHERE ").append(delete.getWhere().toString());
+        }
+
+        // 处理 LIMIT（MySQL 特性）
+        if (delete.getLimit() != null) {
+            countSql.append(" LIMIT ").append(delete.getLimit().getRowCount());
         }
 
         return countSql.toString();

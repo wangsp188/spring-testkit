@@ -33,6 +33,7 @@ import net.sf.jsqlparser.statement.create.index.CreateIndex;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
+import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.update.Update;
 import org.apache.commons.collections.CollectionUtils;
@@ -49,6 +50,7 @@ import java.awt.event.MouseEvent;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -57,6 +59,7 @@ public class SqlDialog extends JDialog {
 
     public static final Icon SQL_ANALYSIS_ICON = IconLoader.getIcon("/icons/sql-analysis.svg", SqlDialog.class);
     public static final Icon SAFE_EXECUTE_ICON = IconLoader.getIcon("/icons/safe-execute.svg", SqlDialog.class);
+    public static final String INSERT_$ = "--insert_100878--";
 
 
     private TestkitToolWindow toolWindow;
@@ -454,20 +457,24 @@ public class SqlDialog extends JDialog {
 
                     Statement statement = null;
                     try {
-                        statement = MysqlUtil.parse(sqlText);
+                        if(!sqlText.startsWith(INSERT_$)){
+                            statement = MysqlUtil.parse(sqlText);
+                        }
                     } catch (Throwable ex) {
                         TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), ex.getMessage());
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
 
-                    boolean b = statement instanceof Alter
+                    boolean b = statement==null
+                            ||statement instanceof Alter
                             || statement instanceof Drop
                             || statement instanceof CreateIndex
                             || statement instanceof CreateTable
-                            || statement instanceof Update;
+                            || statement instanceof Update
+                            || statement instanceof Delete;
                     if (!b) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update");
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update/Delete/Insert");
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
@@ -528,8 +535,30 @@ public class SqlDialog extends JDialog {
                                 if (connection == null) {
                                     connection = datasource.newConnection();
                                 }
-                                MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection);
-                                tableModel.setValueAt(sqlRet.toString(), modelRow, 5);
+                                if(sqlText.startsWith(INSERT_$)){
+                                    List<String> list = Arrays.stream(sqlText.substring(INSERT_$.length()).split(INSERT_$)).toList();
+                                    try {
+                                        List<MysqlUtil.SqlRet> rets = new ArrayList<>();
+                                        for (String sql : list) {
+                                            if (StringUtils.isBlank(sql)) {
+                                                continue;
+                                            }
+                                            MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sql, connection,false);
+                                            if (!sqlRet.isSuccess()) {
+                                                throw new RuntimeException(sqlRet.toString());
+                                            }
+                                            rets.add(sqlRet);
+                                        }
+                                        //提交
+                                        connection.commit();
+                                        tableModel.setValueAt(StringUtils.joinWith(";",rets), modelRow, 5);
+                                    } catch (RuntimeException ex) {
+                                        tableModel.setValueAt("insert fail,"+ex.getMessage(), modelRow, 5);
+                                    }
+                                }else{
+                                    MysqlUtil.SqlRet sqlRet = MysqlUtil.executeSQL(sqlText, connection,true);
+                                    tableModel.setValueAt(sqlRet.toString(), modelRow, 5);
+                                }
                             } catch (RuntimeExceptionWithAttachments edt) {
                                 tableModel.setValueAt("CANCEL", modelRow, 5);
                             } catch (Throwable ex) {
@@ -559,20 +588,24 @@ public class SqlDialog extends JDialog {
 
                     Statement statement = null;
                     try {
-                        statement = MysqlUtil.parse(sqlText);
+                        if(!sqlText.startsWith(INSERT_$)){
+                            statement = MysqlUtil.parse(sqlText);
+                        }
                     } catch (Throwable ex) {
                         TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), ex.getMessage());
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
 
-                    boolean b = statement instanceof Alter
+                    boolean b = statement==null
+                            ||statement instanceof Alter
                             || statement instanceof Drop
                             || statement instanceof CreateIndex
                             || statement instanceof CreateTable
-                            || statement instanceof Update;
+                            || statement instanceof Update
+                            || statement instanceof Delete;
                     if (!b) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update");
+                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update/Delete/Insert");
                         fireEditingStopped(); // 结束编辑状态
                         return;
                     }
@@ -706,9 +739,11 @@ public class SqlDialog extends JDialog {
                                                     || statement instanceof Drop
                                                     || statement instanceof CreateIndex
                                                     || statement instanceof CreateTable
-                                                    || statement instanceof Update;
+                                                    || statement instanceof Update
+                                                    || statement instanceof Delete
+                                                    || statement instanceof Insert;
                                             if (!b) {
-                                                throw new RuntimeException("Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update");
+                                                throw new RuntimeException("Only support MYSQL Alter/Drop/CreateIndex/CreateTable/Update/Delete/Insert");
                                             }
                                             return statement.toString();
                                         }
@@ -722,6 +757,23 @@ public class SqlDialog extends JDialog {
                             }
                             if (trim.split(";").length == parses.getStatements().size()) {
                                 sqls = Arrays.asList(trim.split(";"));
+                            }
+
+                            //找出所有的insert根据表合并
+                            Map<String,List<String>> tableInserts = new HashMap<>();
+                            sqls = new ArrayList<>(sqls);
+                            Iterator<String> iterator = sqls.iterator();
+                            while (iterator.hasNext()) {
+                                String sql = iterator.next();
+                                Statement parse = MysqlUtil.parse(sql);
+                                if(!(parse instanceof Insert)){
+                                    continue;
+                                }
+                                tableInserts.computeIfAbsent(((Insert) parse).getTable().getName(), k -> new ArrayList<>()).add(sql);
+                                iterator.remove();
+                            }
+                            for (Map.Entry<String, List<String>> stringListEntry : tableInserts.entrySet()) {
+                                sqls.add(INSERT_$ +String.join(INSERT_$, stringListEntry.getValue()));
                             }
                         } catch (Exception ex) {
                             TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), ex.getMessage());
@@ -770,7 +822,10 @@ public class SqlDialog extends JDialog {
                                     || statement instanceof Drop
                                     || statement instanceof CreateIndex
                                     || statement instanceof CreateTable
-                                    || statement instanceof Update);
+                                    || statement instanceof Update
+                                    || statement instanceof Delete
+                                    || statement instanceof Insert
+                            );
                         }
                     }).findAny().isPresent()) {
                         sqls = new ArrayList<>();
@@ -792,6 +847,24 @@ public class SqlDialog extends JDialog {
                                             return statement.toString();
                                         }
                                     }).collect(Collectors.toUnmodifiableList());
+                        }
+
+
+                        sqls = new ArrayList<>(sqls);
+                        //找出所有的insert根据表合并
+                        Map<String,List<String>> tableInserts = new HashMap<>();
+                        Iterator<String> iterator = sqls.iterator();
+                        while (iterator.hasNext()) {
+                            String sql = iterator.next();
+                            Statement parse = MysqlUtil.parse(sql);
+                            if(!(parse instanceof Insert)){
+                                continue;
+                            }
+                            tableInserts.computeIfAbsent(((Insert) parse).getTable().getName(), k -> new ArrayList<>()).add(sql);
+                            iterator.remove();
+                        }
+                        for (Map.Entry<String, List<String>> stringListEntry : tableInserts.entrySet()) {
+                            sqls.add(INSERT_$+String.join(INSERT_$, stringListEntry.getValue()));
                         }
                     }
                     refreshExecuteTable(sqls, model, selectDs, table, sqlBoxPanel, updateFilter);

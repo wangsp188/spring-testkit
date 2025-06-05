@@ -242,7 +242,7 @@ public class MysqlUtil {
         return xx;
     }
 
-    public static SqlRet executeSQL(String sql, Connection connection) {
+    public static SqlRet executeSQL(String sql, Connection connection,boolean commit) {
         if (sql == null || connection == null) {
             return SqlRet.buildFail("sql is null");
         }
@@ -271,7 +271,9 @@ public class MysqlUtil {
 
             try {
                 boolean isResultSet = statement.execute(sql);
-                connection.commit();
+                if(commit){
+                    connection.commit();
+                }
                 long endTime = System.currentTimeMillis();
                 //取最前面的
                 // 取消定时任务（如果尚未执行）
@@ -317,9 +319,11 @@ public class MysqlUtil {
             long endTime = System.currentTimeMillis();
             return SqlRet.buildFail("SQLState: " + e.getSQLState() + "\nVendor Code: " + e.getErrorCode() + "\n" + e.getMessage());
         } finally {
-            try {
-                connection.setAutoCommit(autoCommit);
-            } catch (Throwable e) {
+            if(commit){
+                try {
+                    connection.setAutoCommit(autoCommit);
+                } catch (Throwable e) {
+                }
             }
         }
     }
