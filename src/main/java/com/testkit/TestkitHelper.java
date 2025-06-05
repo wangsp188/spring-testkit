@@ -9,6 +9,7 @@ import com.intellij.openapi.module.ModuleUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -117,6 +118,11 @@ public class TestkitHelper {
                 springBootApplicationClasses.forEach(new Consumer<PsiClass>() {
                     @Override
                     public void accept(PsiClass psiClass) {
+                        VirtualFile virtualFile = psiClass.getContainingFile().getVirtualFile();
+                        if (virtualFile == null || virtualFile.getPath().contains("/src/test/java/")) {
+                            return;
+                        }
+
                         RuntimeHelper.AppMeta appMeta = new RuntimeHelper.AppMeta();
                         appMeta.setApp(psiClass.getName());
                         appMeta.setFullName(psiClass.getQualifiedName());
