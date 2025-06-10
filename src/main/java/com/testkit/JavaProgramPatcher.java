@@ -145,7 +145,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                         String startupPort = properties.getProperty("spring-startup-analyzer.admin.http.server.port");
                         TestkitHelper.notify(project, NotificationType.INFORMATION, "Spring startup analyzer will provide in port " + (StringUtils.isBlank(startupPort) ? "8065" : startupPort));
                     } else {
-                        TestkitHelper.notify(project, NotificationType.ERROR, "Spring startup analyzer need config spring-startup-analyzer.app.health.check.endpoints\nPlease check");
+                        TestkitHelper.notify(project, NotificationType.WARNING, "Spring startup analyzer need config spring-startup-analyzer.app.health.check.endpoints\nPlease check");
                     }
                     show = true;
                 }
