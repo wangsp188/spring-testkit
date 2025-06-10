@@ -87,6 +87,7 @@ public class SettingsDialog {
     private OnOffButton traceMybatisToggleButton;
     private OnOffButton logMybatisToggleButton;
     private OnOffButton defaultInterceptorToggleButton;
+    private OnOffButton startupAnalyzerToggleButton;
     private OnOffButton mapperSqlToggleButton;
     private JBTextField tracePackagesField;
 
@@ -195,7 +196,7 @@ public class SettingsDialog {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 左侧选项列表
-        String[] options = {TestkitHelper.getPluginName(), "Trace", "Tool interceptor", "Spring properties", "Controller command", "FeignClient command", "SQL tool"};
+        String[] options = {TestkitHelper.getPluginName(), "Trace", "Tool interceptor", "Startup enhancement", "Controller command", "FeignClient command", "SQL tool"};
         JBList<String> optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
@@ -206,7 +207,7 @@ public class SettingsDialog {
         rightContent.add(createTraceOptionPanel(), "Trace");
         rightContent.add(createSqlPanel(), "SQL tool");
         rightContent.add(createInterceptorOptionPanel(), "Tool interceptor");
-        rightContent.add(createPropertiesOptionPanel(), "Spring properties");
+        rightContent.add(createStartupEnhancementOptionPanel(), "Startup enhancement");
         rightContent.add(createControllerOptionPanel(), "Controller command");
         rightContent.add(createFeignOptionPanel(), "FeignClient command");
 
@@ -2060,7 +2061,7 @@ public class SettingsDialog {
     }
 
 
-    private JPanel createPropertiesOptionPanel() {
+    private JPanel createStartupEnhancementOptionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5); // 添加内边距以美化布局
@@ -2068,7 +2069,7 @@ public class SettingsDialog {
         JTextArea tipArea = TestkitToolWindow.createTips("Here properties takes precedence over spring.properties, you can customize some configurations for local startup\nFor example: customize the log level locally");
         // 添加标签到新行
         gbc.gridx = 0;
-        gbc.gridy = 0; // 新的一行
+        gbc.gridy = 2; // 新的一行
         gbc.gridwidth = 3;
         gbc.weightx = 1;
         gbc.weighty = 0.0;
@@ -2077,12 +2078,42 @@ public class SettingsDialog {
         panel.add(tipArea, gbc);
 
 
+        JTextArea startupLabel = TestkitToolWindow.createTips("Disable spring startup analyzer");
+        startupAnalyzerToggleButton = new OnOffButton();
+        startupAnalyzerToggleButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedApp = (String) propertiesAppBox.getSelectedItem();
+                if (selectedApp == null) {
+                    throw new IllegalArgumentException("Selected app is null");
+                }
+                boolean selected = startupAnalyzerToggleButton.isSelected();
+                startupLabel.setText(selected ? "Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:8080/health\nspring-startup-analyzer.admin.http.server.port=8066" : "Disable spring startup analyzer");
+                SettingsStorageHelper.setAppStartupAnalyzer(toolWindow.getProject(), selectedApp,selected);
+                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, selectedApp+"'s startup analyzer is " + (selected ? "enable" : "disable") + "<br>Take effect after restart");
+            }
+        });
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.0; // Reset weightx
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(startupAnalyzerToggleButton, gbc);
+
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(startupLabel, gbc);
+
 //        EditorTextField editorTextField = new EditorTextField(dummyFile.getViewProvider().getDocument(), project, PropertiesLanguage.INSTANCE.getAssociatedFileType(), true, false);
 
         LanguageTextField propertiesField = new LanguageTextField(PropertiesLanguage.INSTANCE, toolWindow.getProject(), SettingsStorageHelper.getAppProperties(toolWindow.getProject(), ""), false);
         // 布局输入框
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 3;
         gbc.gridwidth = 3; // 占据3列
         gbc.weightx = 1.0;
         gbc.weighty = 1.0;
@@ -2099,7 +2130,7 @@ public class SettingsDialog {
 
         // 添加标签到新行
         gbc.gridx = 0;
-        gbc.gridy = 1; // 新的一行
+        gbc.gridy = 0; // 新的一行
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.weighty = 0.0;
@@ -2109,7 +2140,7 @@ public class SettingsDialog {
 
         // 添加组合框到标签右边
         gbc.gridx = 1;
-        gbc.gridy = 1; // 同一行
+        gbc.gridy = 0; // 同一行
         gbc.gridwidth = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -2121,8 +2152,13 @@ public class SettingsDialog {
                 String selectedApp = (String) propertiesAppBox.getSelectedItem();
                 if (selectedApp == null) {
                     propertiesField.setText(null);
+                    startupAnalyzerToggleButton.setSelected(false);
+                    startupLabel.setText("Disable spring startup analyzer");
                 } else {
                     propertiesField.setText(SettingsStorageHelper.getAppProperties(toolWindow.getProject(), selectedApp));
+                    boolean startupAnalyzer = SettingsStorageHelper.isAppStartupAnalyzer(toolWindow.getProject(), selectedApp);
+                    startupAnalyzerToggleButton.setSelected(startupAnalyzer);
+                    startupLabel.setText(startupAnalyzer?"Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:8080/health\nspring-startup-analyzer.admin.http.server.port=8066\n\n":"Disable spring startup analyzer");
                 }
             }
         });
@@ -2137,7 +2173,7 @@ public class SettingsDialog {
             }
         });
         gbc.gridx = 2;  // 放在同一行的尾部
-        gbc.gridy = 1;
+        gbc.gridy = 0;
         gbc.gridwidth = 1;
         gbc.weightx = 0.0;
         gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
@@ -2179,7 +2215,7 @@ public class SettingsDialog {
 
         // 将按钮面板添加到主面板的底部
         gbc.gridx = 0;
-        gbc.gridy = 3; // 新的一行
+        gbc.gridy = 4; // 新的一行
         gbc.gridwidth = 3; // 占据三列
         gbc.weightx = 0.0; // 重置权重
         gbc.weighty = 0.0; // 重置权重

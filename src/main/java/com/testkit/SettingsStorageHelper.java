@@ -2,7 +2,6 @@ package com.testkit;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
-import com.intellij.openapi.ui.Messages;
 import com.testkit.sql_review.MysqlUtil;
 import com.testkit.util.HttpUtil;
 import com.testkit.view.SettingsDialog;
@@ -596,6 +595,35 @@ public class SettingsStorageHelper {
         return getConfig(project).isDefaultUseInterceptor();
     }
 
+    public static boolean isAppStartupAnalyzer(Project project, String app) {
+        if (app == null) {
+            return false;
+        }
+        return getAppConfig(project,app).isStartupAnalyzer();
+    }
+
+    public static void setAppStartupAnalyzer(Project project, String app, boolean startupAnalyzer) {
+        if (app == null) {
+            return;
+        }
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        if (projectConfig.getAppConfigs() == null) {
+            projectConfig.setAppConfigs(new HashMap<>());
+        }
+
+
+        projectConfig.getAppConfigs().computeIfAbsent(app, new Function<String, Config>() {
+            @Override
+            public Config apply(String s) {
+                return new Config();
+            }
+        }).setStartupAnalyzer(startupAnalyzer);
+        saveProjectConfig(project, projectConfig);
+    }
+
     public static List<String> getBeanAnnotations(Project project) {
         return getConfig(project).getBeanAnnotations();
     }
@@ -928,6 +956,7 @@ public class SettingsStorageHelper {
         private TraceConfig traceConfig;
         private SqlConfig sqlConfig;
         private CliConfig cliConfig;
+        private boolean startupAnalyzer;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -1024,6 +1053,14 @@ public class SettingsStorageHelper {
         public void setCliConfig(CliConfig cliConfig) {
             this.cliConfig = cliConfig;
         }
+
+        public boolean isStartupAnalyzer() {
+            return startupAnalyzer;
+        }
+
+        public void setStartupAnalyzer(boolean startupAnalyzer) {
+            this.startupAnalyzer = startupAnalyzer;
+        }
     }
 
     public static class Config {
@@ -1040,6 +1077,7 @@ public class SettingsStorageHelper {
         private TraceConfig traceConfig;
         private SqlConfig sqlConfig;
         private CliConfig cliConfig;
+        private boolean startupAnalyzer;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -1135,6 +1173,14 @@ public class SettingsStorageHelper {
 
         public void setCliConfig(CliConfig cliConfig) {
             this.cliConfig = cliConfig;
+        }
+
+        public boolean isStartupAnalyzer() {
+            return startupAnalyzer;
+        }
+
+        public void setStartupAnalyzer(boolean startupAnalyzer) {
+            this.startupAnalyzer = startupAnalyzer;
         }
     }
 

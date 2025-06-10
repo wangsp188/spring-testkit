@@ -13,13 +13,21 @@ import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.search.GlobalSearchScope;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.utils.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 
-import java.io.File;
-import java.io.StringReader;
+import java.io.*;
 import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Properties;
+import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 
 public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgramPatcher {
 
@@ -76,7 +84,6 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 //            增加ajar到
             javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
 
-
             SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
             if (traceConfig.isEnable()) {
                 //            增加参数 -javaagent:/Users/dexwang/sourcecode/java/spring-fling_side_server/agent/target/agent-1.0-SNAPSHOT.jar
@@ -101,7 +108,6 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 show = true;
             }
 
-
             vmParametersList.addProperty("testkit.project.name", project.getName());
             vmParametersList.addProperty("testkit.app.name", runProfile.getName());
             vmParametersList.addProperty("testkit.app.env", "local");
@@ -120,6 +126,27 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 show = true;
             }
 
+            if (SettingsStorageHelper.isAppStartupAnalyzer(project, appName)) {
+                String startupzip = pluginPath + File.separator+TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "spring-startup-analyzer.tar.gz";
+                String startupdic = pluginPath + File.separator+TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "spring-startup-analyzer";
+
+                Path targetDir = Paths.get(startupdic); // 指定目标目录
+                Path resultPath = extractTarGz(startupzip, targetDir);
+
+                String startupAgentPath = resultPath.toAbsolutePath()+File.separator+"lib"+File.separator+"spring-profiler-agent.jar";
+
+                javaParameters.getVMParametersList().add("-javaagent:" + startupAgentPath);
+                boolean containsHealthcheck = properties.containsKey("spring-startup-analyzer.app.health.check.endpoints");
+                if (containsHealthcheck) {
+                    String startupPort = properties.getProperty("spring-startup-analyzer.admin.http.server.port");
+                    TestkitHelper.notify(project, NotificationType.INFORMATION, "Spring startup analyzer will provide in port " + (StringUtils.isBlank(startupPort) ? "8065" : startupPort));
+                } else {
+                    TestkitHelper.notify(project, NotificationType.WARNING, "Spring startup analyzer need config spring-startup-analyzer.app.health.check.endpoints\nPlease check");
+                }
+                show = true;
+            }
+
+
             if(show){
                 TestkitHelper.notify(project,NotificationType.INFORMATION,"佛祖保佑 永无BUG");
             }
@@ -127,5 +154,70 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             e.printStackTrace();
         }
     }
+
+
+    /**
+     * 解压 .tar.gz 文件到指定目录
+     * @param inputFile 输入的 .tar.gz 文件路径
+     * @param targetDir 目标目录（解压到此目录）
+     * @return 解压后的目标目录路径（如果已存在则直接返回）
+     * @throws IOException
+     */
+    public static Path extractTarGz(String inputFile, Path targetDir) throws IOException {
+        // 检查目标目录是否存在且非空
+        if (isDirectoryNonEmpty(targetDir)) {
+            System.out.println("目标目录已存在且非空，跳过解压: " + targetDir);
+            return targetDir;
+        }
+
+        // 创建目标目录
+        Files.createDirectories(targetDir);
+
+        // 解压过程
+        try (InputStream fi = Files.newInputStream(Paths.get(inputFile));
+             InputStream gzi = new GZIPInputStream(fi);
+             TarArchiveInputStream ti = new TarArchiveInputStream(gzi)) {
+
+            TarArchiveEntry entry;
+            while ((entry = ti.getNextTarEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue; // 跳过目录（实际创建由文件路径触发）
+                }
+
+                // 构建安全输出路径（确保在目标目录内）
+                Path outputPath = targetDir.resolve(entry.getName()).normalize();
+                if (!outputPath.startsWith(targetDir)) {
+                    throw new IOException("非法路径尝试跳出目标目录: " + entry.getName());
+                }
+
+                // 创建父目录
+                Path parent = outputPath.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+
+                // 写入文件
+                try (OutputStream fo = Files.newOutputStream(outputPath)) {
+                    IOUtils.copy(ti, fo);
+                }
+            }
+        }
+
+        return targetDir;
+    }
+
+    /**
+     * 检查目录是否存在且非空
+     */
+    private static boolean isDirectoryNonEmpty(Path dir) throws IOException {
+        if (!Files.exists(dir) || !Files.isDirectory(dir)) {
+            return false;
+        }
+        try (Stream<Path> entries = Files.list(dir)) {
+            return entries.findAny().isPresent();
+        }
+    }
+
+
 
 }

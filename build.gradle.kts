@@ -24,6 +24,7 @@ dependencies {
     implementation(files("jar/testkit-starter/target/testkit-starter-1.0.jar"))
     implementation(files("jar/testkit-agent/target/testkit-agent-1.0.jar"))
     implementation(files("jar/testkit-cli/target/testkit-cli-1.0.jar"))
+    implementation(files("resource/spring-startup-analyzer.tar.gz"))
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
     intellijPlatform{
