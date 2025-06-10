@@ -2088,7 +2088,7 @@ public class SettingsDialog {
                     throw new IllegalArgumentException("Selected app is null");
                 }
                 boolean selected = startupAnalyzerToggleButton.isSelected();
-                startupLabel.setText(selected ? "Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:8080/health\nspring-startup-analyzer.admin.http.server.port=8066" : "Disable spring startup analyzer");
+                startupLabel.setText(selected ? "Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nclick http://localhost:{port} to visit details.\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:8080/health\nspring-startup-analyzer.admin.http.server.port=8066" : "Disable spring startup analyzer");
                 SettingsStorageHelper.setAppStartupAnalyzer(toolWindow.getProject(), selectedApp,selected);
                 TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, selectedApp+"'s startup analyzer is " + (selected ? "enable" : "disable") + "<br>Take effect after restart");
             }
@@ -2158,7 +2158,7 @@ public class SettingsDialog {
                     propertiesField.setText(SettingsStorageHelper.getAppProperties(toolWindow.getProject(), selectedApp));
                     boolean startupAnalyzer = SettingsStorageHelper.isAppStartupAnalyzer(toolWindow.getProject(), selectedApp);
                     startupAnalyzerToggleButton.setSelected(startupAnalyzer);
-                    startupLabel.setText(startupAnalyzer?"Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:8080/health\nspring-startup-analyzer.admin.http.server.port=8066\n\n":"Disable spring startup analyzer");
+                    startupLabel.setText(startupAnalyzer?"Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nclick http://localhost:{port} to visit details.\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:8080/health\nspring-startup-analyzer.admin.http.server.port=8066\n\n":"Disable spring startup analyzer");
                 }
             }
         });
