@@ -16,7 +16,6 @@ public class TestkitServerAutoConfiguration implements DisposableBean {
 
     // Web 应用场景：Tomcat/Jetty/Undertow 启动后触发
     @EventListener(ServletWebServerInitializedEvent.class)
-    @ConditionalOnWebApplication // 仅 Web 应用生效
     public void onWebServerInitialized(WebServerInitializedEvent event) {
         System.err.println("Testkit onWebServerInitialized");
         startPluginServer(event.getApplicationContext());
@@ -24,7 +23,6 @@ public class TestkitServerAutoConfiguration implements DisposableBean {
 
     // 非 Web 应用场景：ApplicationReadyEvent 后触发
     @EventListener(ApplicationReadyEvent.class)
-    @ConditionalOnNotWebApplication // 仅非 Web 应用生效
     public void onApplicationReady(ApplicationReadyEvent event) {
         System.err.println("Testkit onApplicationReady");
         startPluginServer(event.getApplicationContext());
