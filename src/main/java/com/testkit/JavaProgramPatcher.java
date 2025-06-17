@@ -9,6 +9,7 @@ import com.intellij.execution.configurations.RunProfile;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiClass;
@@ -33,13 +34,12 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 
     @Override
     public void patchJavaParameters(Executor executor, RunProfile runProfile, JavaParameters javaParameters) {
+        if (!(runProfile instanceof ApplicationConfiguration configurationBase)) {
+            System.err.println("当前启动类非spring-boot");
+            return;
+        }
+        Project project = configurationBase.getProject();
         try {
-            if (!(runProfile instanceof ApplicationConfiguration configurationBase)) {
-                System.err.println("当前启动类非spring-boot");
-                return;
-            }
-
-            Project project = configurationBase.getProject();
 //            我想验证这个类是要带有@SpringBootApplication注解的才可以
             // Get the main class from the configuration
             String mainClassName = configurationBase.getRunClass();
@@ -77,6 +77,8 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 // 添加 Jar 到 classpath
                 javaParameters.getClassPath().add(springStarterJarPath);
                 show = true;
+            }else{
+                System.err.println("Testkit 未开启sideServer");
             }
 
 
@@ -106,6 +108,8 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 javaParameters.getVMParametersList().add("-javaagent:" + pluginPath + File.separator + agentPath+"="+encodedJson);
                 vmParametersList.addProperty("testkit.trace.enable", "true");
                 show = true;
+            }else{
+                System.err.println("Testkit 未开启trace");
             }
 
             vmParametersList.addProperty("testkit.project.name", project.getName());
@@ -149,6 +153,8 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                     }
                     show = true;
                 }
+            }else {
+                System.err.println("Testkit 未开启耗时分析");
             }
 
 
@@ -156,6 +162,8 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 TestkitHelper.notify(project,NotificationType.INFORMATION,"佛祖保佑 永无BUG");
             }
         } catch (Exception e) {
+            TestkitHelper.alert(project, Messages.getErrorIcon(),TestkitHelper.getPluginName()+" load error, Please contact the developer.\n"+e.getMessage());
+            System.out.println(TestkitHelper.getPluginName() + " load error");
             e.printStackTrace();
         }
     }

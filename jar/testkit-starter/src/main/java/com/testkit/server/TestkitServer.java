@@ -113,6 +113,15 @@ public class TestkitServer {
         server.createContext("/", new HttpHandler() {
             @Override
             public void handle(HttpExchange exchange) throws IOException {
+                if ("GET".equalsIgnoreCase(exchange.getRequestMethod()) && exchange.getRequestURI().getPath().equals("/health")) {
+                    String response = "{\"success\":true}";
+                    exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+                    exchange.sendResponseHeaders(200, response.getBytes(StandardCharsets.UTF_8).length);
+                    OutputStream outputStream = exchange.getResponseBody();
+                    outputStream.write(response.getBytes(StandardCharsets.UTF_8));
+                    outputStream.close();
+                    return;
+                }
                 if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                     returnError(exchange, "Un support http method, "+exchange.getRequestMethod());
                     return;
@@ -135,9 +144,9 @@ public class TestkitServer {
                         jsonResponse = revealSeria(ret);
                     }
                     exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-                    exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+                    exchange.sendResponseHeaders(200, jsonResponse.getBytes(StandardCharsets.UTF_8).length);
                     OutputStream outputStream = exchange.getResponseBody();
-                    outputStream.write(jsonResponse.getBytes());
+                    outputStream.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
                     outputStream.close();
                 } catch (Throwable e) {
                     log("testkit-server error",e);
