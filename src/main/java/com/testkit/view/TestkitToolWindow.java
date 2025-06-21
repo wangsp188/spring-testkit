@@ -335,7 +335,7 @@ public class TestkitToolWindow {
                     //copy
                     DefaultActionGroup copyGroup = new DefaultActionGroup();
                     //显示的一个图标加上标题
-                    AnAction copyDirect = new AnAction("Step1: Copy&execute this cmd\nComplete the injection according to the guide", "Step1: Copy&execute this cmd\nComplete the injection according to the guide", AllIcons.Actions.Copy) {
+                    AnAction copyDirect = new AnAction("Step1: Copy and execute this cmd use terminal, According to the guided injection capacity", "Step1: Copy and execute this cmd use terminal, According to the guided injection capacity", AllIcons.Actions.Copy) {
                         @Override
                         public void actionPerformed(@NotNull AnActionEvent e) {
                             SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(project);
@@ -362,9 +362,10 @@ public class TestkitToolWindow {
                     copyGroup.add(copyDirect); // 将动作添加到动作组中
 
                     //显示的一个图标加上标题
-                    AnAction infoAction = new AnAction("Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", "Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", null) {
+                    AnAction infoAction = new AnAction("Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", "Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", AllIcons.Actions.Edit) {
                         @Override
                         public void actionPerformed(@NotNull AnActionEvent e) {
+                            TestkitHelper.notify(project,NotificationType.INFORMATION,"After the injection is successful\nplease fill it in manually according to the injection information");
                         }
                     };
                     copyGroup.add(infoAction); // 将动作添加到动作组中
@@ -571,6 +572,8 @@ public class TestkitToolWindow {
                     // 创建 JFrame
                     frame = new JFrame("Link Window");
                     Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+                    screenSize.height = (int) (screenSize.height * 0.8);
+                    screenSize.width = (int) (screenSize.width * 0.8);
                     frame.setSize(screenSize);
                     frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
                     frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);

@@ -12,7 +12,6 @@ import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.sql_review.MysqlUtil;
-import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.util.HttpUtil;
 import com.intellij.icons.AllIcons;
@@ -90,8 +89,8 @@ public class SettingsDialog {
     private JBTextField tracePackagesField;
 
     private JBTextField traceClassSuffixField;
-    private JBTextField traceWhiteListField;
-    private JBTextField traceBlackListField;
+    private JBTextField traceAllowListField;
+    private JBTextField traceDenyListField;
 //    private JBTextField traceSingleClsDepthField;
 
 
@@ -171,8 +170,8 @@ public class SettingsDialog {
                 logMybatisToggleButton.setSelected(traceConfig.isLogMybatis());
                 tracePackagesField.setText(traceConfig.getPackages());
                 traceClassSuffixField.setText(traceConfig.getClsSuffix());
-                traceBlackListField.setText(traceConfig.getBlacks());
-                traceWhiteListField.setText(traceConfig.getWhites());
+                traceDenyListField.setText(traceConfig.getDenys());
+                traceAllowListField.setText(traceConfig.getAllows());
 //        traceSingleClsDepthField.setText(String.valueOf(traceConfig.getSingleClsDepth()));
 
                 SettingsStorageHelper.SqlConfig sqlConfig = SettingsStorageHelper.getSqlConfig(toolWindow.getProject());
@@ -1831,35 +1830,35 @@ public class SettingsDialog {
         traceOptionsPanel.add(traceClassSuffixField, gbc);
 
 
-        JLabel whiteClassLabel = new JLabel("Allow Class:");
-        whiteClassLabel.setToolTipText("Tracing class allow list, multiple use,split");
-        whiteClassLabel.setPreferredSize(labelDimension);
-        traceWhiteListField = new JBTextField(traceConfig.getWhites(), 20);
-        traceWhiteListField.getEmptyText().setText("Tracing class allow list, multiple use,split");
+        JLabel allowClassLabel = new JLabel("Allow Class/Method:");
+        allowClassLabel.setToolTipText("Tracing class/method allow list, multiple use,split;Support full class name or specify method (eg com.Test#methodName) consecutively");
+        allowClassLabel.setPreferredSize(labelDimension);
+        traceAllowListField = new JBTextField(traceConfig.getAllows(), 20);
+        traceAllowListField.getEmptyText().setText("Tracing class/method allow list, multiple use,split;Support full class name or specify method (eg com.Test#methodName) consecutively");
 
         gbc.gridx = 0;
         gbc.gridy = 6;
         gbc.weightx = 0.0;
-        traceOptionsPanel.add(whiteClassLabel, gbc);
+        traceOptionsPanel.add(allowClassLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(traceWhiteListField, gbc);
+        traceOptionsPanel.add(traceAllowListField, gbc);
 
-        JLabel blackClassLabel = new JLabel("Deny Class:");
-        blackClassLabel.setToolTipText("Tracing class deny list, multiple use,split");
-        blackClassLabel.setPreferredSize(labelDimension);
-        traceBlackListField = new JBTextField(traceConfig.getBlacks(), 20);
-        traceBlackListField.getEmptyText().setText("Tracing class deny list, multiple use,split");
+        JLabel denyClassLabel = new JLabel("Deny Class/Method:");
+        denyClassLabel.setToolTipText("Tracing class/method deny list, multiple use,split;Support full class name or specify method (eg com.Test#methodName) consecutively");
+        denyClassLabel.setPreferredSize(labelDimension);
+        traceDenyListField = new JBTextField(traceConfig.getDenys(), 20);
+        traceDenyListField.getEmptyText().setText("Tracing class/method deny list, multiple use,split;Support full class name or specify method (eg com.Test#methodName) consecutively");
 
         gbc.gridx = 0;
         gbc.gridy = 7;
         gbc.weightx = 0.0;
-        traceOptionsPanel.add(blackClassLabel, gbc);
+        traceOptionsPanel.add(denyClassLabel, gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        traceOptionsPanel.add(traceBlackListField, gbc);
+        traceOptionsPanel.add(traceDenyListField, gbc);
 
 
 //        JLabel monitorPrivateLabel = new JLabel("Single Class Depth:");
@@ -1921,8 +1920,8 @@ public class SettingsDialog {
                 SettingsStorageHelper.TraceConfig nowConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
                 nowConfig.setPackages(tracePackagesField.getText().trim());
                 nowConfig.setClsSuffix(traceClassSuffixField.getText().trim());
-                nowConfig.setWhites(traceWhiteListField.getText().trim());
-                nowConfig.setBlacks(traceBlackListField.getText().trim());
+                nowConfig.setAllows(traceAllowListField.getText().trim());
+                nowConfig.setDenys(traceDenyListField.getText().trim());
 //                nowConfig.setSingleClsDepth(singleClsDepth);
                 SettingsStorageHelper.setMonitorConfig(toolWindow.getProject(), nowConfig);
                 TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Trace config was saved");

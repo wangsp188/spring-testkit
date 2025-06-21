@@ -418,9 +418,8 @@ public class TestkitCLI {
                     String ret = processCommand(cmd, port, true, confirmCmd);
                     System.out.println(ret);
                 } catch (Exception e) {
-                    System.out.println(RED + e.getMessage() + RESET);
-                } finally {
                     confirmCmd.set(null);
+                    System.out.println(RED + e.getMessage() + RESET);
                 }
             }
         } finally {

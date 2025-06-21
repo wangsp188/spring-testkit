@@ -7,7 +7,6 @@ import java.io.UnsupportedEncodingException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.ProtectionDomain;
 import java.util.*;
@@ -42,9 +41,9 @@ public class TraceAgent {
                 }).collect(Collectors.toSet()));
             }
 
-            String whites = jsonObject.get("whites");
-            if (whites != null && !whites.isEmpty()) {
-                config.setWhites(Arrays.stream(whites.split(",")).distinct().map(new Function<String, String>() {
+            String allows = jsonObject.get("allows");
+            if (allows != null && !allows.isEmpty()) {
+                config.setAllows(Arrays.stream(allows.split(",")).distinct().map(new Function<String, String>() {
                     @Override
                     public String apply(String s) {
                         return s.trim();
@@ -52,9 +51,9 @@ public class TraceAgent {
                 }).collect(Collectors.toSet()));
             }
 
-            String blacks = jsonObject.get("blacks");
-            if (blacks != null && !blacks.isEmpty()) {
-                config.setBlacks(Arrays.stream(blacks.split(",")).distinct().map(new Function<String, String>() {
+            String denys = jsonObject.get("denys");
+            if (denys != null && !denys.isEmpty()) {
+                config.setDenys(Arrays.stream(denys.split(",")).distinct().map(new Function<String, String>() {
                     @Override
                     public String apply(String s) {
                         return s.trim();
@@ -64,7 +63,29 @@ public class TraceAgent {
             config.setTraceWeb("true".equals(jsonObject.get("traceWeb")));
             config.setTraceMybatis("true".equals(jsonObject.get("traceMybatis")));
             config.setLogMybatis("true".equals(jsonObject.get("logMybatis")));
+
+            config.preprocessedAllows = new HashMap<>();
+            config.preprocessedDenys = new HashMap<>();
+            for (String entry : config.allows) {
+                // 移除方法名部分（如果有）
+                int idx = entry.indexOf('#');
+                Set<String> strings = config.preprocessedAllows.computeIfAbsent(idx == -1 ? entry : entry.substring(0, idx), k -> new HashSet<>());
+                if(idx != -1) {
+                    strings.add(entry.substring(idx + 1));
+                }
+            }
+
+            for (String entry : config.denys) {
+                // 移除方法名部分（如果有）
+                int idx = entry.indexOf('#');
+                Set<String> strings = config.preprocessedDenys.computeIfAbsent(idx == -1 ? entry : entry.substring(0, idx), k -> new HashSet<>());
+                if(idx != -1) {
+                    strings.add(entry.substring(idx + 1));
+                }
+            }
+
             System.err.println("Testkit trace config: " + config);
+
         } catch (Throwable e) {
             System.err.println("Testkit trace config parse error");
             e.printStackTrace();
@@ -104,7 +125,7 @@ public class TraceAgent {
                     return null;
                 }
 
-                return enhanceClass(classPool, group, className.substring(className.lastIndexOf("/") + 1), classfileBuffer);
+                return enhanceClass(classPool, group, className.replace("/","."), classfileBuffer,config);
             }
         }, true);
         if (inst.isRetransformClassesSupported()) {
@@ -276,14 +297,17 @@ public class TraceAgent {
             return null;
         }
         className = className.replace('/', '.');
-        // 检查白名单
-        if (config.whites.contains(className)) {
-            return "white"; // 如果白名单中包含此类，直接认为匹配
-        }
 
         // 检查黑名单
-        if (config.blacks.contains(className)) {
-            return null; // 如果黑名单中包含此类，直接不匹配
+        if (config.preprocessedDenys.containsKey(className) && config.preprocessedDenys.get(className).isEmpty()) {
+            System.err.println("Testkit trace deny: " + className);
+            return null;
+        }
+
+        // 检查白名单
+        if (config.preprocessedAllows.containsKey((className))) {
+            System.err.println("Testkit trace allow: " + className);
+            return "white";
         }
 
         // 检查包名匹配
@@ -300,7 +324,8 @@ public class TraceAgent {
         return null; // 如果没有匹配，返回不匹配
     }
 
-    private static byte[] enhanceClass(ClassPool classPool, String group, String className, byte[] classfileBuffer) {
+    private static byte[] enhanceClass(ClassPool classPool, String group, String className, byte[] classfileBuffer, TraceConfig config) {
+        String simpleClassName = className.substring(className.lastIndexOf(".") + 1);
         String methodSign = null;
         try {
             CtClass ctClass = classPool.makeClass(new java.io.ByteArrayInputStream(classfileBuffer));
@@ -317,8 +342,20 @@ public class TraceAgent {
                     continue;
                 }
 
+                Set<String> blackMethods = config.preprocessedDenys.get(className);
+                if (blackMethods != null && blackMethods.contains(method.getName())) {
+                    System.err.println("Testkit trace skip method: " + className+"#"+method.getName());
+                    continue;
+                }
+
+                Set<String> whiteMethods = config.preprocessedAllows.get(className);
+                if(whiteMethods != null && !whiteMethods.contains(method.getName())) {
+                    System.err.println("Testkit trace skip method: " + className+"#"+method.getName());
+                    continue;
+                }
+
                 methodSign = method.getName() + "(" + method.getSignature() + ")";
-                enhanceMethod(classPool, method, group, className);
+                enhanceMethod(classPool, method, group, simpleClassName);
             }
 
             byte[] enhancedByteCode = ctClass.toBytecode();
@@ -326,7 +363,7 @@ public class TraceAgent {
             return enhancedByteCode;
         } catch (Throwable e) {
             e.printStackTrace();
-            System.err.println("Testkit javassist enhance fail:" + className + "," + methodSign + " errorType:" + e.getClass().getName() + ":" + e.getMessage());
+            System.err.println("Testkit javassist enhance fail:" + simpleClassName + "," + methodSign + " errorType:" + e.getClass().getName() + ":" + e.getMessage());
             return null;
         }
 
@@ -450,9 +487,12 @@ public class TraceAgent {
 
         private Set<String> clsSuffix = new HashSet<>();
 
-        private Set<String> whites = new HashSet<>();
+        private Set<String> allows = new HashSet<>();
 
-        private Set<String> blacks = new HashSet<>();
+        private Set<String> denys = new HashSet<>();
+
+        private HashMap<String,Set<String>> preprocessedAllows;
+        private HashMap<String,Set<String>> preprocessedDenys;
 
 
         public Set<String> getPackages() {
@@ -471,20 +511,20 @@ public class TraceAgent {
             this.clsSuffix = clsSuffix;
         }
 
-        public Set<String> getWhites() {
-            return whites;
+        public Set<String> getAllows() {
+            return allows;
         }
 
-        public void setWhites(Set<String> whites) {
-            this.whites = whites;
+        public void setAllows(Set<String> allows) {
+            this.allows = allows;
         }
 
-        public Set<String> getBlacks() {
-            return blacks;
+        public Set<String> getDenys() {
+            return denys;
         }
 
-        public void setBlacks(Set<String> blacks) {
-            this.blacks = blacks;
+        public void setDenys(Set<String> denys) {
+            this.denys = denys;
         }
 
         public boolean isTraceWeb() {
@@ -519,8 +559,10 @@ public class TraceAgent {
                     ", logMybatis=" + logMybatis +
                     ", packages=" + packages +
                     ", clsSuffix=" + clsSuffix +
-                    ", whites=" + whites +
-                    ", blacks=" + blacks +
+                    ", allows=" + allows +
+                    ", denys=" + denys +
+                    ", preprocessedAllows=" + preprocessedAllows +
+                    ", preprocessedDenys=" + preprocessedDenys +
                     '}';
         }
     }

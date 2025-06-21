@@ -472,8 +472,8 @@ public class SettingsStorageHelper {
         DEF_TRACE_CONFIG.setLogMybatis(true);
         DEF_TRACE_CONFIG.setPackages("app.three.package");
         DEF_TRACE_CONFIG.setClsSuffix("Controller,Service,Impl,Repository");
-        DEF_TRACE_CONFIG.setBlacks("");
-        DEF_TRACE_CONFIG.setWhites("");
+        DEF_TRACE_CONFIG.setDenys("");
+        DEF_TRACE_CONFIG.setAllows("");
         preSettings = parsePreSettings();
 //        DEF_TRACE_CONFIG.setSingleClsDepth(2);
     }
@@ -687,12 +687,12 @@ public class SettingsStorageHelper {
                 traceConfig.setClsSuffix("Controller,Service,Impl,Repository");
             }
 
-            if (StringUtils.isBlank(traceConfig.getWhites())) {
-                traceConfig.setWhites("");
+            if (StringUtils.isBlank(traceConfig.getAllows())) {
+                traceConfig.setAllows("");
             }
 
-            if (StringUtils.isBlank(traceConfig.getBlacks())) {
-                traceConfig.setBlacks("");
+            if (StringUtils.isBlank(traceConfig.getDenys())) {
+                traceConfig.setDenys("");
             }
         }
         projectConfig.setTraceConfig(traceConfig);
@@ -808,8 +808,8 @@ public class SettingsStorageHelper {
 //        copyConfig.setSingleClsDepth(DEF_TRACE_CONFIG.getSingleClsDepth());
         copyConfig.setPackages(DEF_TRACE_CONFIG.getPackages());
         copyConfig.setClsSuffix(DEF_TRACE_CONFIG.getClsSuffix());
-        copyConfig.setWhites(DEF_TRACE_CONFIG.getWhites());
-        copyConfig.setBlacks(DEF_TRACE_CONFIG.getBlacks());
+        copyConfig.setAllows(DEF_TRACE_CONFIG.getAllows());
+        copyConfig.setDenys(DEF_TRACE_CONFIG.getDenys());
         copyConfig.setEnable(DEF_TRACE_CONFIG.isEnable());
         copyConfig.setTraceWeb(DEF_TRACE_CONFIG.isTraceWeb());
         copyConfig.setTraceMybatis(DEF_TRACE_CONFIG.isTraceMybatis());
@@ -1183,9 +1183,9 @@ public class SettingsStorageHelper {
 
         private String clsSuffix;
 
-        private String whites;
+        private String allows;
 
-        private String blacks;
+        private String denys;
 
 //        private int singleClsDepth = 2;
 
@@ -1210,20 +1210,20 @@ public class SettingsStorageHelper {
             this.clsSuffix = clsSuffix;
         }
 
-        public String getWhites() {
-            return whites;
+        public String getAllows() {
+            return allows;
         }
 
-        public void setWhites(String whites) {
-            this.whites = whites;
+        public void setAllows(String allows) {
+            this.allows = allows;
         }
 
-        public String getBlacks() {
-            return blacks;
+        public String getDenys() {
+            return denys;
         }
 
-        public void setBlacks(String blacks) {
-            this.blacks = blacks;
+        public void setDenys(String denys) {
+            this.denys = denys;
         }
 
         public boolean isEnable() {
