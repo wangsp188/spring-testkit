@@ -331,11 +331,10 @@ public class TestkitToolWindow {
 
                 // 添加提交按钮事件
                 injectButton.addActionListener(actionEvent -> {
-
                     //copy
                     DefaultActionGroup copyGroup = new DefaultActionGroup();
                     //显示的一个图标加上标题
-                    AnAction copyDirect = new AnAction("Step1: Copy and execute this cmd use terminal, According to the guided injection capacity", "Step1: Copy and execute this cmd use terminal, According to the guided injection capacity", AllIcons.Actions.Copy) {
+                    AnAction copyDirect = new AnAction("Step1: Click here to Copy and execute this cmd, According to the guided injection capacity", "Step1: Click here to Copy and execute this cmd, According to the guided injection capacity", AllIcons.Actions.Copy) {
                         @Override
                         public void actionPerformed(@NotNull AnActionEvent e) {
                             SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(project);
@@ -355,7 +354,7 @@ public class TestkitToolWindow {
                                     "lib",
                                     "testkit-cli-1.0.jar"
                             ).toFile().getAbsolutePath();
-                            command.append("-jar "+cliPath);
+                            command.append("-jar \""+cliPath+"\"");
                             TestkitHelper.copyToClipboard(project, command.toString(), "CMD copy success\nYou can run this in terminal to  dynamic inject plugin.");
                         }
                     };
