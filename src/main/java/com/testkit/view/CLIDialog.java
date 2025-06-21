@@ -92,20 +92,10 @@ public class CLIDialog extends JDialog {
             urlPanel.setVisible(true);
         }
 
-        // 端口参数
-        JPanel portPanel = new JPanel(new BorderLayout());
-        portPanel.setToolTipText("Port number of the side service");
-        portPanel.add(new JLabel("<html><code style='color:#e83e8c'>java -Dtestkit.cli.port=</code></html>"), BorderLayout.WEST);
-        JBTextField portField = new JBTextField(cliConfig.getPort()==null?"10168":String.valueOf(cliConfig.getPort()));
-        portField.getEmptyText().setText("Port number of the side service");
-
-        portPanel.add(portField, BorderLayout.CENTER);
-        panel.add(portPanel);
-
         // 上下文参数
         JPanel ctxPanel = new JPanel(new BorderLayout());
         ctxPanel.setToolTipText("A static variable in the target jvm that points to ApplicationContext, like com.xx.classname#feildName");
-        ctxPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.cli.ctx=</code></html>"), BorderLayout.WEST);
+        ctxPanel.add(new JLabel("<html><code style='color:#e83e8c'>java -Dtestkit.cli.ctx=</code></html>"), BorderLayout.WEST);
         JBTextField ctxField = new JBTextField(cliConfig.getCtx() == null ? "" : cliConfig.getCtx());
         ctxField.getEmptyText().setText("like com.hook.SpringContextUtil#context points to ApplicationContext");
         ctxPanel.add(ctxField, BorderLayout.CENTER);
@@ -138,17 +128,6 @@ public class CLIDialog extends JDialog {
                 TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "pls set download url");
                 return;
             }
-            Integer port = null;
-            String portText = portField.getText();
-            try {
-                port = Integer.parseInt(portText.trim());
-                if (port < 1 && port > 99999) {
-                    throw new IllegalArgumentException("port must be port");
-                }
-            } catch (Throwable ex) {
-                TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "must be available port ");
-                return;
-            }
 
             String ctxFieldText = ctxField.getText();
             if (!ctxFieldText.trim().isEmpty()) {
@@ -161,7 +140,6 @@ public class CLIDialog extends JDialog {
             SettingsStorageHelper.CliConfig config = new SettingsStorageHelper.CliConfig();
             config.setDownloadFirst(downloadCheckBox.isSelected());
             config.setDownloadUrl(urlField.getText().isBlank()?null:urlField.getText().trim());
-            config.setPort(port);
             config.setCtx(ctxFieldText.trim().isBlank()?null:ctxFieldText.trim());
             config.setEnvKey(envKeyField.getText().trim().isBlank()?null:envKeyField.getText().trim());
             SettingsStorageHelper.saveCliConfig(toolWindow.getProject(), config);

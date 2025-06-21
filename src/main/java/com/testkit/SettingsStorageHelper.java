@@ -33,8 +33,6 @@ public class SettingsStorageHelper {
 
     public static final String defFlexibleTestPackage = "flexibletest";
 
-    public static final String remoteAppDemo = "TestApplication:ip1:8080,MyApplication:ip2:8080";
-
     public static final List<String> defBeanAnnotations = Arrays.asList("org.apache.ibatis.annotations.Mapper", "org.springframework.cloud.openfeign.FeignClient");
 
     public static final String defDownloadCliUrl = "https://raw.githubusercontent.com/wangsp188/spring-testkit/refs/heads/master/how-to-use/testkit-cli-1.0.jar";
@@ -587,10 +585,6 @@ public class SettingsStorageHelper {
         return getConfig(project).getFlexibleTestPackage();
     }
 
-    public static List<String> getRemoteApps(Project project) {
-        return getConfig(project).getRemoteApps();
-    }
-
     public static boolean isDefaultUseInterceptor(Project project) {
         return getConfig(project).isDefaultUseInterceptor();
     }
@@ -658,15 +652,6 @@ public class SettingsStorageHelper {
             projectConfig = new ProjectConfig();
         }
         projectConfig.setFlexibleTestPackage(flexibleTestPackage);
-        saveProjectConfig(project, projectConfig);
-    }
-
-    public static void setRemoteApps(Project project, List<String> remoteApps) {
-        ProjectConfig projectConfig = loadProjectConfig(project);
-        if (projectConfig == null) {
-            projectConfig = new ProjectConfig();
-        }
-        projectConfig.setRemoteApps(remoteApps);
         saveProjectConfig(project, projectConfig);
     }
 
@@ -799,7 +784,6 @@ public class SettingsStorageHelper {
         if (projectConfig == null) {
             Config config = new Config();
             config.setFlexibleTestPackage(defFlexibleTestPackage);
-            config.setRemoteApps(new ArrayList<>());
             config.setBeanAnnotations(defBeanAnnotations);
             config.setTraceConfig(copyDefMonitorConfig());
             config.setSqlConfig(copyDefSqlConfig());
@@ -810,7 +794,6 @@ public class SettingsStorageHelper {
         }
         Config config = new Config();
         config.setFlexibleTestPackage(projectConfig.getFlexibleTestPackage() == null ? defFlexibleTestPackage : projectConfig.getFlexibleTestPackage());
-        config.setRemoteApps(projectConfig.getRemoteApps() == null ? new ArrayList<>() : projectConfig.getRemoteApps());
         config.setBeanAnnotations(projectConfig.getBeanAnnotations() == null ? defBeanAnnotations : projectConfig.getBeanAnnotations());
         config.setTraceConfig(projectConfig.getTraceConfig() == null ? copyDefMonitorConfig() : projectConfig.getTraceConfig());
         config.setSqlConfig(projectConfig.getSqlConfig() == null ? copyDefSqlConfig() : projectConfig.getSqlConfig());
@@ -846,7 +829,6 @@ public class SettingsStorageHelper {
         if (defDownloadCliUrl != null && !defDownloadCliUrl.isEmpty()) {
             cliConfig.setDownloadFirst(true);
         }
-        cliConfig.setPort(10168);
         cliConfig.setEnvKey("spring.profiles.active");
         return cliConfig;
     }
@@ -945,7 +927,6 @@ public class SettingsStorageHelper {
 
         private boolean enableSideServer = true;
         private String flexibleTestPackage;
-        private List<String> remoteApps;
         private boolean defaultUseInterceptor;
         private List<String> beanAnnotations;
         private String script;
@@ -1030,14 +1011,6 @@ public class SettingsStorageHelper {
             this.beanAnnotations = beanAnnotations;
         }
 
-        public List<String> getRemoteApps() {
-            return remoteApps;
-        }
-
-        public void setRemoteApps(List<String> remoteApps) {
-            this.remoteApps = remoteApps;
-        }
-
         public boolean isDefaultUseInterceptor() {
             return defaultUseInterceptor;
         }
@@ -1067,7 +1040,6 @@ public class SettingsStorageHelper {
 
         private boolean enableSideServer = true;
         private String flexibleTestPackage;
-        private List<String> remoteApps;
         private boolean defaultUseInterceptor;
         private List<String> beanAnnotations;
         private String script;
@@ -1149,14 +1121,6 @@ public class SettingsStorageHelper {
 
         public void setBeanAnnotations(List<String> beanAnnotations) {
             this.beanAnnotations = beanAnnotations;
-        }
-
-        public List<String> getRemoteApps() {
-            return remoteApps;
-        }
-
-        public void setRemoteApps(List<String> remoteApps) {
-            this.remoteApps = remoteApps;
         }
 
         public boolean isDefaultUseInterceptor() {
@@ -1388,7 +1352,6 @@ public class SettingsStorageHelper {
 
         private boolean downloadFirst;
         private String downloadUrl;
-        private Integer port;
         private String ctx;
         private String envKey;
 
@@ -1409,9 +1372,6 @@ public class SettingsStorageHelper {
                         "fi\n");
             }
             command.append("java ");
-            if (port!=null && port>0) {
-                command.append("-Dtestkit.cli.port=").append(port).append(" ");
-            }
 
             if (ctx!=null && ctx.trim().split("#").length == 2) {
                 command.append("-Dtestkit.cli.ctx=").append(ctx.trim()).append(" ");
@@ -1442,14 +1402,6 @@ public class SettingsStorageHelper {
 
         public void setDownloadUrl(String downloadUrl) {
             this.downloadUrl = downloadUrl;
-        }
-
-        public Integer getPort() {
-            return port;
-        }
-
-        public void setPort(Integer port) {
-            this.port = port;
         }
 
         public String getCtx() {

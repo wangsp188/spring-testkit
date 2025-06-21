@@ -5,64 +5,55 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class TestkitServerManage {
-    private static Logger logger = LoggerFactory.getLogger(TestkitServerManage.class);
 
+    private static TestkitServer server;
 
-    private static TestkitServer pluginServer;
-
-    private static final Map<Integer, TestkitServer> CLIServers = new HashMap<>();
-
-    public static boolean hasPluginServer() {
-        return pluginServer != null;
+    public static TestkitServer findServer() {
+        return server;
     }
 
-    public static TestkitServer findPluginServer() {
-        return pluginServer;
-    }
-
-    public static boolean hasCLIServer(Integer port) {
-        return CLIServers.get(port) != null;
-    }
-
-    public static TestkitServer findCLIServer(Integer port) {
-        return CLIServers.get(port);
-    }
-
-
-    public synchronized static TestkitServer startPluginServer(ApplicationContext app, String project, String appName, String env, boolean enableTrace) {
+    public synchronized static TestkitServer startServer(ApplicationContext app, String project, String appName, String env, boolean enableTrace) {
         if (app == null) {
             throw new TestkitException("app can not be null");
         }
-        TestkitServer exist = findPluginServer();
+        TestkitServer exist = findServer();
         if (exist != null) {
             System.err.println("already has a testkit server, exist project:" + exist.getProject() + ", appName:" + exist.getAppName() + ", env:" + exist.getEnv() + ", enableTrace:" + exist.isEnableTrace());
+            if (!exist.isRunning()) {
+                exist.start();
+            }
             return exist;
         }
         TestkitServer tempServer = new TestkitServer(app, project, appName, env, enableTrace);
         tempServer.start();
-        return TestkitServerManage.pluginServer = tempServer;
+        return TestkitServerManage.server = tempServer;
     }
 
 
-    public synchronized static TestkitServer startCLIServer(ApplicationContext app, String env, int port) {
-        if (app == null) {
-            throw new TestkitException("app can not be null");
+    public synchronized static TestkitServer startCLIServer(ApplicationContext app, String env, String pidPath) {
+        TestkitServer testkitServer = startServer(app, RuntimeAppHelper.TESTKIT_CLI_PROJECT, getStartupClass(app), env, false);
+        Integer port = testkitServer.fetchServerPort();
+        if (port == null) {
+            throw new RuntimeException("no server started");
         }
-        TestkitServer exist = findCLIServer(port);
-        if (exist != null) {
-            logger.warn("already has a testkit server, exist project:" + exist.getProject() + ", appName:" + exist.getAppName() + ", env:" + exist.getEnv() + ", enableTrace:" + exist.isEnableTrace());
-            if (!exist.isRunning()) {
-                exist.start(port);
+        if (pidPath != null && !pidPath.isEmpty()) {
+            //向String pidPath;写入内容 port
+            Path path = Paths.get(pidPath);
+            try {
+                // 将端口号写入文件（覆盖模式）
+                Files.write(path, String.valueOf(port).getBytes(StandardCharsets.UTF_8));
+            } catch (Throwable e) {
+                throw new RuntimeException("fail write port to " + pidPath, e);
             }
-            return exist;
         }
-        TestkitServer tempServer = new TestkitServer(app, RuntimeAppHelper.TESTKIT_CLI_PROJECT, getStartupClass(app), env, false);
-        tempServer.start(port);
-        return TestkitServerManage.CLIServers.put(port, tempServer);
+        return testkitServer;
     }
 
 

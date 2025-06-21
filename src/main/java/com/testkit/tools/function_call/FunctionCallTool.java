@@ -1089,7 +1089,7 @@ public class FunctionCallTool extends BasePluginTool {
                             JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FUNCTION_CALL.getCode());
                             callReq.put("interceptor", "".equals(stringStringEntry.getValue()) ? null : stringStringEntry.getValue());
                             String cmd = PluginToolEnum.FUNCTION_CALL.getCode() + " " + JSONObject.toJSONString(callReq);
-                            TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
+                            TestkitHelper.copyToClipboard(getProject(), ToolHelper.splitCmdText(cmd), "Cmd copied<br>You can execute this directly in testkit-CLI");
                         }
                     };
                     copyGroup.add(copyCmd); // 将动作添加到动作组中
@@ -1107,7 +1107,7 @@ public class FunctionCallTool extends BasePluginTool {
                                 JSONObject callReq = buildCacheParams(method, jsonObject, map.get(cacheAction));
                                 callReq.put("interceptor", "".equals(stringStringEntry.getValue()) ? null : stringStringEntry.getValue());
                                 String cms = "spring-cache " + JSONObject.toJSONString(callReq);
-                                TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
+                                TestkitHelper.copyToClipboard(getProject(), ToolHelper.splitCmdText(cms), "Cmd copied<br>You can execute this directly in testkit-CLI");
                             }
                         };
                         copyGroup.add(copyCmd); // 将动作添加到动作组中
@@ -1126,7 +1126,7 @@ public class FunctionCallTool extends BasePluginTool {
                         JSONObject callReq = buildParams(method, jsonObject, PluginToolEnum.FUNCTION_CALL.getCode());
                         callReq.put("interceptor", null);
                         String cms = PluginToolEnum.FUNCTION_CALL.getCode() + " " + JSONObject.toJSONString(callReq);
-                        TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
+                        TestkitHelper.copyToClipboard(getProject(), ToolHelper.splitCmdText(cms), "Cmd copied<br>You can execute this directly in testkit-CLI");
                     }
                 };
                 copyGroup.add(copyCmd); // 将动作添加到动作组中
@@ -1145,7 +1145,7 @@ public class FunctionCallTool extends BasePluginTool {
                             JSONObject callReq = buildCacheParams(method, jsonObject, map.get(cacheAction));
                             callReq.put("interceptor", null);
                             String cms = "spring-cache " + JSONObject.toJSONString(callReq);
-                            TestkitHelper.copyToClipboard(getProject(), cms, "Cmd copied<br>You can execute this directly in testkit-dig");
+                            TestkitHelper.copyToClipboard(getProject(), ToolHelper.splitCmdText(cms), "Cmd copied<br>You can execute this directly in testkit-CLI");
                         }
                     };
                     copyGroup.add(copyCmd); // 将动作添加到动作组中

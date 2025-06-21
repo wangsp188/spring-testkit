@@ -8,6 +8,7 @@ import com.intellij.execution.configurations.ParametersList;
 import com.intellij.execution.configurations.RunProfile;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.JavaPsiFacade;
@@ -44,21 +45,21 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             // Get the main class from the configuration
             String mainClassName = configurationBase.getRunClass();
 
-            // Use the Java PSI (Program Structure Interface) to find the class in the project
-            JavaPsiFacade javaPsiFacade = JavaPsiFacade.getInstance(project);
-            PsiClass psiClass = javaPsiFacade.findClass(mainClassName,
-                    GlobalSearchScope.allScope(project));
+            try {
+                PsiClass psiClass = configurationBase.getMainClass();
+                if (psiClass == null) {
+                    System.err.println("无法找到指定的主类: " + mainClassName);
+                    return;
+                }
 
-            if (psiClass == null) {
-                System.err.println("无法找到指定的主类: " + mainClassName);
-                return;
-            }
-
-            // Check for the @SpringBootApplication annotation
-            PsiAnnotation springBootAnnotation = psiClass.getAnnotation("org.springframework.boot.autoconfigure.SpringBootApplication");
-            if (springBootAnnotation == null) {
-                System.err.println("主类不包含@SpringBootApplication注解");
-                return;
+                // Check for the @SpringBootApplication annotation
+                PsiAnnotation springBootAnnotation = psiClass.getAnnotation("org.springframework.boot.autoconfigure.SpringBootApplication");
+                if (springBootAnnotation == null) {
+                    System.err.println("主类不包含@SpringBootApplication注解");
+                    return;
+                }
+            } catch (IndexNotReadyException e) {
+                TestkitHelper.notify(project, NotificationType.WARNING, "IndexNotReady\nWe will still enhance commands");
             }
 
 
@@ -69,25 +70,29 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             String pluginPath = PathManager.getPluginsPath();
 
             boolean show = false;
-
-            if (SettingsStorageHelper.isEnableSideServer(project)) {
+            boolean enableSideServer = SettingsStorageHelper.isEnableSideServer(project);
+            if (enableSideServer) {
                 // 相对路径到你的 JAR 包
                 String relativeJarPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-starter-1.0.jar";
                 String springStarterJarPath = pluginPath + File.separator + relativeJarPath;
                 // 添加 Jar 到 classpath
                 javaParameters.getClassPath().add(springStarterJarPath);
+
+                vmParametersList.addProperty("testkit.project.name", project.getName());
+                vmParametersList.addProperty("testkit.app.name", runProfile.getName());
+                vmParametersList.addProperty("testkit.app.env", "local");
                 show = true;
             }else{
                 System.err.println("Testkit 未开启sideServer");
             }
 
 
-            String linkJarPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-trace-1.0.jar";
-//            增加ajar到
-            javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
-
             SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
-            if (traceConfig.isEnable()) {
+            if (enableSideServer && traceConfig.isEnable()) {
+                String linkJarPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-trace-1.0.jar";
+//            增加ajar到
+                javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
+
                 //            增加参数 -javaagent:/Users/dexwang/sourcecode/java/spring-fling_side_server/agent/target/agent-1.0-SNAPSHOT.jar
                 String agentPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-agent-1.0.jar";
 
@@ -111,10 +116,6 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
             }else{
                 System.err.println("Testkit 未开启trace");
             }
-
-            vmParametersList.addProperty("testkit.project.name", project.getName());
-            vmParametersList.addProperty("testkit.app.name", runProfile.getName());
-            vmParametersList.addProperty("testkit.app.env", "local");
 
             String appName = configurationBase.getName();
             String propertiesStr = SettingsStorageHelper.getAppProperties(project, appName);

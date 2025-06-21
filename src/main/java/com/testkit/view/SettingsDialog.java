@@ -64,8 +64,6 @@ public class SettingsDialog {
 
     private JBTextField beanAnnotationField;
 
-    private JBTextField remoteAppField;
-
     private ComboBox<String> interceptorAppBox;
 
     private ComboBox<String> controllerScriptAppBox;
@@ -132,7 +130,6 @@ public class SettingsDialog {
             @Override
             public void run() {
                 flexibleTestPackageNameField.setText(SettingsStorageHelper.getFlexibleTestPackage(toolWindow.getProject()));
-                remoteAppField.setText(String.join(",", SettingsStorageHelper.getRemoteApps(toolWindow.getProject())));
                 RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
                 String selectedAppName = selectedApp == null ? null : selectedApp.getAppName();
                 if (selectedAppName == null) {
@@ -548,82 +545,6 @@ public class SettingsDialog {
         gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
         springOptionsPanel.add(newButton, gbc);
 
-
-        remoteAppField = new JBTextField(String.join(",", SettingsStorageHelper.getRemoteApps(toolWindow.getProject())), 20);
-        remoteAppField.getEmptyText().setText("Optional Remote apps; multiple use,split; Example: AppName:ip1:port1,App2:ip2:port2");
-        remoteAppField.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                updateToolTip();
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                updateToolTip();
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                updateToolTip();
-            }
-
-            private void updateToolTip() {
-                String text = remoteAppField.getText().trim();
-                if (StringUtils.isBlank(text)) {
-                    remoteAppField.setToolTipText("no remote app list");
-                } else {
-                    List<String> validApps = new ArrayList<>();
-                    for (String remoteApp : text.split(",")) {
-                        if (StringUtils.isBlank(remoteApp)) {
-                            continue;
-                        }
-                        try {
-                            RuntimeHelper.parseApp(remoteApp);
-                            validApps.add(remoteApp);
-                        } catch (Exception e) {
-                        }
-                    }
-                    remoteAppField.setToolTipText("valid remote apps is " + JSON.toJSONString(validApps));
-                }
-            }
-        });
-
-        // 输入框
-        JLabel remoteAppLabel = new JLabel("Remote Apps:");
-        remoteAppLabel.setPreferredSize(labelDimension);
-        remoteAppLabel.setLabelFor(remoteAppField); // 关联标签和输入框
-        remoteAppLabel.setToolTipText("Configure the remote apps to invoke the remote service, Example: AppName:ip1:port1,App2:ip2:port2"); // 提示信息
-
-        // 布局输入框和标签
-        gbc.gridx = 0;
-        gbc.gridy = 4;
-        gbc.anchor = GridBagConstraints.WEST;
-        gbc.weightx = 0;
-        gbc.fill = GridBagConstraints.NONE;
-        springOptionsPanel.add(remoteAppLabel, gbc);
-
-        gbc.gridx = 2;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0; // 让输入框占据剩余空间
-        springOptionsPanel.add(remoteAppField, gbc);
-
-        // 添加新按钮到组合框右边
-        JButton rollbackAppButton = new JButton(AllIcons.Actions.Rollback);
-        rollbackAppButton.setToolTipText("Use demo remote apps");
-        rollbackAppButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                remoteAppField.setText(SettingsStorageHelper.remoteAppDemo);
-            }
-        });
-        gbc.gridx = 3;  // 放在同一行的尾部
-        gbc.gridy = 4;
-        gbc.gridwidth = 1;
-        gbc.weightx = 0.0;
-        gbc.fill = GridBagConstraints.NONE;  // 不强制按钮填满可用空间
-        gbc.anchor = GridBagConstraints.EAST;  // 靠右对齐
-        springOptionsPanel.add(rollbackAppButton, gbc);
-
         //cli相关
         JLabel testkitCLILabel = new JLabel("Testkit-CLI:");
         testkitCLILabel.setPreferredSize(labelDimension);
@@ -636,21 +557,6 @@ public class SettingsDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 new CLIDialog(toolWindow).setVisible(true);
-            }
-        });
-        JButton openCLIButton = new JButton(BasePluginTool.CMD_ICON);
-        openCLIButton.setToolTipText("Copy quick start Testkit-CLI Commond");
-        openCLIButton.setPreferredSize(new Dimension(32, 32));
-        openCLIButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(toolWindow.getProject());
-                String text = cliConfig.buildCommand();
-                if (text != null) {
-                    TestkitHelper.copyToClipboard(toolWindow.getProject(), text, "CMD copy success");
-                } else {
-                    TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Pls save config first");
-                }
             }
         });
 
@@ -668,7 +574,6 @@ public class SettingsDialog {
         comp1.setFont(new Font("Arial", Font.BOLD, 13));
         cliPanel.add(downloadCLIButton);
         cliPanel.add(docButton);
-        cliPanel.add(openCLIButton);
         cliPanel.add(comp1);
 
         // 布局输入框和标签
@@ -734,25 +639,6 @@ public class SettingsDialog {
                     TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Bean annotations is refreshed by " + Arrays.asList(annotationFieldText.trim().split(",")));
                 }
 
-                String remoteAppText = remoteAppField.getText().trim();
-                if (remoteAppText.isEmpty()) {
-                    SettingsStorageHelper.setRemoteApps(toolWindow.getProject(), null);
-                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Remote Apps is clean");
-                } else {
-                    List<String> validApps = new ArrayList<>();
-                    for (String remoteApp : remoteAppText.split(",")) {
-                        if (StringUtils.isBlank(remoteApp)) {
-                            continue;
-                        }
-                        try {
-                            RuntimeHelper.parseApp(remoteApp);
-                            validApps.add(remoteApp);
-                        } catch (Exception e2) {
-                        }
-                    }
-                    SettingsStorageHelper.setRemoteApps(toolWindow.getProject(), validApps);
-                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Remote Apps is refreshed by " + validApps);
-                }
                 TestkitHelper.refresh(toolWindow.getProject());
             }
         };

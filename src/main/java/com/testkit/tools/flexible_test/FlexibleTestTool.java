@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.tools.Tool;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -239,7 +240,7 @@ public class FlexibleTestTool extends BasePluginTool {
                         JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
                         callReq.put("interceptor", "".equals(stringStringEntry.getValue()) ? null : stringStringEntry.getValue());
                         String cmd = PluginToolEnum.FLEXIBLE_TEST.getCode() + " " + JSONObject.toJSONString(callReq);
-                        TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
+                        TestkitHelper.copyToClipboard(getProject(), ToolHelper.splitCmdText(cmd), "Cmd copied<br>You can execute this directly in testkit-CLI");
                     }
                 };
                 copyGroup.add(copyCmd); // 将动作添加到动作组中
@@ -251,7 +252,7 @@ public class FlexibleTestTool extends BasePluginTool {
                     JSONObject callReq = buildParams(selectedItem.getMethod(), jsonObject, PluginToolEnum.FLEXIBLE_TEST.getCode());
                     callReq.put("interceptor", null);
                     String cmd = PluginToolEnum.FLEXIBLE_TEST.getCode() + " " + JSONObject.toJSONString(callReq);
-                    TestkitHelper.copyToClipboard(getProject(), cmd, "Cmd copied<br>You can execute this directly in testkit-dig");
+                    TestkitHelper.copyToClipboard(getProject(), ToolHelper.splitCmdText(cmd), "Cmd copied<br>You can execute this directly in testkit-CLI");
                 }
             };
             copyGroup.add(copyCmd); // 将动作添加到动作组中

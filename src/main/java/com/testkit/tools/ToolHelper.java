@@ -776,6 +776,34 @@ public class ToolHelper {
         return classes.length > 0;
     }
 
+    public static String splitCmdText(String longText) {
+        // 检查输入是否为空
+        if (longText == null || longText.isEmpty()) {
+            return "";
+        }
+
+        int maxLength = 2048;
+        StringBuilder result = new StringBuilder();
+        int startIndex = 0;
+
+        while (startIndex < longText.length()) {
+            int endIndex = Math.min(startIndex + maxLength, longText.length());
+            String chunk = longText.substring(startIndex, endIndex);
+
+            // 添加当前分块
+            result.append(chunk);
+
+            // 如果不是最后一块，添加换行符
+            if (endIndex < longText.length()) {
+                result.append("\n"); // 使用换行符连接
+            }
+
+            startIndex = endIndex; // 移动到下一块
+        }
+
+        return result +"<<END>>";
+    }
+
     public static class MethodAction {
 
         private final PsiMethod method;

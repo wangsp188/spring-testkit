@@ -40,15 +40,6 @@ public class TestkitCLI {
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8.name());
         System.setOut(out);
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-        int port = 10168;
-        String portPro = System.getProperty("testkit.cli.port");
-        if (portPro != null) {
-            try {
-                port = Integer.parseInt(portPro);
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("testkit.cli.port must be int, now:" + portPro);
-            }
-        }
         String ctxProperty = System.getProperty("testkit.cli.ctx", null);
         if (ctxProperty != null && ctxProperty.split("#").length != 2) {
             throw new IllegalArgumentException("testkit.cli.ctx must like clsName#fieldName");
@@ -62,53 +53,38 @@ public class TestkitCLI {
                 "        \\/|__|                 \\//_____/                \\/     \\/            \\/         " + RESET);
         System.out.println(RED + "---------------Do not use online server, only technical learning---------------" + RESET);
 
-        AppMeta runningApp = findRunningApp(port, ctxProperty);
         AtomicReference<String> ctxAtc = new AtomicReference<>(ctxProperty);
-        if (runningApp != null) {
-            System.out.println(YELLOW + "Current port " + port + " has service" + RESET);
-            if (ctxProperty != null && !runningApp.isTestPass()) {
-                throw new IllegalArgumentException("-Dtestkit.cli.ctx Verification fail on current service, " + JSON.toJSONString(runningApp));
+        // 加载嵌入的JAR文件
+        File attachJar = getEmbeddedJar(TESTKIT_CLI_ATTACH_1_0_JAR);
+        File starterJar = getEmbeddedJar(TESTKIT_STARTER_1_0_JAR);
+        attachJar.deleteOnExit();
+        starterJar.deleteOnExit();
+        // 列出所有JVM进程4
+        List<VirtualMachineDescriptor> vmList = VirtualMachine.list();
+        vmList = vmList.stream().filter(new Predicate<VirtualMachineDescriptor>() {
+            @Override
+            public boolean test(VirtualMachineDescriptor virtualMachineDescriptor) {
+                String displayName = virtualMachineDescriptor.displayName();
+                return !displayName.contains(TestkitCLI.class.getName())
+                        && !displayName.contains("IntelliJ IDEA.app")
+                        && !displayName.contains("com.intellij.idea.Main")
+                        && !displayName.contains("testkit-cli-1.0.jar")
+                        ;
             }
-            if (ctxProperty == null) {
-                System.out.println(RED + "Alert: Not set -Dtestkit.cli.ctx" + RESET + YELLOW + JSON.toJSONString(runningApp) + RESET);
-            } else if (runningApp.isTestPass()) {
-                System.out.println(YELLOW + JSON.toJSONString(runningApp) + RESET);
-            }
-            System.out.print(GREEN + "Confirm to connect(Y/N)? : " + RESET);
-            String input = br.readLine().trim();
-            if (!"y".equalsIgnoreCase(input)) {
-                System.out.println("Bye~\nYou can modify vmOptions to change port -Dtestkit.cli.port=xx");
-                return;
-            }
-        } else {
-            // 加载嵌入的JAR文件
-            File attachJar = getEmbeddedJar(TESTKIT_CLI_ATTACH_1_0_JAR);
-            File starterJar = getEmbeddedJar(TESTKIT_STARTER_1_0_JAR);
-            attachJar.deleteOnExit();
-            starterJar.deleteOnExit();
-            // 列出所有JVM进程4
-            List<VirtualMachineDescriptor> vmList = VirtualMachine.list();
-            vmList = vmList.stream().filter(new Predicate<VirtualMachineDescriptor>() {
-                @Override
-                public boolean test(VirtualMachineDescriptor virtualMachineDescriptor) {
-                    String displayName = virtualMachineDescriptor.displayName();
-                    return !displayName.contains(TestkitCLI.class.getName())
-                            && !displayName.contains("IntelliJ IDEA.app")
-                            && !displayName.contains("com.intellij.idea.Main")
-                            && !displayName.contains("testkit-cli-1.0.jar")
-                            ;
-                }
-            }).toList();
-            if (vmList.isEmpty()) {
-                System.out.println("No virtual machine found");
-                return;
-            }
-
-            runningApp = startServerGuide(vmList, br, starterJar.getAbsolutePath(), port, attachJar.getAbsolutePath(), ctxAtc);
-            System.out.println(YELLOW + "Connect success: " + JSON.toJSONString(runningApp) + RESET);
+        }).toList();
+        if (vmList.isEmpty()) {
+            System.out.println("No virtual machine found");
+            return;
         }
+
+        AppMeta runningApp = startServerGuide(vmList, br, starterJar.getAbsolutePath(), attachJar.getAbsolutePath(), ctxAtc);
+        System.out.println(GREEN + "Connect success" + RESET);
+        System.out.println(YELLOW + "You can manually create a connector in plugin panel using the following information:" + RESET);
+        System.out.println(RED + "App: " + runningApp.getApp() + RESET);
+        System.out.println(RED + "Host: " + runningApp.getIp() + RESET);
+        System.out.println(RED + "Testkit port: " + runningApp.getPort() + RESET);
         // 启动交互式命令行
-        startCommandLoop(br, port, ctxAtc.get());
+        startCommandLoop(br, runningApp.getPort(), ctxAtc.get());
     }
 
 
@@ -136,32 +112,31 @@ public class TestkitCLI {
         }
     }
 
-    private static String directRequest(int port, Map<String, Object> requestData) throws Exception {
+    private static StatusMsg directRequest(int port, Map<String, Object> requestData) throws Exception {
         JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
         if (result == null) {
-            return RED + "req is error\n result is null" + RESET;
+            return new StatusMsg(false,RED + "req is error\n result is null" + RESET);
+        }
+        if (!result.getBooleanValue("success")) {
+            return new StatusMsg(false,GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\nreq is error\n" + RED + result.getString("message") + RESET);
+        }
+        Object data = result.get("data");
+        if (data == null) {
+            return new StatusMsg(true,GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\nnull");
+        }
+        if (data instanceof String
+                || data instanceof Byte
+                || data instanceof Short
+                || data instanceof Integer
+                || data instanceof Long
+                || data instanceof Float
+                || data instanceof Double
+                || data instanceof Character
+                || data instanceof Boolean
+                || data.getClass().isEnum()) {
+            return new StatusMsg(true,GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\n" + data);
         } else {
-            if (!result.getBooleanValue("success")) {
-                return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\nreq is error\n" + RED + result.getString("message") + RESET;
-            } else {
-                Object data = result.get("data");
-                if (data == null) {
-                    return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\nnull";
-                } else if (data instanceof String
-                        || data instanceof Byte
-                        || data instanceof Short
-                        || data instanceof Integer
-                        || data instanceof Long
-                        || data instanceof Float
-                        || data instanceof Double
-                        || data instanceof Character
-                        || data instanceof Boolean
-                        || data.getClass().isEnum()) {
-                    return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\n" + data;
-                } else {
-                    return GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\n" + JSON.toJSONString(data, SerializerFeature.PrettyFormat);
-                }
-            }
+            return new StatusMsg(true,GREEN + "[cost:" + result.get("cost") + "]" + RESET + "\n" + JSON.toJSONString(data, SerializerFeature.PrettyFormat));
         }
     }
 
@@ -182,12 +157,12 @@ public class TestkitCLI {
         }, 0, 3, TimeUnit.SECONDS);
     }
 
-    private static AppMeta startServerGuide(List<VirtualMachineDescriptor> vmList, BufferedReader br, String starterJar, int port, String attachJar, AtomicReference<String> textCtx) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException {
+    private static AppMeta startServerGuide(List<VirtualMachineDescriptor> vmList, BufferedReader br, String starterJar, String attachJar, AtomicReference<String> textCtx) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException {
         String pid = System.getProperty("testkit.cli.pid", null);
         Optional<VirtualMachineDescriptor> chooseVm = vmList.stream().filter(new Predicate<VirtualMachineDescriptor>() {
             @Override
             public boolean test(VirtualMachineDescriptor virtualMachineDescriptor) {
-                return pid != null && String.valueOf(virtualMachineDescriptor.id()).equals(pid.trim());
+                return pid != null && pid.trim().equals(virtualMachineDescriptor.id());
             }
         }).findFirst();
         VirtualMachineDescriptor targetVm;
@@ -225,6 +200,10 @@ public class TestkitCLI {
 
         // 附加到目标JVM
         VirtualMachine vm = VirtualMachine.attach(targetVm);
+        // 获取用户主目录
+        String userHome = System.getProperty("user.home");
+        // 构建文件路径
+        String pidPath = Paths.get(userHome, ".testkitCLI." + targetVm.id() + ".txt").toFile().getAbsolutePath();
 
         String ctx = System.getProperty("testkit.cli.ctx", null);
         if (ctx == null) {
@@ -251,23 +230,15 @@ public class TestkitCLI {
 
         String envKey = System.getProperty("testkit.cli.env-key", null);
         if (envKey == null) {
-            int tryTimes = 0;
-            while (true) {
-                tryTimes += 1;
-                System.out.print(GREEN + "Please enter the property key for the deploy environment in the target JVM: " + RESET);
-                String input = br.readLine().trim();
-                if (EXIT.equalsIgnoreCase(input)) {
-                    throw new IllegalArgumentException("Bye~");
-                }
-                if (!input.isEmpty()) {
-                    envKey = input;
-                    break;
-                }
-                if (tryTimes >= 5) {
-                    throw new IllegalArgumentException("env-key failed to be entered for five times！Bye~");
-                } else {
-                    System.out.print(GREEN + "Please enter the property key for the deploy environment in the target JVM: " + RESET);
-                }
+            System.out.print(GREEN + "[Optional] Please enter the property key for the deploy environment in the target JVM: " + RESET);
+            String input = br.readLine().trim();
+            if (EXIT.equalsIgnoreCase(input)) {
+                throw new IllegalArgumentException("Bye~");
+            }
+            envKey = input;
+            if (envKey.isEmpty()) {
+                System.out.print(YELLOW + "By default, spring.profiles.active will be used as the env-key" + RESET);
+                envKey = "spring.profiles.active";
             }
         }
 
@@ -275,7 +246,7 @@ public class TestkitCLI {
         HashMap<String, Object> map = new HashMap<>();
         map.put("starter", starterJar);
         map.put("ctx", ctx);
-        map.put("port", port);
+        map.put("pid-path", pidPath);
         String logPath = System.getProperty("java.io.tmpdir") + File.separator + "testkit-cli.txt";
         map.put("log-path", logPath);
         map.put("env-key", envKey);
@@ -299,13 +270,7 @@ public class TestkitCLI {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
             }
-            AppMeta runningApp = findRunningApp(port, ctx);
-            if (runningApp != null) {
-                if (runningApp.isTestPass()) {
-                    return runningApp;
-                }
-                throw new RuntimeException("ctx Verification fail on current service, " + JSON.toJSONString(runningApp));
-            }
+
             if (System.currentTimeMillis() - millis > 5_000) {
                 // 一次性读取全部字节后转字符串（适合小文件）
                 byte[] bytes = Files.readAllBytes(Paths.get(logPath).normalize());
@@ -315,6 +280,24 @@ public class TestkitCLI {
                 } else {
                     throw new RuntimeException("Wait timeout.");
                 }
+            }
+
+            File file = new File(pidPath);
+            if (!file.exists()) {
+                continue;
+            }
+            int port = 0;
+            try {
+                port = Integer.parseInt(Files.readString(Path.of(pidPath)).trim());
+            } catch (Throwable e) {
+                throw new RuntimeException(pidPath + " content is not port");
+            }
+            AppMeta runningApp = findRunningApp(port, ctx);
+            if (runningApp != null) {
+                if (runningApp.isTestPass()) {
+                    return runningApp;
+                }
+                throw new RuntimeException("ctx Verification fail on current service, " + JSON.toJSONString(runningApp));
             }
         }
     }
@@ -328,19 +311,11 @@ public class TestkitCLI {
             while (isServerRunning) {
                 System.out.print(GREEN + "testkit-cli> " + RESET);
                 String cmd = br.readLine().trim();
-                if (EXIT.equalsIgnoreCase(cmd)) {
-                    break;
-                }
-                if (cmd.equalsIgnoreCase("hi")) {
-                    confirmCmd.set(null);
-                    System.out.println(YELLOW + "[hi] " + JSON.toJSONString(findRunningApp(port, ctx)) + RESET);
-                    continue;
-                }
                 // 处理确认输入
                 if (confirmCmd.get() != null) {
-                    if (cmd.trim().equalsIgnoreCase("Y")) {
+                    if (cmd.equalsIgnoreCase("Y")) {
                         try {
-                            String ret = processCommand(confirmCmd.get(), port, false,confirmCmd);
+                            String ret = processCommand(confirmCmd.get(), port, false, confirmCmd);
                             System.out.println(ret);
                         } catch (Exception e) {
                             System.out.println(RED + e.getMessage() + RESET);
@@ -353,13 +328,99 @@ public class TestkitCLI {
                     }
                     continue;
                 }
+                confirmCmd.set(null);
+                if (EXIT.equalsIgnoreCase(cmd)) {
+                    break;
+                }
+                if (cmd.equalsIgnoreCase("hi")) {
+                    System.out.println(YELLOW + "[hi] " + findRunningApp(port, ctx) + RESET);
+                    continue;
+                }
+                // 示例命令处理
+                if (cmd.equalsIgnoreCase("stop")) {
+                    HashMap<String, String> requestData = new HashMap<>();
+                    requestData.put("method", "stop");
+                    try {
+                        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
+                        if (!response.getBooleanValue("success")) {
+                            System.out.println(YELLOW + "[stop] " + response.getString("message") + RESET);
+                            continue;
+                        }
+                        System.out.println(YELLOW + "[stop] success" + RESET);
+                    } catch (Exception e) {
+                        System.out.println(RED + "[stop] " + e.getMessage() + RESET);
+                    }
+                    continue;
+                }
+                if (cmd.startsWith("view ")) {
+                    String req = cmd.substring("view ".length());
+                    String[] split = req.split("#");
+                    if (split.length == 2) {
+                        JSONObject submitRequest = new JSONObject();
+                        submitRequest.put("method", "view-value");
+                        submitRequest.put("trace", false);
+                        JSONObject value = new JSONObject();
+                        value.put("typeClass", split[0]);
+                        value.put("beanName", null);
+                        value.put("fieldName", split[1]);
+                        submitRequest.put("params", value);
+                        try {
+                            System.out.println(YELLOW + "[view-field]" + RESET + submitReqAndWaitRet(port, submitRequest));
+                        } catch (Exception e) {
+                            System.out.println(RED + e.getMessage() + RESET);
+                        }
+                        continue;
+                    }
+                    JSONObject submitRequest = new JSONObject();
+                    submitRequest.put("method", "property");
+                    JSONObject value = new JSONObject();
+                    value.put("property", req);
+                    submitRequest.put("params", value);
+                    try {
+                        System.out.println(YELLOW + "[view-property]" + RESET + directRequest(port, submitRequest).getMessage());
+                    } catch (Exception e) {
+                        System.out.println(RED + e.getMessage() + RESET);
+                    }
+                    continue;
+                }
+                if (cmd.startsWith("debug ")) {
+                    String bol = cmd.substring("debug ".length());
+                    boolean debug = Objects.equals(bol, "true");
+                    System.setProperty("testkit.cli.debug", String.valueOf(debug));
+                    System.out.println(YELLOW + "[debug] " + System.getProperty("testkit.cli.debug") + RESET);
+                    continue;
+                }
 
+
+                if (!cmd.startsWith("function-call ") && !cmd.startsWith("flexible-test ") && !cmd.startsWith("spring-cache ")) {
+                    System.out.println(RED + "Unknown Cmd: " + cmd + RESET);
+                    continue;
+                }
+
+
+                //这时数据可能是多行的，一直读到指定结尾是<<END>>的结束
+                while (!cmd.endsWith("<<END>>")) {
+                    String line = br.readLine().trim();
+                    if (line.equals(";")) {
+                        break;
+                    }
+                    cmd += (line.trim());
+                }
+                cmd = cmd.substring(0, cmd.length() - 7).trim();
+                String debug = System.getProperty("testkit.cli.debug");
+                if (Objects.equals("true", debug)) {
+                    System.out.println();
+                    System.out.println(GREEN + "[cmd]" + cmd + RESET);
+                    System.out.println();
+                }
                 // 这里需要实现命令分发
                 try {
                     String ret = processCommand(cmd, port, true, confirmCmd);
                     System.out.println(ret);
                 } catch (Exception e) {
                     System.out.println(RED + e.getMessage() + RESET);
+                } finally {
+                    confirmCmd.set(null);
                 }
             }
         } finally {
@@ -368,29 +429,18 @@ public class TestkitCLI {
     }
 
     private static String processCommand(String cmd, int port, boolean prepare, AtomicReference<String> confirmCmd) throws Exception {
-        confirmCmd.set(null);
-        // 示例命令处理
-        if (cmd.equalsIgnoreCase("stop")) {
-            HashMap<String, String> requestData = new HashMap<>();
-            requestData.put("method", "stop");
-            try {
-                JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
-                if (!response.getBooleanValue("success")) {
-                    return YELLOW + "[stop] " + response.getString("message") + RESET;
-                }
-                return YELLOW + "[stop] success" + RESET;
-            } catch (Exception e) {
-                return RED + "[stop] " + e.getMessage() + RESET;
-            }
-        }
         if (cmd.startsWith("function-call ")) {
             String req = cmd.substring("function-call ".length());
             JSONObject reqObject = JSON.parseObject(req);
             if (prepare) {
                 reqObject.put("prepare", true);
-                String confirmMsg = directRequest(port, reqObject);
-                confirmCmd.set(cmd);
-                return YELLOW + "[function-call]" + RESET + confirmMsg+"\n"+GREEN+"Confirm execution? (Y/N): "+RESET;
+                StatusMsg statusMsg = directRequest(port, reqObject);
+                if(statusMsg.isSuccess()){
+                    confirmCmd.set(cmd);
+                    return YELLOW + "[function-call]" + RESET + statusMsg.getMessage() + "\n" + GREEN + "Confirm execution? (Y/N): " + RESET;
+                } else {
+                    return YELLOW + "[function-call]" + RESET + statusMsg.getMessage() + RESET;
+                }
             }
             return YELLOW + "[function-call]" + RESET + submitReqAndWaitRet(port, reqObject);
         }
@@ -399,9 +449,13 @@ public class TestkitCLI {
             JSONObject reqObject = JSON.parseObject(req);
             if (prepare) {
                 reqObject.put("prepare", true);
-                String confirmMsg = directRequest(port, reqObject);
-                confirmCmd.set(cmd);
-                return YELLOW + "[flexible-test]" + RESET + confirmMsg+"\n"+GREEN+"Confirm execution? (Y/N): "+RESET;
+                StatusMsg statusMsg = directRequest(port, reqObject);
+                if(statusMsg.isSuccess()){
+                    confirmCmd.set(cmd);
+                    return YELLOW + "[flexible-test]" + RESET + statusMsg.getMessage() + "\n" + GREEN + "Confirm execution? (Y/N): " + RESET;
+                } else {
+                    return YELLOW + "[flexible-test]" + RESET + statusMsg.getMessage() + RESET;
+                }
             }
             return YELLOW + "[flexible-test]" + RESET + submitReqAndWaitRet(port, reqObject);
         }
@@ -410,32 +464,15 @@ public class TestkitCLI {
             JSONObject reqObject = JSON.parseObject(req);
             if ("delete_cache".equals(reqObject.getJSONObject("params").getString("action")) && prepare) {
                 reqObject.put("prepare", true);
-                String confirmMsg = directRequest(port, reqObject);
-                confirmCmd.set(cmd);
-                return YELLOW + "[spring-cache]" + RESET + confirmMsg+"\n"+GREEN+"Confirm execution? (Y/N): "+RESET;
+                StatusMsg statusMsg = directRequest(port, reqObject);
+                if(statusMsg.isSuccess()){
+                    confirmCmd.set(cmd);
+                    return YELLOW + "[spring-cache]" + RESET + statusMsg.getMessage() + "\n" + GREEN + "Confirm execution? (Y/N): " + RESET;
+                } else {
+                    return YELLOW + "[spring-cache]" + RESET + statusMsg.getMessage() + RESET;
+                }
             }
             return YELLOW + "[spring-cache]" + RESET + submitReqAndWaitRet(port, reqObject);
-        }
-        if (cmd.startsWith("view ")) {
-            String req = cmd.substring("view ".length());
-            String[] split = req.split("#");
-            if (split.length == 2) {
-                JSONObject submitRequest = new JSONObject();
-                submitRequest.put("method", "view-value");
-                submitRequest.put("trace", false);
-                JSONObject value = new JSONObject();
-                value.put("typeClass", split[0]);
-                value.put("beanName", null);
-                value.put("fieldName", split[1]);
-                submitRequest.put("params", value);
-                return YELLOW + "[view-field]" + RESET + submitReqAndWaitRet(port, submitRequest);
-            }
-            JSONObject submitRequest = new JSONObject();
-            submitRequest.put("method", "property");
-            JSONObject value = new JSONObject();
-            value.put("property", req);
-            submitRequest.put("params", value);
-            return YELLOW + "[view-property]" + RESET + directRequest(port, submitRequest);
         }
         return RED + "Unknown Cmd: " + cmd + RESET;
     }
@@ -554,7 +591,7 @@ public class TestkitCLI {
 
 
     public static class AppMeta {
-
+        private int port;
         private String ip;
         private boolean enableTrace;
         private String app;
@@ -608,6 +645,45 @@ public class TestkitCLI {
 
         public void setLoadByCli(boolean loadByCli) {
             this.loadByCli = loadByCli;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
+        }
+
+        @Override
+        public String toString() {
+            return "App:" + app + ", Host: " + ip + ", Testkit port: " + port + ", Env: " + env + ", EnableTrace: " + enableTrace + ", LoadByCli: " + loadByCli;
+        }
+    }
+
+    public static class StatusMsg{
+        private boolean success;
+        private String message;
+
+        public StatusMsg(boolean success, String message) {
+            this.success = success;
+            this.message = message;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
         }
     }
 }

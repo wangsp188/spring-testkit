@@ -76,6 +76,10 @@ public class TestkitServer {
         this.server = startHttpServer(serverPort);
     }
 
+    public synchronized Integer fetchServerPort() {
+        return isRunning()? server.getAddress().getPort() : null;
+    }
+
     public synchronized void start(int port) {
         if (port <= 1) {
             throw new IllegalArgumentException("port can not be less than 1");

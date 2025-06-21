@@ -30,18 +30,13 @@ public class TestkitCLIAttach {
             //帮我解析一些，
             String starterJar = arg.get("starter");
             String ctxGuidingDrug = arg.get("ctx");
-            String envKey = arg.get("env-key");
-            Integer port = null;
-            String portStr = arg.get("port");
-            try {
-                port = Integer.parseInt(portStr);
-            } catch (Throwable ignored) {
-                throw new IllegalArgumentException("Testkit cli port must be int," + portStr);
-            }
-
-            if (starterJar == null || ctxGuidingDrug == null || envKey == null || envKey.isEmpty()) {
+            String pidPath = arg.get("pid-path");
+            if (starterJar == null || ctxGuidingDrug == null || pidPath == null || pidPath.isEmpty()) {
                 throw new IllegalArgumentException("Testkit cli params not enough," + args);
             }
+
+            String envKey = arg.get("env-key");
+            envKey = envKey==null || envKey.isEmpty()?"spring.profiles.active":envKey;
 
             // 解析上下文引导信息
             int hashIndex = ctxGuidingDrug.indexOf('#');
@@ -56,27 +51,27 @@ public class TestkitCLIAttach {
             try {
                 ctxCls = appCls.getClassLoader().loadClass(ctxClsStr);
             } catch (ClassNotFoundException e2) {
-                throw new IllegalArgumentException("ctx class not found", e2);
+                throw new IllegalArgumentException("not found this ctx class in select jvm : "+ctxClsStr, e2);
             }
             // 获取上下文对象
             Field ctxField = ctxCls.getDeclaredField(ctxFieldStr);
             //判断是否是静态的
             if (!Modifier.isStatic(ctxField.getModifiers())) {
-                throw new RuntimeException(ctxFieldStr + " must be statis");
+                throw new RuntimeException(ctxFieldStr + " must be statis in "+ctxClsStr);
             }
             ctxField.setAccessible(true);
             Object ctx = ctxField.get(null);
             if (ctx == null) {
-                throw new RuntimeException("ctx is null");
+                throw new RuntimeException("The value of " + ctxClsStr + "#" + ctxFieldStr + " in the jvm is null");
             }
             Method isActive = ctx.getClass().getMethod("isActive");
             if (!Objects.equals(isActive.invoke(ctx), Boolean.TRUE)) {
-                throw new RuntimeException("ctx is not active, pls wait and try again");
+                throw new RuntimeException("application ctx is not ready, pls wait and try again");
             }
             // 分层加载目标类
             Class<?> serverManageClass = loadTargetClass(logs, inst, ctxCls, starterJar);
             // 反射调用核心方法
-            invokeServerMethod(appCls, serverManageClass, ctx,envKey, port);
+            invokeServerMethod(appCls, serverManageClass, ctx,envKey,pidPath);
         } catch (Throwable t) {
             e = t;
         } finally {
@@ -212,7 +207,7 @@ public class TestkitCLIAttach {
         return null;
     }
 
-    private static void invokeServerMethod(Class appCls, Class<?> clazz, Object ctx, String envKey, int port)
+    private static void invokeServerMethod(Class appCls, Class<?> clazz, Object ctx, String envKey, String pidPath)
             throws Exception {
 
         String env = null;
@@ -241,11 +236,11 @@ public class TestkitCLIAttach {
                 "startCLIServer",
                 appCls,
                 String.class,
-                int.class
+                String.class
         );
 
         method.setAccessible(true);
-        method.invoke(null, ctx, env, port);
+        method.invoke(null, ctx, env,pidPath);
     }
 
 

@@ -4,14 +4,18 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.actionSystem.impl.ActionButton;
+import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.terminal.JBTerminalWidget;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import com.jediterm.terminal.TtyConnector;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -62,8 +66,11 @@ import java.awt.event.ActionListener;
 import java.io.*;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -72,6 +79,8 @@ public class TestkitToolWindow {
     public static final Icon BROWSER_ICON = IconLoader.getIcon("/icons/browser.svg", CodingGuidelinesIconProvider.class);
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
+    private static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
+
 
 
     private Project project;
@@ -274,8 +283,8 @@ public class TestkitToolWindow {
                 portField.setFocusable(true);
 
                 // 创建提交按钮
-                JButton testButton = new JButton("Test");
-                JButton saveButton = new JButton("Add connection");
+                JButton injectButton = new JButton("Dynamic inject");
+                JButton saveButton = new JButton("Test&Add connection");
 
                 // 添加组件到面板
                 gbc.gridx = 0;
@@ -305,7 +314,7 @@ public class TestkitToolWindow {
                 gbc.gridx = 0;
                 gbc.gridy = 3;
 //                gbc.gridwidth = 2;
-                panel.add(testButton, gbc);
+                panel.add(injectButton, gbc);
                 gbc.gridx = 1;
                 panel.add(saveButton, gbc);
 
@@ -321,40 +330,47 @@ public class TestkitToolWindow {
 
 
                 // 添加提交按钮事件
-                testButton.addActionListener(actionEvent -> {
-                    String selectedApp = (String) comboBox.getSelectedItem();
-                    String hostStr = hostField.getText().trim();
-                    String portStr = portField.getText().trim();
-                    if (selectedApp == null) {
-                        TestkitHelper.notify(project, NotificationType.ERROR, "Select app to connect to");
-                        return;
-                    }
-                    if (StringUtils.isBlank(hostStr) || !StringUtils.isNumeric(portStr)) {
-                        TestkitHelper.notify(project, NotificationType.ERROR,"host and port must be not null, port must be Numeric");
-                        return;
-                    }
+                injectButton.addActionListener(actionEvent -> {
 
-                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing test connection " + hostStr+":"+portStr + ", please wait ...", false) {
+                    //copy
+                    DefaultActionGroup copyGroup = new DefaultActionGroup();
+                    //显示的一个图标加上标题
+                    AnAction copyDirect = new AnAction("Step1: Copy&execute this cmd\nComplete the injection according to the guide", "Step1: Copy&execute this cmd\nComplete the injection according to the guide", AllIcons.Actions.Copy) {
                         @Override
-                        public void run(ProgressIndicator indicator) {
-                            String host = hostStr.equals("localhost") || hostStr.equals("127.0.0.1") ? "local" : hostStr;
-                            try {
-                                HashMap<String, String> requestData = new HashMap<>();
-                                requestData.put("method", "hi");
-                                // 发送请求获取实时数据
-                                JSONObject response = HttpUtil.sendPost("http://"+(host.equals("local")?"localhost":host)+":" + portStr + "/", requestData, JSONObject.class);
-                                String app = response.getJSONObject("data").getString("app");
-                                if (!Objects.equals(selectedApp,app)) {
-                                    TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+host+":"+portStr+" success<br>but app not match,expect is "+selectedApp+", got "+app);
-                                    return;
-                                }
-                                TestkitHelper.notify(project,NotificationType.INFORMATION,"Connected success<br>"+selectedApp+":"+host+":"+portStr);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+selectedApp+":"+host+":"+portStr+" failed<br>"+e.getMessage());
+                        public void actionPerformed(@NotNull AnActionEvent e) {
+                            SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(project);
+                            StringBuilder command = new StringBuilder("java ");
+                            String ctx = cliConfig.getCtx();
+                            if (ctx!=null && ctx.trim().split("#").length == 2) {
+                                command.append("-Dtestkit.cli.ctx=").append(ctx.trim()).append(" ");
                             }
+                            String envKey = cliConfig.getEnvKey();
+                            if (envKey!=null && !envKey.trim().isBlank()) {
+                                command.append("-Dtestkit.cli.env-key=").append(envKey.trim()).append(" ");
+                            }
+
+                            String cliPath = Paths.get(
+                                    PathManager.getPluginsPath(),
+                                    TestkitHelper.PLUGIN_ID,
+                                    "lib",
+                                    "testkit-cli-1.0.jar"
+                            ).toFile().getAbsolutePath();
+                            command.append("-jar "+cliPath);
+                            TestkitHelper.copyToClipboard(project, command.toString(), "CMD copy success\nYou can run this in terminal to  dynamic inject plugin.");
                         }
-                    });
+                    };
+                    copyGroup.add(copyDirect); // 将动作添加到动作组中
+
+                    //显示的一个图标加上标题
+                    AnAction infoAction = new AnAction("Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", "Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", null) {
+                        @Override
+                        public void actionPerformed(@NotNull AnActionEvent e) {
+                        }
+                    };
+                    copyGroup.add(infoAction); // 将动作添加到动作组中
+
+                    JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("CopyFunctionCallPopup", copyGroup).getComponent();
+                    popupMenu.show(injectButton, 0, 0);
                 });
 
                 // 添加提交按钮事件
@@ -627,7 +643,7 @@ public class TestkitToolWindow {
     }
 
     private void refreshVisibleApp() {
-        Set<String> newItems = new LinkedHashSet<>(SettingsStorageHelper.getRemoteApps(project));
+        Set<String> newItems = new LinkedHashSet<>();
         List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
         if(localItems!=null){
             newItems.addAll(localItems);
