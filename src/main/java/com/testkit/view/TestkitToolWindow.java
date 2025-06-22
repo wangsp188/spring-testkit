@@ -279,7 +279,7 @@ public class TestkitToolWindow {
                 JButton injectButton = new JButton("Dynamic inject", cmdIcon);
                 injectButton.setToolTipText("If the Testkit-server is not injected when the project starts, Then we provided the ability to dynamically inject runtime projects");
                 JButton saveButton = new JButton("Test&Add connection", AllIcons.General.InlineAdd);
-                injectButton.setToolTipText("Manual add the connection information of testkit-server, Support remote connection");
+                saveButton.setToolTipText("Manual add the connection information of testkit-server, Support remote connection");
 
                 // 添加组件到面板
                 gbc.gridx = 0;
