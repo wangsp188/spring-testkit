@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.actionSystem.impl.ActionButton;
 import com.intellij.openapi.application.PathManager;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -411,9 +410,10 @@ public class TestkitToolWindow {
                             tempApps.add(selectedApp + ":" + ip + ":" + portStr);
                             RuntimeHelper.setTempApps(project.getName(), tempApps);
                             TestkitHelper.notify(project, NotificationType.INFORMATION, "Add connection success<br>" + selectedApp + ":" + ip + ":" + portStr);
-
                             //关闭弹窗
-                            popup.cancel();
+                            SwingUtilities.invokeLater(() -> {
+                                popup.cancel();
+                            });
                         }
                     });
 
@@ -478,18 +478,12 @@ public class TestkitToolWindow {
                         Window window = WindowManager.getInstance().suggestParentWindow(project);
                         active[0] = window != null && window.isActive();
                     });
-                    System.out.println("刷新app任务," + active[0] + "," + new Date());
-                    //等待结果，等10s.
+                    System.out.println("刷新app任务,"+project.getName()+"," + active[0] + "," + new Date());
                     if (active[0]) {
-                        ApplicationManager.getApplication().invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                refreshVisibleApp();
-                            }
-                        });
+                        refreshVisibleApp();
                     }
                 } catch (Throwable e) {
-                    System.err.println("刷新app失败");
+                    System.err.println("刷新app失败,"+project.getName());
                     e.printStackTrace(System.err);
                 }
             }
@@ -709,43 +703,48 @@ public class TestkitToolWindow {
             }
         }
 
-        // 记录当前选中的项
-        String selectedItem = (String) appBox.getSelectedItem();
+        ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+// 记录当前选中的项
+                String selectedItem = (String) appBox.getSelectedItem();
 
-        // 获取当前下拉框中的所有项
-        List<String> currentItems = new ArrayList<>();
-        for (int i = 0; i < appBox.getItemCount(); i++) {
-            currentItems.add(appBox.getItemAt(i).toString());
-        }
-
-        // 更新 monitorMap
-        RuntimeHelper.updateTraces(newMap);
-        // 比较新旧项是否有变化
-        boolean hasChanges = !(newItems.isEmpty() && currentItems.isEmpty()) && !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
-        if (!hasChanges) {
-            return;
-        }
-        // 更新下拉框内容
-        appBox.removeAllItems();
-        ArrayList<RuntimeHelper.VisibleApp> objects = new ArrayList<>();
-        for (String item : newItems) {
-            objects.add(RuntimeHelper.parseApp(item));
-            appBox.addItem(item);
-        }
-        RuntimeHelper.updateVisibleApps(project.getName(), objects);
-
-        // 保持选中项不变
-        if (selectedItem != null && appBox.getItemCount() > 0) {
-            for (int i = 0; i < appBox.getItemCount(); i++) {
-                if (appBox.getItemAt(i).equals(selectedItem)) {
-                    appBox.setSelectedIndex(i);
-                    break;
+                // 获取当前下拉框中的所有项
+                List<String> currentItems = new ArrayList<>();
+                for (int i = 0; i < appBox.getItemCount(); i++) {
+                    currentItems.add(appBox.getItemAt(i).toString());
                 }
-            }
-        }
 
-        //更新索引
-        TestkitHelper.refresh(project);
+                // 更新 monitorMap
+                RuntimeHelper.updateTraces(newMap);
+                // 比较新旧项是否有变化
+                boolean hasChanges = !(newItems.isEmpty() && currentItems.isEmpty()) && !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
+                if (!hasChanges) {
+                    return;
+                }
+                // 更新下拉框内容
+                appBox.removeAllItems();
+                ArrayList<RuntimeHelper.VisibleApp> objects = new ArrayList<>();
+                for (String item : newItems) {
+                    objects.add(RuntimeHelper.parseApp(item));
+                    appBox.addItem(item);
+                }
+                RuntimeHelper.updateVisibleApps(project.getName(), objects);
+
+                // 保持选中项不变
+                if (selectedItem != null && appBox.getItemCount() > 0) {
+                    for (int i = 0; i < appBox.getItemCount(); i++) {
+                        if (appBox.getItemAt(i).equals(selectedItem)) {
+                            appBox.setSelectedIndex(i);
+                            break;
+                        }
+                    }
+                }
+
+                //更新索引
+                TestkitHelper.refresh(project);
+            }
+        });
     }
 
     private void openTipsDoc() {
