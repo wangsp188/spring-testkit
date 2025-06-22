@@ -2,27 +2,24 @@ package com.testkit.view;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.TypeReference;
 import com.intellij.openapi.actionSystem.impl.ActionButton;
 import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
-import com.intellij.openapi.wm.ToolWindowManager;
-import com.intellij.terminal.JBTerminalWidget;
+import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
-import com.jediterm.terminal.TtyConnector;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesIconProvider;
 import com.testkit.sql_review.MysqlUtil;
-import com.testkit.tools.ToolHelper;
 import com.testkit.tools.mapper_sql.MapperSqlTool;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
@@ -47,8 +44,6 @@ import com.testkit.tools.flexible_test.FlexibleTestTool;
 import com.intellij.ui.components.JBScrollPane;
 import com.testkit.util.HttpUtil;
 import com.intellij.ui.jcef.JBCefBrowser;
-import com.testkit.util.JsonUtil;
-import kotlinx.html.A;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -66,11 +61,10 @@ import java.awt.event.ActionListener;
 import java.io.*;
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -80,7 +74,6 @@ public class TestkitToolWindow {
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
     private static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
-
 
 
     private Project project;
@@ -241,15 +234,16 @@ public class TestkitToolWindow {
         tools.put(PluginToolEnum.FLEXIBLE_TEST, new FlexibleTestTool(this));
         tools.put(PluginToolEnum.MAPPER_SQL, new MapperSqlTool(this));
         // 添加 toolBox 到 topPanel
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(),  PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode()});
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode()});
+        toolBox.setToolTipText("Tool list");
         toolBox.setPreferredSize(new Dimension(120, 32));
 //        toolBox.setEnabled(false);
         toolBox.addActionListener(e -> onSwitchTool());
         topPanel.add(toolBox);
 
 
-        appPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        ActionButton addBtn = new ActionButton(new AnAction("No automatic refresh or remote link ?", null, AllIcons.General.InlineAdd) {
+        appPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
+        ActionButton addBtn = new ActionButton(new AnAction("No automatic refresh or remote connection?", null, AllIcons.General.InlineAdd) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
                 // 创建面板
@@ -262,7 +256,7 @@ public class TestkitToolWindow {
 
                 List<RuntimeHelper.AppMeta> appMetas = RuntimeHelper.getAppMetas(project.getName());
                 if (CollectionUtils.isEmpty(appMetas)) {
-                    TestkitHelper.alert(project,Messages.getErrorIcon(),"No app metas found, Pls wait index refresh");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "No app metas found, Pls wait index refresh");
                     return;
                 }
 
@@ -271,11 +265,11 @@ public class TestkitToolWindow {
                 ComboBox<String> comboBox = new ComboBox<>(options);
 
                 // 创建两个文本框
-                JBTextField hostField = new JBTextField("localhost");
-                hostField.getEmptyText().setText("Which host connect to?");
-                hostField.setEditable(true);
-                hostField.setEnabled(true);
-                hostField.setFocusable(true);
+                JBTextField ipField = new JBTextField("localhost");
+                ipField.getEmptyText().setText("Which ip connect to? Support remote connection, localhost is equivalent to 127.0.0.1");
+                ipField.setEditable(true);
+                ipField.setEnabled(true);
+                ipField.setFocusable(true);
                 JBTextField portField = new JBTextField("18080");
                 portField.getEmptyText().setText("It is generally ${tomcat_port}+10000");
                 portField.setEditable(true);
@@ -283,8 +277,10 @@ public class TestkitToolWindow {
                 portField.setFocusable(true);
 
                 // 创建提交按钮
-                JButton injectButton = new JButton("Dynamic inject");
-                JButton saveButton = new JButton("Test&Add connection");
+                JButton injectButton = new JButton("Dynamic inject", cmdIcon);
+                injectButton.setToolTipText("If the Testkit-server is not injected when the project starts, Then we provided the ability to dynamically inject runtime projects");
+                JButton saveButton = new JButton("Test&Add connection", AllIcons.General.InlineAdd);
+                injectButton.setToolTipText("Manual add the connection information of testkit-server, Support remote connection");
 
                 // 添加组件到面板
                 gbc.gridx = 0;
@@ -298,10 +294,11 @@ public class TestkitToolWindow {
 
                 gbc.gridx = 0;
                 gbc.gridy = 1;
-                JLabel hostLabel = new JLabel("Host:");
-                panel.add(hostLabel, gbc);
+                JLabel ipLabel = new JLabel("Ip:");
+                ipLabel.setToolTipText("Which ip you want connect to, Support remote connection, localhost is equivalent to 127.0.0.1");
+                panel.add(ipLabel, gbc);
                 gbc.gridx = 1;
-                panel.add(hostField, gbc);
+                panel.add(ipField, gbc);
 
                 gbc.gridx = 0;
                 gbc.gridy = 2;
@@ -323,7 +320,7 @@ public class TestkitToolWindow {
                 JBPopup popup = popupFactory.createComponentPopupBuilder(panel, portField)
                         .setRequestFocus(true)
                         .setFocusable(true)
-                        .setTitle("Temporary configure the connector")
+                        .setTitle("Manual configure the connector")
                         .setMovable(true)
                         .setResizable(false)
                         .createPopup();
@@ -340,11 +337,11 @@ public class TestkitToolWindow {
                             SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(project);
                             StringBuilder command = new StringBuilder("java ");
                             String ctx = cliConfig.getCtx();
-                            if (ctx!=null && ctx.trim().split("#").length == 2) {
+                            if (ctx != null && ctx.trim().split("#").length == 2) {
                                 command.append("-Dtestkit.cli.ctx=").append(ctx.trim()).append(" ");
                             }
                             String envKey = cliConfig.getEnvKey();
-                            if (envKey!=null && !envKey.trim().isBlank()) {
+                            if (envKey != null && !envKey.trim().isBlank()) {
                                 command.append("-Dtestkit.cli.env-key=").append(envKey.trim()).append(" ");
                             }
 
@@ -354,7 +351,7 @@ public class TestkitToolWindow {
                                     "lib",
                                     "testkit-cli-1.0.jar"
                             ).toFile().getAbsolutePath();
-                            command.append("-jar \""+cliPath+"\"");
+                            command.append("-jar \"" + cliPath + "\"");
                             TestkitHelper.copyToClipboard(project, command.toString(), "CMD copy success\nYou can run this in terminal to  dynamic inject plugin.");
                         }
                     };
@@ -364,7 +361,7 @@ public class TestkitToolWindow {
                     AnAction infoAction = new AnAction("Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", "Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", AllIcons.Actions.Edit) {
                         @Override
                         public void actionPerformed(@NotNull AnActionEvent e) {
-                            TestkitHelper.notify(project,NotificationType.INFORMATION,"After the injection is successful\nplease fill it in manually according to the injection information");
+                            TestkitHelper.notify(project, NotificationType.INFORMATION, "After the injection is successful\nplease fill it in manually according to the injection information");
                         }
                     };
                     copyGroup.add(infoAction); // 将动作添加到动作组中
@@ -376,44 +373,47 @@ public class TestkitToolWindow {
                 // 添加提交按钮事件
                 saveButton.addActionListener(actionEvent -> {
                     String selectedApp = (String) comboBox.getSelectedItem();
-                    String hostStr = hostField.getText().trim();
+                    String ipStr = ipField.getText().trim();
                     String portStr = portField.getText().trim();
                     if (selectedApp == null) {
-                        TestkitHelper.notify(project,NotificationType.ERROR, "Select app to connect to");
+                        TestkitHelper.notify(project, NotificationType.ERROR, "Select app to connect to");
                         return;
                     }
-                    if (StringUtils.isBlank(hostStr) || !StringUtils.isNumeric(portStr)) {
-                        TestkitHelper.notify(project,NotificationType.ERROR,"host and port must be not null, port must be Numeric");
+                    if (StringUtils.isBlank(ipStr) || !StringUtils.isNumeric(portStr)) {
+                        TestkitHelper.notify(project, NotificationType.ERROR, "host and port must be not null, port must be Numeric");
                         return;
                     }
 
-                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing test connection " + hostStr+":"+portStr + ", please wait ...", false) {
+                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing test connection " + ipStr + ":" + portStr + ", please wait ...", false) {
                         @Override
                         public void run(ProgressIndicator indicator) {
-                            String host = hostStr.equals("localhost") || hostStr.equals("127.0.0.1") ? "local" : hostStr;
+                            String ip = ipStr.equals("localhost") || ipStr.equals("127.0.0.1") ? "local" : ipStr;
                             try {
                                 HashMap<String, String> requestData = new HashMap<>();
                                 requestData.put("method", "hi");
                                 // 发送请求获取实时数据
-                                JSONObject response = HttpUtil.sendPost("http://"+(host.equals("local")?"localhost":host)+":" + portStr + "/", requestData, JSONObject.class);
+                                JSONObject response = HttpUtil.sendPost("http://" + (ip.equals("local") ? "localhost" : ip) + ":" + portStr + "/", requestData, JSONObject.class, 5);
                                 String app = response.getJSONObject("data").getString("app");
-                                if (!Objects.equals(selectedApp,app)) {
-                                    TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+host+":"+portStr+" success<br>but app not match, expect is "+selectedApp+", got "+app);
+                                if (!Objects.equals(selectedApp, app)) {
+                                    TestkitHelper.notify(project, NotificationType.ERROR, "Connected to " + ip + ":" + portStr + " success<br>but app not match, expect is " + selectedApp + ", got " + app);
                                     return;
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
-                                TestkitHelper.notify(project,NotificationType.ERROR,"Connected to "+selectedApp+":"+host+":"+portStr+" failed<br>"+e.getMessage());
+                                TestkitHelper.notify(project, NotificationType.ERROR, "Connected to " + selectedApp + ":" + ip + ":" + portStr + " failed<br>" + e.getMessage());
                                 return;
                             }
                             List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
-                            if (tempApps.contains(selectedApp+":"+host+":"+portStr)) {
-                                TestkitHelper.notify(project,NotificationType.WARNING,selectedApp+":"+host+":"+portStr+"already exists in "+tempApps);
+                            if (tempApps.contains(selectedApp + ":" + ip + ":" + portStr)) {
+                                TestkitHelper.notify(project, NotificationType.WARNING, selectedApp + ":" + ip + ":" + portStr + "already exists in " + tempApps);
                                 return;
                             }
-                            tempApps.add(selectedApp+":"+host+":"+portStr);
+                            tempApps.add(selectedApp + ":" + ip + ":" + portStr);
                             RuntimeHelper.setTempApps(project.getName(), tempApps);
-                            TestkitHelper.notify(project,NotificationType.INFORMATION,"Add connection success<br>"+selectedApp+":"+host+":"+portStr);
+                            TestkitHelper.notify(project, NotificationType.INFORMATION, "Add connection success<br>" + selectedApp + ":" + ip + ":" + portStr);
+
+                            //关闭弹窗
+                            popup.cancel();
                         }
                     });
 
@@ -422,9 +422,11 @@ public class TestkitToolWindow {
                 // 显示弹出框
                 popup.show(new RelativePoint(appPanel, new Point(0, 0)));
             }
-        },null,"1",new Dimension(16, 32));
+        }, null, "1", new Dimension(16, 32));
         // 添加 VisibleApp Label
         JLabel appLabel = new JLabel("RuntimeApp:");
+//        appLabel.setPreferredSize(new Dimension(80, 32));
+        appLabel.setToolTipText("The list of currently connected apps,You can click the + on the right to manually add connection");
         appPanel.add(appLabel);
         appPanel.add(addBtn);
 
@@ -433,28 +435,17 @@ public class TestkitToolWindow {
         // 添加 appBox 到 topPanel
         appBox = new ComboBox<>(new String[]{});
         appBox.setPreferredSize(new Dimension(150, 32));
-        Border border = appBox.getBorder();
+        Color defColor = appBox.getForeground();
         appBox.addItemListener(e -> {
             String selectedItem = (String) appBox.getSelectedItem();
             RuntimeHelper.updateSelectedApp(getProject().getName(), selectedItem == null ? null : RuntimeHelper.parseApp(selectedItem));
             appBox.setToolTipText(selectedItem == null ? "" : selectedItem); // 动态更新 ToolTipText
-
-            if (selectedItem != null && RuntimeHelper.isMonitor(selectedItem)) {
-                appBox.setBorder(new LineBorder(new Color(114, 169, 107), 1));
+            if (selectedItem != null && RuntimeHelper.isEnableTrace(selectedItem)) {
+                appBox.setForeground(new Color(114, 169, 107));
             } else {
-                appBox.setBorder(border);
+                appBox.setForeground(defColor);
             }
         });
-        new Thread(() -> {
-            while (true) {
-                try {
-                    refreshVisibleApp();
-                    Thread.sleep(5 * 1000); // 每隔一分钟调用一次
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
 
         // 将左侧按钮组添加到主面板西侧
         outPanel.add(topPanel, BorderLayout.WEST);
@@ -476,6 +467,34 @@ public class TestkitToolWindow {
             // 事件或代码在索引准备好后运行
             findSpringBootApplicationClasses();
         });
+
+
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(5 * 1000); // 每隔一分钟调用一次
+                    boolean[] active = new boolean[]{false};
+                    ApplicationManager.getApplication().invokeAndWait(() -> {
+                        Window window = WindowManager.getInstance().suggestParentWindow(project);
+                        active[0] = window != null && window.isActive();
+                    });
+                    System.out.println("刷新app任务," + active[0] + "," + new Date());
+                    //等待结果，等10s.
+                    if (active[0]) {
+                        ApplicationManager.getApplication().invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                refreshVisibleApp();
+                            }
+                        });
+                    }
+                } catch (Throwable e) {
+                    System.err.println("刷新app失败");
+                    e.printStackTrace(System.err);
+                }
+            }
+        }).start();
+
         return outPanel;
     }
 
@@ -562,7 +581,7 @@ public class TestkitToolWindow {
         actionGroup.add(copyAction);
 
         if (linkRenderHtml != null) {
-            traceAction = new AnAction("Dagre this req", "Dagre this req", dagreIcon) {
+            traceAction = new AnAction("Request visualization", "Request visualization", dagreIcon) {
 
                 private JFrame frame;
                 private JBCefBrowser jbCefBrowser;
@@ -571,9 +590,18 @@ public class TestkitToolWindow {
                     // 创建 JFrame
                     frame = new JFrame("Link Window");
                     Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-                    screenSize.height = (int) (screenSize.height * 0.8);
-                    screenSize.width = (int) (screenSize.width * 0.8);
-                    frame.setSize(screenSize);
+
+                    // 计算70%窗口尺寸
+                    int frameWidth = (int) (screenSize.getWidth() * 0.7);
+                    int frameHeight = (int) (screenSize.getHeight() * 0.7);
+                    // 设置窗口大小
+                    frame.setSize(frameWidth, frameHeight);
+                    // 计算居中位置
+                    int x = (int) ((screenSize.getWidth() - frameWidth) / 2);
+                    int y = (int) ((screenSize.getHeight() - frameHeight) / 2);
+                    frame.setLocation(x, y);
+
+                    frame.setResizable(true); // 允许用户调整窗口大小
                     frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
                     frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
@@ -647,7 +675,7 @@ public class TestkitToolWindow {
     private void refreshVisibleApp() {
         Set<String> newItems = new LinkedHashSet<>();
         List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
-        if(localItems!=null){
+        if (localItems != null) {
             newItems.addAll(localItems);
         }
         List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
@@ -671,7 +699,7 @@ public class TestkitToolWindow {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
             try {
                 // 发送请求获取实时数据
-                JSONObject response = HttpUtil.sendPost("http://"+(visibleApp.judgeIsLocal()?"localhost":visibleApp.getIp())+":" + visibleApp.getTestkitPort() + "/", requestData, JSONObject.class);
+                JSONObject response = HttpUtil.sendPost("http://" + (visibleApp.judgeIsLocal() ? "localhost" : visibleApp.getIp()) + ":" + visibleApp.getTestkitPort() + "/", requestData, JSONObject.class, 5);
                 boolean enableTrace = response.getJSONObject("data").getBooleanValue("enableTrace");
                 newMap.put(item, enableTrace);
             } catch (Exception e) {
@@ -691,7 +719,7 @@ public class TestkitToolWindow {
         }
 
         // 更新 monitorMap
-        RuntimeHelper.updateMonitors(newMap);
+        RuntimeHelper.updateTraces(newMap);
         // 比较新旧项是否有变化
         boolean hasChanges = !(newItems.isEmpty() && currentItems.isEmpty()) && !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
         if (!hasChanges) {
@@ -756,7 +784,7 @@ public class TestkitToolWindow {
         }
     }
 
-    public void refreshSqlDatasources(){
+    public void refreshSqlDatasources() {
         sqlDialog.refreshDatasources();
     }
 
@@ -806,9 +834,6 @@ public class TestkitToolWindow {
     }
 
 
-
-
-
     private void initStoreDialog() {
         storeDialog = new ReqStoreDialog(this);
     }
@@ -834,7 +859,7 @@ public class TestkitToolWindow {
                 public void run() {
 
                     List<RuntimeHelper.AppMeta> apps = RuntimeHelper.getAppMetas(project.getName());
-                    if(apps==null || apps.isEmpty()){
+                    if (apps == null || apps.isEmpty()) {
                         apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
                     }
                     List<String> appNames = apps.stream().map(new Function<RuntimeHelper.AppMeta, String>() {
@@ -851,7 +876,7 @@ public class TestkitToolWindow {
 
                     //当前项目没有有没有配置
                     if (!SettingsStorageHelper.hasAnySettings()) {
-                        TestkitHelper.notify(project,NotificationType.INFORMATION,"Welcome to Testkit\nYou can get started quickly with the documentation");
+                        TestkitHelper.notify(project, NotificationType.INFORMATION, "Welcome to Testkit\nYou can get started quickly with the documentation");
                     }
                 }
             });

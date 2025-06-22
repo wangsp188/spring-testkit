@@ -38,8 +38,7 @@ public class TestkitServerAutoConfiguration implements DisposableBean {
         String project = environment.getProperty("testkit.project.name");
         String appName = environment.getProperty("testkit.app.name");
         String env = environment.getProperty("testkit.app.env");
-        boolean enableTrace = "true".equals(environment.getProperty("testkit.trace.enable"));
-        this.server = TestkitServerManage.startServer(app, project, appName, env, enableTrace);
+        this.server = TestkitServerManage.startServer(app, project, appName, env);
     }
 
     @Override

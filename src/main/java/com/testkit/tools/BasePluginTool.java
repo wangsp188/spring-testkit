@@ -339,7 +339,7 @@ public abstract class BasePluginTool {
                     HashMap<Object, Object> params = new HashMap<>();
                     params.put("reqId", lastReqId);
                     map.put("params", params);
-                    return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class);
+                    return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,30);
                 }
 
                 @Override
@@ -369,7 +369,7 @@ public abstract class BasePluginTool {
                     if (request == null) {
                         return;
                     }
-                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class);
+                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class,30);
                 } catch (Throwable e) {
                     setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
                     return;
@@ -390,7 +390,7 @@ public abstract class BasePluginTool {
                     params.put("reqId", reqId);
                     map.put("params", params);
 
-                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class);
+                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,600);
 
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (cancelReqs.remove(reqId)) {

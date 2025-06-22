@@ -40,7 +40,7 @@ public class TestkitServer {
     private boolean enableTrace;
 
 
-    public TestkitServer(ApplicationContext app, String project, String appName, String env, boolean enableTrace) {
+    public TestkitServer(ApplicationContext app, String project, String appName, String env) {
         this.loadByCli = RuntimeAppHelper.loadByTestkitCli(project);
         if (!this.loadByCli && (project == null || project.isEmpty() || appName == null || appName.isEmpty())) {
             throw new IllegalArgumentException("project/appName can not be empty");
@@ -61,7 +61,11 @@ public class TestkitServer {
         this.project = project;
         this.appName = appName;
         this.env = env;
-        this.enableTrace = enableTrace;
+        try {
+            Class.forName("com.testkit.agent.TraceAgent");
+            this.enableTrace = true;
+        } catch (Throwable ignore) {
+        }
     }
 
 

@@ -831,7 +831,7 @@ public class SettingsDialog {
 //                        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
                         String reqId;
                         try {
-                            JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", req, JSONObject.class);
+                            JSONObject submitRes = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", req, JSONObject.class,30);
                             if (submitRes == null) {
                                 TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\nFailed to submit req\nsubmitRes is null");
                                 return;
@@ -852,7 +852,7 @@ public class SettingsDialog {
                         params.put("reqId", reqId);
                         getRetReq.put("params", params);
 
-                        JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", getRetReq, JSONObject.class);
+                        JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", getRetReq, JSONObject.class,600);
                         if (result == null || !result.getBooleanValue("success")) {
                             TestkitHelper.alert(getProject(), Messages.getErrorIcon(), "Test tool-interceptor error\n" + (result == null ? "result is null" : result.getString("message")));
                             return;

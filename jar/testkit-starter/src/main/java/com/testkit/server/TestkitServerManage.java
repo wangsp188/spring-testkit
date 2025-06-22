@@ -19,7 +19,7 @@ public class TestkitServerManage {
         return server;
     }
 
-    public synchronized static TestkitServer startServer(ApplicationContext app, String project, String appName, String env, boolean enableTrace) {
+    public synchronized static TestkitServer startServer(ApplicationContext app, String project, String appName, String env) {
         if (app == null) {
             throw new TestkitException("app can not be null");
         }
@@ -31,14 +31,14 @@ public class TestkitServerManage {
             }
             return exist;
         }
-        TestkitServer tempServer = new TestkitServer(app, project, appName, env, enableTrace);
+        TestkitServer tempServer = new TestkitServer(app, project, appName, env);
         tempServer.start();
         return TestkitServerManage.server = tempServer;
     }
 
 
     public synchronized static TestkitServer startCLIServer(ApplicationContext app, String env, String pidPath) {
-        TestkitServer testkitServer = startServer(app, RuntimeAppHelper.TESTKIT_CLI_PROJECT, getStartupClass(app), env, false);
+        TestkitServer testkitServer = startServer(app, RuntimeAppHelper.TESTKIT_CLI_PROJECT, getStartupClass(app), env);
         Integer port = testkitServer.fetchServerPort();
         if (port == null) {
             throw new RuntimeException("no server started");

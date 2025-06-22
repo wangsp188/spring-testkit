@@ -88,7 +88,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
 
 
             SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
-            if (enableSideServer && traceConfig.isEnable()) {
+            if (traceConfig.isEnable()) {
                 String linkJarPath = TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "testkit-trace-1.0.jar";
 //            增加ajar到
                 javaParameters.getVMParametersList().add("-Xbootclasspath/a:" + pluginPath + File.separator + linkJarPath);
@@ -111,7 +111,6 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 String base64Json = Base64.getEncoder().encodeToString(traceConfig.toString().getBytes("UTF-8"));
                 String encodedJson = URLEncoder.encode(base64Json, "UTF-8");
                 javaParameters.getVMParametersList().add("-javaagent:" + pluginPath + File.separator + agentPath+"="+encodedJson);
-                vmParametersList.addProperty("testkit.trace.enable", "true");
                 show = true;
             }else{
                 System.err.println("Testkit 未开启trace");

@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
 public class HttpUtil {  
 
@@ -25,12 +26,15 @@ public class HttpUtil {
      * @return          响应对象  
      * @throws Exception 请求或解析时发生错误  
      */  
-    public static <T, R> R sendPost(String url, T request, Class<R> responseType) throws Exception {  
+    public static <T, R> R sendPost(String url, T request, Class<R> responseType,int timeoutSecond) throws Exception {
         HttpURLConnection connection = null;  
         try {  
             // 打开连接  
             URL requestUrl = new URL(url);  
-            connection = (HttpURLConnection) requestUrl.openConnection();  
+            connection = (HttpURLConnection) requestUrl.openConnection();
+            // 设置超时时间（关键修改）
+            connection.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(5)); // 连接超时 5 秒
+            connection.setReadTimeout((int) TimeUnit.SECONDS.toMillis(timeoutSecond));
             connection.setDoOutput(true);  
             connection.setDoInput(true);  
             connection.setRequestMethod("POST");  

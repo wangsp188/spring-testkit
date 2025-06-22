@@ -81,7 +81,7 @@ public class TestkitCLI {
         System.out.println(GREEN + "Connect success" + RESET);
         System.out.println(YELLOW + "You can manually create a connector in plugin panel using the following information:" + RESET);
         System.out.println(RED + "App: " + runningApp.getApp() + RESET);
-        System.out.println(RED + "Host: " + runningApp.getIp() + RESET);
+        System.out.println(RED + "Ip: " + runningApp.getIp() + RESET);
         System.out.println(RED + "Testkit port: " + runningApp.getPort() + RESET);
         // 启动交互式命令行
         startCommandLoop(br, runningApp.getPort(), ctxAtc.get());
@@ -98,7 +98,7 @@ public class TestkitCLI {
         }
 
         try {
-            JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
+            JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class,5);
             if (!response.getBooleanValue("success")) {
                 return null;
             }
@@ -113,7 +113,7 @@ public class TestkitCLI {
     }
 
     private static StatusMsg directRequest(int port, Map<String, Object> requestData) throws Exception {
-        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
+        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class,30);
         if (result == null) {
             return new StatusMsg(false,RED + "req is error\n result is null" + RESET);
         }
@@ -341,7 +341,7 @@ public class TestkitCLI {
                     HashMap<String, String> requestData = new HashMap<>();
                     requestData.put("method", "stop");
                     try {
-                        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class);
+                        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class,30);
                         if (!response.getBooleanValue("success")) {
                             System.out.println(YELLOW + "[stop] " + response.getString("message") + RESET);
                             continue;
@@ -477,7 +477,7 @@ public class TestkitCLI {
     }
 
     private static String submitReqAndWaitRet(int port, JSONObject reqObject) throws Exception {
-        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", reqObject, JSONObject.class);
+        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", reqObject, JSONObject.class,30);
         if (response == null || !response.getBooleanValue("success") || response.getString("data") == null) {
             return RED + "submit req error \n" + response.getString("message") + RESET;
         }
@@ -489,7 +489,7 @@ public class TestkitCLI {
         params.put("reqId", reqId);
         map.put("params", params);
 
-        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", map, JSONObject.class);
+        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", map, JSONObject.class,600);
         if (result == null) {
             return RED + "req is error\n result is null" + RESET;
         } else {
@@ -656,7 +656,7 @@ public class TestkitCLI {
 
         @Override
         public String toString() {
-            return "App:" + app + ", Host: " + ip + ", Testkit port: " + port + ", Env: " + env + ", EnableTrace: " + enableTrace + ", LoadByCli: " + loadByCli;
+            return "App:" + app + ", Ip: " + ip + ", Testkit port: " + port + ", Env: " + env + ", EnableTrace: " + enableTrace + ", LoadByCli: " + loadByCli;
         }
     }
 

@@ -22,7 +22,7 @@ public class RuntimeHelper {
 
     private static final String APPS_DIR = ".spring-testkit/apps";
 
-    private static final Map<String, Boolean> monitorMap = new HashMap<>();
+    private static final Map<String, Boolean> traceMap = new HashMap<>();
 
     private static final Map<String, VisibleApp> selectedApps = new HashMap<>();
 
@@ -65,19 +65,19 @@ public class RuntimeHelper {
     }
 
 
-    public static void updateMonitors(Map<String, Boolean> monitors) {
-        if (monitors == null) {
+    public static void updateTraces(Map<String, Boolean> traces) {
+        if (traces == null) {
             return;
         }
-        monitorMap.putAll(monitors);
+        traceMap.putAll(traces);
     }
 
-    public static boolean isMonitor(String app) {
+    public static boolean isEnableTrace(String app) {
         if (app == null) {
             return false;
         }
-        Boolean monitor = monitorMap.get(app);
-        return monitor != null && monitor;
+        Boolean trace = traceMap.get(app);
+        return trace != null && trace;
     }
 
     public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls, List<String> writes) {
