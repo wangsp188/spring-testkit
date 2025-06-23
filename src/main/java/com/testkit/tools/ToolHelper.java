@@ -50,12 +50,15 @@ public class ToolHelper {
 
 
     public static String buildMethodName(PsiMethod method) {
-        if (method == null || !method.isValid()) {
+        if (method == null) {
             return null;
         }
         return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
             @Override
             public String compute() {
+                if (!method.isValid()) {
+                    return null;
+                }
                 // 获取类名
                 PsiClass containingClass = method.getContainingClass();
                 String className = "UnknownClass";
@@ -89,12 +92,15 @@ public class ToolHelper {
     }
 
     public static String buildMethodKey(PsiMethod method) {
-        if (method == null || !method.isValid()) {
+        if (method == null) {
             return null;
         }
         return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
             @Override
             public String compute() {
+                if (!method.isValid()) {
+                    return null;
+                }
                 // 获取类名
                 PsiClass containingClass = method.getContainingClass();
                 String className = containingClass != null ? containingClass.getQualifiedName() : "UnknownClass";
@@ -119,12 +125,15 @@ public class ToolHelper {
     }
 
     public static String buildXmlTagName(XmlTag xmlTag) {
-        if (xmlTag == null || !xmlTag.isValid()) {
+        if (xmlTag == null) {
             return null;
         }
         return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
             @Override
             public String compute() {
+                if (!xmlTag.isValid()) {
+                    return null;
+                }
                 // 获取标签名
                 String tagName = xmlTag.getContainingFile().getName();
                 if (xmlTag.getContainingFile().getVirtualFile().getPath().contains("/")) {
@@ -155,12 +164,15 @@ public class ToolHelper {
     }
 
     public static String buildXmlTagKey(XmlTag xmlTag) {
-        if (xmlTag == null || !xmlTag.isValid()) {
+        if (xmlTag == null) {
             return null;
         }
         return ApplicationManager.getApplication().runReadAction(new Computable<String>() {
             @Override
             public String compute() {
+                if (!xmlTag.isValid()) {
+                    return null;
+                }
                 // 获取标签名
                 String tagName = xmlTag.getContainingFile().getVirtualFile().getPath();
 
