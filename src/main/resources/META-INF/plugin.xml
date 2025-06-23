@@ -39,6 +39,7 @@
   <li><b>Coding-guidelines</b> - 角标指引式研发提醒</li>
   <li><b>Realtime-view-value</b> - 实时观测bean的字段内容</li>
   <li><b>Curl-parser</b> - 简易curl解析器</li>
+  <li><b>Spring-startup-analyzer</b> - spring启动耗时分析</li>
 </ul>
 ]]></description>
 <!--  开发F&Q  https://intellij-support.jetbrains.com/hc/en-us/search?utf8=%E2%9C%93-->
