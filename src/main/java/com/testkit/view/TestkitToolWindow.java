@@ -391,7 +391,7 @@ public class TestkitToolWindow {
                                 HashMap<String, String> requestData = new HashMap<>();
                                 requestData.put("method", "hi");
                                 // 发送请求获取实时数据
-                                JSONObject response = HttpUtil.sendPost("http://" + (ip.equals("local") ? "localhost" : ip) + ":" + portStr + "/", requestData, JSONObject.class, 5);
+                                JSONObject response = HttpUtil.sendPost("http://" + (ip.equals("local") ? "localhost" : ip) + ":" + portStr + "/", requestData, JSONObject.class, 5,5);
                                 String app = response.getJSONObject("data").getString("app");
                                 if (!Objects.equals(selectedApp, app)) {
                                     TestkitHelper.notify(project, NotificationType.ERROR, "Connected to " + ip + ":" + portStr + " success<br>but app not match, expect is " + selectedApp + ", got " + app);
@@ -693,7 +693,7 @@ public class TestkitToolWindow {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
             try {
                 // 发送请求获取实时数据
-                JSONObject response = HttpUtil.sendPost("http://" + (visibleApp.judgeIsLocal() ? "localhost" : visibleApp.getIp()) + ":" + visibleApp.getTestkitPort() + "/", requestData, JSONObject.class, 5);
+                JSONObject response = HttpUtil.sendPost("http://" + (visibleApp.judgeIsLocal() ? "localhost" : visibleApp.getIp()) + ":" + visibleApp.getTestkitPort() + "/", requestData, JSONObject.class, null,5);
                 boolean enableTrace = response.getJSONObject("data").getBooleanValue("enableTrace");
                 newMap.put(item, enableTrace);
             } catch (Exception e) {

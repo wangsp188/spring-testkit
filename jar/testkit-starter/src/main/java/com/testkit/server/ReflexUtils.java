@@ -66,6 +66,9 @@ public class ReflexUtils {
         module.addDeserializer(Date.class, new CustomDateDeserializer());
         // 配置 ObjectMapper 在序列化时包含 null 值
         SIMPLE_MAPPER.setSerializationInclusion(JsonInclude.Include.ALWAYS);
+        // 关键：使用字段序列化，禁用方法序列化
+        SIMPLE_MAPPER.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE);
+        SIMPLE_MAPPER.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
         // 自动处理枚举类型，无需自定义注册
         SIMPLE_MAPPER.registerModule(module);
     }

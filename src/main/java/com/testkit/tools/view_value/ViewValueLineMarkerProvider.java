@@ -233,7 +233,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
                             submitRequest.put("params", value);
 
-                            JSONObject submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class,5);
+                            JSONObject submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class,5,5);
                             if (submitRet == null || !submitRet.getBooleanValue("success") || submitRet.getString("data") == null) {
                                 TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "submit req error \n" + submitRet.getString("message"));
                                 return;
@@ -246,7 +246,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             params.put("reqId", reqId);
                             map.put("params", params);
 
-                            JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", map, JSONObject.class,5);
+                            JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", map, JSONObject.class,5,5);
                             if (result == null) {
                                 TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "req is error\n result is null");
                             } else if (!result.getBooleanValue("success")) {

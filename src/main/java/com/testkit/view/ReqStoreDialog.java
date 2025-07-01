@@ -1575,7 +1575,7 @@ public class ReqStoreDialog {
                     HashMap<Object, Object> params = new HashMap<>();
                     params.put("reqId", lastReqId);
                     map.put("params", params);
-                    return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,30);
+                    return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,5,30);
                 }
 
                 @Override
@@ -1602,7 +1602,7 @@ public class ReqStoreDialog {
                 // 发起任务请求，获取请求ID
                 JSONObject response = null;
                 try {
-                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", submit.get(), JSONObject.class,30);
+                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", submit.get(), JSONObject.class,5,30);
                 } catch (Throwable e) {
                     setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
                     return;
@@ -1627,7 +1627,7 @@ public class ReqStoreDialog {
                     params.put("reqId", reqId);
                     map.put("params", params);
 
-                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,600);
+                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,5,600);
 
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (cancelReqs.remove(reqId)) {
