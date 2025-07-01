@@ -59,7 +59,7 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                     return;
                 }
             } catch (IndexNotReadyException e) {
-                TestkitHelper.notify(project, NotificationType.WARNING, "IndexNotReady\nWe will still enhance commands");
+                TestkitHelper.notify(project, NotificationType.WARNING, "IndexNotReady\nWe will still enhance commands\nThe project will still be launched");
             }
 
 
