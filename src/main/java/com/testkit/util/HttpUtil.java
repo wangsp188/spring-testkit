@@ -28,7 +28,7 @@ public class HttpUtil {
      * @return 响应对象
      * @throws Exception 请求或解析时发生错误
      */
-    public static <T, R> R sendPost(String url, T request, Class<R> responseType,Integer connectSecond,int timeoutSecond) throws Exception {
+    public static <T, R> R sendPost(String url, T request, Class<R> responseType,Integer connectSecond,Integer timeoutSecond) throws Exception {
         HttpURLConnection connection = null;
         try {
             // 打开连接  
@@ -36,7 +36,7 @@ public class HttpUtil {
             connection = (HttpURLConnection) requestUrl.openConnection();
             // 设置超时时间（关键修改）
             connection.setConnectTimeout(connectSecond==null?0:(int) TimeUnit.SECONDS.toMillis(connectSecond)); // 连接超时 5 秒
-            connection.setReadTimeout((int) TimeUnit.SECONDS.toMillis(timeoutSecond));
+            connection.setReadTimeout(connectSecond==null?0:(int) TimeUnit.SECONDS.toMillis(timeoutSecond));
             connection.setDoOutput(true);
             connection.setDoInput(true);
             connection.setRequestMethod("POST");

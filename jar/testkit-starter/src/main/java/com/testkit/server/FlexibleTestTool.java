@@ -56,7 +56,7 @@ public class FlexibleTestTool implements TestkitTool {
         return new PrepareRet() {
             @Override
             public String confirm() {
-                return MessageFormat.format(TestkitTool.RED+"Can you confirm execute flexible-test?\n"+TestkitTool.RESET+TestkitTool.YELLOW+"Method: {0}\n"+TestkitTool.RESET+"{1}"+TestkitTool.GREEN+"\nCode:\n"+TestkitTool.RESET+"{2}",reflexBox.buildMethodStr(),reflexBox.buildArgStr(),code);
+                return MessageFormat.format(TestkitTool.GREEN+"Code:\n"+TestkitTool.RESET+"{0}\n"+TestkitTool.RED+"Can you confirm execute flexible-test?\n"+TestkitTool.RESET+TestkitTool.YELLOW+"Method: {1}\n"+TestkitTool.RESET+"{2}",code,reflexBox.buildMethodStr(),reflexBox.buildArgStr());
             }
 
             @Override
