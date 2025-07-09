@@ -14,8 +14,10 @@ import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -165,6 +167,7 @@ public class TestkitServer {
         new Thread(() -> {
             try {
                 server.start();
+                selfTest();
                 if(!loadByCli){
                     RuntimeAppHelper.addApp(project, appName, server.getAddress().getPort());
                     System.err.println("————————————————————————————————————————————————————————————————————\n" +
@@ -514,6 +517,59 @@ public class TestkitServer {
         OutputStream outputStream = exchange.getResponseBody();
         outputStream.write(bytes);
         outputStream.close();
+    }
+
+
+    /**
+     * 自测
+     *
+     * @return 响应对象
+     * @throws Exception 请求或解析时发生错误
+     */
+    public String selfTest() throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            // 打开连接
+            URL requestUrl = new URL("http://localhost:"+server.getAddress().getPort());
+            connection = (HttpURLConnection) requestUrl.openConnection();
+            // 设置超时时间（关键修改）
+            connection.setConnectTimeout(5000); // 连接超时 5 秒
+            connection.setReadTimeout(5000);
+            connection.setDoOutput(true);
+            connection.setDoInput(true);
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", "Java/HttpURLConnection");
+            connection.setRequestProperty("Connection", "close");
+
+            // 发送 JSON 请求
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = "{\"method\":\"hi\"}".getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            // 检查响应码
+            int status = connection.getResponseCode();
+            InputStream is = status < 400? connection.getInputStream() : connection.getErrorStream();
+
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                StringBuilder response = new StringBuilder();
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+                if (status >= 400 || status<200) {
+                    throw new IOException("SelfCheck Error,It might be that the port:"+server.getAddress().getPort()+" is specially occupied by the firewall, You can try to change the project's own port, " + status + ": " + response);
+                }
+                // 解析响应 JSON
+                return response.toString();
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
 

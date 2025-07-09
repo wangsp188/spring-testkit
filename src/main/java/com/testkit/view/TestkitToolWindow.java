@@ -58,6 +58,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.*;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Paths;
@@ -697,15 +698,25 @@ public class TestkitToolWindow {
                 boolean enableTrace = response.getJSONObject("data").getBooleanValue("enableTrace");
                 System.out.println("链接探活:"+item+",true,"+enableTrace);
                 newMap.put(item, enableTrace);
-            } catch (Exception e) {
+            }catch (Throwable e) {
                 e.printStackTrace();
                 iterator.remove();
                 System.out.println("链接探活:"+item+",false,");
-                //将这个加入到临时的链接集里
-                List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
-                if (!tempApps1.contains(item)) {
-                    tempApps1.add(item);
-                    RuntimeHelper.setTempApps(project.getName(),tempApps1);
+
+                if(e instanceof ConnectException && e.getMessage()!=null && e.getMessage().contains("Connection refused") ) {
+                    //将这个加入到临时的链接集里
+                    List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
+                    if (tempApps1.contains(item)) {
+                        tempApps1.remove(item);
+                        RuntimeHelper.setTempApps(project.getName(),tempApps1);
+                    }
+                }else{
+                    //将这个加入到临时的链接集里
+                    List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
+                    if (!tempApps1.contains(item)) {
+                        tempApps1.add(item);
+                        RuntimeHelper.setTempApps(project.getName(),tempApps1);
+                    }
                 }
                 RuntimeHelper.removeApp(project.getName(), visibleApp);
             }

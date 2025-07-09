@@ -1,11 +1,9 @@
 package com.testkit.util;
 
 import com.alibaba.fastjson.JSON;
+import org.apache.http.HttpException;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -49,11 +47,18 @@ public class HttpUtil {
                 os.write(input, 0, input.length);
             }
 
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+            // 检查响应码
+            int status = connection.getResponseCode();
+            InputStream is = status < 400? connection.getInputStream() : connection.getErrorStream();
+
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                 StringBuilder response = new StringBuilder();
                 String responseLine;
                 while ((responseLine = br.readLine()) != null) {
                     response.append(responseLine.trim());
+                }
+                if (status >= 400 || status < 200) {
+                    throw new HttpException("HTTP Error " + status + ": " + response);
                 }
                 // 解析响应 JSON
                 return JSON.parseObject(response.toString(), responseType);
