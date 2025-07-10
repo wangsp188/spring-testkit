@@ -332,15 +332,25 @@ public class ToolHelper {
                 initParams.put(name, sdf.format(new Date()));
             } else if (isEnumType(type)) {
                 initParams.put(name, getFirstEnumConstant(type));
-            } else if (isCollectionType(type)) {
-                initParams.put(name, initializeCollection(type));
-            } else if (isMapType(type)) {
-                initParams.put(name, initializeMap(type));
-            } else if (type instanceof PsiArrayType) {
-                initParams.put(name, initializeArray(type));
             } else {
-                // 为对象类型初始化一个带有可设置字段的 HashMap
-                initParams.put(name, initializeObjectFields(type));
+                try {
+                    if (isCollectionType(type)) {
+                        initParams.put(name, initializeCollection(type));
+                    } else if (isMapType(type)) {
+                        initParams.put(name, initializeMap(type));
+                    } else if (type instanceof PsiArrayType) {
+                        initParams.put(name, initializeArray(type));
+                    } else {
+                        initParams.put(name, initializeObjectFields(type));
+                    }
+                } catch (StackOverflowError e) {
+                    if(isCollectionType(type) || type instanceof PsiArrayType) {
+                        initParams.put(name, new ArrayList<>());
+                    }else {
+                        initParams.put(name, new HashMap<>());
+                    }
+
+                }
             }
         }
 
@@ -409,7 +419,10 @@ public class ToolHelper {
                     collectionInit.add(getFirstEnumConstant(elementType));
                 } else if (elementType instanceof PsiClassType) {
                     // 对于对象类型的元素，初始化一个空对象结构
-                    collectionInit.add(initializeObjectFields(elementType));
+                    try {
+                        collectionInit.add(initializeObjectFields(elementType));
+                    } catch (StackOverflowError e) {
+                    }
                 }
             }
 
@@ -467,14 +480,23 @@ public class ToolHelper {
             return sdf.format(new Date());
         } else if (isEnumType(type)) {
             return getFirstEnumConstant(type);
-        } else if (isCollectionType(type)) {
-            return initializeCollection(type);
-        } else if (isMapType(type)) {
-            return initializeMap(type);
-        } else if (type instanceof PsiArrayType) {
-            return initializeArray(type);
         } else {
-            return initializeObjectFields(type);
+            try {
+                if (isCollectionType(type)) {
+                    return initializeCollection(type);
+                } else if (isMapType(type)) {
+                    return initializeMap(type);
+                } else if (type instanceof PsiArrayType) {
+                    return initializeArray(type);
+                } else {
+                    return initializeObjectFields(type);
+                }
+            } catch (StackOverflowError e) {
+                if(isCollectionType(type) || type instanceof PsiArrayType) {
+                    return new ArrayList<>();
+                }
+                return new HashMap<>();
+            }
         }
     }
 
@@ -554,17 +576,20 @@ public class ToolHelper {
                     fieldValues.put(fieldName, sdf.format(new Date()));
                 } else if (isEnumType(fieldType)) {
                     fieldValues.put(fieldName, getFirstEnumConstant(fieldType));
-                } else if (isCollectionType(fieldType)) {
-                    fieldValues.put(fieldName, initializeCollection(fieldType));
-                } else if (isMapType(fieldType)) {
-                    fieldValues.put(fieldName, new HashMap<>());
                 } else {
-                    // 如果是对象类型，递归调用初始化
-                    fieldValues.put(fieldName, initializeObjectFields(fieldType));
+                    if (isCollectionType(fieldType)) {
+                        fieldValues.put(fieldName, initializeCollection(fieldType));
+                    } else if (isMapType(fieldType)) {
+                        fieldValues.put(fieldName, initializeMap(fieldType));
+                    }else if (fieldType instanceof PsiArrayType){
+                        fieldValues.put(fieldName, initializeArray(fieldType));
+                    } else {
+                        // 如果是对象类型，递归调用初始化
+                        fieldValues.put(fieldName, initializeObjectFields(fieldType));
+                    }
                 }
             }
         }
-
         return fieldValues;
     }
 
