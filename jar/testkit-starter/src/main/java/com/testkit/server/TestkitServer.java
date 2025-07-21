@@ -529,8 +529,56 @@ public class TestkitServer {
     public String selfTest() throws Exception {
         HttpURLConnection connection = null;
         try {
+            try {
+                // 打开连接
+                URL requestUrl = new URL("http://localhost:"+server.getAddress().getPort());
+                connection = (HttpURLConnection) requestUrl.openConnection();
+                // 设置超时时间（关键修改）
+                connection.setConnectTimeout(5000); // 连接超时 5 秒
+                connection.setReadTimeout(5000);
+                connection.setDoOutput(true);
+                connection.setDoInput(true);
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                connection.setRequestProperty("Accept", "application/json");
+                connection.setRequestProperty("User-Agent", "Java/HttpURLConnection");
+                connection.setRequestProperty("Connection", "close");
+
+                // 发送 JSON 请求
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = "{\"method\":\"hi\"}".getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                }
+
+                // 检查响应码
+                int status = connection.getResponseCode();
+                InputStream is = status == 200? connection.getInputStream() : connection.getErrorStream();
+
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                    if (status != 200) {
+                        throw new IOException("SelfCheck Error,It might be that the port:" + server.getAddress().getPort() + " is specially occupied by the firewall, You can try to change the project's own port, " + status + ": " + response);
+                    }
+                    if (response.length() == 0) {
+                        throw new IOException("HTTP Error " + status + ": [response is empty]");
+                    }
+                    // 解析响应 JSON
+                    return response.toString();
+                }
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                    connection = null;
+                }
+            }
+        } catch (Throwable e) {
+            String host = LocalIpUtil.getLocalIp()==null?"127.0.0.1":LocalIpUtil.getLocalIp();
             // 打开连接
-            URL requestUrl = new URL("http://localhost:"+server.getAddress().getPort());
+            URL requestUrl = new URL("http://"+host+":"+server.getAddress().getPort());
             connection = (HttpURLConnection) requestUrl.openConnection();
             // 设置超时时间（关键修改）
             connection.setConnectTimeout(5000); // 连接超时 5 秒
@@ -551,7 +599,7 @@ public class TestkitServer {
 
             // 检查响应码
             int status = connection.getResponseCode();
-            InputStream is = status < 400? connection.getInputStream() : connection.getErrorStream();
+            InputStream is = status == 200? connection.getInputStream() : connection.getErrorStream();
 
             try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                 StringBuilder response = new StringBuilder();
@@ -559,13 +607,16 @@ public class TestkitServer {
                 while ((responseLine = br.readLine()) != null) {
                     response.append(responseLine.trim());
                 }
-                if (status >= 400 || status<200) {
-                    throw new IOException("SelfCheck Error,It might be that the port:"+server.getAddress().getPort()+" is specially occupied by the firewall, You can try to change the project's own port, " + status + ": " + response);
+                if (status != 200) {
+                    throw new IOException("SelfCheck Error,It might be that the port:" + server.getAddress().getPort() + " is specially occupied by the firewall, You can try to change the project's own port, " + status + ": " + response);
+                }
+                if (response.length() == 0) {
+                    throw new IOException("HTTP Error " + status + ": [response is empty]");
                 }
                 // 解析响应 JSON
                 return response.toString();
             }
-        } finally {
+        }finally {
             if (connection != null) {
                 connection.disconnect();
             }

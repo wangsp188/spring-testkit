@@ -84,11 +84,11 @@ public class TestkitCLI {
         System.out.println(RED + "Ip: " + runningApp.getIp() + RESET);
         System.out.println(RED + "Testkit port: " + runningApp.getPort() + RESET);
         // 启动交互式命令行
-        startCommandLoop(br, runningApp.getPort(), ctxAtc.get());
+        startCommandLoop(br, "localhost",runningApp.getPort(), ctxAtc.get());
     }
 
 
-    private static AppMeta findRunningApp(int port, String ctx) {
+    private static AppMeta findRunningApp(String host, int port, String ctx) {
         JSONObject requestData = new JSONObject();
         requestData.put("method", "hi");
         if (ctx != null) {
@@ -98,7 +98,7 @@ public class TestkitCLI {
         }
 
         try {
-            JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class,5);
+            JSONObject response = HttpUtil.sendPost("http://"+host+":" + port + "/", requestData, JSONObject.class,5,5);
             if (!response.getBooleanValue("success")) {
                 return null;
             }
@@ -106,14 +106,14 @@ public class TestkitCLI {
         } catch (Exception e) {
             //判断
             if (!HttpUtil.isTcpPortAvailable(port)) {
-                throw new IllegalArgumentException("The port is occupied. pls change vmOptions change port, for example -Dtestkit.cli.port=10086");
+                throw new IllegalArgumentException("The port:"+port+" is occupied.");
             }
             return null;
         }
     }
 
-    private static StatusMsg directRequest(int port, Map<String, Object> requestData) throws Exception {
-        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class,30);
+    private static StatusMsg directRequest(String host, int port, Map<String, Object> requestData) throws Exception {
+        JSONObject result = HttpUtil.sendPost("http://"+host+":" + port + "/", requestData, JSONObject.class,5,30);
         if (result == null) {
             return new StatusMsg(false,RED + "req is error\n result is null" + RESET);
         }
@@ -140,10 +140,10 @@ public class TestkitCLI {
         }
     }
 
-    private static void startHeartbeatCheck(int port, String ctx) {
+    private static void startHeartbeatCheck(String host,int port, String ctx) {
         heartbeatExecutor.scheduleWithFixedDelay(() -> {
             try {
-                AppMeta app = findRunningApp(port, ctx);
+                AppMeta app = findRunningApp(host,port, ctx);
                 if (app == null) {
                     System.err.println("[Heartbeat] Server lost, shutting down...");
                     isServerRunning = false;
@@ -165,11 +165,13 @@ public class TestkitCLI {
                 return pid != null && pid.trim().equals(virtualMachineDescriptor.id());
             }
         }).findFirst();
-        VirtualMachineDescriptor targetVm;
+        VirtualMachineDescriptor targetVm = null;
         if (chooseVm.isPresent()) {
             System.out.println("Automatically select the preset pid:" + pid);
             targetVm = chooseVm.get();
         } else {
+            System.out.printf(YELLOW+"%2d. %6s %s\n",
+                    0, 0, "Remote connection"+RESET);
             for (int i = 0; i < vmList.size(); i++) {
                 VirtualMachineDescriptor vmd = vmList.get(i);
                 System.out.printf("%2d. %6s %s\n",
@@ -179,13 +181,16 @@ public class TestkitCLI {
             int tryTimes = 0;
             do {
                 tryTimes += 1;
-                System.out.print(GREEN + "Please select Jvm: " + RESET);
+                System.out.print(GREEN + "Please select Jvm(0 represents a remote connection): " + RESET);
                 String lineNumber = br.readLine();
                 if (EXIT.equalsIgnoreCase(lineNumber)) {
                     throw new IllegalArgumentException("Bye~");
                 }
                 try {
                     int choice = Integer.parseInt(lineNumber);
+                    if (choice == 0) {
+                        break;
+                    }
                     targetVm = vmList.get(choice - 1);
                     break;
                 } catch (Throwable e) {
@@ -196,6 +201,43 @@ public class TestkitCLI {
                     }
                 }
             } while (true);
+        }
+        //remote 链接
+        if (targetVm == null) {
+            System.out.print(GREEN + "Please enter remote host (IP or domain, empty is equals to localhost): " + RESET);
+            String host = br.readLine().trim();
+            if (EXIT.equalsIgnoreCase(host)) {
+                throw new IllegalArgumentException("Bye~");
+            }
+            host = host.trim().isEmpty() ? "localhost" : host.trim().toLowerCase();
+
+            int port = 0;
+            int tryTimes = 0;
+            while (port <= 0) {
+                tryTimes++;
+                System.out.print(GREEN + "Please enter remote port: " + RESET);
+                String portStr = br.readLine().trim();
+                if (EXIT.equalsIgnoreCase(portStr)) {
+                    throw new IllegalArgumentException("Bye~");
+                }
+                try {
+                    port = Integer.parseInt(portStr);
+                    if (port <= 0 || port > 65535) {
+                        System.out.println(RED + "Port must be between 1 and 65535." + RESET);
+                        port = 0;
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println(RED + "Invalid port number." + RESET);
+                }
+                if (tryTimes >= 3) {
+                    throw new IllegalArgumentException("Three consecutive input failures! Bye~");
+                }
+            }
+            AppMeta runningApp = findRunningApp(host, port, null);
+            if (runningApp == null) {
+                throw new IllegalArgumentException("Connection fail, Bye~");
+            }
+            return runningApp;
         }
 
         // 附加到目标JVM
@@ -292,7 +334,7 @@ public class TestkitCLI {
             } catch (Throwable e) {
                 throw new RuntimeException(pidPath + " content is not port");
             }
-            AppMeta runningApp = findRunningApp(port, ctx);
+            AppMeta runningApp = findRunningApp("localhost", port, ctx);
             if (runningApp != null) {
                 if (runningApp.isTestPass()) {
                     return runningApp;
@@ -303,9 +345,9 @@ public class TestkitCLI {
     }
 
 
-    private static void startCommandLoop(BufferedReader br, int port, String ctx) throws IOException {
+    private static void startCommandLoop(BufferedReader br, String host,int port, String ctx) throws IOException {
         // 启动心跳检测
-        startHeartbeatCheck(port, ctx);
+        startHeartbeatCheck(host,port, ctx);
         try {
             AtomicReference<String> confirmCmd = new AtomicReference<>();
             while (isServerRunning) {
@@ -315,7 +357,7 @@ public class TestkitCLI {
                 if (confirmCmd.get() != null) {
                     if (cmd.equalsIgnoreCase("Y")) {
                         try {
-                            String ret = processCommand(confirmCmd.get(), port, false, confirmCmd);
+                            String ret = processCommand(confirmCmd.get(),host, port, false, confirmCmd);
                             System.out.println(ret);
                         } catch (Exception e) {
                             System.out.println(RED + e.getMessage() + RESET);
@@ -333,7 +375,7 @@ public class TestkitCLI {
                     break;
                 }
                 if (cmd.equalsIgnoreCase("hi")) {
-                    System.out.println(YELLOW + "[hi] " + findRunningApp(port, ctx) + RESET);
+                    System.out.println(YELLOW + "[hi] " + findRunningApp(host, port, ctx) + RESET);
                     continue;
                 }
                 // 示例命令处理
@@ -341,7 +383,7 @@ public class TestkitCLI {
                     HashMap<String, String> requestData = new HashMap<>();
                     requestData.put("method", "stop");
                     try {
-                        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", requestData, JSONObject.class,30);
+                        JSONObject response = HttpUtil.sendPost("http://"+host+":" + port + "/", requestData, JSONObject.class,5,30);
                         if (!response.getBooleanValue("success")) {
                             System.out.println(YELLOW + "[stop] " + response.getString("message") + RESET);
                             continue;
@@ -365,7 +407,7 @@ public class TestkitCLI {
                         value.put("fieldName", split[1]);
                         submitRequest.put("params", value);
                         try {
-                            System.out.println(YELLOW + "[view-field]" + RESET + submitReqAndWaitRet(port, submitRequest));
+                            System.out.println(YELLOW + "[view-field]" + RESET + submitReqAndWaitRet(host,port, submitRequest));
                         } catch (Exception e) {
                             System.out.println(RED + e.getMessage() + RESET);
                         }
@@ -377,7 +419,7 @@ public class TestkitCLI {
                     value.put("property", req);
                     submitRequest.put("params", value);
                     try {
-                        System.out.println(YELLOW + "[view-property]" + RESET + directRequest(port, submitRequest).getMessage());
+                        System.out.println(YELLOW + "[view-property]" + RESET + directRequest(host,port, submitRequest).getMessage());
                     } catch (Exception e) {
                         System.out.println(RED + e.getMessage() + RESET);
                     }
@@ -415,7 +457,7 @@ public class TestkitCLI {
                 }
                 // 这里需要实现命令分发
                 try {
-                    String ret = processCommand(cmd, port, true, confirmCmd);
+                    String ret = processCommand(cmd, host, port, true, confirmCmd);
                     System.out.println(ret);
                 } catch (Exception e) {
                     confirmCmd.set(null);
@@ -427,13 +469,13 @@ public class TestkitCLI {
         }
     }
 
-    private static String processCommand(String cmd, int port, boolean prepare, AtomicReference<String> confirmCmd) throws Exception {
+    private static String processCommand(String cmd, String host, int port, boolean prepare, AtomicReference<String> confirmCmd) throws Exception {
         if (cmd.startsWith("function-call ")) {
             String req = cmd.substring("function-call ".length());
             JSONObject reqObject = JSON.parseObject(req);
             if (prepare) {
                 reqObject.put("prepare", true);
-                StatusMsg statusMsg = directRequest(port, reqObject);
+                StatusMsg statusMsg = directRequest(host, port, reqObject);
                 if(statusMsg.isSuccess()){
                     confirmCmd.set(cmd);
                     return YELLOW + "[function-call]" + RESET + statusMsg.getMessage() + "\n" + GREEN + "Confirm execution? (Y/N): " + RESET;
@@ -441,14 +483,14 @@ public class TestkitCLI {
                     return YELLOW + "[function-call]" + RESET + statusMsg.getMessage() + RESET;
                 }
             }
-            return YELLOW + "[function-call]" + RESET + submitReqAndWaitRet(port, reqObject);
+            return YELLOW + "[function-call]" + RESET + submitReqAndWaitRet(host, port, reqObject);
         }
         if (cmd.startsWith("flexible-test ")) {
             String req = cmd.substring("flexible-test ".length());
             JSONObject reqObject = JSON.parseObject(req);
             if (prepare) {
                 reqObject.put("prepare", true);
-                StatusMsg statusMsg = directRequest(port, reqObject);
+                StatusMsg statusMsg = directRequest(host, port, reqObject);
                 if(statusMsg.isSuccess()){
                     confirmCmd.set(cmd);
                     return YELLOW + "[flexible-test]" + RESET + statusMsg.getMessage() + "\n" + GREEN + "Confirm execution? (Y/N): " + RESET;
@@ -456,14 +498,14 @@ public class TestkitCLI {
                     return YELLOW + "[flexible-test]" + RESET + statusMsg.getMessage() + RESET;
                 }
             }
-            return YELLOW + "[flexible-test]" + RESET + submitReqAndWaitRet(port, reqObject);
+            return YELLOW + "[flexible-test]" + RESET + submitReqAndWaitRet(host, port, reqObject);
         }
         if (cmd.startsWith("spring-cache ")) {
             String req = cmd.substring("spring-cache ".length());
             JSONObject reqObject = JSON.parseObject(req);
             if ("delete_cache".equals(reqObject.getJSONObject("params").getString("action")) && prepare) {
                 reqObject.put("prepare", true);
-                StatusMsg statusMsg = directRequest(port, reqObject);
+                StatusMsg statusMsg = directRequest(host, port, reqObject);
                 if(statusMsg.isSuccess()){
                     confirmCmd.set(cmd);
                     return YELLOW + "[spring-cache]" + RESET + statusMsg.getMessage() + "\n" + GREEN + "Confirm execution? (Y/N): " + RESET;
@@ -471,13 +513,13 @@ public class TestkitCLI {
                     return YELLOW + "[spring-cache]" + RESET + statusMsg.getMessage() + RESET;
                 }
             }
-            return YELLOW + "[spring-cache]" + RESET + submitReqAndWaitRet(port, reqObject);
+            return YELLOW + "[spring-cache]" + RESET + submitReqAndWaitRet(host, port, reqObject);
         }
         return RED + "Unknown Cmd: " + cmd + RESET;
     }
 
-    private static String submitReqAndWaitRet(int port, JSONObject reqObject) throws Exception {
-        JSONObject response = HttpUtil.sendPost("http://localhost:" + port + "/", reqObject, JSONObject.class,30);
+    private static String submitReqAndWaitRet(String host, int port, JSONObject reqObject) throws Exception {
+        JSONObject response = HttpUtil.sendPost("http://"+host+":" + port + "/", reqObject, JSONObject.class,5,30);
         if (response == null || !response.getBooleanValue("success") || response.getString("data") == null) {
             return RED + "submit req error \n" + response.getString("message") + RESET;
         }
@@ -489,7 +531,7 @@ public class TestkitCLI {
         params.put("reqId", reqId);
         map.put("params", params);
 
-        JSONObject result = HttpUtil.sendPost("http://localhost:" + port + "/", map, JSONObject.class,600);
+        JSONObject result = HttpUtil.sendPost("http://"+host+":" + port + "/", map, JSONObject.class,5,600);
         if (result == null) {
             return RED + "req is error\n result is null" + RESET;
         } else {
