@@ -64,17 +64,10 @@ public class ViewValueTool implements TestkitTool {
         } catch (Throwable e) {
             throw new TestkitException("can not find field: " + fieldName + ", please check");
         }
-        Field finalField = field;
-        boolean isSpringInjected = springTypes.stream().anyMatch(new Predicate<Class>() {
-            @Override
-            public boolean test(Class aClass) {
-                return finalField.isAnnotationPresent(aClass);
-            }
-        });
 
-        // 检查字段是否为static  
+        // 检查字段是否为static
         if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-            // 如果是static字段，直接从类获取  
+            // 如果是static字段，直接从类获取
             Field finalField1 = field;
             return new PrepareRet() {
                 @Override
@@ -84,43 +77,63 @@ public class ViewValueTool implements TestkitTool {
 
                 @Override
                 public Object execute() throws Exception {
-                    return adapter(finalField1.get(null), isSpringInjected);
+                    return finalField1.get(null);
                 }
             };
         }
+
+
+        Field finalField = field;
+        boolean isSpringInjected = springTypes.stream().anyMatch(new Predicate<Class>() {
+            @Override
+            public boolean test(Class aClass) {
+                return finalField.isAnnotationPresent(aClass);
+            }
+        });
+
         // 如果不是static字段，从Spring context中获取bean
-        Object bean = null;
+        Map<String, Object> beansOfType = null;
         if (beanName == null || beanName.trim().isEmpty()) {
-            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
+            beansOfType = (Map<String, Object>) app.getBeansOfType(typeClass);
             if (beansOfType.isEmpty()) {
                 throw new TestkitException("can not find " + typeClass + " in this spring");
-            } else if (beansOfType.size() > 1) {
-                throw new TestkitException("no union bean of type " + typeClass + " in this spring");
             }
-            bean = beansOfType.values().iterator().next();
         } else {
             try {
-                bean = app.getBean(beanName, typeClass);
+                beansOfType = new HashMap<>();
+                Object bean = app.getBean(beanName, typeClass);
+                beansOfType.put(beanName, bean);
             } catch (BeansException e) {
                 throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
             }
         }
 
-        // 获取原始对象
-        Object targetObject = ReflexUtils.getTargetObject(bean);
-        if (!typeClass.isAssignableFrom(targetObject.getClass())) {
-            throw new TestkitException("bean is not type of " + typeClassStr);
+        //超过一个，自动组成map告诉他
+        HashMap<String, Object> oriMap = new HashMap<>();
+        for (Map.Entry<String, ?> stringEntry : beansOfType.entrySet()) {
+            Object targetObject = ReflexUtils.getTargetObject(stringEntry.getValue());
+            if (!typeClass.isAssignableFrom(targetObject.getClass())) {
+                throw new TestkitException("bean:" + stringEntry.getKey() + " is not type of " + typeClassStr);
+            }
+            oriMap.put(stringEntry.getKey(), targetObject);
         }
-        Field finalField2 = field;
+
         return new PrepareRet() {
             @Override
-            public String confirm() {
+            public String confirm() throws Exception {
                 return null;
             }
 
             @Override
             public Object execute() throws Exception {
-                return adapter(finalField2.get(targetObject), isSpringInjected);
+                if (oriMap.size() == 1) {
+                    return adapter(finalField.get(oriMap.values().iterator().next()), isSpringInjected);
+                }
+                HashMap<Object, Object> map = new HashMap<>();
+                for (Map.Entry<String, Object> stringEntry : oriMap.entrySet()) {
+                    map.put(stringEntry.getKey(), adapter(finalField.get(stringEntry.getValue()), isSpringInjected));
+                }
+                return map;
             }
         };
     }
