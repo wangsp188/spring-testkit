@@ -19,6 +19,7 @@ import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesIconProvider;
 import com.testkit.sql_review.MysqlUtil;
+import com.testkit.sql_review.SqlDialog;
 import com.testkit.tools.mapper_sql.MapperSqlTool;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
@@ -41,6 +42,8 @@ import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.tools.flexible_test.FlexibleTestTool;
 import com.intellij.ui.components.JBScrollPane;
+import com.testkit.tools.mcp_function.MCPServerDialog;
+import com.testkit.tools.mcp_function.McpFunctionTool;
 import com.testkit.util.HttpUtil;
 import com.intellij.ui.jcef.JBCefBrowser;
 import org.apache.commons.collections.CollectionUtils;
@@ -52,8 +55,6 @@ import org.cef.handler.CefLoadHandlerAdapter;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.border.Border;
-import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -64,7 +65,6 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -90,6 +90,7 @@ public class TestkitToolWindow {
     private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
     private SqlDialog sqlDialog;
+    private MCPServerDialog mcpServerDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
@@ -227,14 +228,16 @@ public class TestkitToolWindow {
 
         curlDialog = new CurlDialog(this);
         sqlDialog = new SqlDialog(this);
+        mcpServerDialog = new MCPServerDialog(this);
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
 //        初始化所有tool的面板，但是不加载
         tools.put(PluginToolEnum.FUNCTION_CALL, new FunctionCallTool(this));
         tools.put(PluginToolEnum.FLEXIBLE_TEST, new FlexibleTestTool(this));
         tools.put(PluginToolEnum.MAPPER_SQL, new MapperSqlTool(this));
+        tools.put(PluginToolEnum.MCP_FUNCTION, new McpFunctionTool(this));
         // 添加 toolBox 到 topPanel
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode()});
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode(),PluginToolEnum.MCP_FUNCTION.getCode()});
         toolBox.setToolTipText("Tool list");
         toolBox.setPreferredSize(new Dimension(120, 32));
 //        toolBox.setEnabled(false);
@@ -813,6 +816,19 @@ public class TestkitToolWindow {
         }
     }
 
+    public void refreshMcpFunctions() {
+        BasePluginTool basePluginTool = tools.get(PluginToolEnum.MCP_FUNCTION);
+        basePluginTool.onSwitchAction(null);
+    }
+
+    public void openMcpServerDialog() {
+        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
+            //设置
+            mcpServerDialog.refreshMcpJson();
+            mcpServerDialog.resizeDialog();
+            mcpServerDialog.setVisible(true);
+        }
+    }
 
     public void switchTool(PluginToolEnum tool, PsiElement element) {
         toolBox.setSelectedItem(tool.getCode());

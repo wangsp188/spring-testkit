@@ -3,7 +3,8 @@ package com.testkit.tools;
 public enum PluginToolEnum {
     FUNCTION_CALL("function-call"),
     FLEXIBLE_TEST("flexible-test"),
-    MAPPER_SQL("mapper-sql")
+    MAPPER_SQL("mapper-sql"),
+    MCP_FUNCTION("mcp-function")
     ;
 
     private String code;

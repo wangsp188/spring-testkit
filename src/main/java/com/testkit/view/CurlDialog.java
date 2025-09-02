@@ -22,6 +22,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.util.*;
 
 public class CurlDialog extends JDialog {
@@ -70,17 +71,8 @@ public class CurlDialog extends JDialog {
         c1.gridwidth = 2; // 不再跨列
         panelMain.add(panelResults, c1);
 
-        // 设置 closePanel
-        JButton closeButton = new JButton("Close");
-        closeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dispose();
-            }
-        });
 
         JPanel closePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        closePanel.add(closeButton);
 
         c1.fill = GridBagConstraints.NONE;
         c1.anchor = GridBagConstraints.SOUTHEAST; // 将按钮放置在东南角
@@ -93,6 +85,12 @@ public class CurlDialog extends JDialog {
         add(panelMain);
         pack();
         resizeDialog();
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        getRootPane().registerKeyboardAction(
+                e -> dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
     }
 
     public void resizeDialog() {

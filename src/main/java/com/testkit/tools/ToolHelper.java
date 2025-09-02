@@ -7,6 +7,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.Computable;
 import com.testkit.SettingsStorageHelper;
+import com.testkit.tools.mcp_function.McpFunctionDefinition;
 import com.testkit.util.JsonUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
@@ -906,6 +907,47 @@ public class ToolHelper {
 
         public XmlTag getXmlTag() {
             return xmlTag;
+        }
+    }
+
+    public static class McpFunctionAction {
+
+        private final McpFunctionDefinition functionDefinition;
+
+        private String args;
+
+        public McpFunctionAction(McpFunctionDefinition functionDefinition) {
+            this.functionDefinition = functionDefinition;
+        }
+
+        public String buildDescription(){
+            if (this.functionDefinition==null) {
+                return "";
+            }
+            return this.functionDefinition.buildDescription();
+        }
+
+
+        @Override
+        public String toString() {
+            if (functionDefinition == null) {
+                return "unknown";
+            }
+            String s = functionDefinition.buildDisplayName();
+            return s == null ? "unknown" : s;
+        }
+
+
+        public String getArgs() {
+            return args;
+        }
+
+        public void setArgs(String args) {
+            this.args = args;
+        }
+
+        public McpFunctionDefinition getFunctionDefinition() {
+            return functionDefinition;
         }
     }
 }

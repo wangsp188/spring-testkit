@@ -1,9 +1,8 @@
-package com.testkit.view;
+package com.testkit.sql_review;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.lang.Language;
 import com.intellij.notification.NotificationType;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.RuntimeExceptionWithAttachments;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
@@ -15,10 +14,6 @@ import com.intellij.util.ui.JBUI;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
-import com.testkit.sql_review.MysqlVerifyExecuteUtil;
-import com.testkit.sql_review.MysqlUtil;
-import com.testkit.sql_review.SqlReviewer;
-import com.testkit.sql_review.Suggest;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -26,6 +21,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
+import com.testkit.view.TestkitToolWindow;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.Statements;
 import net.sf.jsqlparser.statement.alter.Alter;
@@ -43,14 +39,10 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -111,17 +103,8 @@ public class SqlDialog extends JDialog {
         c1.anchor = GridBagConstraints.SOUTH;
         panelMain.add(panelResults, c1);
 
-        // 设置 closePanel
-        JButton closeButton = new JButton("Close");
-        closeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dispose();
-            }
-        });
 
         JPanel closePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        closePanel.add(closeButton);
 
         c1.fill = GridBagConstraints.NONE;
         c1.anchor = GridBagConstraints.SOUTHEAST; // 将按钮放置在东南角
@@ -134,6 +117,12 @@ public class SqlDialog extends JDialog {
         add(panelMain);
         pack();
         resizeDialog();
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        getRootPane().registerKeyboardAction(
+                e -> dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
     }
 
     public void resizeDialog() {
@@ -1270,4 +1259,61 @@ public class SqlDialog extends JDialog {
         return null;
     }
 
+    // 自定义单元格渲染器，实现自动换行
+    static class TextAreaCellRenderer extends JTextArea implements TableCellRenderer {
+        private static final Color[] TECH_COLORS = {
+    //            new Color(207, 201, 201, 255),
+    //            new Color(240, 255, 220),
+                new Color(178, 198, 11, 255),
+                new Color(255, 75, 219),
+        };
+
+
+        private final Set<Integer> tooltips;
+        private final int randomBackLoop;
+
+        // 添加构造参数控制颜色重复周期
+        public TextAreaCellRenderer(int row, Set<Integer> tooltips, int randomBackLoop) {
+            setLineWrap(true);
+            setWrapStyleWord(true);
+            setOpaque(true);
+            setRows(row);
+            this.tooltips = tooltips != null ? new HashSet<>(tooltips) : Collections.emptySet();
+            this.randomBackLoop = randomBackLoop;
+        }
+
+        public TextAreaCellRenderer(int row, Set<Integer> tooltips) {
+            this(row, tooltips, 0);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                       boolean isSelected, boolean hasFocus, int row, int column) {
+            // 原始文本处理逻辑
+            setText(value != null ? value.toString() : "");
+            handleTooltip(value, column);
+
+            if (randomBackLoop > 0) {
+                int colorIndex = (row / randomBackLoop) % TECH_COLORS.length;
+                setForeground(TECH_COLORS[colorIndex]);
+    //            setBackground(TECH_COLORS[colorIndex]);
+            }
+            return this;
+        }
+
+        // 原有工具提示逻辑
+        private void handleTooltip(Object value, int column) {
+            if (tooltips.contains(column)) {
+                String str = value != null ? value.toString() : "";
+                List<String> strs = Arrays.asList(str.replace("\n", "<br>").split("br>"));
+                if (strs.size() > 10) {
+                    strs = new ArrayList<>(strs.subList(0, 9));
+                    strs.add("...");
+                }
+                setToolTipText(String.join("<br>", strs));
+            } else {
+                setToolTipText(null);
+            }
+        }
+    }
 }

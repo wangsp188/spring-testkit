@@ -19,6 +19,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
+import com.testkit.tools.mcp_function.McpHelper;
 
 import javax.swing.*;
 import java.util.Arrays;
@@ -31,6 +32,8 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
     public static final Icon CURL_ICON = IconLoader.getIcon("/icons/curl.svg", FunctionCallIconProvider.class);
 
     public static final Icon SQL_TOOL_ICON = IconLoader.getIcon("/icons/sql-tool.svg", FunctionCallIconProvider.class);
+    public static final Icon MCP_ICON = IconLoader.getIcon("/icons/mcp.svg", FunctionCallIconProvider.class);
+
 
 
     private static final Map<Project, TestkitToolWindow> windows = new HashMap<>();
@@ -109,6 +112,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             ContentManager contentManager = toolWindow.getContentManager();
             contentManager.addContent(content);
             addHeaderActions(toolWindow, project, testkitToolWindow);
+            McpHelper.subscribe(testkitToolWindow);
         }
 
     }
@@ -141,6 +145,19 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
+        // 添加第二个按钮
+        AnAction mcp = new AnAction("MCP Servers", "MCP Servers", MCP_ICON) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        testkitToolWindow.openMcpServerDialog();
+                    }
+                });
+            }
+        };
+
         // 添加第三个个按钮
         AnAction refresh = new AnAction("Refresh", "Refresh", AllIcons.Actions.Refresh) {
             @Override
@@ -157,6 +174,6 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         };
 
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,refresh));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,refresh));
     }
 }

@@ -569,6 +569,8 @@ public abstract class BasePluginTool {
                             xmlTag.getContainingFile().getVirtualFile(),
                             xmlTag.getTextOffset()
                     ).navigate(true);
+                }else if(selectedItem instanceof ToolHelper.McpFunctionAction){
+                    toolWindow.openMcpServerDialog();
                 }
             }
         });
@@ -632,6 +634,8 @@ public abstract class BasePluginTool {
                 tooltip = ToolHelper.buildMethodKey(((ToolHelper.MethodAction) selectedItem).getMethod());
             }else if(selectedItem instanceof ToolHelper.XmlTagAction){
                 tooltip = ToolHelper.buildXmlTagKey(((ToolHelper.XmlTagAction) selectedItem).getXmlTag());
+            }else if(selectedItem instanceof ToolHelper.McpFunctionAction){
+                tooltip = ((ToolHelper.McpFunctionAction) selectedItem).buildDescription();
             }
 
             actionComboBox.setToolTipText(tooltip); // 动态更新 ToolTipText
