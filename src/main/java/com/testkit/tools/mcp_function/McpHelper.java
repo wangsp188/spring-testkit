@@ -119,7 +119,7 @@ public class McpHelper {
         }
         McpSchema.CallToolResult callToolResult = client.callTool(new McpSchema.CallToolRequest(toolName, args));
         if (callToolResult == null) {
-            return null;
+            return "null";
         }
         //fail
         if (callToolResult.isError() != null && callToolResult.isError()) {
@@ -131,7 +131,7 @@ public class McpHelper {
         }
         List<McpSchema.Content> content = Optional.ofNullable(callToolResult.content()).orElse(new ArrayList<>());
         if (content.isEmpty()) {
-            return null;
+            return "null";
         }
 
         //判断是否是仅一个text
