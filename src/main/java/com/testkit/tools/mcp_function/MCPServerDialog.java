@@ -37,7 +37,7 @@ public class MCPServerDialog extends JDialog {
 
 
     public MCPServerDialog(TestkitToolWindow testkitWindow) {
-        super((Frame) null, "MCP Servers", true);
+        super((Frame) null,  "MCP Servers is all you need", true);
         this.toolWindow = testkitWindow;
         JPanel panelMain = new JPanel(new GridBagLayout());
         GridBagConstraints c1 = new GridBagConstraints();
@@ -80,12 +80,8 @@ public class MCPServerDialog extends JDialog {
             ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Verify MCP-Servers, please wait ...", false) {
                 @Override
                 public void run(@NotNull ProgressIndicator progressIndicator) {
-                    McpAdapter.McpInitRet mcpInitRet = McpAdapter.parseAndBuildMcpClients(finalJsonObject);
-                    try {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), mcpInitRet.toString().replace("\n","<br>"));
-                    } finally {
-                        mcpInitRet.close();
-                    }
+                    McpAdapter.McpInitRet mcpInitRet = McpAdapter.parseMcpServers(finalJsonObject);
+                    TestkitHelper.alert(toolWindow.getProject(), Messages.getInformationIcon(), mcpInitRet.toString().replace("\n","<br>"));
                 }
             });
         });
@@ -117,8 +113,7 @@ public class MCPServerDialog extends JDialog {
                     @Override
                     public void run(@NotNull ProgressIndicator progressIndicator) {
                         //更新配置
-                        McpAdapter.McpInitRet mcpInitRet = McpAdapter.parseAndBuildMcpClients(finalJsonObject);
-
+                        McpAdapter.McpInitRet mcpInitRet = McpAdapter.parseMcpServers(finalJsonObject);
                         try {
                             // 添加确认对话框
                             int result = JOptionPane.showConfirmDialog(
@@ -135,11 +130,10 @@ public class MCPServerDialog extends JDialog {
 
                             //保存文件
                             McpHelper.saveMcpJson(finalJsonObject);
-                            McpHelper.refreshClients(mcpInitRet.clients());
+                            McpHelper.refreshServers(mcpInitRet.servers());
                             TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "MCP-Servers apply successfully\n"+mcpInitRet);
                         } catch (RuntimeExceptionWithAttachments ex) {
                             ex.printStackTrace();
-                            mcpInitRet.close();
                         }
                     }
                 });

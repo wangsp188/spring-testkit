@@ -6,6 +6,7 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.project.Project;
 import com.testkit.TestkitHelper;
+import com.testkit.util.ExceptionUtil;
 import com.testkit.view.TestkitToolWindow;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -27,7 +28,7 @@ public class McpHelper {
 
     private static final String MCP_DIR = ".spring-testkit/mcp";
 
-    private static final Map<String,McpSyncClient> clients = new HashMap<>();
+    private static final Map<String,McpServerDefinition> servers = new HashMap<>();
 
     private static final Set<TestkitToolWindow> subscribeWindows = new HashSet<>();
 
@@ -37,17 +38,17 @@ public class McpHelper {
             @Override
             public void run() {
                 System.err.println("start Initialize MCP-server");
-                McpAdapter.McpInitRet ret = McpAdapter.parseAndBuildMcpClients(mcpJson);
+                McpAdapter.McpInitRet ret = McpAdapter.parseMcpServers(mcpJson);
                 //从.spring-testkit/.mcp.json内容初始化
                 System.err.println("Initialize MCP-server," + ret);
-                if (MapUtils.isNotEmpty(ret.clients())) {
-                    String servers = ret.clients().keySet().stream().collect(Collectors.joining(","));
+                if (MapUtils.isNotEmpty(ret.servers())) {
+                    String servers = ret.servers().keySet().stream().collect(Collectors.joining(","));
                     TestkitHelper.notify(null, NotificationType.INFORMATION, "Initialize MCP-server successful<br>" + servers);
                 }
                 if (MapUtils.isNotEmpty(ret.errors())) {
                     TestkitHelper.notify(null, NotificationType.ERROR, "Initialize MCP-server occur some error<br>" + JSON.toJSONString(ret.errors()));
                 }
-                refreshClients(ret.clients());
+                refreshServers(ret.servers());
                 System.err.println("end Initialize MCP-server");
             }
         }).start();
@@ -95,60 +96,82 @@ public class McpHelper {
     }
 
 
-    public static List<McpFunctionDefinition> fetchDefinitions() {
-        Map<String,McpSyncClient> clients = getClients();
+    public static List<McpServerDefinition.McpFunctionDefinition> fetchDefinitions() {
+        Map<String,McpServerDefinition> clients = getServers();
         if (MapUtils.isEmpty(clients)) {
             return new ArrayList<>();
         }
-        List<McpFunctionDefinition> definitions = new ArrayList<>();
-        for (Map.Entry<String, McpSyncClient> clientEntry : clients.entrySet()) {
-            List<McpFunctionDefinition> mcpFunctionDefinitions = McpAdapter.fetchToolDefinition(clientEntry.getKey(),clientEntry.getValue());
+        List<McpServerDefinition.McpFunctionDefinition> definitions = new ArrayList<>();
+        for (Map.Entry<String, McpServerDefinition> clientEntry : clients.entrySet()) {
+            McpServerDefinition serverDefinition = clientEntry.getValue();
+            if (serverDefinition==null) {
+                continue;
+            }
+            List<McpServerDefinition.McpFunctionDefinition> mcpFunctionDefinitions = serverDefinition.getDefinitions();
+            if (mcpFunctionDefinitions==null) {
+                continue;
+            }
             definitions.addAll(mcpFunctionDefinitions);
         }
         return definitions;
     }
 
-    public static Map<String,McpSyncClient> getClients() {
-        return clients;
+    public static Map<String,McpServerDefinition> getServers() {
+        return servers;
     }
 
     public static String callTool(String serverKey, String toolName, JSONObject args) {
-        McpSyncClient client = clients.get(serverKey);
-        if (client == null) {
+        McpServerDefinition serverDefinition = servers.get(serverKey);
+        if (serverDefinition == null) {
             throw new IllegalArgumentException("serverKey:" + serverKey + " not found");
         }
-        McpSchema.CallToolResult callToolResult = client.callTool(new McpSchema.CallToolRequest(toolName, args));
-        if (callToolResult == null) {
-            return "null";
-        }
-        //fail
-        if (callToolResult.isError() != null && callToolResult.isError()) {
-            List<McpSchema.Content> content = callToolResult.content();
-            if (content != null && content.size() == 1 && content.get(0) instanceof McpSchema.TextContent) {
+        McpSyncClient mcpSyncClient = null;
+        try {
+            mcpSyncClient = McpAdapter.initMcpServer(serverDefinition.getConfig());
+
+            McpSchema.CallToolResult callToolResult = mcpSyncClient.callTool(new McpSchema.CallToolRequest(toolName, args));
+            if (callToolResult == null) {
+                return "null";
+            }
+            //fail
+            if (callToolResult.isError() != null && callToolResult.isError()) {
+                List<McpSchema.Content> content = callToolResult.content();
+                if (content != null && content.size() == 1 && content.get(0) instanceof McpSchema.TextContent) {
+                    return ((McpSchema.TextContent) content.get(0)).text();
+                }
+                return callToolResult.toString();
+            }
+            List<McpSchema.Content> content = Optional.ofNullable(callToolResult.content()).orElse(new ArrayList<>());
+            if (content.isEmpty()) {
+                return "null";
+            }
+
+            //判断是否是仅一个text
+            if (content.size() == 1 && content.get(0) instanceof McpSchema.TextContent) {
                 return ((McpSchema.TextContent) content.get(0)).text();
             }
-            return callToolResult.toString();
-        }
-        List<McpSchema.Content> content = Optional.ofNullable(callToolResult.content()).orElse(new ArrayList<>());
-        if (content.isEmpty()) {
-            return "null";
-        }
 
-        //判断是否是仅一个text
-        if (content.size() == 1 && content.get(0) instanceof McpSchema.TextContent) {
-            return ((McpSchema.TextContent) content.get(0)).text();
-        }
-
-        return content.stream().map(new Function<McpSchema.Content, String>() {
-            @Override
-            public String apply(McpSchema.Content content) {
-                if (content instanceof McpSchema.TextContent) {
-                    return ((McpSchema.TextContent) content).text();
-                }else{
-                    return content.toString();
+            return content.stream().map(new Function<McpSchema.Content, String>() {
+                @Override
+                public String apply(McpSchema.Content content) {
+                    if (content instanceof McpSchema.TextContent) {
+                        return ((McpSchema.TextContent) content).text();
+                    }else{
+                        return content.toString();
+                    }
                 }
+            }).collect(Collectors.joining("\n\n"));
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return ExceptionUtil.fetchStackTrace(e);
+        }finally {
+            if(mcpSyncClient!=null){
+                System.out.println("mcp-server is close,"+mcpSyncClient.getServerInfo().name());
+                mcpSyncClient.close();
             }
-        }).collect(Collectors.joining("\n\n"));
+        }
+
+
     }
 
     public static void subscribe(TestkitToolWindow window) {
@@ -159,14 +182,9 @@ public class McpHelper {
     }
 
 
-    public static void refreshClients(Map<String,McpSyncClient> newClients) {
-        HashMap<String,McpSyncClient> temp = new HashMap<>(clients);
-        for (Map.Entry<String, McpSyncClient> clientEntry : temp.entrySet()) {
-            System.err.println("close MCP-server, "+clientEntry.getKey());
-            clientEntry.getValue().close();
-        }
-        clients.clear();
-        clients.putAll(newClients);
+    public static void refreshServers(Map<String,McpServerDefinition> newServers) {
+        servers.clear();
+        servers.putAll(newServers);
         Iterator<TestkitToolWindow> iterator = subscribeWindows.iterator();
         while (iterator.hasNext()) {
             TestkitToolWindow window = iterator.next();

@@ -69,9 +69,6 @@
         <toolWindow id="Spring-Testkit" icon="/icons/spring-testkit.svg" factoryClass="com.testkit.view.TestkitToolWindowFactory" anchor="right"/>
         <!-- Here you can register other extensions, for example, actions -->
     </extensions>
-    <applicationListeners>
-        <listener class="com.testkit.listener.ServiceCloseListener" topic="com.intellij.ide.AppLifecycleListener"/>
-    </applicationListeners>
 
     <actions>
         <action icon="/icons/trace.svg" id="popup_graph_trace_profiler" class="com.testkit.trace.TestkitTraceViewAction" text="Popup graph req trace"

@@ -84,7 +84,7 @@ public class McpFunctionTool extends BasePluginTool {
                             return "please select mcp function";
                         }
                         selectedItem.setArgs(jsonInput);
-                        McpFunctionDefinition functionDefinition = selectedItem.getFunctionDefinition();
+                        McpServerDefinition.McpFunctionDefinition functionDefinition = selectedItem.getFunctionDefinition();
                         return McpHelper.callTool(functionDefinition.getServerKey(), functionDefinition.getName(), jsonObject);
                     }
                 });
@@ -113,8 +113,8 @@ public class McpFunctionTool extends BasePluginTool {
         //psiElement 恒为null
         SwingUtilities.invokeLater(() -> {
             actionComboBox.removeAllItems();
-            List<McpFunctionDefinition> definitions = McpHelper.fetchDefinitions();
-            for (McpFunctionDefinition definition : definitions) {
+            List<McpServerDefinition.McpFunctionDefinition> definitions = McpHelper.fetchDefinitions();
+            for (McpServerDefinition.McpFunctionDefinition definition : definitions) {
                 ToolHelper.McpFunctionAction item = new ToolHelper.McpFunctionAction(definition);
                 actionComboBox.addItem(item);
             }
@@ -129,7 +129,7 @@ public class McpFunctionTool extends BasePluginTool {
             jsonInputField.setText("{}");
             return;
         }
-        McpFunctionDefinition functionDefinition = functionAction.getFunctionDefinition();
+        McpServerDefinition.McpFunctionDefinition functionDefinition = functionAction.getFunctionDefinition();
         String oldText = jsonInputField.getText();
         jsonInputField.setText("init params ...");
         new SwingWorker<JSONObject, Void>() {

@@ -27,7 +27,7 @@ dependencies {
     implementation(files("resource/spring-startup-analyzer.tar.gz"))
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
-    implementation("io.projectreactor:reactor-core:3.4.0")
+    implementation("io.projectreactor:reactor-core:3.7.0")
     implementation("io.modelcontextprotocol.sdk:mcp:0.11.3")
     intellijPlatform{
         create("IC","2023.2")

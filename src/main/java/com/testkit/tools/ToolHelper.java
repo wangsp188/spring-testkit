@@ -7,7 +7,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.Computable;
 import com.testkit.SettingsStorageHelper;
-import com.testkit.tools.mcp_function.McpFunctionDefinition;
+import com.testkit.tools.mcp_function.McpServerDefinition;
 import com.testkit.util.JsonUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
@@ -912,11 +912,11 @@ public class ToolHelper {
 
     public static class McpFunctionAction {
 
-        private final McpFunctionDefinition functionDefinition;
+        private final McpServerDefinition.McpFunctionDefinition functionDefinition;
 
         private String args;
 
-        public McpFunctionAction(McpFunctionDefinition functionDefinition) {
+        public McpFunctionAction(McpServerDefinition.McpFunctionDefinition functionDefinition) {
             this.functionDefinition = functionDefinition;
         }
 
@@ -946,7 +946,7 @@ public class ToolHelper {
             this.args = args;
         }
 
-        public McpFunctionDefinition getFunctionDefinition() {
+        public McpServerDefinition.McpFunctionDefinition getFunctionDefinition() {
             return functionDefinition;
         }
     }
