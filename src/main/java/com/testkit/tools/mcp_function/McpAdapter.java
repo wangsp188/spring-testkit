@@ -84,7 +84,13 @@ public class McpAdapter {
             } catch (Throwable e) {
                 System.err.println("init mcp-server fail, key:" + key);
                 e.printStackTrace();
-                errors.put(key, ExceptionUtil.fetchStackTrace(e));
+                if (e.getMessage() != null && e.getMessage().contains("java.io.IOException: Cannot run program") && e.getMessage().contains("error=2")) {
+                    errors.put(key, "Command execution failed: the IDE plugin cannot access your terminal PATH.\n" +
+                            "Please provide the full absolute path on the `command` key.\n" +
+                            "On macOS, run `which uv` (or `which <command>`) in Terminal to find the path, then update the plugin configuration.");
+                } else {
+                    errors.put(key, ExceptionUtil.fetchStackTrace(e));
+                }
             }finally {
                 if (mcpClient != null) {
                     System.out.println("mcp-server is close,"+key);
