@@ -8,8 +8,8 @@ import com.intellij.openapi.project.Project;
 import com.testkit.TestkitHelper;
 import com.testkit.util.ExceptionUtil;
 import com.testkit.view.TestkitToolWindow;
-import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.spec.McpSchema;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.mcp.client.McpClient;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -17,11 +17,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class McpHelper {
@@ -125,49 +125,26 @@ public class McpHelper {
         if (serverDefinition == null) {
             throw new IllegalArgumentException("serverKey:" + serverKey + " not found");
         }
-        McpSyncClient mcpSyncClient = null;
+        McpClient mcpClient = null;
         try {
-            mcpSyncClient = McpAdapter.initMcpServer(serverDefinition.getConfig());
-
-            McpSchema.CallToolResult callToolResult = mcpSyncClient.callTool(new McpSchema.CallToolRequest(toolName, args));
-            if (callToolResult == null) {
-                return "null";
-            }
-            //fail
-            if (callToolResult.isError() != null && callToolResult.isError()) {
-                List<McpSchema.Content> content = callToolResult.content();
-                if (content != null && content.size() == 1 && content.get(0) instanceof McpSchema.TextContent) {
-                    return ((McpSchema.TextContent) content.get(0)).text();
-                }
-                return callToolResult.toString();
-            }
-            List<McpSchema.Content> content = Optional.ofNullable(callToolResult.content()).orElse(new ArrayList<>());
-            if (content.isEmpty()) {
-                return "null";
-            }
-
-            //判断是否是仅一个text
-            if (content.size() == 1 && content.get(0) instanceof McpSchema.TextContent) {
-                return ((McpSchema.TextContent) content.get(0)).text();
-            }
-
-            return content.stream().map(new Function<McpSchema.Content, String>() {
-                @Override
-                public String apply(McpSchema.Content content) {
-                    if (content instanceof McpSchema.TextContent) {
-                        return ((McpSchema.TextContent) content).text();
-                    }else{
-                        return content.toString();
-                    }
-                }
-            }).collect(Collectors.joining("\n\n"));
+            mcpClient = McpAdapter.initMcpServer(serverDefinition.getConfig());
+            Constructor<?> constructor = ToolExecutionRequest.Builder.class.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            ToolExecutionRequest.Builder reqBuilder = (ToolExecutionRequest.Builder) constructor.newInstance();
+            ToolExecutionRequest request = reqBuilder.name(toolName).arguments(args.toJSONString()).build();
+            String result = mcpClient.executeTool(request);
+            return result == null || result.isEmpty() ? "null" : result;
         } catch (Throwable e) {
             e.printStackTrace();
             return ExceptionUtil.fetchStackTrace(e);
         }finally {
-            if(mcpSyncClient!=null){
-                System.out.println("mcp-server is close,"+mcpSyncClient.getServerInfo().name());
-                mcpSyncClient.close();
+            if(mcpClient!=null){
+                System.out.println("mcp-server is close,"+serverKey);
+                try {
+                    mcpClient.close();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
             }
         }
 

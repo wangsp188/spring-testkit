@@ -1,24 +1,22 @@
 package com.testkit.tools.mcp_function;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.testkit.TestkitHelper;
 import com.testkit.util.ExceptionUtil;
-import io.modelcontextprotocol.client.McpClient;
-import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
-import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
-import io.modelcontextprotocol.client.transport.ServerParameters;
-import io.modelcontextprotocol.client.transport.StdioClientTransport;
-import io.modelcontextprotocol.spec.McpSchema;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.mcp.client.DefaultMcpClient;
+import dev.langchain4j.mcp.client.McpClient;
+import dev.langchain4j.mcp.client.transport.McpTransport;
+import dev.langchain4j.mcp.client.transport.http.HttpMcpTransport;
+import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
+import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
+import dev.langchain4j.model.chat.request.json.*;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -71,27 +69,30 @@ public class McpAdapter {
             return new McpInitRet(errors, servers);
         }
         for (String key : mcpServers.keySet()) {
-            McpSyncClient syncClient = null;
+            McpClient mcpClient = null;
             try {
                 JSONObject value = mcpServers.getJSONObject(key);
                 if (value == null) {
                     errors.put(key, "config is empty");
                     continue;
                 }
-                syncClient = initMcpServer(value);
+                mcpClient = initMcpServer(value);
                 McpServerDefinition serverDefinition = new McpServerDefinition();
-                serverDefinition.setServerName(syncClient.getServerInfo().name());
                 serverDefinition.setConfig(value);
-                serverDefinition.setDefinitions(fetchToolDefinition(key, syncClient));
+                serverDefinition.setDefinitions(fetchToolDefinition(key, mcpClient));
                 servers.put(key, serverDefinition);
             } catch (Throwable e) {
                 System.err.println("init mcp-server fail, key:" + key);
                 e.printStackTrace();
                 errors.put(key, ExceptionUtil.fetchStackTrace(e));
             }finally {
-                if (syncClient != null) {
-                    System.out.println("mcp-server is close,"+syncClient.getServerInfo().name());
-                    syncClient.close();
+                if (mcpClient != null) {
+                    System.out.println("mcp-server is close,"+key);
+                    try {
+                        mcpClient.close();
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -99,7 +100,7 @@ public class McpAdapter {
     }
 
 
-    public static McpSyncClient initMcpServer(JSONObject config) {
+    public static McpClient initMcpServer(JSONObject config) {
         if (config == null) {
             throw new IllegalArgumentException("MCP-server config can not be null");
         }
@@ -126,85 +127,77 @@ public class McpAdapter {
     }
 
 
-    public static McpSyncClient buildStdioMcp(String commond, List<String> args, Map<String, String> env) {
-        McpSchema.Implementation clientInfo = new McpSchema.Implementation(TestkitHelper.getPluginName(), VERSION);
-        ServerParameters serverParameters = ServerParameters.builder(commond).args(args).env(env).build();
-//
-        StdioClientTransport transport = new StdioClientTransport(serverParameters);
-        McpClient.SyncSpec spec = McpClient.sync(transport)
-                .clientInfo(clientInfo)
-                .requestTimeout(Duration.ofSeconds(300));
-
-
-        McpSyncClient client = spec.build();
-        client.initialize();
-        return client;
-    }
-
-    public static McpSyncClient buildSseMcp(String baseUrl) {
-        McpSchema.Implementation clientInfo = new McpSchema.Implementation(TestkitHelper.getPluginName(), VERSION);
-        int i = baseUrl.lastIndexOf("/");
-        if (i <= 0) {
-            throw new RuntimeException("baseUrl is error");
+    public static McpClient buildStdioMcp(String command, List<String> args, Map<String, String> env) {
+        List<String> commands = new ArrayList<>();
+        commands.add(command);
+        if(CollectionUtils.isNotEmpty(args)){
+            commands.addAll(args);
         }
-        String baseUri = baseUrl.substring(0, i);
-        String endPoint = baseUrl.substring(i);
-        HttpClient.Builder clientBuilder = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).followRedirects(HttpClient.Redirect.NORMAL);
 
-        HttpClientSseClientTransport sseTransport = HttpClientSseClientTransport.builder(baseUri)
-                .sseEndpoint(endPoint)
-                .clientBuilder(clientBuilder)
-                .objectMapper(new ObjectMapper())
+        McpTransport transport = new StdioMcpTransport.Builder()
+                .command(commands)
+                .environment(env)
+                .logEvents(true)
                 .build();
 
-        McpClient.SyncSpec spec2 = McpClient.sync(sseTransport)
-                .clientInfo(clientInfo)
-                .requestTimeout(Duration.ofSeconds(300));
-        McpSyncClient client2 = spec2.build();
-
-        client2.initialize();
-        return client2;
+        DefaultMcpClient mcpClient = new DefaultMcpClient.Builder()
+                .clientName(TestkitHelper.getPluginName())
+                .clientVersion(VERSION)
+                .toolExecutionTimeout(Duration.ofSeconds(300))
+                .initializationTimeout(Duration.ofSeconds(10))
+                .autoHealthCheck(false)
+                .transport(transport)
+                .build();
+        return mcpClient;
     }
 
-    public static McpSyncClient buildStreamMcp(String baseUrl) {
-        McpSchema.Implementation clientInfo = new McpSchema.Implementation(TestkitHelper.getPluginName(), VERSION);
-        int i = baseUrl.lastIndexOf("/");
-        if (i <= 0) {
-            throw new RuntimeException("baseUrl is error");
-        }
-        String baseUri = baseUrl.substring(0, i);
-        String endPoint = baseUrl.substring(i);
-        HttpClient.Builder clientBuilder = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).followRedirects(HttpClient.Redirect.NORMAL);
-
-        HttpClientStreamableHttpTransport streamTransport = HttpClientStreamableHttpTransport.builder(baseUri)
-                .endpoint(endPoint)
-                .clientBuilder(clientBuilder)
-                .objectMapper(new ObjectMapper())
+    public static McpClient buildSseMcp(String baseUrl) {
+        McpTransport transport = new HttpMcpTransport.Builder()
+                .sseUrl(baseUrl)
+                .timeout(Duration.ofSeconds(10))
+                .logRequests(true)
+                .logResponses(true)
                 .build();
 
-        McpClient.SyncSpec spec2 = McpClient.sync(streamTransport)
-                .clientInfo(clientInfo)
-                .requestTimeout(Duration.ofSeconds(300));
-        McpSyncClient client2 = spec2.build();
 
-        client2.initialize();
-        return client2;
+        DefaultMcpClient mcpClient = new DefaultMcpClient.Builder()
+                .clientName(TestkitHelper.getPluginName())
+                .clientVersion(VERSION)
+                .toolExecutionTimeout(Duration.ofSeconds(300))
+                .initializationTimeout(Duration.ofSeconds(10))
+                .autoHealthCheck(false)
+                .transport(transport)
+                .build();
+        return mcpClient;
+    }
+
+    public static McpClient buildStreamMcp(String baseUrl) {
+        McpTransport transport = new StreamableHttpMcpTransport.Builder()
+                .url(baseUrl)
+                .timeout(Duration.ofSeconds(10))
+                .logRequests(true)
+                .logResponses(true)
+                .build();
+        DefaultMcpClient mcpClient = new DefaultMcpClient.Builder()
+                .clientName(TestkitHelper.getPluginName())
+                .clientVersion(VERSION)
+                .toolExecutionTimeout(Duration.ofSeconds(300))
+                .initializationTimeout(Duration.ofSeconds(10))
+                .autoHealthCheck(false)
+                .transport(transport)
+                .build();
+        return mcpClient;
     }
 
 
-    private static List<McpServerDefinition.McpFunctionDefinition> fetchToolDefinition(String name, McpSyncClient client) {
-        McpSchema.ListToolsResult listToolsResult = client.listTools();
-        if (listToolsResult == null) {
-            return new ArrayList<>();
-        }
-
-        List<McpSchema.Tool> tools = listToolsResult.tools();
+    private static List<McpServerDefinition.McpFunctionDefinition> fetchToolDefinition(String name, McpClient client) {
+        List<ToolSpecification> tools = client.listTools();
         if (CollectionUtils.isEmpty(tools)) {
             return new ArrayList<>();
         }
         ArrayList<McpServerDefinition.McpFunctionDefinition> objects = new ArrayList<>();
-        for (McpSchema.Tool tool : tools) {
-            McpSchema.JsonSchema jsonSchema = tool.inputSchema();
+        for (ToolSpecification tool : tools) {
+            JsonObjectSchema jsonSchema = tool.parameters();
             McpServerDefinition.McpFunctionDefinition exposureDefinition = new McpServerDefinition.McpFunctionDefinition();
             exposureDefinition.setType(McpServerDefinition.FunctionType.tool);
             exposureDefinition.setServerKey(name);
@@ -212,22 +205,43 @@ public class McpAdapter {
             exposureDefinition.setDescription(tool.description());
 
             ArrayList<McpServerDefinition.ArgSchema> argSchemas = new ArrayList<>();
-            Map<String, Object> properties = jsonSchema.properties();
+            Map<String, JsonSchemaElement> properties = jsonSchema.properties();
             if (MapUtils.isEmpty(properties)) {
                 exposureDefinition.setArgSchemas(argSchemas);
                 objects.add(exposureDefinition);
                 continue;
             }
             List<String> required = jsonSchema.required();
-            for (Map.Entry<String, Object> stringObjectEntry : properties.entrySet()) {
+            for (Map.Entry<String, JsonSchemaElement> stringObjectEntry : properties.entrySet()) {
                 String argName = stringObjectEntry.getKey();
-                Object value = stringObjectEntry.getValue();
-                JSONObject argJson = new JSONObject();
-                if (value != null) {
-                    argJson = JSON.parseObject(JSON.toJSONString(value));
+                JsonSchemaElement value = stringObjectEntry.getValue();
+                String type = value.getClass().getSimpleName();
+                Object typeExtension = null;
+                if (value instanceof JsonAnyOfSchema) {
+                    type = McpServerDefinition.ArgType.ANY_OF.getCode();
+                }else if(value instanceof JsonObjectSchema){
+                    type = McpServerDefinition.ArgType.OBJECT.getCode();
+                }else if (value instanceof JsonArraySchema){
+                    type = McpServerDefinition.ArgType.ARRAY.getCode();
+                }else if(value instanceof JsonBooleanSchema){
+                    type = McpServerDefinition.ArgType.BOOLEAN.getCode();
+                }else if(value instanceof JsonNumberSchema){
+                    type = McpServerDefinition.ArgType.NUMBER.getCode();
+                }else if(value instanceof JsonIntegerSchema){
+                    type = McpServerDefinition.ArgType.INTEGER.getCode();
+                }else if (value instanceof JsonStringSchema){
+                    type = McpServerDefinition.ArgType.STRING.getCode();
+                }else if(value instanceof JsonNullSchema){
+                    type = McpServerDefinition.ArgType.NULL.getCode();
+                }else if (value instanceof JsonEnumSchema){
+                    type = McpServerDefinition.ArgType.ENUM.getCode();
+                    typeExtension = ((JsonEnumSchema) value).enumValues();
+                }else if (value instanceof JsonRawSchema){
+                    type = McpServerDefinition.ArgType.RAW.getCode();
+                }else if (value instanceof JsonReferenceSchema){
+                    type = McpServerDefinition.ArgType.REFERENCE.getCode();
                 }
-                String string = argJson.getString("type");
-                McpServerDefinition.ArgSchema argSchema = new McpServerDefinition.ArgSchema(argName, string, argJson.getString("description"), required != null && required.contains(argName));
+                McpServerDefinition.ArgSchema argSchema = new McpServerDefinition.ArgSchema(argName, type, typeExtension,value.description(), required != null && required.contains(argName));
                 argSchemas.add(argSchema);
             }
             exposureDefinition.setArgSchemas(argSchemas);

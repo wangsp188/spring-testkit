@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 
 public class McpServerDefinition {
-    private String serverName;
     private JSONObject config;
     private List<McpFunctionDefinition> definitions;
 
@@ -29,53 +28,76 @@ public class McpServerDefinition {
         this.definitions = definitions;
     }
 
-    public String getServerName() {
-        return serverName;
-    }
-
-    public void setServerName(String serverName) {
-        this.serverName = serverName;
-    }
 
     public static enum FunctionType {
         tool
     }
 
     public static enum ArgType {
-        integer("integer"){
+        ANY_OF("AnyOf"){
+            @Override
+            public Object init() {
+                return null;
+            }
+        },
+        INTEGER("Integer"){
             @Override
             public Object init() {
                 return 0;
             }
         },
-        string("string"){
+        STRING("String"){
             @Override
             public Object init() {
                 return "";
             }
         },
-        number("number"){
+        NUMBER("Number"){
             @Override
             public Object init() {
                 return 0.0;
             }
         },
-        array("array"){
+        ARRAY("Array"){
             @Override
             public Object init() {
                 return new ArrayList<>();
             }
         },
-        object("object"){
+        OBJECT("Object"){
             @Override
             public Object init() {
                 return new HashMap<>();
             }
         },
-        Boolean("boolean"){
+        BOOLEAN("Boolean"){
             @Override
             public Object init() {
                 return false;
+            }
+        },
+        NULL("Null"){
+            @Override
+            public Object init() {
+                return null;
+            }
+        },
+        ENUM("Enum"){
+            @Override
+            public Object init() {
+                return null;
+            }
+        },
+        RAW("Raw"){
+            @Override
+            public Object init() {
+                return null;
+            }
+        },
+        REFERENCE("Reference"){
+            @Override
+            public Object init() {
+                return null;
             }
         };
 
@@ -84,6 +106,11 @@ public class McpServerDefinition {
         ArgType(String code) {
             this.code = code;
         }
+
+        public String getCode() {
+            return code;
+        }
+
         public abstract Object init();
 
         public static ArgType getByCode(String code) {
@@ -99,6 +126,7 @@ public class McpServerDefinition {
 
     public static record ArgSchema(String name,
                                    String type,
+                                   Object typeExtension,
                                    String description,
                                    boolean required) {
     }
@@ -128,24 +156,25 @@ public class McpServerDefinition {
 
         public String buildDescription(){
             String ret = "";
+            if (CollectionUtils.isNotEmpty(argSchemas)) {
+                ret += "Args:<br>";
+                for (ArgSchema argSchema : argSchemas) {
+                    ret += "  ";
+                    if(argSchema.required()){
+                        ret +="*";
+                    }
+                    ret += argSchema.name() + "("+argSchema.type()+"): ";
+                    if (StringUtils.isNotBlank(argSchema.description())) {
+                        ret+=(argSchema.description() + "<br>");
+                    }else{
+                        ret+="<br>";
+                    }
+                }
+                ret = (ret + "<br>").replace("\n", "<br>");
+            }
+
             if(StringUtils.isNotBlank(description)){
-                ret = description + "<br>";
-            }
-            if (CollectionUtils.isEmpty(argSchemas)) {
-                return ret.replace("\n", "<br>");
-            }
-            ret += "Args:<br>";
-            for (ArgSchema argSchema : argSchemas) {
-                ret += "  ";
-                if(argSchema.required()){
-                    ret +="*";
-                }
-                ret += argSchema.name() + "("+argSchema.type()+"): ";
-                if (StringUtils.isNotBlank(argSchema.description())) {
-                    ret+=(argSchema.description() + "<br>");
-                }else{
-                    ret+="<br>";
-                }
+                ret += description + "<br>";
             }
             return ret.replace("\n", "<br>");
         }
