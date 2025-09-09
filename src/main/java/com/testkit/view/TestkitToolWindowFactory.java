@@ -158,6 +158,19 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
+        // 添加第二个按钮
+        AnAction store = new AnAction("Testkit Store", "Testkit Store", AllIcons.Vcs.History) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        TestkitStoreWindowFactory.show(project);
+                    }
+                });
+            }
+        };
+
         // 添加第三个个按钮
         AnAction refresh = new AnAction("Refresh", "Refresh", AllIcons.Actions.Refresh) {
             @Override
@@ -174,6 +187,6 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         };
 
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,refresh));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,store,refresh));
     }
 }

@@ -87,7 +87,6 @@ public class TestkitToolWindow {
     private JComboBox<String> appBox;
 
     private SettingsDialog settingsDialog;
-    private ReqStoreDialog storeDialog;
     private CurlDialog curlDialog;
     private SqlDialog sqlDialog;
     private MCPServerDialog mcpServerDialog;
@@ -466,7 +465,6 @@ public class TestkitToolWindow {
         //        topPanel.add(appBox);
 
         initSettingsDialog();
-        initStoreDialog();
         DumbService.getInstance(project).smartInvokeLater(() -> {
             // 事件或代码在索引准备好后运行
             findSpringBootApplicationClasses();
@@ -664,10 +662,6 @@ public class TestkitToolWindow {
         // 将工具栏添加到输出面板的左侧
         outputPanel.add(toolbarPanel, BorderLayout.WEST);
         return outputPanel;
-    }
-
-    public void visibleStoreDialog() {
-        storeDialog.visible(true);
     }
 
     private void refreshVisibleApp() {
@@ -868,10 +862,6 @@ public class TestkitToolWindow {
     }
 
 
-    private void initStoreDialog() {
-        storeDialog = new ReqStoreDialog(this);
-    }
-
     private void initSettingsDialog() {
         settingsDialog = new SettingsDialog(this);
         settingsButton.addActionListener(new AbstractAction() {
@@ -902,7 +892,7 @@ public class TestkitToolWindow {
                             return appMeta.getApp();
                         }
                     }).collect(Collectors.toUnmodifiableList());
-                    storeDialog.initApps(appNames);
+                    TestkitStoreWindowFactory.initApps(project,appNames);
                     settingsDialog.initApps(appNames);
 //                    更新datasources
                     updateDatasources();
@@ -979,10 +969,6 @@ public class TestkitToolWindow {
         }
     }
 
-
-    public void refreshStore() {
-        storeDialog.refreshTree();
-    }
 
 
 }

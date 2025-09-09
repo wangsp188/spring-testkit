@@ -7,6 +7,8 @@ import com.alibaba.fastjson.TypeReference;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.wm.ToolWindow;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -65,17 +67,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class ReqStoreDialog {
+public class TestkitStoreWindow {
 
-    public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", ReqStoreDialog.class);
+    public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", TestkitStoreWindow.class);
 
 
-    private JDialog dialog;
+    private Project project;
+    private ToolWindow window;
+
+    private JPanel windowContent;
 
     private JComboBox<String> appBox;
     private AtomicBoolean expandToggle = new AtomicBoolean(true);
 
-    private TestkitToolWindow toolWindow;
 
     private DefaultMutableTreeNode root;
 
@@ -104,9 +108,8 @@ public class ReqStoreDialog {
 
     private JComboBox<ReqStorageHelper.SavedReq> reqsComboBox;
 
+    private JButton metaButton;
     private LanguageTextField jsonInputField;
-
-    private JTextPane metaTextPane;
 
     private JTextPane outputTextPane;
 
@@ -116,20 +119,23 @@ public class ReqStoreDialog {
     private String lastReqId;
 
 
-    public ReqStoreDialog(TestkitToolWindow toolWindow) {
-        this.toolWindow = toolWindow;
+    public TestkitStoreWindow(Project project, ToolWindow window) {
+        this.window = window;
+        this.project = project;
         init();
     }
 
-    private void init() {
-        dialog = new JDialog((Frame) null, TestkitHelper.getPluginName() + " Store", true);
+    public JPanel getContent() {
+        return windowContent;
+    }
 
+    private void init() {
         // 定义主面板
-        JPanel contentPanel = new JPanel(new BorderLayout());
+        windowContent = new JPanel(new BorderLayout());
 
         // 1. 创建顶部参数面板
         JPanel topPanel = createTopPanel();
-        contentPanel.add(topPanel, BorderLayout.NORTH);
+        windowContent.add(topPanel, BorderLayout.NORTH);
 
         // 初始化树结构
         initializeTree();
@@ -151,20 +157,8 @@ public class ReqStoreDialog {
         splitPane.setLeftComponent(leftScrollPane);
         splitPane.setRightComponent(rightScrollPane);
 
-        contentPanel.add(splitPane, BorderLayout.CENTER);
+        windowContent.add(splitPane, BorderLayout.CENTER);
 
-        // 设置对话框大小和位置
-        dialog.setContentPane(contentPanel);
-        resizeDialog();
-
-    }
-
-    private void resizeDialog() {
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int width = (int) (screenSize.width * 0.8);
-        int height = (int) (screenSize.height * 0.8);
-        dialog.setSize(width, height);
-        dialog.setLocationRelativeTo(null);
     }
 
 
@@ -223,7 +217,7 @@ public class ReqStoreDialog {
 
 
             String app = (String) appBox.getSelectedItem();
-            List<ReqStorageHelper.GroupItems> groups = app == null ? null : ReqStorageHelper.getAppReqs(toolWindow.getProject(), app);
+            List<ReqStorageHelper.GroupItems> groups = app == null ? null : ReqStorageHelper.getAppReqs(project, app);
             updateRightPanel();
 
             root.removeAllChildren();
@@ -290,12 +284,12 @@ public class ReqStoreDialog {
     }
 
 
-    public void visible(boolean visible) {
+    public void show() {
         if (appBox.getItemCount() > 0) {
             String selectedItem = (String) appBox.getSelectedItem();
-            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(toolWindow.getProject().getName());
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.getSelectedApp(project.getName());
             String selectedApp = visibleApp == null ? null : visibleApp.getAppName();
-            List<String> projectAppList = RuntimeHelper.getAppMetas(toolWindow.getProject().getName()).stream().map(new Function<RuntimeHelper.AppMeta, String>() {
+            List<String> projectAppList = RuntimeHelper.getAppMetas(project.getName()).stream().map(new Function<RuntimeHelper.AppMeta, String>() {
                 @Override
                 public String apply(RuntimeHelper.AppMeta appMeta) {
                     return appMeta.getApp();
@@ -305,11 +299,7 @@ public class ReqStoreDialog {
                 appBox.setSelectedItem(selectedApp);
             }
         }
-
-        try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
-            resizeDialog();
-            dialog.setVisible(true);
-        }
+        window.show();
     }
 
 //
@@ -368,7 +358,7 @@ public class ReqStoreDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 refreshTree();
-                TestkitHelper.notify(getToolWindow().getProject(), NotificationType.INFORMATION, "Reload success");
+                TestkitHelper.notify(project, NotificationType.INFORMATION, "Reload success");
             }
         });
         panel.add(refreshButton);
@@ -381,7 +371,7 @@ public class ReqStoreDialog {
             public void actionPerformed(ActionEvent e) {
                 String app = (String) appBox.getSelectedItem();
                 if (app == null) {
-                    TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a app");
                     return;
                 }
                 //常见一个弹出层
@@ -415,16 +405,16 @@ public class ReqStoreDialog {
                     try {
                         groupItems = JSON.parseObject(jsonInput.getText().trim(), ReqStorageHelper.GroupItems.class);
                     } catch (Exception ex) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import item must be group items, " + ex.getMessage());
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Import item must be group items, " + ex.getMessage());
                         return;
                     }
                     try {
-                        ReqStorageHelper.saveAppGroupItems(toolWindow.getProject(), app, groupItems);
+                        ReqStorageHelper.saveAppGroupItems(project, app, groupItems);
                         refreshTree();
                         dialog.dispose();
-                        TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Import successfully");
+                        TestkitHelper.notify(project, NotificationType.INFORMATION, "Import successfully");
                     } catch (Exception ex) {
-                        TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Import error," + ex.getMessage());
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Import error," + ex.getMessage());
                     }
                 });
 
@@ -448,13 +438,13 @@ public class ReqStoreDialog {
             public void actionPerformed(ActionEvent e) {
                 String app = (String) appBox.getSelectedItem();
                 if (app == null) {
-                    TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a app");
                     return;
                 }
 
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
                 if (node == null) {
-                    TestkitHelper.alert(toolWindow.getProject(), Messages.getErrorIcon(), "Please select a group or item");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a group or item");
                     return;
                 }
                 ReqStorageHelper.GroupItems exportObj = exportReqs(app, node);
@@ -488,7 +478,7 @@ public class ReqStoreDialog {
                 // 创建导入按钮
                 JButton copyConfirmButton = new JButton("Copy");
                 copyConfirmButton.addActionListener(e1 -> {
-                    TestkitHelper.copyToClipboard(toolWindow.getProject(), jsonInput.getText(), (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
+                    TestkitHelper.copyToClipboard(project, jsonInput.getText(), (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
                     dialog.dispose();
                 });
 
@@ -512,7 +502,7 @@ public class ReqStoreDialog {
 
     private ReqStorageHelper.GroupItems exportReqs(String app, DefaultMutableTreeNode node) {
         ReqStorageHelper.GroupItems exportObj = null;
-        List<ReqStorageHelper.GroupItems> groups = ReqStorageHelper.getAppReqs(toolWindow.getProject(), app);
+        List<ReqStorageHelper.GroupItems> groups = ReqStorageHelper.getAppReqs(project, app);
         Object userObject = node.getUserObject();
         if (userObject instanceof ReqStorageHelper.GroupItems) {
             Optional<ReqStorageHelper.GroupItems> groupItems = Optional.ofNullable(groups)
@@ -586,7 +576,7 @@ public class ReqStoreDialog {
                 String app = (String) appBox.getSelectedItem();
                 ReqStorageHelper.SavedReq selectedReq = (ReqStorageHelper.SavedReq) reqsComboBox.getSelectedItem();
                 if (selectedReq == null || selectedItem == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a item");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a item");
                     return;
                 }
 
@@ -595,7 +585,7 @@ public class ReqStoreDialog {
                 try {
                     selectedReq.setArgs(JSON.parseObject(jsonInputField.getText()));
                 } catch (Throwable ex) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Input parameter must be json object");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Input parameter must be json object");
                     return;
                 }
 
@@ -603,23 +593,23 @@ public class ReqStoreDialog {
                 switch (selectedItem.getType()) {
                     case function_call -> {
                         try {
-                            meta = JSON.parseObject(metaTextPane.getText().trim());
+                            meta = JSON.parseObject(metaButton.getToolTipText().trim());
                         } catch (Throwable ex) {
-                            TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                            TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                             return;
                         }
                     }
                     case flexible_test -> {
                         ReqStorageHelper.FlexibleTestMeta metaObj = selectedItem.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                        metaObj.setCode(metaTextPane.getText().trim());
+                        metaObj.setCode(metaButton.getToolTipText().trim());
                         meta = JSON.parseObject(JSON.toJSONString(metaObj, SerializerFeature.WriteMapNullValue));
                     }
                     default -> {
 
                     }
                 }
-                ReqStorageHelper.saveAppReq(getToolWindow().getProject(), app, selectedItem.getGroup(), selectedItem.getType(), selectedItem.getName(), meta, title, selectedReq);
-                TestkitHelper.notify(getToolWindow().getProject(), NotificationType.INFORMATION, "Save success");
+                ReqStorageHelper.saveAppReq(project, app, selectedItem.getGroup(), selectedItem.getType(), selectedItem.getName(), meta, title, selectedReq);
+                TestkitHelper.notify(project, NotificationType.INFORMATION, "Save success");
                 //触发重绘
                 reqsComboBox.repaint();
             }
@@ -635,9 +625,9 @@ public class ReqStoreDialog {
                 if (selectedReq == null || selectedItem == null) {
                     return;
                 }
-                ReqStorageHelper.delAppReq(getToolWindow().getProject(), app, selectedItem.getGroup(), selectedItem.getType(), selectedItem.getName(), selectedReq.getTitle());
-                TestkitHelper.notify(getToolWindow().getProject(), NotificationType.INFORMATION, "Delete success");
-                toolWindow.refreshStore();
+                ReqStorageHelper.delAppReq(project, app, selectedItem.getGroup(), selectedItem.getType(), selectedItem.getName(), selectedReq.getTitle());
+                TestkitHelper.notify(project, NotificationType.INFORMATION, "Delete success");
+                refreshTree();
             }
         });
 
@@ -684,7 +674,7 @@ public class ReqStoreDialog {
 
 
         // 第二行：下拉框和执行按钮
-        inputPanel = buildInputPanel(toolWindow);
+        inputPanel = buildInputPanel();
 
         gbc.gridy = 2;
         gbc.weighty = 0;
@@ -712,7 +702,7 @@ public class ReqStoreDialog {
         return panel;
     }
 
-    private JPanel buildInputPanel(TestkitToolWindow window) {
+    private JPanel buildInputPanel() {
         JPanel panelResults = new JPanel();
         GridBagLayout gridbag = new GridBagLayout();
         GridBagConstraints c = new GridBagConstraints();
@@ -721,16 +711,16 @@ public class ReqStoreDialog {
         JPanel panelParamsHeadersBody = new JPanel(new GridLayout(1, 2));
         panelParamsHeadersBody.setPreferredSize(new Dimension(0, 300));
 
-
+        
         jsonInputField = new LanguageTextField(JsonLanguage.INSTANCE, null, "", false);
-        JPanel paramsPanel = createLabelTextFieldPanel(window, "Params", jsonInputField);
-        metaTextPane = new JTextPane();
-        metaTextPane.setEditable(false);
-        JPanel metaPanel = createLabelTextFieldPanel(window, "Meta", metaTextPane);
+        JPanel paramsPanel = createLabelTextFieldPanel("Params", jsonInputField);
+//        metaTextPane = new JTextPane();
+//        metaTextPane.setEditable(false);
+//        JPanel metaPanel = createLabelTextFieldPanel("Meta", metaTextPane);
 
 
         panelParamsHeadersBody.add(paramsPanel);
-        panelParamsHeadersBody.add(metaPanel);
+//        panelParamsHeadersBody.add(metaPanel);
 
         c.fill = GridBagConstraints.BOTH;
         c.weightx = 1;
@@ -769,7 +759,7 @@ public class ReqStoreDialog {
         copyRetButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                TestkitHelper.copyToClipboard(toolWindow.getProject(), outputTextPane.getText(), null);
+                TestkitHelper.copyToClipboard(project, outputTextPane.getText(), null);
             }
         });
 
@@ -821,16 +811,16 @@ public class ReqStoreDialog {
                 String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
                 String jsonInput = jsonInputField.getText();
                 if (item == null || selectedInstance == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select valid item and runtime app");
                     return;
                 }
                 RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
                 if (visibleApp == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select runtime app");
                     return;
                 }
                 if (item.getType() != ReqStorageHelper.ItemType.function_call) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Spring cache only support function-call");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Spring cache only support function-call");
                     return;
                 }
                 JSONObject args = new JSONObject();
@@ -838,15 +828,15 @@ public class ReqStoreDialog {
                     try {
                         args = JSON.parseObject(jsonInput.trim());
                     } catch (Throwable e1) {
-                        TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Params must be json object");
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Params must be json object");
                         return;
                     }
                 }
                 ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
+                    meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                     return;
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
@@ -867,16 +857,16 @@ public class ReqStoreDialog {
                 String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
                 String jsonInput = jsonInputField.getText();
                 if (item == null || selectedInstance == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select valid item and runtime app");
                     return;
                 }
                 RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
                 if (visibleApp == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select runtime app");
                     return;
                 }
                 if (item.getType() != ReqStorageHelper.ItemType.function_call) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Spring cache only support function-call");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Spring cache only support function-call");
                     return;
                 }
                 JSONObject args = new JSONObject();
@@ -884,15 +874,15 @@ public class ReqStoreDialog {
                     try {
                         args = JSON.parseObject(jsonInput.trim());
                     } catch (Throwable e1) {
-                        TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Params must be json object");
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Params must be json object");
                         return;
                     }
                 }
                 ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
+                    meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                     return;
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
@@ -913,16 +903,16 @@ public class ReqStoreDialog {
                 String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
                 String jsonInput = jsonInputField.getText();
                 if (item == null || selectedInstance == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select valid item and runtime app");
                     return;
                 }
                 RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
                 if (visibleApp == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select runtime app");
                     return;
                 }
                 if (item.getType() != ReqStorageHelper.ItemType.function_call) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Spring cache only support function-call");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Spring cache only support function-call");
                     return;
                 }
                 JSONObject args = new JSONObject();
@@ -930,15 +920,15 @@ public class ReqStoreDialog {
                     try {
                         args = JSON.parseObject(jsonInput.trim());
                     } catch (Throwable e1) {
-                        TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Params must be json object");
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Params must be json object");
                         return;
                     }
                 }
                 ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
+                    meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Meta must be json object");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                     return;
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
@@ -961,18 +951,18 @@ public class ReqStoreDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (selectedItem == null || appBox.getSelectedItem() == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a app and item");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a app and item");
                     return;
                 }
                 ReqStorageHelper.FunctionCallMeta functionCallMeta = selectedItem.metaObj(ReqStorageHelper.FunctionCallMeta.class);
                 if (functionCallMeta.getSubType() != ReqStorageHelper.SubItemType.controller || functionCallMeta.getHttpMeta() == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Un support subType or meta is null");
                     return;
                 }
 
                 String app = (String) appBox.getSelectedItem();
                 DefaultActionGroup controllerActionGroup = new DefaultActionGroup();
-                SettingsStorageHelper.HttpCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(toolWindow.getProject(), app);
+                SettingsStorageHelper.HttpCommand controllerCommand = SettingsStorageHelper.getAppControllerCommand(project, app);
                 String script = controllerCommand.getScript();
                 List<String> envs = controllerCommand.getEnvs();
                 if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript())) {
@@ -986,7 +976,7 @@ public class ReqStoreDialog {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 Application application = ApplicationManager.getApplication();
-                                ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+                                ProgressManager.getInstance().run(new Task.Backgroundable(project, "Processing generate function, please wait ...", false) {
 
                                     @Override
                                     public void run(@NotNull ProgressIndicator indicator) {
@@ -1009,7 +999,7 @@ public class ReqStoreDialog {
                     //没有自定义逻辑，则直接处理
 
                     Application application = ApplicationManager.getApplication();
-                    ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+                    ProgressManager.getInstance().run(new Task.Backgroundable(project, "Processing generate function, please wait ...", false) {
 
                         @Override
                         public void run(@NotNull ProgressIndicator indicator) {
@@ -1155,18 +1145,18 @@ public class ReqStoreDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (selectedItem == null || appBox.getSelectedItem() == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select a app and item");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a app and item");
                     return;
                 }
                 ReqStorageHelper.FunctionCallMeta functionCallMeta = selectedItem.metaObj(ReqStorageHelper.FunctionCallMeta.class);
                 if (functionCallMeta.getSubType() != ReqStorageHelper.SubItemType.feign_client || functionCallMeta.getHttpMeta() == null) {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support subType or meta is null");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Un support subType or meta is null");
                     return;
                 }
 
                 String app = (String) appBox.getSelectedItem();
                 DefaultActionGroup feignActionGroup = new DefaultActionGroup();
-                SettingsStorageHelper.HttpCommand httpCommand = SettingsStorageHelper.getAppFeignCommand(toolWindow.getProject(), app);
+                SettingsStorageHelper.HttpCommand httpCommand = SettingsStorageHelper.getAppFeignCommand(project, app);
                 String script = httpCommand.getScript();
                 List<String> envs = httpCommand.getEnvs();
                 if (CollectionUtils.isNotEmpty(envs) || !Objects.equals(script, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript())) {
@@ -1180,7 +1170,7 @@ public class ReqStoreDialog {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
                                 Application application = ApplicationManager.getApplication();
-                                ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+                                ProgressManager.getInstance().run(new Task.Backgroundable(project, "Processing generate function, please wait ...", false) {
 
                                     @Override
                                     public void run(@NotNull ProgressIndicator indicator) {
@@ -1203,7 +1193,7 @@ public class ReqStoreDialog {
                     //没有自定义逻辑，则直接处理
 
                     Application application = ApplicationManager.getApplication();
-                    ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing generate function, please wait ...", false) {
+                    ProgressManager.getInstance().run(new Task.Backgroundable(project, "Processing generate function, please wait ...", false) {
 
                         @Override
                         public void run(@NotNull ProgressIndicator indicator) {
@@ -1341,7 +1331,7 @@ public class ReqStoreDialog {
 
 
     private void refreshVisibleApp() {
-        List<RuntimeHelper.VisibleApp> visibleAppList = RuntimeHelper.getVisibleApps(toolWindow.getProject().getName()).stream()
+        List<RuntimeHelper.VisibleApp> visibleAppList = RuntimeHelper.getVisibleApps(project.getName()).stream()
                 .filter(visibleApp -> Objects.equals(appBox.getSelectedItem(), visibleApp.getAppName()))
                 .toList();
 
@@ -1376,26 +1366,41 @@ public class ReqStoreDialog {
             visibleAppComboBox.setSelectedItem(selectedItem);
         }
 //        visibleAppComboBox.repaint();
-        dialog.revalidate();
-        dialog.repaint();
+        windowContent.revalidate();
+        windowContent.repaint();
     }
 
 
-    private JPanel createLabelTextFieldPanel(TestkitToolWindow window, String labelText, Component field) {
+    private JPanel createLabelTextFieldPanel(String labelText, Component field) {
         JPanel panel = new JPanel(new BorderLayout());
         JLabel label = new JLabel(labelText);
+
+        Dimension preferredSize = new Dimension(30, 30);
+
+        metaButton = new JButton(AllIcons.General.Information);
+        metaButton.setToolTipText("");
+        metaButton.setPreferredSize(preferredSize);
+        metaButton.setMaximumSize(preferredSize);
+        metaButton.setMinimumSize(preferredSize);
+        metaButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+            }
+        });
+
         JButton copyButton = new JButton(AllIcons.Actions.Copy);
         copyButton.setToolTipText("Copy this");
-        Dimension preferredSize = new Dimension(30, 30);
         copyButton.setPreferredSize(preferredSize);
         copyButton.setMaximumSize(preferredSize);
         copyButton.setMinimumSize(preferredSize);
         copyButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                TestkitHelper.copyToClipboard(window.getProject(), field instanceof TextAccessor ? ((TextAccessor) field).getText() : ((JTextComponent) field).getText(), labelText + " was Copied");
+                TestkitHelper.copyToClipboard(project, field instanceof TextAccessor ? ((TextAccessor) field).getText() : ((JTextComponent) field).getText(), labelText + " was Copied");
             }
         });
+
 
 
         // 将 JTextComponent 放入 JScrollPane
@@ -1415,6 +1420,7 @@ public class ReqStoreDialog {
         // 顶部面板
         JPanel northPanel = new JPanel();
         northPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        northPanel.add(metaButton);
         northPanel.add(label);
         northPanel.add(copyButton);
 
@@ -1436,7 +1442,7 @@ public class ReqStoreDialog {
             iconLabel.setIcon(null);
             reqsComboBox.removeAllItems();
             jsonInputField.setText("");
-            metaTextPane.setText("");
+            metaButton.setToolTipText("");
             setOutputText("", null);
             actionPanel.removeAll();
             return;
@@ -1465,13 +1471,11 @@ public class ReqStoreDialog {
                 // 根据条件添加script输入框
                 if (item.getType() == ReqStorageHelper.ItemType.flexible_test) {
                     ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                    metaTextPane.setText(meta.getCode() == null ? "" : meta.getCode());
-                    metaTextPane.setEnabled(false);
+                    metaButton.setToolTipText(meta.getCode() == null ? "" : meta.getCode());
                 } else if (item.getType() == ReqStorageHelper.ItemType.function_call) {
-                    metaTextPane.setText(item.getMeta() == null ? "" : JsonUtil.formatObj(item.getMeta()));
-                    metaTextPane.setEnabled(false);
+                    metaButton.setToolTipText(item.getMeta() == null ? "" : JsonUtil.formatObj(item.getMeta()));
                 } else {
-                    TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Un support type, please contact developer");
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Un support type, please contact developer");
                     return;
                 }
 
@@ -1512,12 +1516,12 @@ public class ReqStoreDialog {
         String selectedInstance = (String) visibleAppComboBox.getSelectedItem();
         String jsonInput = jsonInputField.getText();
         if (item == null || selectedInstance == null) {
-            TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select valid item and runtime app");
+            TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select valid item and runtime app");
             return;
         }
         RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedInstance);
         if (visibleApp == null) {
-            TestkitHelper.alert(getToolWindow().getProject(), Messages.getErrorIcon(), "Please select runtime app");
+            TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select runtime app");
             return;
         }
 
@@ -1535,7 +1539,7 @@ public class ReqStoreDialog {
                     }
                     ReqStorageHelper.FunctionCallMeta meta = null;
                     try {
-                        meta = JSON.parseObject(metaTextPane.getText(), ReqStorageHelper.FunctionCallMeta.class);
+                        meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                     } catch (Throwable e) {
                         throw new RuntimeException("Meta must be json object");
                     }
@@ -1550,7 +1554,7 @@ public class ReqStoreDialog {
                         }
                     }
                     ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                    meta.setCode(metaTextPane.getText().trim());
+                    meta.setCode(metaButton.getToolTipText().trim());
                     return buildFlexibleParams(meta, visibleApp, args);
                 }
 
@@ -1596,7 +1600,7 @@ public class ReqStoreDialog {
             return;
         }
 
-        ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Processing req, please wait ...", false) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Processing req, please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
                 // 发起任务请求，获取请求ID
@@ -1685,11 +1689,11 @@ public class ReqStoreDialog {
         req.put("method", PluginToolEnum.FUNCTION_CALL.getCode());
         req.put("params", params);
 
-        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
         req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
-            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(project, visibleApp.getAppName()));
         }
         return req;
     }
@@ -1706,11 +1710,11 @@ public class ReqStoreDialog {
         req.put("method", "spring-cache");
         req.put("params", params);
 
-        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
         req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
-            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(project, visibleApp.getAppName()));
         }
         return req;
     }
@@ -1725,11 +1729,11 @@ public class ReqStoreDialog {
         req.put("method", PluginToolEnum.FLEXIBLE_TEST.getCode());
         req.put("params", params);
 
-        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(toolWindow.getProject());
+        SettingsStorageHelper.TraceConfig traceConfig = SettingsStorageHelper.getTraceConfig(project);
         req.put("trace", traceConfig.isEnable());
 //        req.put("singleClsDepth", traceConfig.getSingleClsDepth());
         if (meta.isUseInterceptor()) {
-            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(toolWindow.getProject(), visibleApp.getAppName()));
+            req.put("interceptor", SettingsStorageHelper.encodeInterceptor(project, visibleApp.getAppName()));
         }
         return req;
     }
@@ -1752,23 +1756,6 @@ public class ReqStoreDialog {
             default:
                 return UNKNOWN_ICON;
         }
-    }
-
-
-    public JDialog getDialog() {
-        return dialog;
-    }
-
-    public void setDialog(JDialog dialog) {
-        this.dialog = dialog;
-    }
-
-    public TestkitToolWindow getToolWindow() {
-        return toolWindow;
-    }
-
-    public void setToolWindow(TestkitToolWindow toolWindow) {
-        this.toolWindow = toolWindow;
     }
 
 

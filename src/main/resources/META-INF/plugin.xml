@@ -67,6 +67,8 @@
 
         <java.programPatcher implementation="com.testkit.JavaProgramPatcher" />
         <toolWindow id="Spring-Testkit" icon="/icons/spring-testkit.svg" factoryClass="com.testkit.view.TestkitToolWindowFactory" anchor="right"/>
+        <toolWindow id="Testkit-Store" icon="/icons/testkit-store.svg" factoryClass="com.testkit.view.TestkitStoreWindowFactory" anchor="right"/>
+
         <!-- Here you can register other extensions, for example, actions -->
     </extensions>
 

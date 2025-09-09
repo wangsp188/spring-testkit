@@ -11,6 +11,7 @@ import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.util.JsonUtil;
+import com.testkit.view.TestkitStoreWindowFactory;
 import com.testkit.view.TestkitToolWindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.util.PsiNavigationSupport;
@@ -145,15 +146,6 @@ public abstract class BasePluginTool {
             fillStoreAction();
         }
 
-
-        AnAction historyAction = new AnAction("Open Store", "Open Store", AllIcons.Vcs.History) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                // 调用复制功能
-                toolWindow.visibleStoreDialog();
-            }
-        };
-        actionGroup.add(historyAction);
 
 
         // 创建ActionToolbar
@@ -294,7 +286,7 @@ public abstract class BasePluginTool {
                             } catch (InterruptedException ex) {
                                 throw new RuntimeException(ex);
                             }
-                            toolWindow.refreshStore();
+                            TestkitStoreWindowFactory.refreshStore(getProject());
                         }
                     }.start();
                     TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Save success");
