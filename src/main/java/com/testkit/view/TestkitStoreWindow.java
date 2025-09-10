@@ -48,6 +48,7 @@ import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ibatis.io.ResolverUtil;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
@@ -654,7 +655,7 @@ public class TestkitStoreWindow {
 
         //        初始化后面用的标签
         visibleAppComboBox = new JComboBox<>();
-
+        visibleAppComboBox.setMaximumSize(new Dimension(200, 32));
         new Thread(() -> {
             while (true) {
                 try {
@@ -1442,12 +1443,12 @@ public class TestkitStoreWindow {
     }
 
     private void showQuickSavePopup() {
-        java.util.List<String> apps = RuntimeHelper.getAppMetas(project.getName()).stream().map(new Function<RuntimeHelper.AppMeta, String>() {
-            @Override
-            public String apply(RuntimeHelper.AppMeta appMeta) {
-                return appMeta.getApp();
-            }
-        }).collect(Collectors.toCollection(ArrayList::new));
+        String app = (String) appBox.getSelectedItem();
+        if (app == null) {
+            TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a app");
+            return;
+        }
+        java.util.List<String> apps = List.of(app);
 
         JPanel panel = new JPanel();
         panel.setLayout(new GridBagLayout());
@@ -1458,9 +1459,6 @@ public class TestkitStoreWindow {
 
         String[] options = apps.toArray(new String[apps.size()]);
         ComboBox<String> comboBox = new ComboBox<>(options);
-        if (appBox != null && appBox.getSelectedItem() instanceof String) {
-            comboBox.setSelectedItem((String) appBox.getSelectedItem());
-        }
 
         JBTextField groupField = new JBTextField("default");
         groupField.getEmptyText().setText("Which group to save to");
