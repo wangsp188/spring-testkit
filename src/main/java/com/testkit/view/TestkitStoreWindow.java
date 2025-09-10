@@ -655,7 +655,9 @@ public class TestkitStoreWindow {
 
         //        初始化后面用的标签
         visibleAppComboBox = new JComboBox<>();
-        visibleAppComboBox.setMaximumSize(new Dimension(200, 32));
+        Dimension fixed = new Dimension(150, 32);
+        visibleAppComboBox.setPreferredSize(fixed);
+        visibleAppComboBox.setMaximumSize(fixed);
         new Thread(() -> {
             while (true) {
                 try {
@@ -1793,6 +1795,19 @@ public class TestkitStoreWindow {
     }
 
 
+    private static String truncateWithEllipsis(String s, int maxLen) {
+        if (s == null) {
+            return "";
+        }
+        if (s.length() <= maxLen) {
+            return s;
+        }
+        if (maxLen <= 3) {
+            return s.substring(0, Math.max(0, maxLen));
+        }
+        return s.substring(0, maxLen - 3) + "...";
+    }
+
     private void rebuildCombos(List<ReqStorageHelper.GroupItems> groups, String selectedGroup, String selectedItemNameAndType) {
         suppressComboEvents = true;
         try {
@@ -1849,10 +1864,11 @@ public class TestkitStoreWindow {
             return;
         }
 
-        // 重建 item 列表（以当前组为准）
+        // 重建 item 列表（以当前组为准）并同步右侧
         String app = (String) appBox.getSelectedItem();
         List<ReqStorageHelper.GroupItems> groups = app == null ? null : ReqStorageHelper.getAppReqs(project, app);
         rebuildCombos(groups, group, null);
+        updateRightPanel();
     }
 
     private void onItemSelected() {
@@ -1863,6 +1879,7 @@ public class TestkitStoreWindow {
             return;
         }
         itemBox.setToolTipText(item == null ? "" : item.getName());
+        updateRightPanel();
     }
 
 
