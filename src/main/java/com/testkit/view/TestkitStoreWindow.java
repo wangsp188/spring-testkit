@@ -655,7 +655,7 @@ public class TestkitStoreWindow {
 
         //        初始化后面用的标签
         visibleAppComboBox = new JComboBox<>();
-        Dimension fixed = new Dimension(150, 32);
+        Dimension fixed = new Dimension(180, 32);
         visibleAppComboBox.setPreferredSize(fixed);
         visibleAppComboBox.setMaximumSize(fixed);
         new Thread(() -> {
@@ -1351,6 +1351,7 @@ public class TestkitStoreWindow {
         Object nowItem = (itemBox != null && itemBox.getSelectedItem() instanceof ReqStorageHelper.Item)
                 ? (ReqStorageHelper.Item) itemBox.getSelectedItem() : null;
         if (nowItem == selectedItem) {
+            iconLabel.setToolTipText("");
             return;
         }
         if (!(nowItem instanceof ReqStorageHelper.Item)) {
@@ -1874,11 +1875,7 @@ public class TestkitStoreWindow {
     private void onItemSelected() {
         ReqStorageHelper.Item item = (ReqStorageHelper.Item) itemBox.getSelectedItem();
         String group = (String) groupBox.getSelectedItem();
-        if (group == null) {
-            itemBox.setToolTipText("");
-            return;
-        }
-        itemBox.setToolTipText(item == null ? "" : item.getName());
+        itemBox.setToolTipText(item == null || group==null ? "" : item.getName());
         updateRightPanel();
     }
 
