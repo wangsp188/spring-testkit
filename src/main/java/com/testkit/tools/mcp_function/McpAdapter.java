@@ -157,6 +157,7 @@ public class McpAdapter {
         return mcpClient;
     }
 
+    @Deprecated
     public static McpClient buildSseMcp(String baseUrl) {
         McpTransport transport = new HttpMcpTransport.Builder()
                 .sseUrl(baseUrl)

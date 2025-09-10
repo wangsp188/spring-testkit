@@ -228,6 +228,12 @@ public class SettingsDialog {
         dialog.setContentPane(contentPanel);
         // 设置对话框的大小与显示位置
         resizeDialog();
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.getRootPane().registerKeyboardAction(
+                e -> dialog.dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
     }
 
     private void resizeDialog() {

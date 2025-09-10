@@ -289,7 +289,7 @@ public abstract class BasePluginTool {
                             TestkitStoreWindowFactory.refreshStore(getProject());
                         }
                     }.start();
-                    TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Save success");
+                    TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Save success<br>You can click the store button in the upper right corner of the plugin to open the store window");
                     popup.dispose();
                 });
 

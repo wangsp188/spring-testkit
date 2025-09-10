@@ -9,6 +9,7 @@ import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.ui.awt.RelativePoint;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
@@ -35,9 +36,13 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
@@ -71,6 +76,9 @@ public class TestkitStoreWindow {
 
     public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", TestkitStoreWindow.class);
 
+    public static final Icon STORE_ICON = IconLoader.getIcon("/icons/testkit-store.svg", TestkitStoreWindow.class);
+
+
 
     private Project project;
     private ToolWindow window;
@@ -78,24 +86,17 @@ public class TestkitStoreWindow {
     private JPanel windowContent;
 
     private JComboBox<String> appBox;
-    private AtomicBoolean expandToggle = new AtomicBoolean(true);
 
-
-    private DefaultMutableTreeNode root;
-
-    private DefaultTreeModel treeModel;
-
-    private JTree tree;
 
     private JLabel iconLabel;
 
-    private JTextField titleTextField;
 
     private JPanel inputPanel;
     private JPanel actionPanel;
 
     private JComboBox<String> visibleAppComboBox;
     private JButton copyRetButton;
+    private JButton quickSaveParamsButton;
     private JToggleButton useProxyButton;
     private JButton executeButton;
     private JButton controllerCommandButton;
@@ -108,12 +109,16 @@ public class TestkitStoreWindow {
 
     private JComboBox<ReqStorageHelper.SavedReq> reqsComboBox;
 
-    private JButton metaButton;
     private LanguageTextField jsonInputField;
 
     private JTextPane outputTextPane;
 
     private ReqStorageHelper.Item selectedItem;
+
+    // 新增：用于替代左侧树的下拉选择
+    private JComboBox<String> groupBox;
+    private JComboBox<ReqStorageHelper.Item> itemBox;
+    private volatile boolean suppressComboEvents = false;
 
     protected Set<String> cancelReqs = new HashSet<>(128);
     private String lastReqId;
@@ -133,141 +138,42 @@ public class TestkitStoreWindow {
         // 定义主面板
         windowContent = new JPanel(new BorderLayout());
 
-        // 1. 创建顶部参数面板
+        // 1. 创建顶部参数面板（增加水平滚动以避免按钮被挤没）
         JPanel topPanel = createTopPanel();
-        windowContent.add(topPanel, BorderLayout.NORTH);
+        JBScrollPane topScrollPane = new JBScrollPane(topPanel,
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        topScrollPane.setBorder(JBUI.Borders.empty());
+        topScrollPane.setPreferredSize(new Dimension(0, Math.max(36, topPanel.getPreferredSize().height + 4)));
+        windowContent.add(topScrollPane, BorderLayout.NORTH);
 
-        // 初始化树结构
-        initializeTree();
-
-        // 创建分隔面板
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        splitPane.setDividerLocation(250);
-        splitPane.setDividerSize(0); // 隐藏分隔条
-        splitPane.setOneTouchExpandable(false);
-
-        // 添加滚动面板
-        JBScrollPane leftScrollPane = new JBScrollPane(tree);
-        leftScrollPane.setBorder(JBUI.Borders.empty());
-
+        // 仅使用右侧详情面板
         JPanel rightPanel = createRightPanel();
         JBScrollPane rightScrollPane = new JBScrollPane(rightPanel);
         rightScrollPane.setBorder(JBUI.Borders.empty());
-
-        splitPane.setLeftComponent(leftScrollPane);
-        splitPane.setRightComponent(rightScrollPane);
-
-        windowContent.add(splitPane, BorderLayout.CENTER);
+        windowContent.add(rightScrollPane, BorderLayout.CENTER);
 
     }
 
-
-    private void initializeTree() {
-        root = new DefaultMutableTreeNode("Root");
-        treeModel = new DefaultTreeModel(root);
-        tree = new JTree(treeModel);
-
-        // 设置树的基本属性
-        tree.setCellRenderer(new HistoryTreeRenderer());
-        tree.setRootVisible(false);
-        tree.setShowsRootHandles(true);
-        tree.setRowHeight(28);
-        tree.setBackground(new JBColor(new Color(250, 250, 250), new Color(43, 43, 43)));
-        tree.setBorder(JBUI.Borders.empty(5));
-
-        // 添加选择监听器
-        tree.addTreeSelectionListener(e -> {
-            updateRightPanel();
-        });
-    }
-
-    // 2. 新增一级节点展开/闭合的功能函数
-    public void expandFirstLevelNodes(boolean expand) {
-        for (int i = 0; i < root.getChildCount(); i++) {
-            DefaultMutableTreeNode node = (DefaultMutableTreeNode) root.getChildAt(i);
-            TreePath path = new TreePath(node.getPath());
-            if (expand) {
-                tree.expandPath(path);
-            } else {
-                tree.collapsePath(path);
-            }
-        }
-    }
 
     public void refreshTree() {
         SwingUtilities.invokeLater(() -> {
-            // 保存当前选中的节点信息
-            DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
-            String selectedGroup = null;
+            // 保存当前下拉选择
+            String selectedGroup = groupBox == null ? null : (String) groupBox.getSelectedItem();
             String selectedItemNameAndType = null;
-
-            if (selectedNode != null) {
-                Object userObject = selectedNode.getUserObject();
-                if (userObject instanceof ReqStorageHelper.GroupItems) {
-                    selectedGroup = ((ReqStorageHelper.GroupItems) userObject).getGroup();
-                } else if (userObject instanceof ReqStorageHelper.Item) {
-                    ReqStorageHelper.Item item = (ReqStorageHelper.Item) userObject;
-                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) selectedNode.getParent();
-                    if (parentNode != null && parentNode.getUserObject() instanceof ReqStorageHelper.GroupItems) {
-                        selectedGroup = ((ReqStorageHelper.GroupItems) parentNode.getUserObject()).getGroup();
-                        selectedItemNameAndType = item.getName() + "|" + item.getType();
-                    }
-                }
+            if (itemBox != null && itemBox.getSelectedItem() instanceof ReqStorageHelper.Item) {
+                ReqStorageHelper.Item it = (ReqStorageHelper.Item) itemBox.getSelectedItem();
+                selectedItemNameAndType = it.getName() + "|" + it.getType();
             }
-
 
             String app = (String) appBox.getSelectedItem();
             List<ReqStorageHelper.GroupItems> groups = app == null ? null : ReqStorageHelper.getAppReqs(project, app);
-            updateRightPanel();
+            // 重建顶部下拉框
+            rebuildCombos(groups, selectedGroup, selectedItemNameAndType);
 
-            root.removeAllChildren();
-            if (CollectionUtils.isNotEmpty(groups)) {
-                for (ReqStorageHelper.GroupItems group : groups) {
-                    DefaultMutableTreeNode groupNode = new DefaultMutableTreeNode(group);
-                    root.add(groupNode);
-
-                    for (ReqStorageHelper.Item item : group.getItems()) {
-                        groupNode.add(new DefaultMutableTreeNode(item));
-                    }
-                }
-            }
-            treeModel.reload();
-            if (expandToggle.get()) {
-                expandFirstLevelNodes(true);
-            }
-            // 然后尝试恢复之前的选择
-            if (selectedGroup == null) {
-                return;
-            }
-
-            // 遍历查找匹配的节点
-            for (int i = 0; i < root.getChildCount(); i++) {
-                DefaultMutableTreeNode groupNode = (DefaultMutableTreeNode) root.getChildAt(i);
-                ReqStorageHelper.GroupItems group = (ReqStorageHelper.GroupItems) groupNode.getUserObject();
-                if (!selectedGroup.equals(group.getGroup())) {
-                    continue;
-                }
-                // 如果之前选中的是组节点，直接选中组
-                TreePath path = new TreePath(groupNode.getPath());
-                tree.setSelectionPath(path);
-                tree.expandPath(path);
-                if (selectedItemNameAndType == null) {
-                    break;
-                }
-                // 如果之前选中的是子节点，查找对应的子节点
-                for (int j = 0; j < groupNode.getChildCount(); j++) {
-                    DefaultMutableTreeNode childNode = (DefaultMutableTreeNode) groupNode.getChildAt(j);
-                    ReqStorageHelper.Item item = (ReqStorageHelper.Item) childNode.getUserObject();
-                    String currentItemNameAndType = item.getName() + "|" + item.getType();
-                    if (!selectedItemNameAndType.equals(currentItemNameAndType)) {
-                        continue;
-                    }
-                    path = new TreePath(childNode.getPath());
-                    tree.setSelectionPath(path);
-                    break;
-                }
-                break;
-            }
+            // 更新右侧面板
+            ReqStorageHelper.Item now = itemBox == null ? null : (ReqStorageHelper.Item) itemBox.getSelectedItem();
+            updateRightPanelByItem(now);
         });
     }
 
@@ -299,27 +205,23 @@ public class TestkitStoreWindow {
                 appBox.setSelectedItem(selectedApp);
             }
         }
-        window.show();
+        window.setAvailable(true, new Runnable() {
+            @Override
+            public void run() {
+                window.show();
+            }
+        });
     }
 
-//
-//    public boolean isListEqual(List<String> list1, List<String> list2) {
-//        if (CollectionUtils.isEmpty(list1) && CollectionUtils.isEmpty(list2)) {
-//            return true;
-//        }
-//        if ((list1 == null ? 0 : list1.size()) != (list2 == null ? 0 : list2.size())) {
-//            return false;
-//        }
-//
-//        return new HashSet<>(list1).equals(new HashSet<>(list2));
-//    }
 
 
     // 创建顶部参数面板
     private JPanel createTopPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel panel = new JPanel(new BorderLayout());
 
-        // 创建下拉列表
+        // 第一行：App + 操作按钮
+        JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        row1.setBorder(JBUI.Borders.empty(0, 6, 0, 0));
         String[] options = {};
         appBox = new JComboBox<>(options);
         appBox.addActionListener(new ActionListener() {
@@ -330,38 +232,20 @@ public class TestkitStoreWindow {
         });
         JLabel appLabel = new JLabel("App:");
         appLabel.setLabelFor(appBox);
-        panel.add(appLabel);
-        panel.add(appBox);
+        row1.add(appLabel);
+        row1.add(appBox);
 
-        JButton expandToggleButton = new JButton(AllIcons.Actions.Collapseall);
-        expandToggleButton.setPreferredSize(new Dimension(32, 32));
-        expandToggleButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (!expandToggle.get()) {
-                    expandFirstLevelNodes(true);
-                    expandToggle.set(true);
-                    expandToggleButton.setIcon(AllIcons.Actions.Collapseall);
-                } else {
-                    expandFirstLevelNodes(false);
-                    expandToggle.set(false);
-                    expandToggleButton.setIcon(AllIcons.Actions.Expandall);
-                }
-            }
-        });
-        panel.add(expandToggleButton);
-
-        JButton refreshButton = new JButton(AllIcons.Actions.Refresh);
-        refreshButton.setPreferredSize(new Dimension(32, 32));
-        refreshButton.setToolTipText("Reload store");
-        refreshButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                refreshTree();
-                TestkitHelper.notify(project, NotificationType.INFORMATION, "Reload success");
-            }
-        });
-        panel.add(refreshButton);
+//        JButton refreshButton = new JButton(AllIcons.Actions.Refresh);
+//        refreshButton.setPreferredSize(new Dimension(32, 32));
+//        refreshButton.setToolTipText("Reload store");
+//        refreshButton.addActionListener(new ActionListener() {
+//            @Override
+//            public void actionPerformed(ActionEvent e) {
+//                refreshTree();
+//                TestkitHelper.notify(project, NotificationType.INFORMATION, "Reload success");
+//            }
+//        });
+//        row1.add(refreshButton);
 
         JButton importButton = new JButton(SettingsDialog.IMPORT_ICON);
         importButton.setPreferredSize(new Dimension(32, 32));
@@ -374,31 +258,21 @@ public class TestkitStoreWindow {
                     TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a app");
                     return;
                 }
-                //常见一个弹出层
-//              标题是 import reqs
-//              一个大面积的json输入框
-//                最下面是个import按钮，点击按钮后触发一个动作
-
-                // 创建弹出对话框
                 JDialog dialog = new JDialog();
                 dialog.setTitle("Import/Update item to the selected app");
                 dialog.setModal(true);
                 dialog.setSize(500, 400);
                 dialog.setLocationRelativeTo(null);
 
-                // 创建说明文本标签
                 JLabel instructionLabel = new JLabel("<html>Paste the data you want to import here<br>Usually json content exported from other device or project</html>");
-// 启用自动换行
                 instructionLabel.setForeground(new Color(0x72A96B));
                 instructionLabel.setFont(new Font("Arial", Font.BOLD, 13));
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                // 创建JSON输入框
                 JTextArea jsonInput = new JTextArea();
                 jsonInput.setLineWrap(true);
                 jsonInput.setWrapStyleWord(true);
                 JScrollPane scrollPane = new JScrollPane(jsonInput);
 
-                // 创建导入按钮
                 JButton importConfirmButton = new JButton("Import");
                 importConfirmButton.addActionListener(e1 -> {
                     ReqStorageHelper.GroupItems groupItems = null;
@@ -418,17 +292,23 @@ public class TestkitStoreWindow {
                     }
                 });
 
-                // 布局
                 dialog.setLayout(new BorderLayout());
                 dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                // 将组件添加到面板
                 dialog.add(instructionLabel, BorderLayout.NORTH);
                 dialog.add(scrollPane, BorderLayout.CENTER);
                 dialog.add(importConfirmButton, BorderLayout.SOUTH);
+
+                dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+                dialog.getRootPane().registerKeyboardAction(
+                        e2 -> dialog.dispose(),
+                        KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                        JComponent.WHEN_IN_FOCUSED_WINDOW
+                );
+
                 dialog.setVisible(true);
             }
         });
-        panel.add(importButton);
+        row1.add(importButton);
 
         JButton exportButton = new JButton(SettingsDialog.EXPORT_ICON);
         exportButton.setPreferredSize(new Dimension(32, 32));
@@ -442,96 +322,189 @@ public class TestkitStoreWindow {
                     return;
                 }
 
-                DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
-                if (node == null) {
-                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a group or item");
+                String group = groupBox == null ? null : (String) groupBox.getSelectedItem();
+                ReqStorageHelper.Item selected = (itemBox != null && itemBox.getSelectedItem() instanceof ReqStorageHelper.Item)
+                        ? (ReqStorageHelper.Item) itemBox.getSelectedItem() : null;
+                if (group == null && selected == null) {
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a group or Item");
                     return;
                 }
-                ReqStorageHelper.GroupItems exportObj = exportReqs(app, node);
 
-                // 创建弹出对话框
+                // 构建可选导出范围
+                java.util.List<String> scopeList = new ArrayList<>();
+                if (group != null) {
+                    scopeList.add("Group");
+                }
+                if (selected != null) {
+                    scopeList.add("Item");
+                }
+
+
+                // 创建单选面板
+                JPanel radioPanel = new JPanel(new GridLayout(0, 1)); // 垂直排列
+                ButtonGroup buttonGroup = new ButtonGroup();
+                JRadioButton group1 = new JRadioButton("Group");
+                group1.setSelected(true);
+                buttonGroup.add(group1);
+                radioPanel.add(group1);
+                JRadioButton group2 = new JRadioButton("Item");
+                buttonGroup.add(group2);
+                radioPanel.add(group2);
+
+                // 弹窗设置
+                int result = JOptionPane.showConfirmDialog(
+                        exportButton,
+                        radioPanel,
+                        "Choose export scope",
+                        JOptionPane.OK_CANCEL_OPTION,
+                        JOptionPane.PLAIN_MESSAGE
+                );
+
+                if (result != JOptionPane.OK_OPTION) {
+                    return;
+                }
+
+                String targetGroup = null;
+                ReqStorageHelper.Item targetItem = null;
+                if (group1.isSelected()) {
+                    if (group == null) {
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a group first");
+                        return;
+                    }
+                    targetGroup = group;
+                } else  {
+                    if (selected == null) {
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a item first");
+                        return;
+                    }
+                    targetItem = selected;
+                }
+
+                ReqStorageHelper.GroupItems exportObj = exportReqs(app, targetGroup == null ? (targetItem == null ? group : targetItem.getGroup()) : targetGroup, targetItem);
+
                 JDialog dialog = new JDialog();
                 dialog.setTitle("Export the selected group or item");
                 dialog.setModal(true);
                 dialog.setSize(500, 400);
                 dialog.setLocationRelativeTo(null);
 
-                String title = "";
-                if (node.getUserObject() instanceof ReqStorageHelper.GroupItems) {
-                    title = ((ReqStorageHelper.GroupItems) node.getUserObject()).getGroup();
-                } else if (node.getUserObject() instanceof ReqStorageHelper.Item) {
-                    title = ((ReqStorageHelper.Item) node.getUserObject()).getGroup() + "." + ((ReqStorageHelper.Item) node.getUserObject()).getName();
-                }
-                // 创建说明文本标签
-                JLabel instructionLabel = new JLabel("<html>Current export scope: " + title + "<br>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
-// 启用自动换行
+                String title = targetItem == null ? String.valueOf((targetGroup == null ? (group == null ? "" : group) : targetGroup)) : (targetItem.getGroup() + "." + targetItem.getName());
+                JLabel instructionLabel = new JLabel("<html>Current export scope: " + title + "<br><br>The exported content is already below<br/>You can copy it and import it on another device or project</html>");
                 instructionLabel.setForeground(new Color(0x72A96B));
                 instructionLabel.setFont(new Font("Arial", Font.BOLD, 13));
                 instructionLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                // 创建JSON输入框
                 JTextArea jsonInput = new JTextArea();
                 jsonInput.setEditable(false);
                 jsonInput.setLineWrap(true);
                 jsonInput.setWrapStyleWord(true);
                 JScrollPane scrollPane = new JScrollPane(jsonInput);
                 jsonInput.setText(JsonUtil.formatObj(exportObj));
-                // 创建导入按钮
                 JButton copyConfirmButton = new JButton("Copy");
                 copyConfirmButton.addActionListener(e1 -> {
                     TestkitHelper.copyToClipboard(project, jsonInput.getText(), (exportObj == null || exportObj.getItems() == null ? 0 : exportObj.getItems().size()) + " item have been copied");
                     dialog.dispose();
                 });
 
-                // 布局
                 dialog.setLayout(new BorderLayout());
                 dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                // 将组件添加到面板
                 dialog.add(instructionLabel, BorderLayout.NORTH);
                 dialog.add(scrollPane, BorderLayout.CENTER);
                 dialog.add(copyConfirmButton, BorderLayout.SOUTH);
                 dialog.setVisible(true);
             }
         });
-        panel.add(exportButton);
+        row1.add(exportButton);
 
-        // 创建文本标签
-//        JLabel textLabel = new JLabel("Good luck");
-//        panel.add(textLabel);
+        panel.add(row1, BorderLayout.NORTH);
+
+        // 第二行：Group + Item 选择（自适应宽度）
+        JPanel row2 = new JPanel(new GridBagLayout());
+        row2.setBorder(JBUI.Borders.empty(0, 6, 0, 0));
+        GridBagConstraints r2 = new GridBagConstraints();
+        r2.insets = JBUI.insets(0, 0, 0, 6);
+
+        groupBox = new JComboBox<>();
+//        groupBox.setPrototypeDisplayValue("XXXXXXXXXXXX");
+        groupBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (suppressComboEvents) {
+                    return;
+                }
+                onGroupSelected();
+            }
+        });
+        JLabel groupLabel = new JLabel("Group:");
+        groupLabel.setLabelFor(groupBox);
+
+        r2.gridx = 0; r2.gridy = 0; r2.weightx = 0; r2.fill = GridBagConstraints.NONE;
+        row2.add(groupLabel, r2);
+        r2.gridx = 1; r2.gridy = 0; r2.weightx = 0.35; r2.fill = GridBagConstraints.HORIZONTAL;
+        row2.add(groupBox, r2);
+
+        itemBox = new JComboBox<>();
+        itemBox.setRenderer(new ListCellRenderer<ReqStorageHelper.Item>() {
+            private final DefaultListCellRenderer delegate = new DefaultListCellRenderer();
+            @Override
+            public Component getListCellRendererComponent(JList<? extends ReqStorageHelper.Item> list, ReqStorageHelper.Item value, int index, boolean isSelected, boolean cellHasFocus) {
+                String text = value == null ? "" : value.getName();
+                return delegate.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
+            }
+        });
+        itemBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (suppressComboEvents) {
+                    itemBox.setToolTipText("");
+                    return;
+                }
+                onItemSelected();
+            }
+        });
+        JLabel itemLabel = new JLabel("Item:");
+        itemLabel.setLabelFor(itemBox);
+
+        r2.gridx = 2; r2.gridy = 0; r2.weightx = 0; r2.fill = GridBagConstraints.NONE;
+        row2.add(itemLabel, r2);
+        r2.gridx = 3; r2.gridy = 0; r2.weightx = 0.65; r2.fill = GridBagConstraints.HORIZONTAL;
+        row2.add(itemBox, r2);
+
+        panel.add(row2, BorderLayout.CENTER);
+
         return panel;
     }
 
-    private ReqStorageHelper.GroupItems exportReqs(String app, DefaultMutableTreeNode node) {
+    private ReqStorageHelper.GroupItems exportReqs(String app, String groupName, ReqStorageHelper.Item itemOrNull) {
         ReqStorageHelper.GroupItems exportObj = null;
         List<ReqStorageHelper.GroupItems> groups = ReqStorageHelper.getAppReqs(project, app);
-        Object userObject = node.getUserObject();
-        if (userObject instanceof ReqStorageHelper.GroupItems) {
+        if (itemOrNull == null) {
             Optional<ReqStorageHelper.GroupItems> groupItems = Optional.ofNullable(groups)
                     .orElse(new ArrayList<>())
                     .stream().filter(new Predicate<ReqStorageHelper.GroupItems>() {
                         @Override
                         public boolean test(ReqStorageHelper.GroupItems groupItems) {
-                            return groupItems != null && Objects.equals(((ReqStorageHelper.GroupItems) userObject).getGroup(), groupItems.getGroup());
+                            return groupItems != null && Objects.equals(groupName, groupItems.getGroup());
                         }
                     }).findFirst();
-            exportObj = (ReqStorageHelper.GroupItems) groupItems.orElseGet(new Supplier<ReqStorageHelper.GroupItems>() {
+            exportObj = groupItems.orElseGet(new Supplier<ReqStorageHelper.GroupItems>() {
                 @Override
                 public ReqStorageHelper.GroupItems get() {
                     ReqStorageHelper.GroupItems items = new ReqStorageHelper.GroupItems();
-                    items.setGroup(((ReqStorageHelper.GroupItems) userObject).getGroup());
+                    items.setGroup(groupName);
                     return items;
                 }
             });
-        } else if (userObject instanceof ReqStorageHelper.Item) {
+        } else {
             Optional<ReqStorageHelper.GroupItems> groupItems = Optional.ofNullable(groups)
                     .orElse(new ArrayList<>())
                     .stream().filter(new Predicate<ReqStorageHelper.GroupItems>() {
                         @Override
                         public boolean test(ReqStorageHelper.GroupItems groupItems) {
-                            return groupItems != null && Objects.equals(((ReqStorageHelper.Item) userObject).getGroup(), groupItems.getGroup());
+                            return groupItems != null && Objects.equals(itemOrNull.getGroup(), groupItems.getGroup());
                         }
                     }).findFirst();
             exportObj = new ReqStorageHelper.GroupItems();
-            exportObj.setGroup(((ReqStorageHelper.Item) userObject).getGroup());
+            exportObj.setGroup(itemOrNull.getGroup());
             if (groupItems.isPresent()) {
                 Optional<ReqStorageHelper.Item> first = Optional.ofNullable(groupItems.get().getItems())
                         .orElse(new ArrayList<>())
@@ -539,7 +512,7 @@ public class TestkitStoreWindow {
                         .filter(new Predicate<ReqStorageHelper.Item>() {
                             @Override
                             public boolean test(ReqStorageHelper.Item item) {
-                                return item != null && Objects.equals(item.getName(), ((ReqStorageHelper.Item) userObject).getName()) && Objects.equals(item.getType(), ((ReqStorageHelper.Item) userObject).getType());
+                                return item != null && Objects.equals(item.getName(), itemOrNull.getName()) && Objects.equals(item.getType(), itemOrNull.getType());
                             }
                         }).findFirst();
                 if (first.isPresent()) {
@@ -566,57 +539,11 @@ public class TestkitStoreWindow {
         reqsComboBox = new JComboBox<>();
         firstRow.add(iconLabel, BorderLayout.WEST);
         firstRow.add(reqsComboBox, BorderLayout.CENTER);
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
-
-        JButton saveButton = new JButton(AllIcons.Actions.MenuSaveall);
-        saveButton.setPreferredSize(new Dimension(32, 32));
-        saveButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String app = (String) appBox.getSelectedItem();
-                ReqStorageHelper.SavedReq selectedReq = (ReqStorageHelper.SavedReq) reqsComboBox.getSelectedItem();
-                if (selectedReq == null || selectedItem == null) {
-                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select a item");
-                    return;
-                }
-
-                String title = selectedReq.getTitle();
-                selectedReq.setTitle(titleTextField.getText());
-                try {
-                    selectedReq.setArgs(JSON.parseObject(jsonInputField.getText()));
-                } catch (Throwable ex) {
-                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Input parameter must be json object");
-                    return;
-                }
-
-                JSONObject meta = new JSONObject();
-                switch (selectedItem.getType()) {
-                    case function_call -> {
-                        try {
-                            meta = JSON.parseObject(metaButton.getToolTipText().trim());
-                        } catch (Throwable ex) {
-                            TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
-                            return;
-                        }
-                    }
-                    case flexible_test -> {
-                        ReqStorageHelper.FlexibleTestMeta metaObj = selectedItem.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                        metaObj.setCode(metaButton.getToolTipText().trim());
-                        meta = JSON.parseObject(JSON.toJSONString(metaObj, SerializerFeature.WriteMapNullValue));
-                    }
-                    default -> {
-
-                    }
-                }
-                ReqStorageHelper.saveAppReq(project, app, selectedItem.getGroup(), selectedItem.getType(), selectedItem.getName(), meta, title, selectedReq);
-                TestkitHelper.notify(project, NotificationType.INFORMATION, "Save success");
-                //触发重绘
-                reqsComboBox.repaint();
-            }
-        });
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
 
         JButton delButton = new JButton(AllIcons.Actions.GC);
         delButton.setPreferredSize(new Dimension(32, 32));
+        delButton.setMargin(JBUI.insets(0));
         delButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -631,11 +558,8 @@ public class TestkitStoreWindow {
             }
         });
 
-        buttonPanel.add(saveButton);
         buttonPanel.add(delButton);
         firstRow.add(buttonPanel, BorderLayout.EAST);
-
-        titleTextField = new JTextField();
 
         reqsComboBox.addActionListener(new ActionListener() {
             @Override
@@ -643,23 +567,16 @@ public class TestkitStoreWindow {
                 ReqStorageHelper.SavedReq selectedReq = (ReqStorageHelper.SavedReq) reqsComboBox.getSelectedItem();
                 if (selectedReq == null || selectedItem == null) {
                     jsonInputField.setText("");
-                    titleTextField.setText("");
                     return;
                 }
                 ReqStorageHelper.ItemType type = selectedItem.getType();
                 if (type == null) {
                     jsonInputField.setText("");
-                    titleTextField.setText("");
                     return;
                 }
                 jsonInputField.setText(selectedReq.getArgs() == null ? "{}" : JSON.toJSONString(selectedReq.getArgs(), SerializerFeature.WriteMapNullValue, SerializerFeature.PrettyFormat));
-                titleTextField.setText(selectedReq.getTitle());
             }
         });
-
-        // 第二行：标题输入框和按钮
-        JPanel secondRow = new JPanel(new BorderLayout(5, 0));
-        secondRow.add(titleTextField, BorderLayout.CENTER);
 
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -669,14 +586,11 @@ public class TestkitStoreWindow {
 
         contentPanel.add(firstRow, gbc);
 
-        gbc.gridy = 1;
-        contentPanel.add(secondRow, gbc);
-
 
         // 第二行：下拉框和执行按钮
         inputPanel = buildInputPanel();
 
-        gbc.gridy = 2;
+        gbc.gridy = 1;
         gbc.weighty = 0;
 //        gbc.insets = JBUI.insets(0, 0, 10, 0);
         gbc.fill = GridBagConstraints.BOTH;
@@ -692,7 +606,7 @@ public class TestkitStoreWindow {
         outputScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 
         // 将内容面板添加到主面板
-        gbc.gridy = 3;
+        gbc.gridy = 2;
         gbc.weighty = 1;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.insets = JBUI.insets(1);
@@ -760,6 +674,17 @@ public class TestkitStoreWindow {
             @Override
             public void actionPerformed(ActionEvent e) {
                 TestkitHelper.copyToClipboard(project, outputTextPane.getText(), null);
+            }
+        });
+
+        // 保存参数按钮（放在 copy 按钮旁）
+        quickSaveParamsButton = new JButton(AllIcons.Actions.MenuSaveall);
+        quickSaveParamsButton.setPreferredSize(new Dimension(32, 32));
+        quickSaveParamsButton.setToolTipText("Save current params to store");
+        quickSaveParamsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showQuickSavePopup();
             }
         });
 
@@ -834,7 +759,7 @@ public class TestkitStoreWindow {
                 }
                 ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
+                    meta = JSON.parseObject(iconLabel.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
                     TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                     return;
@@ -880,7 +805,7 @@ public class TestkitStoreWindow {
                 }
                 ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
+                    meta = JSON.parseObject(iconLabel.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
                     TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                     return;
@@ -926,7 +851,7 @@ public class TestkitStoreWindow {
                 }
                 ReqStorageHelper.FunctionCallMeta meta = null;
                 try {
-                    meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
+                    meta = JSON.parseObject(iconLabel.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                 } catch (Throwable e2) {
                     TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
                     return;
@@ -1377,17 +1302,6 @@ public class TestkitStoreWindow {
 
         Dimension preferredSize = new Dimension(30, 30);
 
-        metaButton = new JButton(AllIcons.General.Information);
-        metaButton.setToolTipText("");
-        metaButton.setPreferredSize(preferredSize);
-        metaButton.setMaximumSize(preferredSize);
-        metaButton.setMinimumSize(preferredSize);
-        metaButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-
-            }
-        });
 
         JButton copyButton = new JButton(AllIcons.Actions.Copy);
         copyButton.setToolTipText("Copy this");
@@ -1420,7 +1334,6 @@ public class TestkitStoreWindow {
         // 顶部面板
         JPanel northPanel = new JPanel();
         northPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
-        northPanel.add(metaButton);
         northPanel.add(label);
         northPanel.add(copyButton);
 
@@ -1432,8 +1345,8 @@ public class TestkitStoreWindow {
 
     // 更新右侧面板的方法
     public void updateRightPanel() {
-        DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
-        Object nowItem = node == null ? null : node.getUserObject();
+        Object nowItem = (itemBox != null && itemBox.getSelectedItem() instanceof ReqStorageHelper.Item)
+                ? (ReqStorageHelper.Item) itemBox.getSelectedItem() : null;
         if (nowItem == selectedItem) {
             return;
         }
@@ -1442,7 +1355,7 @@ public class TestkitStoreWindow {
             iconLabel.setIcon(null);
             reqsComboBox.removeAllItems();
             jsonInputField.setText("");
-            metaButton.setToolTipText("");
+            iconLabel.setToolTipText("");
             setOutputText("", null);
             actionPanel.removeAll();
             return;
@@ -1471,9 +1384,9 @@ public class TestkitStoreWindow {
                 // 根据条件添加script输入框
                 if (item.getType() == ReqStorageHelper.ItemType.flexible_test) {
                     ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                    metaButton.setToolTipText(meta.getCode() == null ? "" : meta.getCode());
+                    iconLabel.setToolTipText(meta.getCode() == null ? "" : meta.getCode());
                 } else if (item.getType() == ReqStorageHelper.ItemType.function_call) {
-                    metaButton.setToolTipText(item.getMeta() == null ? "" : JsonUtil.formatObj(item.getMeta()));
+                    iconLabel.setToolTipText(item.getMeta() == null ? "" : JsonUtil.formatObj(item.getMeta()));
                 } else {
                     TestkitHelper.alert(project, Messages.getErrorIcon(), "Un support type, please contact developer");
                     return;
@@ -1485,6 +1398,7 @@ public class TestkitStoreWindow {
                 instanceLabel.setText("RuntimeApp:");
                 instanceLabel.setToolTipText("The list of currently connected apps");
                 actionPanel.add(copyRetButton);
+                actionPanel.add(quickSaveParamsButton);
                 // 创建底部面板使用FlowLayout
                 actionPanel.add(instanceLabel);
                 actionPanel.add(visibleAppComboBox);
@@ -1507,6 +1421,144 @@ public class TestkitStoreWindow {
                 actionPanel.repaint();
             }
         });
+    }
+
+    // 供刷新后直接根据 item 更新右侧区域
+    private void updateRightPanelByItem(ReqStorageHelper.Item item) {
+        suppressComboEvents = true;
+        try {
+            if (itemBox != null && item != null) {
+                for (int i = 0; i < itemBox.getItemCount(); i++) {
+                    if (Objects.equals(itemBox.getItemAt(i), item)) {
+                        itemBox.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+            updateRightPanel();
+        } finally {
+            suppressComboEvents = false;
+        }
+    }
+
+    private void showQuickSavePopup() {
+        java.util.List<String> apps = RuntimeHelper.getAppMetas(project.getName()).stream().map(new Function<RuntimeHelper.AppMeta, String>() {
+            @Override
+            public String apply(RuntimeHelper.AppMeta appMeta) {
+                return appMeta.getApp();
+            }
+        }).collect(Collectors.toCollection(ArrayList::new));
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = JBUI.insets(5);
+
+        String[] options = apps.toArray(new String[apps.size()]);
+        ComboBox<String> comboBox = new ComboBox<>(options);
+        if (appBox != null && appBox.getSelectedItem() instanceof String) {
+            comboBox.setSelectedItem((String) appBox.getSelectedItem());
+        }
+
+        JBTextField groupField = new JBTextField("default");
+        groupField.getEmptyText().setText("Which group to save to");
+        groupField.setEditable(true);
+        groupField.setEnabled(true);
+        groupField.setFocusable(true);
+        if (groupBox != null && groupBox.getSelectedItem() instanceof String) {
+            groupField.setText((String) groupBox.getSelectedItem());
+        }
+        JBTextField titleField = new JBTextField("default");
+        titleField.getEmptyText().setText("Give this parameter a name");
+        titleField.setEditable(true);
+        titleField.setEnabled(true);
+        titleField.setFocusable(true);
+        if (reqsComboBox != null && reqsComboBox.getSelectedItem() instanceof ReqStorageHelper.SavedReq) {
+            ReqStorageHelper.SavedReq sel = (ReqStorageHelper.SavedReq) reqsComboBox.getSelectedItem();
+            if (sel != null && StringUtils.isNotBlank(sel.getTitle())) {
+                titleField.setText(sel.getTitle());
+            }
+        }
+
+        JButton submitButton = new JButton("Save");
+
+        gbc.gridx = 0; gbc.gridy = 0;
+        JLabel appLabel = new JLabel("App:");
+        appLabel.setLabelFor(comboBox);
+        appLabel.setToolTipText("Which app domain you want to save to");
+        panel.add(appLabel, gbc);
+        gbc.gridx = 1; panel.add(comboBox, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 1;
+        JLabel groupLabel = new JLabel("Group:");
+        groupLabel.setToolTipText("Grouping functions");
+        panel.add(groupLabel, gbc);
+        gbc.gridx = 1; panel.add(groupField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 2;
+        JLabel titleLabel = new JLabel("Title:");
+        titleLabel.setToolTipText("Multiple params can be stored in a function");
+        panel.add(titleLabel, gbc);
+        gbc.gridx = 1; panel.add(titleField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        panel.add(submitButton, gbc);
+
+        JBPopup popup = JBPopupFactory.getInstance().createComponentPopupBuilder(panel, titleField)
+                .setRequestFocus(true)
+                .setFocusable(true)
+                .setTitle("Save this to store")
+                .setMovable(true)
+                .setResizable(false)
+                .createPopup();
+
+        submitButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String app = (String) comboBox.getSelectedItem();
+                String group = groupField.getText();
+                String title = titleField.getText();
+                if (StringUtils.isBlank(app) || StringUtils.isBlank(group) || StringUtils.isBlank(title)) {
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "App/Group/Title must not be blank");
+                    return;
+                }
+                if (selectedItem == null) {
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Please select an item first");
+                    return;
+                }
+                ReqStorageHelper.SavedReq req = new ReqStorageHelper.SavedReq();
+                req.setTitle(title);
+                try {
+                    JSONObject args = StringUtils.isBlank(jsonInputField.getText()) ? new JSONObject() : JSON.parseObject(jsonInputField.getText());
+                    req.setArgs(args);
+                } catch (Throwable ex) {
+                    TestkitHelper.alert(project, Messages.getErrorIcon(), "Params must be json object");
+                    return;
+                }
+
+                JSONObject meta = new JSONObject();
+                if (selectedItem.getType() == ReqStorageHelper.ItemType.function_call) {
+                    try {
+                        meta = JSON.parseObject(iconLabel.getToolTipText().trim());
+                    } catch (Throwable ex) {
+                        TestkitHelper.alert(project, Messages.getErrorIcon(), "Meta must be json object");
+                        return;
+                    }
+                } else if (selectedItem.getType() == ReqStorageHelper.ItemType.flexible_test) {
+                    ReqStorageHelper.FlexibleTestMeta metaObj = selectedItem.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
+                    metaObj.setCode(iconLabel.getToolTipText().trim());
+                    meta = JSON.parseObject(JSON.toJSONString(metaObj, SerializerFeature.WriteMapNullValue));
+                }
+
+                ReqStorageHelper.saveAppReq(project, app, group, selectedItem.getType(), selectedItem.getName(), meta, title, req);
+                TestkitHelper.notify(project, NotificationType.INFORMATION, "Save success");
+                popup.closeOk(null);
+                refreshTree();
+            }
+        });
+        popup.show(new RelativePoint(jsonInputField, new Point(0, 0)));
     }
 
 
@@ -1539,7 +1591,7 @@ public class TestkitStoreWindow {
                     }
                     ReqStorageHelper.FunctionCallMeta meta = null;
                     try {
-                        meta = JSON.parseObject(metaButton.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
+                        meta = JSON.parseObject(iconLabel.getToolTipText(), ReqStorageHelper.FunctionCallMeta.class);
                     } catch (Throwable e) {
                         throw new RuntimeException("Meta must be json object");
                     }
@@ -1554,7 +1606,7 @@ public class TestkitStoreWindow {
                         }
                     }
                     ReqStorageHelper.FlexibleTestMeta meta = item.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
-                    meta.setCode(metaButton.getToolTipText().trim());
+                    meta.setCode(iconLabel.getToolTipText().trim());
                     return buildFlexibleParams(meta, visibleApp, args);
                 }
 
@@ -1740,6 +1792,79 @@ public class TestkitStoreWindow {
 
     private void setOutputText(String text, List<Map<String, String>> profile) {
         outputTextPane.setText(text);
+    }
+
+
+    private void rebuildCombos(List<ReqStorageHelper.GroupItems> groups, String selectedGroup, String selectedItemNameAndType) {
+        suppressComboEvents = true;
+        try {
+            groupBox.removeAllItems();
+            itemBox.removeAllItems();
+            if (CollectionUtils.isEmpty(groups)) {
+                return;
+            }
+            Set<String> groupNames = new LinkedHashSet<>();
+            for (ReqStorageHelper.GroupItems g : groups) {
+                if (g != null && StringUtils.isNotBlank(g.getGroup())) {
+                    groupNames.add(g.getGroup());
+                }
+            }
+            for (String name : groupNames) {
+                groupBox.addItem(name);
+            }
+            if (selectedGroup != null && groupNames.contains(selectedGroup)) {
+                groupBox.setSelectedItem(selectedGroup);
+            }
+
+            // 填充 itemBox
+            String groupToFill = (String) groupBox.getSelectedItem();
+            if (groupToFill != null) {
+                for (ReqStorageHelper.GroupItems g : groups) {
+                    if (g != null && Objects.equals(groupToFill, g.getGroup()) && CollectionUtils.isNotEmpty(g.getItems())) {
+                        for (ReqStorageHelper.Item it : g.getItems()) {
+                            itemBox.addItem(it);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (selectedItemNameAndType != null) {
+                for (int i = 0; i < itemBox.getItemCount(); i++) {
+                    ReqStorageHelper.Item it = itemBox.getItemAt(i);
+                    String key = it.getName() + "|" + it.getType();
+                    if (selectedItemNameAndType.equals(key)) {
+                        itemBox.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        } finally {
+            suppressComboEvents = false;
+        }
+    }
+
+    private void onGroupSelected() {
+        String group = (String) groupBox.getSelectedItem();
+        if (group == null) {
+            itemBox.setToolTipText("");
+            return;
+        }
+
+        // 重建 item 列表（以当前组为准）
+        String app = (String) appBox.getSelectedItem();
+        List<ReqStorageHelper.GroupItems> groups = app == null ? null : ReqStorageHelper.getAppReqs(project, app);
+        rebuildCombos(groups, group, null);
+    }
+
+    private void onItemSelected() {
+        ReqStorageHelper.Item item = (ReqStorageHelper.Item) itemBox.getSelectedItem();
+        String group = (String) groupBox.getSelectedItem();
+        if (group == null) {
+            itemBox.setToolTipText("");
+            return;
+        }
+        itemBox.setToolTipText(item == null ? "" : item.getName());
     }
 
 

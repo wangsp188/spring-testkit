@@ -2,6 +2,8 @@ package com.testkit.view;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
+import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
+import com.intellij.util.messages.MessageBusConnection;
 import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.testkit.tools.BasePluginTool;
@@ -158,18 +160,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
-        // 添加第二个按钮
-        AnAction store = new AnAction("Testkit Store", "Testkit Store", AllIcons.Vcs.History) {
-            @Override
-            public void actionPerformed(AnActionEvent e) {
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        TestkitStoreWindowFactory.show(project);
-                    }
-                });
-            }
-        };
+
 
         // 添加第三个个按钮
         AnAction refresh = new AnAction("Refresh", "Refresh", AllIcons.Actions.Refresh) {
@@ -186,7 +177,20 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             }
         };
 
+        // 添加第二个按钮
+        AnAction store = new AnAction("Testkit Store", "Testkit Store", TestkitStoreWindow.STORE_ICON) {
+            @Override
+            public void actionPerformed(AnActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        TestkitStoreWindowFactory.show(project);
+                    }
+                });
+            }
+        };
+
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,store,refresh));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,refresh,store));
     }
 }

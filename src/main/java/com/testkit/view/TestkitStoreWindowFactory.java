@@ -19,6 +19,7 @@ import com.testkit.coding_guidelines.CodingGuidelinesHelper;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.testkit.tools.mcp_function.McpHelper;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.util.Arrays;
@@ -37,6 +38,10 @@ public class TestkitStoreWindowFactory implements ToolWindowFactory {
     }
 
 
+    @Override
+    public boolean shouldBeAvailable(@NotNull Project project) {
+        return false;
+    }
 
     public static void refreshStore(Project project){
         TestkitStoreWindowFactory.getOrInitStoreWindow(project, new Consumer<TestkitStoreWindow>() {

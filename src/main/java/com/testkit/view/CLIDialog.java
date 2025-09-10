@@ -21,6 +21,7 @@ import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -41,6 +42,12 @@ public class CLIDialog extends JDialog {
         initComponents();
         pack();
         setLocationRelativeTo(null);
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        getRootPane().registerKeyboardAction(
+                e -> dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
     }
 
     private void initComponents() {
@@ -163,11 +170,17 @@ public class CLIDialog extends JDialog {
 
 
     public static JDialog createCMDDialog(){
-        JDialog jDialog = new JDialog((Frame) null, "Testkit-CLI CMD list", true);
-        jDialog.setContentPane(createCMDPanel());
-        jDialog.pack();
-        jDialog.setLocationRelativeTo(null);
-        return jDialog;
+        JDialog dialog = new JDialog((Frame) null, "Testkit-CLI CMD list", true);
+        dialog.setContentPane(createCMDPanel());
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.getRootPane().registerKeyboardAction(
+                e -> dialog.dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
+        return dialog;
     }
 
 
