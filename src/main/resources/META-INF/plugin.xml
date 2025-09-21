@@ -77,7 +77,7 @@
                 description="Processes the selected TRACE_PROFILER and graph it">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="first"/>
         </action>
-        <action icon="/icons/test-code.svg" id="generate_flexible_text_code"
+        <action icon="AllIcons.Nodes.TestSourceFolder" id="generate_flexible_text_code"
                 class="com.testkit.tools.function_call.GenerateFlexibleTestAction"
                 text="Generate flexible test code"
                 description="Generate flexible test code from selected code">

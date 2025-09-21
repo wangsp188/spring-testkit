@@ -1,5 +1,6 @@
 package com.testkit.tools.function_call;
 
+import com.intellij.icons.AllIcons;
 import com.testkit.RuntimeHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.tools.ToolHelper;
@@ -60,6 +61,38 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
                 } else {
                     System.out.println("not_support_call, " + beanMethod + ":" + method.getContainingClass() + "#" + method.getName());
                 }
+            } else if (element instanceof PsiIdentifier && element.getParent() instanceof PsiClass) {
+                // 类名标识符：为 Spring Bean 类添加测试生成按钮
+                PsiClass psiClass = (PsiClass) element.getParent();
+                String support = isCreateClassTest(psiClass);
+                if (support == null) {
+                    PsiIdentifier identifierElement = (PsiIdentifier) element;
+                    LineMarkerInfo<PsiIdentifier> classTestMarker = new LineMarkerInfo<>(
+                            identifierElement,
+                            identifierElement.getTextRange(),
+                            AllIcons.Nodes.TestSourceFolder,
+                            new com.intellij.util.Function<PsiIdentifier, String>() {
+                                @Override
+                                public String fun(PsiIdentifier element) {
+                                    return "Generate and open test class for this class";
+                                }
+                            },
+                            new GutterIconNavigationHandler<PsiIdentifier>() {
+                                @Override
+                                public void navigate(java.awt.event.MouseEvent e, PsiIdentifier elt) {
+                                    if (java.awt.GraphicsEnvironment.isHeadless()) {
+                                        throw new java.awt.HeadlessException("Cannot display UI elements in a headless environment.");
+                                    }
+                                    Project project = elt.getProject();
+                                    generateAndOpenTestClass(project, (PsiClass) elt.getParent());
+                                }
+                            },
+                            GutterIconRenderer.Alignment.RIGHT
+                    );
+                    result.add(classTestMarker);
+                } else {
+                    System.out.println("not_support_createClassTest, " + support + ":" + psiClass.getQualifiedName());
+                }
             }
         }
     }
@@ -119,7 +152,7 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
             LineMarkerInfo<PsiIdentifier> generateTestMarker = new LineMarkerInfo<>(
                     identifierElement,
                     identifierElement.getTextRange(),
-                    FlexibleTestIconProvider.FLEXIBLE_TEST_ICON,
+                    AllIcons.Nodes.TestSourceFolder,
                     new Function<PsiIdentifier, String>() {
                         @Override
                         public String fun(PsiIdentifier element) {
@@ -417,6 +450,20 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
                 fieldName);
     }
 
+    private static String generateTestClassContent(PsiClass psiClass, String packageName, String fieldName) {
+        String className = psiClass.getName();
+        String fullyQualifiedClassName = psiClass.getQualifiedName();
+        String testClassName = className + "_FlexibleTest";
+        String importStatement = "import " + fullyQualifiedClassName + ";";
+
+        return String.format(TEST_CLASS_TEMPLATE,
+                packageName,
+                importStatement,
+                testClassName,
+                className,
+                fieldName);
+    }
+
     private String getFullyQualifiedName(PsiType psiType) {
         if (psiType == null) {
             return "void";
@@ -691,5 +738,123 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
                 modifierList.hasAnnotation("org.springframework.cache.annotation.CacheEvict") ||
                 modifierList.hasAnnotation("org.springframework.cache.annotation.CachePut") ||
                 modifierList.hasAnnotation("org.springframework.cache.annotation.Caching");
+    }
+
+    private String isCreateClassTest(PsiClass psiClass) {
+        if (psiClass == null || psiClass.getName() == null) {
+            return "class_null";
+        }
+        if (psiClass.isInterface() || psiClass.isAnnotationType()) {
+            return "not_concrete";
+        }
+        if (!ToolHelper.isSpringBean(psiClass)) {
+            return "not_spring_bean";
+        }
+        PsiFile psiFile = psiClass.getContainingFile();
+        if (psiFile == null || psiFile.getVirtualFile() == null) {
+            return "no_virtual_file";
+        }
+        String filePath = psiFile.getVirtualFile().getPath();
+        if (filePath.contains("/src/test/java/")) {
+            return "is_test_source";
+        }
+        if (!RuntimeHelper.hasAppMeta(psiClass.getProject().getName())) {
+            return "no_app_meta";
+        }
+        if (!SettingsStorageHelper.isEnableSideServer(psiClass.getProject())) {
+            return "disable_side_server";
+        }
+        return null;
+    }
+
+    private void generateAndOpenTestClass(Project project, PsiClass psiClass) {
+        Module module = ModuleUtilCore.findModuleForPsiElement(psiClass);
+        if (module == null) {
+            Messages.showMessageDialog(project, "Module not found for the selected class.", "Error", Messages.getErrorIcon());
+            return;
+        }
+
+        VirtualFile testSourceRoot = getTestSourceRoot(module);
+        if (testSourceRoot == null) {
+            try {
+                testSourceRoot = createTestRoot(module);
+            } catch (Throwable e) {
+                TestkitHelper.notify(module.getProject(), NotificationType.ERROR, "Failed to create test source root: " + e.getMessage());
+                return;
+            }
+        }
+
+        PsiDirectory testDir = PsiManager.getInstance(project).findDirectory(testSourceRoot);
+        if (testDir == null) {
+            TestkitHelper.notify(project, NotificationType.ERROR, "Test source root not found for the " + module.getName() + " module.");
+            return;
+        }
+
+        String packageName = SettingsStorageHelper.getFlexibleTestPackage(project);
+        String className = psiClass.getName();
+        String testClassName = className + "_FlexibleTest";
+
+        PsiClass exist = findTestClass(testClassName, packageName, project);
+        if (exist != null) {
+            String fieldName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
+            ensureAutowiredField(exist, psiClass, fieldName);
+            exist.navigate(true);
+            return;
+        }
+
+        String fieldName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
+        String content = generateTestClassContent(psiClass, packageName, fieldName);
+        PsiDirectory packageDir = createPackageDirectory(project, testDir);
+        PsiJavaFile testFile = createTestFile(packageDir, testClassName, content);
+        PsiClass testClass = PsiTreeUtil.findChildOfType(testFile, PsiClass.class);
+        if (testClass == null) {
+            TestkitHelper.notify(project, NotificationType.ERROR, "Test class not found");
+            return;
+        }
+        testClass.navigate(true);
+    }
+
+    private void ensureAutowiredField(PsiClass testClass, PsiClass targetClass, String fieldName) {
+        Project project = testClass.getProject();
+        PsiJavaFile javaFile = (PsiJavaFile) testClass.getContainingFile();
+        // Check if an @Autowired field with the same type already exists
+        for (PsiField field : testClass.getFields()) {
+            PsiType type = field.getType();
+            PsiClass resolved = PsiUtil.resolveClassInType(type);
+            if (resolved != null && targetClass.getQualifiedName() != null && targetClass.getQualifiedName().equals(resolved.getQualifiedName())) {
+                // Found same type field, no further action
+                return;
+            }
+        }
+
+        PsiElementFactory factory = PsiElementFactory.getInstance(project);
+
+        // Ensure imports
+        ApplicationManager.getApplication().runWriteAction(new Runnable() {
+            @Override
+            public void run() {
+                if (javaFile.getImportList() != null) {
+                    try {
+                        PsiClass autowiredClass = JavaPsiFacade.getInstance(project).findClass("org.springframework.beans.factory.annotation.Autowired", GlobalSearchScope.allScope(project));
+                        if (autowiredClass != null) {
+                            javaFile.getImportList().add(factory.createImportStatement(autowiredClass));
+                        }
+                        if (targetClass != null) {
+                            javaFile.getImportList().add(factory.createImportStatement(targetClass));
+                        }
+                    } catch (IncorrectOperationException ignored) {
+                    }
+                }
+
+                // Create field text with simple class name after import
+                String className = targetClass.getName();
+                String fieldText = "@Autowired\nprivate " + className + " " + fieldName + ";";
+                try {
+                    PsiField newField = factory.createFieldFromText(fieldText, testClass);
+                    testClass.add(newField);
+                } catch (IncorrectOperationException ignored) {
+                }
+            }
+        });
     }
 }

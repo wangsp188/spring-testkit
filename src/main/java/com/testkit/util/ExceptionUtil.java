@@ -1,6 +1,5 @@
 package com.testkit.util;
 
-import com.testkit.server.TestkitException;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
