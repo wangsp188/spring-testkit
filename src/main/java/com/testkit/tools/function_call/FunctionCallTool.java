@@ -1,5 +1,6 @@
 package com.testkit.tools.function_call;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
@@ -163,7 +164,7 @@ public class FunctionCallTool extends BasePluginTool {
     private void buildControllerButton(TestkitToolWindow testkitToolWindow) {
         controllerCommandButton = new JButton(CONTROLLER_ICON);
         controllerCommandButton.setPreferredSize(new Dimension(32, 32));
-        controllerCommandButton.setToolTipText("[Controller] Generate controller command");
+        controllerCommandButton.setToolTipText("[Controller] Send/Generate controller command");
         controllerCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
@@ -197,7 +198,28 @@ public class FunctionCallTool extends BasePluginTool {
                         envs.add(null);
                     }
                     for (String env : envs) {
-                        //显示的一个图标加上标题
+
+                        // 显示执行请求
+                        AnAction executeAction = new AnAction("Send request with " + app + ":" + env, "Send request with " + app + ":" + env, AllIcons.Actions.Execute) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                Application application = ApplicationManager.getApplication();
+                                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Sending request, please wait ...", false) {
+
+                                    @Override
+                                    public void run(@NotNull ProgressIndicator indicator) {
+                                        application.runReadAction(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                handleControllerCommand("send",env, script, selectedItem.getMethod());
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        controllerActionGroup.add(executeAction);
+                        // 显示生成脚本
                         AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, CONTROLLER_ICON) {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
@@ -209,7 +231,7 @@ public class FunctionCallTool extends BasePluginTool {
                                         application.runReadAction(new Runnable() {
                                             @Override
                                             public void run() {
-                                                handleControllerCommand(env, script, selectedItem.getMethod());
+                                                handleControllerCommand("generate",env, script, selectedItem.getMethod());
                                             }
                                         });
                                     }
@@ -217,29 +239,53 @@ public class FunctionCallTool extends BasePluginTool {
                             }
                         };
                         controllerActionGroup.add(documentation); // 将动作添加到动作组中
+
                     }
                 }
             }
 
 
             if (controllerActionGroup.getChildrenCount() == 0) {
-                //没有自定义逻辑，则直接处理
 
-                Application application = ApplicationManager.getApplication();
-                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
-
+                AnAction defaultExec = new AnAction("Send request with default", "Send request with default script", AllIcons.Actions.Execute) {
                     @Override
-                    public void run(@NotNull ProgressIndicator indicator) {
-                        application.runReadAction(new Runnable() {
+                    public void actionPerformed(@NotNull AnActionEvent e12) {
+                        Application application = ApplicationManager.getApplication();
+                        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Sending request, please wait ...", false) {
+
                             @Override
-                            public void run() {
-                                handleControllerCommand(null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
+                            public void run(@NotNull ProgressIndicator indicator) {
+                                application.runReadAction(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        handleControllerCommand("send",null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
+                                    }
+                                });
                             }
                         });
                     }
-                });
+                };
+                controllerActionGroup.add(defaultExec);
+                // 没有自定义逻辑，提供默认生成和执行
+                AnAction defaultGen = new AnAction("Generate with default", "Generate controller command with default script", CONTROLLER_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e12) {
+                        Application application = ApplicationManager.getApplication();
+                        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
 
-                return;
+                            @Override
+                            public void run(@NotNull ProgressIndicator indicator) {
+                                application.runReadAction(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        handleControllerCommand("generate",null, SettingsStorageHelper.DEF_CONTROLLER_COMMAND.getScript(), selectedItem.getMethod());
+                                    }
+                                });
+                            }
+                        });
+                    }
+                };
+                controllerActionGroup.add(defaultGen);
             }
 
             JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("ControllerCommandPopup", controllerActionGroup).getComponent();
@@ -250,7 +296,7 @@ public class FunctionCallTool extends BasePluginTool {
     private void buildFeignButton(TestkitToolWindow testkitToolWindow) {
         feignCommandButton = new JButton(FEIGN_ICON);
         feignCommandButton.setPreferredSize(new Dimension(32, 32));
-        feignCommandButton.setToolTipText("[FeignClient] Generate feign command");
+        feignCommandButton.setToolTipText("[FeignClient] Send/Generate feign command");
         feignCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
@@ -284,7 +330,28 @@ public class FunctionCallTool extends BasePluginTool {
                         envs.add(null);
                     }
                     for (String env : envs) {
-                        //显示的一个图标加上标题
+
+                        // 显示执行请求
+                        AnAction executeAction = new AnAction("Send request with " + app + ":" + env, "Send Feign request with " + app + ":" + env, AllIcons.Actions.Execute) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                Application application = ApplicationManager.getApplication();
+                                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Sending request, please wait ...", false) {
+
+                                    @Override
+                                    public void run(@NotNull ProgressIndicator indicator) {
+                                        application.runReadAction(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                handleFeignCommand("send",env, script, selectedItem.getMethod());
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        feignActionGroup.add(executeAction);
+                        // 显示生成脚本
                         AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FEIGN_ICON) {
                             @Override
                             public void actionPerformed(@NotNull AnActionEvent e) {
@@ -296,7 +363,7 @@ public class FunctionCallTool extends BasePluginTool {
                                         application.runReadAction(new Runnable() {
                                             @Override
                                             public void run() {
-                                                handleFeignCommand(env, script, selectedItem.getMethod());
+                                                handleFeignCommand("generate",env, script, selectedItem.getMethod());
                                             }
                                         });
                                     }
@@ -304,29 +371,53 @@ public class FunctionCallTool extends BasePluginTool {
                             }
                         };
                         feignActionGroup.add(documentation); // 将动作添加到动作组中
+
                     }
                 }
             }
 
 
             if (feignActionGroup.getChildrenCount() == 0) {
-                //没有自定义逻辑，则直接处理
-
-                Application application = ApplicationManager.getApplication();
-                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
-
+                AnAction defaultExec = new AnAction("Send request with default", "Send Feign request with default script", AllIcons.Actions.Execute) {
                     @Override
-                    public void run(@NotNull ProgressIndicator indicator) {
-                        application.runReadAction(new Runnable() {
+                    public void actionPerformed(@NotNull AnActionEvent e12) {
+                        Application application = ApplicationManager.getApplication();
+                        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Sending request, please wait ...", false) {
+
                             @Override
-                            public void run() {
-                                handleFeignCommand(null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), selectedItem.getMethod());
+                            public void run(@NotNull ProgressIndicator indicator) {
+                                application.runReadAction(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        handleFeignCommand("send",null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), selectedItem.getMethod());
+                                    }
+                                });
                             }
                         });
                     }
-                });
+                };
+                feignActionGroup.add(defaultExec);
+                // 没有自定义逻辑，提供默认生成和执行
+                AnAction defaultGen = new AnAction("Generate with default", "Generate Feign command with default script", FEIGN_ICON) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e12) {
+                        Application application = ApplicationManager.getApplication();
+                        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing generate function, please wait ...", false) {
 
-                return;
+                            @Override
+                            public void run(@NotNull ProgressIndicator indicator) {
+                                application.runReadAction(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        handleFeignCommand("generate",null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), selectedItem.getMethod());
+                                    }
+                                });
+                            }
+                        });
+                    }
+                };
+                feignActionGroup.add(defaultGen);
+
             }
 
             JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("FeignCommandPopup", feignActionGroup).getComponent();
@@ -704,7 +795,7 @@ public class FunctionCallTool extends BasePluginTool {
         return commandMeta;
     }
 
-    private void handleControllerCommand(String env, String script, PsiMethod method) {
+    private void handleControllerCommand(String action,String env, String script, PsiMethod method) {
         String jsonParams = jsonInputField.getText();
         JSONObject inputParams = null;
         try {
@@ -800,7 +891,7 @@ public class FunctionCallTool extends BasePluginTool {
         }
         setOutputText("Generate controller command ...");
         try {
-            String ret = invokeControllerScript(script, env, httpMethod, path1, urlParams, jsonBody, headerValues);
+            String ret = invokeControllerScript(script, action, env, httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
@@ -811,7 +902,7 @@ public class FunctionCallTool extends BasePluginTool {
         }
     }
 
-    private void handleFeignCommand(String env, String script, PsiMethod method) {
+    private void handleFeignCommand(String action,String env, String script, PsiMethod method) {
         String jsonParams = jsonInputField.getText();
         JSONObject inputParams = null;
         try {
@@ -907,7 +998,7 @@ public class FunctionCallTool extends BasePluginTool {
         }
         setOutputText("Generate FeignClient command ...");
         try {
-            String ret = invokeFeignScript(script, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody, headerValues);
+            String ret = invokeFeignScript(script, action, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
@@ -918,19 +1009,21 @@ public class FunctionCallTool extends BasePluginTool {
         }
     }
 
-    public String invokeFeignScript(String code, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
+    public String invokeFeignScript(String code, String fun, String env, String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, feignName, feignUrl, httpMethod, path, params, headerValues, jsonBody});
+        System.err.println("invoke feign script,fun:"+fun+", env:"+env+", httpMethod:"+httpMethod+", path:"+path+", params:"+ JSON.toJSONString(params)+", jsonBody:"+jsonBody+", headerValues:"+JSON.toJSONString(headerValues));
+        Object build = InvokerHelper.invokeMethod(script, fun, new Object[]{env, feignName, feignUrl, httpMethod, path, params, headerValues, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 
 
-    public String invokeControllerScript(String code, String env, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
+    public String invokeControllerScript(String code, String fun, String env, String httpMethod, String path, Map<String, String> params, String jsonBody, Map<String, String> headerValues) {
         RuntimeHelper.VisibleApp selectedApp = RuntimeHelper.getSelectedApp(getProject().getName());
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
-        Object build = InvokerHelper.invokeMethod(script, "generate", new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody});
+        System.err.println("invoke controller script,fun:"+fun+", env:"+env+", httpMethod:"+httpMethod+", path:"+path+", params:"+ JSON.toJSONString(params)+", jsonBody:"+jsonBody+", headerValues:"+JSON.toJSONString(headerValues));
+        Object build = InvokerHelper.invokeMethod(script, fun, new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody});
         return build == null ? "" : String.valueOf(build);
     }
 

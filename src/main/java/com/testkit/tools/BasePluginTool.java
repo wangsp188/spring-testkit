@@ -468,6 +468,10 @@ public abstract class BasePluginTool {
 
 
     protected void setOutputText(String content) {
+        try {
+            content = JsonUtil.formatObj(JSONObject.parse(content));
+        } catch (Throwable ignore) {
+        }
         toolWindow.setOutputText(content);
         toolWindow.setOutputProfile(null);
     }
