@@ -29,7 +29,7 @@ public interface CurlPatternConstants {
     /**
      * 默认HTTP请求方法匹配
      */
-    Pattern DEFAULT_HTTP_METHOD_PATTERN = Pattern.compile(".*\\s(-d|--data|--data-binary)\\s.*");
+    Pattern DEFAULT_HTTP_METHOD_PATTERN = Pattern.compile("(-d|--data|--data-binary|--data-raw|--data-urlencode|-F|--form)");
  
     /**
      * 请求头匹配
@@ -45,7 +45,7 @@ public interface CurlPatternConstants {
     /**
      * --data-raw 请求体匹配
      */
-    Pattern HTTP_ROW_BODY_PATTERN = Pattern.compile("--data-raw '(.+?)'(?s)", Pattern.DOTALL);
+    Pattern HTTP_ROW_BODY_PATTERN = Pattern.compile("--data-raw\\s+(?:'([^']*)'|\"([^\"]*)\"|(\\S+))", Pattern.DOTALL);
  
     /**
      * --form 请求体匹配
@@ -56,6 +56,6 @@ public interface CurlPatternConstants {
     /**
      * --data-urlencode 请求体匹配
      */
-    Pattern HTTP_URLENCODE_BODY_PATTERN = Pattern.compile("--data-urlencode\\s+'(.*?)'");
+    Pattern HTTP_URLENCODE_BODY_PATTERN = Pattern.compile("--data-urlencode\\s+(?:'([^']*)'|\"([^\"]*)\"|(\\S+))", Pattern.DOTALL);
  
 }

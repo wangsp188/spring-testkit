@@ -113,8 +113,10 @@ public class HttpBodyHandler extends CurlHandlerChain {
         // 重置指针匹配的位置
         urlencodeMatcher.reset();
         while (urlencodeMatcher.find()) {
-            // 提取键值对字符串
-            String keyValueEncoded = urlencodeMatcher.group(1);
+            // 提取键值对字符串：兼容'..' / ".." / 无引号
+            String keyValueEncoded = urlencodeMatcher.group(1) != null
+                    ? urlencodeMatcher.group(1)
+                    : (urlencodeMatcher.group(2) != null ? urlencodeMatcher.group(2) : urlencodeMatcher.group(3));
 
             // 分隔键和值
             String[] keyValue = keyValueEncoded.split("=", 2);
@@ -134,7 +136,10 @@ public class HttpBodyHandler extends CurlHandlerChain {
     }
 
     private JSONObject parseRowBody(Matcher rowMatcher) {
-        String rawData = rowMatcher.group(1);
+        // 兼容'..' / ".." / 无引号三种捕获
+        String rawData = rowMatcher.group(1) != null
+                ? rowMatcher.group(1)
+                : (rowMatcher.group(2) != null ? rowMatcher.group(2) : rowMatcher.group(3));
 
         if (isXML(rawData)) {
             // throw new IllegalArgumentException("Curl --data-raw content cant' be XML");

@@ -45,10 +45,11 @@ public abstract class CurlHandlerChain implements ICurlHandler<CurlEntity, Strin
             public void handle(CurlEntity entity, String curl) {
                 this.validate(curl);
 
-                // 替换掉可能存在的转译(字符串中的空白字符，包括空格、换行符和制表符...)
-                curl = curl.replace("\\", "")
-                        .replace("\n", "")
-                        .replace("\t", "");
+                // 仅折叠续行：将行尾反斜杠 + 换行 + 后续缩进折叠为单个空格，保留字符串内部转义
+                // 1) 归一化换行
+                curl = curl.replace("\r\n", "\n");
+                // 2) 折叠续行：\\\n 及其后空白 -> 单个空格
+                curl = curl.replaceAll("\\\\\n\\s*", " ");
 
                 if (next != null) {
                     next.handle(entity, curl);
