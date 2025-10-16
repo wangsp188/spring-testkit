@@ -9,7 +9,6 @@ import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.psi.*;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
-import com.testkit.tools.function_call.FunctionCallTool;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitStoreWindowFactory;
 import com.testkit.view.TestkitToolWindow;
@@ -60,7 +59,9 @@ public abstract class BasePluginTool {
     protected Set<String> cancelReqs = new HashSet<>(128);
     protected String lastReqId;
 
-//    protected SwingWorker lastLocalFuture;
+    protected Set<String> cancelLocalTasks = new HashSet<>(128);
+    protected String lastLocalTaskId;
+    protected Thread lastLocalThread;
 
     protected JPanel actionPanel;
     protected TestkitToolWindow toolWindow;
@@ -148,17 +149,29 @@ public abstract class BasePluginTool {
 
 
 
-        // 创建ActionToolbar
+        jsonInputField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
+        // 先创建中部输入内容，保证 jsonInputField 已初始化（供工具栏动作使用）
+        JComponent centerComponent = createInputContent(inputPanel);
+
+        // 创建ActionToolbar（在 jsonInputField 初始化之后设置 target）
         ActionToolbar actionToolbar = new ActionToolbarImpl("InputToolbar", actionGroup, false);
-        actionToolbar.setTargetComponent(jsonInputField);
+        actionToolbar.setTargetComponent(centerComponent);
         JComponent toolbarComponent = actionToolbar.getComponent();
         toolbarComponent.setLayout(new BoxLayout(toolbarComponent, BoxLayout.Y_AXIS));
 
         // 将工具栏添加到控制面板的左侧
         inputPanel.add(toolbarComponent, BorderLayout.WEST);
 
-        jsonInputField = new LanguageTextField(JsonLanguage.INSTANCE, getProject(), "", false);
-//        inputEditorTextField.setPlaceholder("json params, plugin will init first, click refresh can parse again");
+        // 添加中部输入内容
+        inputPanel.add(centerComponent, BorderLayout.CENTER);
+        panel.add(inputPanel, gbc);
+    }
+
+    /**
+     * 子类可重写该方法以自定义中部输入区域的渲染。
+     * 默认实现提供 JSON 编辑器。
+     */
+    protected JComponent createInputContent(JPanel inputPanel) {
         JBScrollPane scrollPane = new JBScrollPane(jsonInputField);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Input"));
         jsonInputField.getDocument().addDocumentListener(new DocumentAdapter() {
@@ -168,8 +181,7 @@ public abstract class BasePluginTool {
                 scrollPane.repaint();
             }
         });
-        inputPanel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(inputPanel, gbc);
+        return scrollPane;
     }
 
     protected boolean canStore() {
@@ -311,7 +323,7 @@ public abstract class BasePluginTool {
     public abstract void onSwitchAction(PsiElement psiElement);
 
 
-    protected void triggerHttpTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
+    protected void triggerTestkitServerTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
         if (AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())) {
             return;
         }
@@ -430,19 +442,21 @@ public abstract class BasePluginTool {
     }
 
     protected void triggerLocalTask(JButton triggerBtn, Icon executeIcon, String msg, Supplier<String> submit) {
-        if (AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())) {
-//            triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
-//            if (lastLocalFuture == null) {
-//                return;
-//            }
-//            try {
-//                lastLocalFuture.cancel(true);
-//            } catch (Throwable e) {
-//                e.printStackTrace();
-//            }finally {
-//                lastLocalFuture = null;
-//                setOutputText("req is cancel");
-//            }
+        if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
+            if (lastLocalTaskId == null) {
+                triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+                return;
+            }
+            cancelLocalTasks.add(lastLocalTaskId);
+            try {
+                if (lastLocalThread != null) {
+                    lastLocalThread.interrupt();
+                }
+            } catch (Throwable ignore) {
+            } finally {
+                setOutputText("req is cancel");
+                triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+            }
             return;
         }
 
@@ -451,16 +465,27 @@ public abstract class BasePluginTool {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
+                String taskId = UUID.randomUUID().toString();
+                lastLocalTaskId = taskId;
                 // 立即更新UI
                 setOutputText(msg + " ...");
-                triggerBtn.setIcon(AllIcons.Hierarchy.MethodNotDefined);
+                triggerBtn.setIcon(AllIcons.Actions.Suspend);
+                lastLocalThread = Thread.currentThread();
                 try {
                     String ret = submit.get();
-                    setOutputText(ret);
+                    if (!cancelLocalTasks.remove(taskId)) {
+                        setOutputText(ret);
+                    }
                 } catch (Throwable ex) {
-                    setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
+                    if (!cancelLocalTasks.remove(taskId)) {
+                        setOutputText("wait ret is error\n" + ToolHelper.getStackTrace(ex));
+                    }
                 } finally {
                     triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+                    if (Objects.equals(lastLocalTaskId, taskId)) {
+                        lastLocalTaskId = null;
+                    }
+                    lastLocalThread = null;
                 }
             }
         });
@@ -468,9 +493,12 @@ public abstract class BasePluginTool {
 
 
     protected void setOutputText(String content) {
-        try {
-            content = JsonUtil.formatObj(JSONObject.parse(content));
-        } catch (Throwable ignore) {
+        content = content == null ? "" : content;
+        if(!Objects.equals("null", content) && !content.isEmpty()) {
+            try {
+                content = JsonUtil.formatObj(JSONObject.parse(content));
+            } catch (Throwable ignore) {
+            }
         }
         toolWindow.setOutputText(content);
         toolWindow.setOutputProfile(null);
@@ -663,6 +691,8 @@ public abstract class BasePluginTool {
             ((ToolHelper.MethodAction) selectedItem).setArgs(null);
         } else if (selectedItem instanceof ToolHelper.XmlTagAction) {
             ((ToolHelper.XmlTagAction) selectedItem).setArgs(null);
+        }else if (selectedItem instanceof ToolHelper.McpFunctionAction) {
+            ((ToolHelper.McpFunctionAction) selectedItem).setArgs(null);
         }
         actionComboBox.setSelectedItem(selectedItem);
 

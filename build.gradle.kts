@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.testkit"
-version = "1.0623"
+version = "1.1017"
 
 repositories {
     mavenCentral()
@@ -27,7 +27,7 @@ dependencies {
     implementation(files("resource/spring-startup-analyzer.tar.gz"))
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
-    implementation("dev.langchain4j:langchain4j-mcp:1.4.0-beta10")
+    implementation("dev.langchain4j:langchain4j-mcp:1.7.1-beta14")
     intellijPlatform{
         create("IC","2023.2")
 //        "Git4Idea","com.intellij.spring.boot","com.intellij.database"

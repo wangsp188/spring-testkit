@@ -27,7 +27,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.tools.Tool;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -153,7 +152,7 @@ public class FlexibleTestTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerHttpTask(runButton, AllIcons.Actions.Execute, app.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerTestkitServerTask(runButton, AllIcons.Actions.Execute, app.getTestkitPort(), new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         String jsonInput = jsonInputField.getDocument().getText();

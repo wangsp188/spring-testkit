@@ -10,6 +10,7 @@ import com.testkit.util.ExceptionUtil;
 import com.testkit.view.TestkitToolWindow;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.mcp.client.McpClient;
+import dev.langchain4j.service.tool.ToolExecutionResult;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -120,7 +121,7 @@ public class McpHelper {
         return servers;
     }
 
-    public static String callTool(String serverKey, String toolName, JSONObject args) {
+    public static ToolExecutionResult callTool(String serverKey, String toolName, JSONObject args) {
         McpServerDefinition serverDefinition = servers.get(serverKey);
         if (serverDefinition == null) {
             throw new IllegalArgumentException("serverKey:" + serverKey + " not found");
@@ -132,11 +133,10 @@ public class McpHelper {
             constructor.setAccessible(true);
             ToolExecutionRequest.Builder reqBuilder = (ToolExecutionRequest.Builder) constructor.newInstance();
             ToolExecutionRequest request = reqBuilder.name(toolName).arguments(args.toJSONString()).build();
-            String result = mcpClient.executeTool(request);
-            return result == null || result.isEmpty() ? "null" : result;
+            return mcpClient.executeTool(request);
         } catch (Throwable e) {
             e.printStackTrace();
-            return ExceptionUtil.fetchStackTrace(e);
+            return ToolExecutionResult.builder().isError(true).resultText(ExceptionUtil.fetchStackTrace(e)).build();
         }finally {
             if(mcpClient!=null){
                 System.out.println("mcp-server is close,"+serverKey);
