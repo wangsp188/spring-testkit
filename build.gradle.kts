@@ -1,11 +1,11 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
-    id("org.jetbrains.intellij.platform") version "2.3.0"
+    id("org.jetbrains.intellij.platform") version "2.10.2"
 }
 
 group = "com.testkit"
-version = "1.1017"
+version = "1.1027"
 
 repositories {
     mavenCentral()
@@ -24,14 +24,14 @@ dependencies {
     implementation(files("jar/testkit-starter/target/testkit-starter-1.0.jar"))
     implementation(files("jar/testkit-agent/target/testkit-agent-1.0.jar"))
     implementation(files("jar/testkit-cli/target/testkit-cli-1.0.jar"))
-    implementation(files("resource/spring-startup-analyzer.tar.gz"))
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
     implementation("dev.langchain4j:langchain4j-mcp:1.7.1-beta14")
     intellijPlatform{
-        create("IC","2023.2")
+        create("IC","2025.1")
 //        "Git4Idea","com.intellij.spring.boot","com.intellij.database"
-        bundledPlugins(listOf("com.intellij.java","org.intellij.groovy"))
+//        https://github.com/linyimin0812/spring-startup-analyzer/releases/download/v3.1.4/spring-startup-analyzer.tar.gz
+        bundledPlugins(listOf("com.intellij.java","org.intellij.groovy","com.intellij.modules.json"))
     }
 }
 

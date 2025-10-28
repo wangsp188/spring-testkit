@@ -87,6 +87,10 @@ public class TestkitHelper {
         return pluginName;
     }
 
+    public static String getPluginId() {
+        return PLUGIN_ID;
+    }
+
 
     public static HashMap<String, RuntimeHelper.AppMeta> findSpringBootClass(Project project) {
 

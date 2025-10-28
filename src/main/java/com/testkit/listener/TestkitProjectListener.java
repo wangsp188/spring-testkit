@@ -1,20 +1,25 @@
 package com.testkit.listener;
 
 import com.alibaba.fastjson.JSON;
+import com.intellij.notification.Notification;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.notification.NotificationAction;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
+import com.intellij.openapi.application.ApplicationManager;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesHelper;
-import com.intellij.notification.NotificationType;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.ProjectActivity;
 import com.testkit.sql_review.MysqlUtil;
 import com.testkit.view.TestkitToolWindow;
 import com.testkit.view.TestkitToolWindowFactory;
+import com.testkit.util.UpdaterUtil;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
 import org.apache.commons.lang3.StringUtils;
@@ -52,6 +57,51 @@ public class TestkitProjectListener implements ProjectActivity {
                         System.out.println("Init project line marker,"+project.getName());
                         TestkitHelper.refresh(project);
                         CodingGuidelinesHelper.refreshDoc(project);
+                    }
+                });
+
+                // Startup: check plugin updates in background
+                ProgressManager.getInstance().run(new Task.Backgroundable(project, "Check plugin updates", false){
+                    @Override
+                    public void run(@NotNull ProgressIndicator indicator) {
+                        UpdaterUtil.LastVersion last = UpdaterUtil.fetchNeedUpdateLastVersion();
+                        if (last == null) {
+                            return;
+                        }
+                        String zipPath = last.buildPluginPath();
+                        ApplicationManager.getApplication().invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                String title = TestkitHelper.getPluginName();
+                                String content = "New version available (v" + last.getVersion() + ") for your IDE";
+                                Notification notification = new Notification(title, title, content, NotificationType.INFORMATION);
+                                notification.addAction(NotificationAction.createSimple("Install now", new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        boolean ok = UpdaterUtil.installFromZip(zipPath, project);
+                                        if (ok) {
+                                            // 安装成功，显示重启提示
+                                            showRestartNotification(project, last.getVersion());
+                                        } else {
+                                            TestkitHelper.notify(project, NotificationType.WARNING, "Install failed. Please open folder and install via Plugins > Install from Disk.");
+                                        }
+                                    }
+                                }));
+                                notification.addAction(NotificationAction.createSimple("Open folder", new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        UpdaterUtil.revealFile(zipPath);
+                                    }
+                                }));
+                                notification.addAction(NotificationAction.createSimple("Later", new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        notification.expire();
+                                    }
+                                }));
+                                Notifications.Bus.notify(notification, project);
+                            }
+                        });
                     }
                 });
 
@@ -133,5 +183,30 @@ public class TestkitProjectListener implements ProjectActivity {
         } catch (Throwable e) {
             System.out.println("datasource更新失败" + e.getMessage());
         }
+    }
+
+    /**
+     * 显示重启 IDE 的通知
+     */
+    private static void showRestartNotification(Project project, String version) {
+        String title = TestkitHelper.getPluginName();
+        String content = "Plugin v" + version + " installed successfully. Restart IDE to apply changes.";
+        Notification notification = new Notification(title, title, content, NotificationType.INFORMATION);
+        
+        notification.addAction(NotificationAction.createSimple("Restart Now", new Runnable() {
+            @Override
+            public void run() {
+                ApplicationManager.getApplication().restart();
+            }
+        }));
+        
+        notification.addAction(NotificationAction.createSimple("Restart Later", new Runnable() {
+            @Override
+            public void run() {
+                notification.expire();
+            }
+        }));
+        
+        Notifications.Bus.notify(notification, project);
     }
 }

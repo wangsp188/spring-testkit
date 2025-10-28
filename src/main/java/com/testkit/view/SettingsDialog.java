@@ -27,6 +27,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.*;
 import com.testkit.util.JsonUtil;
+import com.testkit.util.ZipUtil;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -40,12 +41,16 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.StringReader;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 public class SettingsDialog {
 
@@ -593,6 +598,60 @@ public class SettingsDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridwidth = 2; // 让输入框占据剩余空间
         springOptionsPanel.add(cliPanel, gbc);
+
+        //Coding-Guidelines相关
+        JLabel codingGuidelinesLabel = new JLabel("Coding-Guidelines:");
+        codingGuidelinesLabel.setPreferredSize(labelDimension);
+
+        JPanel guidelinesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT,0,5));
+        
+        // 检查是否已初始化
+        String projectPath = toolWindow.getProject().getBasePath();
+        boolean isInitialized = projectPath != null && new java.io.File(projectPath + com.testkit.coding_guidelines.CodingGuidelinesHelper.CODING_GUIDELINES).exists();
+        
+        if (!isInitialized) {
+            JButton initButton = new JButton(com.testkit.coding_guidelines.CodingGuidelinesIconProvider.DOC_ICON);
+            initButton.setToolTipText("Initialize coding-guidelines config file");
+            initButton.setPreferredSize(new Dimension(32, 32));
+            initButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    com.intellij.openapi.application.Application application = com.intellij.openapi.application.ApplicationManager.getApplication();
+                    application.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            com.testkit.coding_guidelines.CodingGuidelinesHelper.initDocDirectory(toolWindow.getProject());
+                            TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, "Coding-guidelines initialized successfully<br>Please reopen settings to see the changes");
+                            refreshSettings();
+                        }
+                    });
+                }
+            });
+            
+            JLabel comp2 = new JLabel("Initialize coding-guidelines config file for team development standards");
+            comp2.setForeground(new Color(0x72A96B));
+            comp2.setFont(new Font("Arial", Font.BOLD, 13));
+            guidelinesPanel.add(initButton);
+            guidelinesPanel.add(comp2);
+        } else {
+            JLabel comp2 = new JLabel("Coding-guidelines config file has been initialized. You can configure the specification guidelines of the project under the project coding-guidelines directory");
+            comp2.setForeground(new Color(0x72A96B));
+            comp2.setFont(new Font("Arial", Font.BOLD, 13));
+            guidelinesPanel.add(comp2);
+        }
+
+        // 布局输入框和标签
+        gbc.gridx = 0;
+        gbc.gridy = 6;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        springOptionsPanel.add(codingGuidelinesLabel, gbc);
+
+        gbc.gridx = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridwidth = 2; // 让输入框占据剩余空间
+        springOptionsPanel.add(guidelinesPanel, gbc);
 
 
         gbc.gridx = 0;
@@ -1976,12 +2035,127 @@ public class SettingsDialog {
             public void actionPerformed(ActionEvent e) {
                 String selectedApp = (String) propertiesAppBox.getSelectedItem();
                 if (selectedApp == null) {
-                    throw new IllegalArgumentException("Selected app is null");
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.WARNING, "Selected app is null");
+                    return;
                 }
                 boolean selected = startupAnalyzerToggleButton.isSelected();
                 startupLabel.setText(selected ? "Enable spring startup analyzer\ndoc :https://github.com/linyimin0812/spring-startup-analyzer\nclick http://localhost:{port} to visit details.\nspring-startup-analyzer.app.health.check.endpoints=http://localhost:18080/health\nspring-startup-analyzer.admin.http.server.port=8066" : "Disable spring startup analyzer");
                 SettingsStorageHelper.setAppStartupAnalyzer(toolWindow.getProject(), selectedApp,selected);
-                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, selectedApp+"'s startup analyzer is " + (selected ? "enable" : "disable") + "<br>Take effect after restart");
+                if(!selected){
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, selectedApp+"'s startup analyzer is " + (selected ? "enable" : "disable"));
+                    return;
+                }
+
+                TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, selectedApp+"'s startup analyzer is " + (selected ? "enable" : "disable") + "<br>Take affect after restart");
+                String userHome = System.getProperty("user.home");
+                String targetDir = userHome + File.separator + ".spring-testkit"+File.separator+"libs";
+                String targetPath = targetDir + File.separator + "spring-startup-analyzer.tar.gz";
+                //先判断是否存在该文件，不存在或者不是压缩包再下载
+                File targetFile = new File(targetPath);
+                if (targetFile.exists() && targetFile.isFile() && ZipUtil.isValidTarGzFile(targetFile)) {
+                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, 
+                        "spring-startup-analyzer.tar.gz already exists and is valid.<br>File path: " + targetPath);
+                    return;
+                }
+
+                String downUrl = "https://github.com/linyimin0812/spring-startup-analyzer/releases/download/v3.1.4/spring-startup-analyzer.tar.gz";
+
+                // 使用后台任务下载文件
+                ProgressManager.getInstance().run(new Task.Backgroundable(toolWindow.getProject(), "Downloading spring-startup-analyzer", true) {
+                    @Override
+                    public void run(@NotNull ProgressIndicator indicator) {
+                        indicator.setIndeterminate(false);
+                        indicator.setText("Downloading spring-startup-analyzer.tar.gz...");
+                        
+                        try {
+                            // 确保目录存在
+                            File dir = new File(targetDir);
+                            if (!dir.exists()) {
+                                dir.mkdirs();
+                            }
+                            
+                            // 开始下载
+                            HttpURLConnection conn = null;
+                            BufferedInputStream in = null;
+                            FileOutputStream out = null;
+                            
+                            try {
+                                URL url = new URL(downUrl);
+                                conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod("GET");
+                                conn.setConnectTimeout((int) TimeUnit.SECONDS.toMillis(30));
+                                conn.setReadTimeout((int) TimeUnit.SECONDS.toMillis(120));
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+                                
+                                int responseCode = conn.getResponseCode();
+                                if (responseCode != HttpURLConnection.HTTP_OK) {
+                                    throw new RuntimeException("Download failed with HTTP status: " + responseCode);
+                                }
+                                
+                                long fileSize = conn.getContentLengthLong();
+                                in = new BufferedInputStream(conn.getInputStream());
+                                out = new FileOutputStream(targetFile);
+                                
+                                byte[] buffer = new byte[8192];
+                                int bytesRead;
+                                long totalBytesRead = 0;
+                                
+                                while ((bytesRead = in.read(buffer)) != -1) {
+                                    if (indicator.isCanceled()) {
+                                        throw new InterruptedException("Download cancelled by user");
+                                    }
+                                    
+                                    out.write(buffer, 0, bytesRead);
+                                    totalBytesRead += bytesRead;
+                                    
+                                    // 更新进度
+                                    if (fileSize > 0) {
+                                        double progress = (double) totalBytesRead / fileSize;
+                                        indicator.setFraction(progress);
+                                        indicator.setText(String.format("Downloading: %.1f MB / %.1f MB", 
+                                            totalBytesRead / 1024.0 / 1024.0, 
+                                            fileSize / 1024.0 / 1024.0));
+                                    } else {
+                                        indicator.setText(String.format("Downloading: %.1f MB", 
+                                            totalBytesRead / 1024.0 / 1024.0));
+                                    }
+                                }
+                                
+                                out.flush();
+                                
+                                // 下载成功
+                                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                                    TestkitHelper.notify(toolWindow.getProject(), NotificationType.INFORMATION, 
+                                        "Download completed successfully!<br>File saved to: " + targetPath);
+                                });
+                                
+                            } finally {
+                                if (out != null) {
+                                    try { out.close(); } catch (Exception ignored) {}
+                                }
+                                if (in != null) {
+                                    try { in.close(); } catch (Exception ignored) {}
+                                }
+                                if (conn != null) {
+                                    conn.disconnect();
+                                }
+                            }
+                            
+                        } catch (InterruptedException e) {
+                            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                                TestkitHelper.notify(toolWindow.getProject(), NotificationType.WARNING, 
+                                    "Download cancelled");
+                            });
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+                                TestkitHelper.notify(toolWindow.getProject(), NotificationType.ERROR, 
+                                    "Download failed: " + ex.getMessage());
+                            });
+                        }
+                    }
+                });
+
             }
         });
 

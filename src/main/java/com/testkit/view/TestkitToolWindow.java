@@ -204,23 +204,17 @@ public class TestkitToolWindow {
                         openTipsDoc();
                     }
                 });
-                actionGroup.add(new AnAction("Init coding-guidelines config file", null, CodingGuidelinesIconProvider.DOC_ICON) {
-                    @Override
-                    public void actionPerformed(@NotNull AnActionEvent e) {
-                        // 使用 Application.runWriteAction 进行写操作
-                        Application application = ApplicationManager.getApplication();
-                        application.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                CodingGuidelinesHelper.initDocDirectory(project);
-                            }
-                        });
-
-                    }
-                });
                 fillDynamicDoc(actionGroup);
-                JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("TipsPopup", actionGroup).getComponent();
-                popupMenu.show(tipsButton, 0, tipsButton.getHeight());
+
+                // 判断 actionGroup 中的子项数量
+                int childrenCount = actionGroup.getChildrenCount();
+                if (childrenCount == 1) {
+                    openTipsDoc();
+                } else {
+                    // 如果有多个 action，显示菜单
+                    JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("TipsPopup", actionGroup).getComponent();
+                    popupMenu.show(tipsButton, 0, tipsButton.getHeight());
+                }
             }
         });
         topPanel.add(tipsButton);
@@ -764,7 +758,7 @@ public class TestkitToolWindow {
     }
 
     private void openTipsDoc() {
-        String url = "https://github.com/wangsp188/spring-testkit/blob/master/how-to-use/spring-testkit.md";
+        String url = "https://github.com/wangsp188/product/blob/master/spring-testkit/spring-testkit.md";
         Object selectedItem = toolBox.getSelectedItem();
 
         if (Desktop.isDesktopSupported()) {

@@ -135,23 +135,30 @@ public class JavaProgramPatcher extends com.intellij.execution.runners.JavaProgr
                 if(StringUtils.isBlank(userHome) || !new File(userHome).exists()) {
                     TestkitHelper.notify(project, NotificationType.ERROR, "Spring startup analyzer not support ,Because user.home is not exists\nPlease check");
                 }else{
-                    String startupzip = pluginPath + File.separator+TestkitHelper.PLUGIN_ID + File.separator + "lib" + File.separator + "spring-startup-analyzer.tar.gz";
+                    String startupzip = userHome + File.separator+".spring-testkit" + File.separator + "libs" + File.separator + "spring-startup-analyzer.tar.gz";
                     String startupdic = userHome + File.separator + "spring-startup-analyzer";
 
-                    Path targetDir = Paths.get(startupdic); // 指定目标目录
-                    Path resultPath = extractTarGz(startupzip, targetDir);
-
-                    String startupAgentPath = resultPath.toAbsolutePath()+File.separator+"lib"+File.separator+"spring-profiler-agent.jar";
-
-                    javaParameters.getVMParametersList().add("-javaagent:" + startupAgentPath);
-                    boolean containsHealthcheck = properties.containsKey("spring-startup-analyzer.app.health.check.endpoints");
-                    if (containsHealthcheck) {
-                        String startupPort = properties.getProperty("spring-startup-analyzer.admin.http.server.port");
-                        TestkitHelper.notify(project, NotificationType.INFORMATION, "Spring startup analyzer will provide in port " + (StringUtils.isBlank(startupPort) ? "8065" : startupPort));
-                    } else {
-                        TestkitHelper.notify(project, NotificationType.WARNING, "Spring startup analyzer need config spring-startup-analyzer.app.health.check.endpoints\nPlease check");
+                    try {
+                        Path targetDir = Paths.get(startupdic); // 指定目标目录
+                        Path resultPath = extractTarGz(startupzip, targetDir);
+                        String startupAgentPath = resultPath.toAbsolutePath()+ File.separator+"lib"+File.separator+"spring-profiler-agent.jar";
+                        File jarFile = new File(startupAgentPath);
+                        if (!jarFile.exists() || !jarFile.isFile()){
+                            throw new RuntimeException(jarFile+" is not exists or not a file");
+                        }
+                        javaParameters.getVMParametersList().add("-javaagent:" + startupAgentPath);
+                        boolean containsHealthcheck = properties.containsKey("spring-startup-analyzer.app.health.check.endpoints");
+                        if (containsHealthcheck) {
+                            String startupPort = properties.getProperty("spring-startup-analyzer.admin.http.server.port");
+                            TestkitHelper.notify(project, NotificationType.INFORMATION, "Spring startup analyzer will provide in port " + (StringUtils.isBlank(startupPort) ? "8065" : startupPort));
+                        } else {
+                            TestkitHelper.notify(project, NotificationType.WARNING, "Spring startup analyzer need config spring-startup-analyzer.app.health.check.endpoints\nPlease check");
+                        }
+                        show = true;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        TestkitHelper.notify(project, NotificationType.ERROR, "Spring startup analyzer jar download failed\nPlease check this folder "+startupdic+" has ./lib/spring-profiler-agent.jar");
                     }
-                    show = true;
                 }
             }else {
                 System.err.println("Testkit 未开启耗时分析");
