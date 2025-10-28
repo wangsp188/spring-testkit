@@ -20,7 +20,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -30,15 +29,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.zip.ZipFile;
-import java.util.zip.ZipException;
 
 public class UpdaterUtil {
 
@@ -65,17 +58,22 @@ public class UpdaterUtil {
 
             List<LastVersion> candidates = new ArrayList<>();
             for (LastVersion v : all) {
+                System.err.println("处理插件版本："+v);
                 if (StringUtil.isEmpty(v.getVersion())){
+                    System.err.println("版本为空");
                     continue;
                 }
                 if (!isPublishTimeArrived(v.getPublishTime(), now)){
+                    System.err.println("时候未到");
                     continue;
                 }
                 if (!isBuildCompatible(ideBuild, v.getSinceBuild(), v.getUntilBuild())){
+                    System.err.println("版本不支持,"+ideBuild);
                     continue;
                 }
-                if (compareVersions(v.getVersion(), currentVersion) < 0){
-                    continue; // 仅提示当前或更高版本
+                if (compareVersions(v.getVersion(), currentVersion) <= 0){
+                    System.err.println("版本老,"+currentVersion);
+                    continue;
                 }
                 candidates.add(v);
             }
@@ -85,6 +83,7 @@ public class UpdaterUtil {
                 return null;
             }
 
+
             // 选择最大版本
             candidates.sort(new Comparator<LastVersion>() {
                 @Override
@@ -93,6 +92,7 @@ public class UpdaterUtil {
                 }
             });
             LastVersion target = candidates.get(0);
+            System.err.println("候选版本,currentVersion:"+currentVersion+",target:"+target.getVersion());
 
             // 确保 zip 已下载（下载完成后再原子移动到目标目录）
             ensureDownloaded(target);
@@ -129,7 +129,7 @@ public class UpdaterUtil {
     private static void ensureDownloaded(LastVersion v) throws Exception {
         String finalPath = v.buildPluginPath();
         File finalFile = new File(finalPath);
-        
+
         // 如果文件已存在，验证其完整性
         if (finalFile.exists() && finalFile.isFile() && finalFile.length() > 0) {
             if (ZipUtil.isValidZipFile(finalFile)) {
@@ -140,21 +140,21 @@ public class UpdaterUtil {
                 finalFile.delete();
             }
         }
-        
+
         File parent = finalFile.getParentFile();
         if (!parent.exists()){
             parent.mkdirs();
         }
-        
+
         File tmp = File.createTempFile("plugin-", ".zip", parent);
         try {
             downloadToFile(v.getDownloadUrl(), tmp.toPath());
-            
+
             // 验证下载的 zip 文件完整性
             if (!ZipUtil.isValidZipFile(tmp)) {
                 throw new RuntimeException("Downloaded file is not a valid zip archive: " + tmp.getAbsolutePath());
             }
-            
+
             Files.move(tmp.toPath(), finalFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } finally {
             if (tmp.exists()){
@@ -223,7 +223,9 @@ public class UpdaterUtil {
     }
 
     private static int compareVersions(String a, String b) {
-        if (StringUtil.equals(a, b)) return 0;
+        if (Objects.equals(a, b)){
+            return 0;
+        }
         String[] as = a.split("[^0-9]+");
         String[] bs = b.split("[^^0-9]+");
         // 修正：上面的正则写错了，重新按点分割并回退到数字比较
@@ -235,10 +237,14 @@ public class UpdaterUtil {
         for (int i = 0; i < n; i++) {
             int ai = i < as.length && StringUtil.isNotEmpty(as[i]) ? parseIntSafe(as[i]) : 0;
             int bi = i < bs.length && StringUtil.isNotEmpty(bs[i]) ? parseIntSafe(bs[i]) : 0;
-            if (ai != bi) return Integer.compare(ai, bi);
+            if (ai != bi){
+                return Integer.compare(ai, bi);
+            }
         }
         return 0;
     }
+
+
 
     private static int parseIntSafe(String s) {
         try { return Integer.parseInt(s); } catch (Exception e) { return 0; }
@@ -251,6 +257,8 @@ public class UpdaterUtil {
                 return StringUtil.notNullize(descriptor.getVersion(), "0");
             }
         } catch (Throwable ignored) {
+            System.err.println("获取版本异常");
+            ignored.printStackTrace();
         }
         return "0";
     }
@@ -339,7 +347,7 @@ public class UpdaterUtil {
     public static class LastVersion {
 
         private String version;
-        private String sinceBuild;
+        private String sinceBuild = "";
 
         private String untilBuild;
 
@@ -402,6 +410,18 @@ public class UpdaterUtil {
 
         public void setPublishTime(String publishTime) {
             this.publishTime = publishTime;
+        }
+
+        @Override
+        public String toString() {
+            return "LastVersion{" +
+                    "version='" + version + '\'' +
+                    ", sinceBuild='" + sinceBuild + '\'' +
+                    ", untilBuild='" + untilBuild + '\'' +
+                    ", downloadUrl='" + downloadUrl + '\'' +
+                    ", releaseNotes='" + releaseNotes + '\'' +
+                    ", publishTime='" + publishTime + '\'' +
+                    '}';
         }
     }
 
