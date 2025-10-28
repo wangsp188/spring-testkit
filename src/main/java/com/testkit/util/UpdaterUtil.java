@@ -265,6 +265,24 @@ public class UpdaterUtil {
             return false;
         }
 
+        // 尝试方案: 完整参数 API (InstalledPluginsTableModel, PluginEnabler, File, Project, JComponent, Consumer) - 2023-2024
+        try {
+            InstalledPluginsTableModel model = new InstalledPluginsTableModel(project);
+            PluginEnabler enabler = PluginEnabler.HEADLESS;
+            JComponent parent = null;
+            Consumer<PluginInstallCallbackData> cb = data -> { };
+            Method installFromDisk = PluginInstaller.class.getDeclaredMethod("installFromDisk", InstalledPluginsTableModel.class, PluginEnabler.class, File.class, Project.class, JComponent.class, Consumer.class);
+            installFromDisk.setAccessible(true);
+            Object result = installFromDisk.invoke(null, model, enabler, file, project, parent, cb);
+            System.out.println("Plugin installed successfully using API signature: (InstalledPluginsTableModel, PluginEnabler, File, Project, JComponent, Consumer)");
+            return result == null || (result instanceof Boolean && (Boolean) result);
+        } catch (NoSuchMethodException e) {
+            // 方案1失败，继续尝试方案4
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+
         // 尝试方案: 完整参数 API (InstalledPluginsTableModel, PluginEnabler, Path, Project, JComponent, Consumer) - 2023-2024
         try {
             InstalledPluginsTableModel model = new InstalledPluginsTableModel(project);
@@ -277,7 +295,7 @@ public class UpdaterUtil {
             System.out.println("Plugin installed successfully using API signature: (InstalledPluginsTableModel, PluginEnabler, Path, Project, JComponent, Consumer)");
             return result == null || (result instanceof Boolean && (Boolean) result);
         } catch (NoSuchMethodException e) {
-            // 方案3失败，继续尝试方案4
+            // 方案2失败
         } catch (Exception e) {
             e.printStackTrace();
             return false;
