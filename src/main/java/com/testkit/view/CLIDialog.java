@@ -14,6 +14,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBTextField;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -94,7 +95,7 @@ public class CLIDialog extends JDialog {
             urlPanel.setVisible(downloadCheckBox.isSelected());
             pack(); // 重新调整窗口大小
         });
-        if (cliConfig.isDownloadFirst()) {
+        if (cliConfig.isDownloadFirst() && StringUtils.isNotBlank(cliConfig.getDownloadUrl())) {
             downloadCheckBox.setSelected(true);
             urlPanel.setVisible(true);
         }
