@@ -239,7 +239,7 @@ public class McpFunctionTool extends BasePluginTool {
             rbc.gridx = 0;
             rbc.gridy = 0;
 
-            JLabel label = new JLabel((required ? "*" : "") + name + (Objects.equals(type, McpServerDefinition.ArgType.ENUM.getCode())?"":" (" + type + ")"));
+            JLabel label = new JLabel((required ? "*" : "") + name + (Objects.equals(type, McpServerDefinition.ArgType.ENUM.getCode()) || Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())?"":" (" + type + ")"));
             if (description != null && !description.isEmpty()) {
                 label.setToolTipText(description);
             }

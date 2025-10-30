@@ -174,6 +174,31 @@ public class McpHelper {
         }
     }
 
+    /**
+     * 从 Cursor 配置文件中读取 MCP 配置
+     * @return Cursor 的 mcp.json 配置对象
+     * @throws Exception 如果文件不存在或解析失败
+     */
+    public static JSONObject readCursorMcpConfig() throws Exception {
+        String userHome = System.getProperty("user.home");
+        if (StringUtils.isEmpty(userHome)) {
+            throw new IllegalArgumentException("User home directory is not set");
+        }
+        
+        Path cursorConfigPath = Paths.get(userHome, ".cursor", "mcp.json");
+        File cursorConfigFile = cursorConfigPath.toFile();
+        
+        if (!cursorConfigFile.exists()) {
+            throw new IOException("Cursor configuration file not found: " + cursorConfigPath);
+        }
+        
+        try (FileReader reader = new FileReader(cursorConfigFile)) {
+            String content = new String(Files.readAllBytes(cursorConfigFile.toPath()));
+            return JSON.parseObject(content);
+        } catch (Exception e) {
+            throw new Exception("Failed to parse Cursor configuration file: " + e.getMessage(), e);
+        }
+    }
 
 
 }
