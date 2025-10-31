@@ -662,7 +662,7 @@ public class TestkitStoreWindow {
             while (true) {
                 try {
                     refreshVisibleApp();
-                    Thread.sleep(3 * 1000); // 每隔一分钟调用一次
+                    Thread.sleep(3 * 1000); // 每3秒刷新一次
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
@@ -1350,43 +1350,45 @@ public class TestkitStoreWindow {
 
 
     private void refreshVisibleApp() {
-        List<RuntimeHelper.VisibleApp> visibleAppList = RuntimeHelper.getVisibleApps(project.getName()).stream()
-                .filter(visibleApp -> Objects.equals(appBox.getSelectedItem(), visibleApp.getAppName()))
-                .toList();
+        SwingUtilities.invokeLater(() -> {
+            List<RuntimeHelper.VisibleApp> visibleAppList = RuntimeHelper.getVisibleApps(project.getName()).stream()
+                    .filter(visibleApp -> Objects.equals(appBox.getSelectedItem(), visibleApp.getAppName()))
+                    .toList();
 
-        // 获取当前列表的内容，用于比较是否有变化
-        List<String> currentItems = new ArrayList<>();
-        for (int i = 0; i < visibleAppComboBox.getItemCount(); i++) {
-            currentItems.add(visibleAppComboBox.getItemAt(i));
-        }
+            // 获取当前列表的内容，用于比较是否有变化
+            List<String> currentItems = new ArrayList<>();
+            for (int i = 0; i < visibleAppComboBox.getItemCount(); i++) {
+                currentItems.add(visibleAppComboBox.getItemAt(i));
+            }
 
-        // 构建新列表
-        List<String> newItems = visibleAppList.stream()
-                .map(app -> app.getAppName() +":"+app.getIp()+ ":" + app.getTestkitPort())
-                .toList();
+            // 构建新列表
+            List<String> newItems = visibleAppList.stream()
+                    .map(app -> app.getAppName() +":"+app.getIp()+ ":" + app.getTestkitPort())
+                    .toList();
 
-        // 如果列表内容没变，直接返回
-        if (new HashSet<>(currentItems).containsAll(newItems) && new HashSet<>(newItems).containsAll(currentItems)) {
-            return;
-        }
+            // 如果列表内容没变，直接返回
+            if (new HashSet<>(currentItems).containsAll(newItems) && new HashSet<>(newItems).containsAll(currentItems)) {
+                return;
+            }
 
-        // 保存当前选中的项
-        String selectedItem = (String) visibleAppComboBox.getSelectedItem();
+            // 保存当前选中的项
+            String selectedItem = (String) visibleAppComboBox.getSelectedItem();
 
-        // 更新列表内容
-        visibleAppComboBox.removeAllItems();
-        for (RuntimeHelper.VisibleApp visibleApp : visibleAppList) {
-            String item = visibleApp.getAppName() +":"+visibleApp.getIp()+ ":" + visibleApp.getTestkitPort();
-            visibleAppComboBox.addItem(item);
-        }
+            // 更新列表内容
+            visibleAppComboBox.removeAllItems();
+            for (RuntimeHelper.VisibleApp visibleApp : visibleAppList) {
+                String item = visibleApp.getAppName() +":"+visibleApp.getIp()+ ":" + visibleApp.getTestkitPort();
+                visibleAppComboBox.addItem(item);
+            }
 
-        // 如果之前选中的项还在新列表中，则重新选中它
-        if (selectedItem != null && newItems.contains(selectedItem)) {
-            visibleAppComboBox.setSelectedItem(selectedItem);
-        }
-//        visibleAppComboBox.repaint();
-        windowContent.revalidate();
-        windowContent.repaint();
+            // 如果之前选中的项还在新列表中，则重新选中它
+            if (selectedItem != null && newItems.contains(selectedItem)) {
+                visibleAppComboBox.setSelectedItem(selectedItem);
+            }
+            
+            windowContent.revalidate();
+            windowContent.repaint();
+        });
     }
 
 
