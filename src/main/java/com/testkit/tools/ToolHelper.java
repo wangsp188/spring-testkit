@@ -398,6 +398,10 @@ public class ToolHelper {
     }
 
     private static Object initializeCollection(PsiType type) {
+        return initializeCollection(type, new HashSet<>());
+    }
+
+    private static Object initializeCollection(PsiType type, Set<String> visited) {
         if (type instanceof PsiClassType) {
             PsiClassType classType = (PsiClassType) type;
             PsiType[] parameters = classType.getParameters();
@@ -421,7 +425,7 @@ public class ToolHelper {
                 } else if (elementType instanceof PsiClassType) {
                     // 对于对象类型的元素，初始化一个空对象结构
                     try {
-                        collectionInit.add(initializeObjectFields(elementType));
+                        collectionInit.add(initializeObjectFields(elementType, visited));
                     } catch (StackOverflowError e) {
                     }
                 }
@@ -435,6 +439,10 @@ public class ToolHelper {
     }
 
     private static Object initializeMap(PsiType type) {
+        return initializeMap(type, new HashSet<>());
+    }
+
+    private static Object initializeMap(PsiType type, Set<String> visited) {
         if (type instanceof PsiClassType) {
             PsiClassType classType = (PsiClassType) type;
             PsiType[] parameters = classType.getParameters();
@@ -445,8 +453,8 @@ public class ToolHelper {
                 PsiType keyType = parameters[0];
                 PsiType valueType = parameters[1];
 
-                Object defaultKey = getDefaultValueForType(keyType);
-                Object defaultValue = getDefaultValueForType(valueType);
+                Object defaultKey = getDefaultValueForType(keyType, visited);
+                Object defaultValue = getDefaultValueForType(valueType, visited);
 
                 mapInit.put(defaultKey, defaultValue);
             }
@@ -458,13 +466,17 @@ public class ToolHelper {
     }
 
     private static Object initializeArray(PsiType type) {
+        return initializeArray(type, new HashSet<>());
+    }
+
+    private static Object initializeArray(PsiType type, Set<String> visited) {
         if (type instanceof PsiArrayType) {
             PsiArrayType arrayType = (PsiArrayType) type;
             PsiType componentType = arrayType.getComponentType();
 
             ArrayList<Object> arrayInit = new ArrayList<>();
 
-            Object defaultValue = getDefaultValueForType(componentType);
+            Object defaultValue = getDefaultValueForType(componentType, visited);
             arrayInit.add(defaultValue);
 
             return arrayInit;
@@ -474,6 +486,10 @@ public class ToolHelper {
     }
 
     private static Object getDefaultValueForType(PsiType type) {
+        return getDefaultValueForType(type, new HashSet<>());
+    }
+
+    private static Object getDefaultValueForType(PsiType type, Set<String> visited) {
         if (type.equalsToText("java.lang.String") || isPrimitiveWrapper(type)) {
             return null;
         } else if (type.equalsToText("java.util.Date")) {
@@ -484,13 +500,13 @@ public class ToolHelper {
         } else {
             try {
                 if (isCollectionType(type)) {
-                    return initializeCollection(type);
+                    return initializeCollection(type, visited);
                 } else if (isMapType(type)) {
-                    return initializeMap(type);
+                    return initializeMap(type, visited);
                 } else if (type instanceof PsiArrayType) {
-                    return initializeArray(type);
+                    return initializeArray(type, visited);
                 } else {
-                    return initializeObjectFields(type);
+                    return initializeObjectFields(type, visited);
                 }
             } catch (StackOverflowError e) {
                 if(isCollectionType(type) || type instanceof PsiArrayType) {
@@ -502,6 +518,10 @@ public class ToolHelper {
     }
 
     private static Object initializeObjectFields(PsiType type) {
+        return initializeObjectFields(type, new HashSet<>());
+    }
+
+    private static Object initializeObjectFields(PsiType type, Set<String> visited) {
         if (!(type instanceof PsiClassType)) {
             return null;
         }
@@ -511,87 +531,102 @@ public class ToolHelper {
 
         PsiClassType classType = (PsiClassType) type;
         PsiClass psiClass = classType.resolve();
-//        如果是 com.baomidou.mybatisplus.extension.plugins.pagination.Page 就给个 size:10,current=1的jsonobject
 
         if (psiClass == null) {
             return new HashMap<>();
         }
 
-        // 检查是否为 Page 类型
-        if ("com.baomidou.mybatisplus.extension.plugins.pagination.Page".equals(psiClass.getQualifiedName())) {
-            JSONObject pageObject = new JSONObject();
-            pageObject.put("size", 10);
-            pageObject.put("current", 1);
-            return pageObject;
+        // 获取类型的全限定名作为唯一标识
+        String typeKey = classType.getCanonicalText();
+        
+        // 检测循环引用：如果该类型已经在处理中，直接返回null避免无限递归
+        if (visited.contains(typeKey)) {
+            return null;
         }
 
-        HashMap<String, Object> fieldValues = new HashMap<>();
+        // 将当前类型加入已访问集合
+        visited.add(typeKey);
 
-        for (PsiMethod method : psiClass.getAllMethods()) {
-            String methodName = method.getName();
+        try {
+            // 检查是否为 Page 类型
+            if ("com.baomidou.mybatisplus.extension.plugins.pagination.Page".equals(psiClass.getQualifiedName())) {
+                JSONObject pageObject = new JSONObject();
+                pageObject.put("size", 10);
+                pageObject.put("current", 1);
+                return pageObject;
+            }
 
-            if ((methodName.startsWith("set") && method.getParameterList().getParametersCount() == 1) ||
-                    (methodName.startsWith("is") && method.getParameterList().getParametersCount() == 1 && isBooleanType(method.getParameterList().getParameters()[0].getType()))) {
+            HashMap<String, Object> fieldValues = new HashMap<>();
 
-                PsiParameter setterParameter = method.getParameterList().getParameters()[0];
-                PsiType fieldType = setterParameter.getType();
+            for (PsiMethod method : psiClass.getAllMethods()) {
+                String methodName = method.getName();
 
-                // 根据方法前缀提取字段名
-                String fieldName;
-                if (methodName.startsWith("set")) {
-                    if (methodName.length() == 3) {
-                        continue;
+                if ((methodName.startsWith("set") && method.getParameterList().getParametersCount() == 1) ||
+                        (methodName.startsWith("is") && method.getParameterList().getParametersCount() == 1 && isBooleanType(method.getParameterList().getParameters()[0].getType()))) {
+
+                    PsiParameter setterParameter = method.getParameterList().getParameters()[0];
+                    PsiType fieldType = setterParameter.getType();
+
+                    // 根据方法前缀提取字段名
+                    String fieldName;
+                    if (methodName.startsWith("set")) {
+                        if (methodName.length() == 3) {
+                            continue;
+                        }
+                        fieldName = methodName.substring(3);
+                    } else { // is
+                        if (methodName.length() == 2) {
+                            continue;
+                        }
+                        fieldName = methodName.substring(2);
                     }
-                    fieldName = methodName.substring(3);
-                } else { // is
-                    if (methodName.length() == 2) {
-                        continue;
-                    }
-                    fieldName = methodName.substring(2);
-                }
 
-                // 将字段名首字母小写
-                fieldName = Character.toLowerCase(fieldName.charAt(0)) + fieldName.substring(1);
+                    // 将字段名首字母小写
+                    fieldName = Character.toLowerCase(fieldName.charAt(0)) + fieldName.substring(1);
 
-                // 初始化字段值
-                if (fieldType.equalsToText("java.lang.String") || isEnumType(fieldType)) {
-                    fieldValues.put(fieldName, null);
-                } else if (fieldType.equalsToText("boolean")) {
-                    fieldValues.put(fieldName, false);
-                } else if (fieldType.equalsToText("char")) {
-                    fieldValues.put(fieldName, '\0');
-                } else if (fieldType.equalsToText("byte")) {
-                    fieldValues.put(fieldName, (byte) 0);
-                } else if (fieldType.equalsToText("short")) {
-                    fieldValues.put(fieldName, (short) 0);
-                } else if (fieldType.equalsToText("int")) {
-                    fieldValues.put(fieldName, 0);
-                } else if (fieldType.equalsToText("long")) {
-                    fieldValues.put(fieldName, 0L);
-                } else if (fieldType.equalsToText("float")) {
-                    fieldValues.put(fieldName, 0.0f);
-                } else if (fieldType.equalsToText("double")) {
-                    fieldValues.put(fieldName, 0.0);
-                } else if (fieldType.equalsToText("java.util.Date")) {
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                    fieldValues.put(fieldName, sdf.format(new Date()));
-                } else if (isEnumType(fieldType)) {
-                    fieldValues.put(fieldName, getFirstEnumConstant(fieldType));
-                } else {
-                    if (isCollectionType(fieldType)) {
-                        fieldValues.put(fieldName, initializeCollection(fieldType));
-                    } else if (isMapType(fieldType)) {
-                        fieldValues.put(fieldName, initializeMap(fieldType));
-                    }else if (fieldType instanceof PsiArrayType){
-                        fieldValues.put(fieldName, initializeArray(fieldType));
+                    // 初始化字段值
+                    if (fieldType.equalsToText("java.lang.String") || isEnumType(fieldType)) {
+                        fieldValues.put(fieldName, null);
+                    } else if (fieldType.equalsToText("boolean")) {
+                        fieldValues.put(fieldName, false);
+                    } else if (fieldType.equalsToText("char")) {
+                        fieldValues.put(fieldName, '\0');
+                    } else if (fieldType.equalsToText("byte")) {
+                        fieldValues.put(fieldName, (byte) 0);
+                    } else if (fieldType.equalsToText("short")) {
+                        fieldValues.put(fieldName, (short) 0);
+                    } else if (fieldType.equalsToText("int")) {
+                        fieldValues.put(fieldName, 0);
+                    } else if (fieldType.equalsToText("long")) {
+                        fieldValues.put(fieldName, 0L);
+                    } else if (fieldType.equalsToText("float")) {
+                        fieldValues.put(fieldName, 0.0f);
+                    } else if (fieldType.equalsToText("double")) {
+                        fieldValues.put(fieldName, 0.0);
+                    } else if (fieldType.equalsToText("java.util.Date")) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                        fieldValues.put(fieldName, sdf.format(new Date()));
+                    } else if (isEnumType(fieldType)) {
+                        fieldValues.put(fieldName, getFirstEnumConstant(fieldType));
                     } else {
-                        // 如果是对象类型，递归调用初始化
-                        fieldValues.put(fieldName, initializeObjectFields(fieldType));
+                        if (isCollectionType(fieldType)) {
+                            fieldValues.put(fieldName, initializeCollection(fieldType, visited));
+                        } else if (isMapType(fieldType)) {
+                            fieldValues.put(fieldName, initializeMap(fieldType, visited));
+                        } else if (fieldType instanceof PsiArrayType) {
+                            fieldValues.put(fieldName, initializeArray(fieldType, visited));
+                        } else {
+                            // 如果是对象类型，递归调用初始化（传递visited避免循环）
+                            fieldValues.put(fieldName, initializeObjectFields(fieldType, visited));
+                        }
                     }
                 }
             }
+            return fieldValues;
+        } finally {
+            // 处理完成后从visited中移除，允许在不同分支中重复使用该类型
+            visited.remove(typeKey);
         }
-        return fieldValues;
     }
 
     private static boolean isBooleanType(PsiType type) {
