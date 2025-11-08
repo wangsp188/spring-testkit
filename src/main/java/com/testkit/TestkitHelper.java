@@ -14,6 +14,7 @@ import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.AnnotatedElementsSearch;
+import com.testkit.view.TestkitToolWindowFactory;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
@@ -72,6 +73,40 @@ public class TestkitHelper {
         }
         Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
         TestkitHelper.notify(project, NotificationType.INFORMATION, copyMsg == null ? "Copy success" : copyMsg);
+    }
+
+    /**
+     * Show error dialog with option to open Settings and navigate to specific panel
+     *
+     * @param project   Project instance
+     * @param panelName Settings panel name to navigate to, e.g., "Controller command"
+     * @param title     Dialog title
+     * @param message   Error message (HTML format)
+     */
+    public static void showErrorWithSettingsNavigation(Project project, String panelName, String title, String message) {
+        if (project == null) {
+            return;
+        }
+        
+        SwingUtilities.invokeLater(() -> {
+            String[] options = {"Open Settings"};
+            int choice = Messages.showDialog(
+                project,
+                message,
+                title,
+                options,
+                0,  // Default to "Open Settings"
+                Messages.getErrorIcon()
+            );
+            
+            if (choice == 0 && panelName != null) {
+                // Open Settings and navigate to specified panel
+                com.testkit.view.TestkitToolWindow toolWindow = TestkitToolWindowFactory.getToolWindow(project);
+                if (toolWindow != null && toolWindow.getSettingsDialog() != null) {
+                    toolWindow.getSettingsDialog().visible(panelName);
+                }
+            }
+        });
     }
 
     public static void refresh(Project project) {

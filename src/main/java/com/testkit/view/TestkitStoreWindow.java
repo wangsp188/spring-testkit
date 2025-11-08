@@ -1112,7 +1112,7 @@ public class TestkitStoreWindow {
 
     private void buildFeignButton() {
         feignCommandButton = new JButton(FunctionCallTool.FEIGN_ICON);
-        feignCommandButton.setToolTipText("[FeignClient] Send/Generate feign command");
+        feignCommandButton.setToolTipText("[FeignClient] Generate feign command");
         feignCommandButton.setPreferredSize(new Dimension(32, 32));
         feignCommandButton.addActionListener(new ActionListener() {
             @Override
@@ -1138,27 +1138,6 @@ public class TestkitStoreWindow {
                         envs.add(null);
                     }
                     for (String env : envs) {
-
-                        // 执行请求
-                        AnAction executeAction = new AnAction("Send request with " + app + ":" + env, "Send request with " + app + ":" + env, AllIcons.Actions.Execute) {
-                            @Override
-                            public void actionPerformed(@NotNull AnActionEvent e) {
-                                Application application = ApplicationManager.getApplication();
-                                ProgressManager.getInstance().run(new Task.Backgroundable(project, "Sending request, please wait ...", false) {
-
-                                    @Override
-                                    public void run(@NotNull ProgressIndicator indicator) {
-                                        application.runReadAction(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                handleFeignCommand("send",env, script, functionCallMeta.getHttpMeta());
-                                            }
-                                        });
-                                    }
-                                });
-                            }
-                        };
-                        feignActionGroup.add(executeAction);
                         //显示的一个图标加上标题
                         AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FunctionCallTool.FEIGN_ICON) {
                             @Override
@@ -1185,27 +1164,7 @@ public class TestkitStoreWindow {
 
 
                 if (feignActionGroup.getChildrenCount() == 0) {
-
-                    AnAction defaultExec = new AnAction("Send request with default", "Send Feign request with default script", AllIcons.Actions.Execute) {
-                        @Override
-                        public void actionPerformed(@NotNull AnActionEvent e12) {
-                            Application application = ApplicationManager.getApplication();
-                            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Sending request, please wait ...", false) {
-
-                                @Override
-                                public void run(@NotNull ProgressIndicator indicator) {
-                                    application.runReadAction(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            handleFeignCommand("send",null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), functionCallMeta.getHttpMeta());
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    };
-                    feignActionGroup.add(defaultExec);
-                    // 没有自定义逻辑，提供默认生成和执行
+                    // 没有自定义逻辑，提供默认生成
                     AnAction defaultGen = new AnAction("Generate default script", "Generate Feign command with default script", FunctionCallTool.FEIGN_ICON) {
                         @Override
                         public void actionPerformed(@NotNull AnActionEvent e12) {

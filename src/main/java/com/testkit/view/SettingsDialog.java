@@ -98,6 +98,8 @@ public class SettingsDialog {
     private JBTextField traceDenyListField;
 //    private JBTextField traceSingleClsDepthField;
 
+    private JBList<String> optionList;
+    private JPanel rightContent;
 
     public SettingsDialog(TestkitToolWindow toolWindow) {
         this.toolWindow = toolWindow;
@@ -105,11 +107,43 @@ public class SettingsDialog {
     }
 
     public void visible() {
+        visible(null);
+    }
+
+    /**
+     * Show settings dialog and optionally navigate to a specific panel
+     * @param panelName Panel name to navigate to, e.g., "Controller command", or null to show default panel
+     */
+    public void visible(String panelName) {
         try (var token = com.intellij.concurrency.ThreadContext.resetThreadContext()) {
             refreshSettings();
             dialog.revalidate();
             dialog.repaint();
+            
+            // Navigate to panel before showing dialog if specified
+            if (panelName != null) {
+                navigateToPanel(panelName);
+            }
+            
             dialog.setVisible(true);
+        }
+    }
+
+    /**
+     * Navigate to the specified settings panel
+     * @param panelName Panel name, e.g., "Controller command"
+     */
+    public void navigateToPanel(String panelName) {
+        if (optionList != null && rightContent != null) {
+            ListModel<String> model = optionList.getModel();
+            for (int i = 0; i < model.getSize(); i++) {
+                if (panelName.equals(model.getElementAt(i))) {
+                    optionList.setSelectedIndex(i);
+                    CardLayout cl = (CardLayout) rightContent.getLayout();
+                    cl.show(rightContent, panelName);
+                    break;
+                }
+            }
         }
     }
 
@@ -198,12 +232,12 @@ public class SettingsDialog {
 
         // 左侧选项列表
         String[] options = {TestkitHelper.getPluginName(), "Trace", "Tool interceptor", "Startup enhancement", "Controller command", "FeignClient command", "SQL tool"};
-        JBList<String> optionList = new JBList<>(options);
+        optionList = new JBList<>(options);
         optionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         // 默认选中第一个选项
         optionList.setSelectedIndex(0);
         // 右侧内容显示区域
-        JPanel rightContent = new JPanel(new CardLayout());
+        rightContent = new JPanel(new CardLayout());
         rightContent.add(createBasicOptionPanel(), TestkitHelper.getPluginName());
         rightContent.add(createTraceOptionPanel(), "Trace");
         rightContent.add(createSqlPanel(), "SQL tool");

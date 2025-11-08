@@ -34,7 +34,7 @@ import java.util.function.Supplier;
 
 public class McpFunctionTool extends BasePluginTool {
 
-    public static final Icon MCP_FUNCTION_ICON = IconLoader.getIcon("/icons/mcp-disable.svg", McpFunctionTool.class);
+    public static final Icon MCP_FUNCTION_ICON = IconLoader.getIcon("/icons/mcp.svg", McpFunctionTool.class);
 
     private JComboBox<ToolHelper.McpFunctionAction> actionComboBox;
 
@@ -82,7 +82,7 @@ public class McpFunctionTool extends BasePluginTool {
         runButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                triggerLocalTask(runButton, AllIcons.Actions.Execute, "Execute MCP function", new Supplier<String>() {
+                triggerLocalTask(runButton, AllIcons.Actions.Execute, "Execute mcp tool", new Supplier<String>() {
                     @Override
                     public String get() {
                         ToolHelper.McpFunctionAction selectedItem = (ToolHelper.McpFunctionAction) actionComboBox.getSelectedItem();
@@ -141,7 +141,12 @@ public class McpFunctionTool extends BasePluginTool {
         });
 
         gbc.gridx = 4;
-        topPanel.add(runButton, gbc);
+        // 将 runButton 添加到容器面板（如果支持拦截器）
+        addToInterceptorContainer(runButton, gbc);
+        // 如果不支持拦截器，则添加到原面板
+        if (interceptorContainerPanel == null) {
+            topPanel.add(runButton, gbc);
+        }
 
         return topPanel;
     }

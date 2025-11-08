@@ -866,6 +866,10 @@ public class TestkitToolWindow {
         });
     }
 
+    public SettingsDialog getSettingsDialog() {
+        return settingsDialog;
+    }
+
 
     public void findSpringBootApplicationClasses() {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {

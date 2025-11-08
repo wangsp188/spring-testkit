@@ -35,8 +35,6 @@ import java.util.function.Supplier;
 
 public class MapperSqlTool extends BasePluginTool {
 
-    public static final Icon MAPPER_SQL_DISABLE_ICON = IconLoader.getIcon("/icons/mapper-sql-disable.svg", MapperSqlIconProvider.class);
-
 
     public static final Icon REPLACE_DISABLE_ICON = IconLoader.getIcon("/icons/replace-disable.svg", FunctionCallIconProvider.class);
     public static final Icon REPLACE_ICON = IconLoader.getIcon("/icons/replace.svg", FunctionCallIconProvider.class);
@@ -58,7 +56,7 @@ public class MapperSqlTool extends BasePluginTool {
     @Override
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new GridBagLayout());
-        actionComboBox = addActionComboBox(MAPPER_SQL_DISABLE_ICON, MAPPER_SQL_DISABLE_ICON, "<strong>mapper-sql</strong><br>\n" +
+        actionComboBox = addActionComboBox(MapperSqlIconProvider.MAPPER_SQL_ICON, MapperSqlIconProvider.MAPPER_SQL_ICON, "<strong>mapper-sql</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>sql tag of mapper xml</li>\n" +
                 "    <li>select/insert/update/delete</li>\n" +
@@ -169,7 +167,12 @@ public class MapperSqlTool extends BasePluginTool {
         });
 
         gbc.gridx = 4;
-        topPanel.add(runButton, gbc);
+        // 将 runButton 添加到容器面板（如果支持拦截器）
+        addToInterceptorContainer(runButton, gbc);
+        // 如果不支持拦截器，则添加到原面板
+        if (interceptorContainerPanel == null) {
+            topPanel.add(runButton, gbc);
+        }
 
         return topPanel;
     }

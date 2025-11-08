@@ -40,7 +40,10 @@ import java.util.stream.Collectors;
 
 public class FlexibleTestTool extends BasePluginTool {
 
-    public static final Icon FLEXIBLE_TEST_DISABLE_ICON = IconLoader.getIcon("/icons/test-code-disable.svg", FunctionCallIconProvider.class);
+
+    // 拦截器图标
+    public static final Icon INTERCEPTOR_ICON = IconLoader.getIcon("/icons/interceptor.svg", FlexibleTestTool.class);
+    public static final Icon INTERCEPTOR_DISABLE_ICON = IconLoader.getIcon("/icons/interceptor-disable.svg", FlexibleTestTool.class);
 
 
     private JComboBox<ToolHelper.MethodAction> actionComboBox;
@@ -116,7 +119,7 @@ public class FlexibleTestTool extends BasePluginTool {
 
     protected JPanel createActionPanel() {
         JPanel topPanel = new JPanel(new GridBagLayout());
-        actionComboBox = addActionComboBox(FlexibleTestIconProvider.FLEXIBLE_TEST_ICON, FLEXIBLE_TEST_DISABLE_ICON, "<strong>flexible-test</strong><br>\n" +
+        actionComboBox = addActionComboBox(INTERCEPTOR_ICON, INTERCEPTOR_DISABLE_ICON, "<strong>flexible-test</strong><br>\n" +
                 "<ul>\n" +
                 "    <li>module test source ,public method of  package : ${Test Package}</li>\n" +
                 "    <li>not static</li>\n" +
@@ -178,7 +181,12 @@ public class FlexibleTestTool extends BasePluginTool {
                 });
             }
         });
-        topPanel.add(runButton, gbc);
+        // 将 runButton 添加到容器面板（如果支持拦截器）
+        addToInterceptorContainer(runButton, gbc);
+        // 如果不支持拦截器，则添加到原面板
+        if (interceptorContainerPanel == null) {
+            topPanel.add(runButton, gbc);
+        }
         return topPanel;
     }
 

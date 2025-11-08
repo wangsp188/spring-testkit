@@ -1,5 +1,6 @@
 package com.testkit.view;
 
+import com.alibaba.fastjson.JSONObject;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
@@ -11,6 +12,7 @@ import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.IconLoader;
@@ -21,6 +23,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
+import com.testkit.tools.mcp_function.McpAdapter;
 import com.testkit.tools.mcp_function.McpHelper;
 
 import javax.swing.*;
@@ -166,14 +169,40 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         AnAction refresh = new AnAction("Refresh", "Refresh", AllIcons.Actions.Refresh) {
             @Override
             public void actionPerformed(AnActionEvent e) {
-                try {
-                    testkitToolWindow.findSpringBootApplicationClasses();
-                    CodingGuidelinesHelper.refreshDoc(project);
-                    TestkitHelper.refresh(project);
-                    TestkitHelper.notify(project, NotificationType.INFORMATION, "Refresh success");
-                } catch (Exception ex) {
-                    TestkitHelper.notify(project, NotificationType.ERROR, "Refresh failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
-                }
+                // 所有耗时操作都在后台线程执行，避免阻塞 EDT
+                ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    try {
+                        // 1. 查找 Spring Boot 应用类（已经在后台线程中执行）
+                        testkitToolWindow.findSpringBootApplicationClasses();
+                        
+                        // 2. 刷新文档（文件 I/O 操作，在后台线程执行）
+                        CodingGuidelinesHelper.refreshDoc(project);
+                        
+                        // 3. 刷新代码分析器（在后台线程执行）
+                        TestkitHelper.refresh(project);
+                        
+                        // 4. 读取并刷新 MCP 配置（文件 I/O 操作，在后台线程执行）
+                        try {
+                            JSONObject cursorConfig = McpHelper.fetchMcpJson();
+                            McpAdapter.McpInitRet mcpInitRet = McpAdapter.parseMcpServers(cursorConfig);
+                            // refreshServers 内部会调用 SwingUtilities.invokeLater 来更新 UI
+                            McpHelper.refreshServers(mcpInitRet.servers());
+                        } catch (Exception mcpEx) {
+                            // MCP 配置读取失败不影响其他操作
+                            System.err.println("Failed to refresh MCP config: " + mcpEx.getMessage());
+                        }
+                        
+                        // 5. 在 EDT 上显示成功通知
+                        SwingUtilities.invokeLater(() -> {
+                            TestkitHelper.notify(project, NotificationType.INFORMATION, "Refresh success");
+                        });
+                    } catch (Exception ex) {
+                        // 在 EDT 上显示错误通知
+                        SwingUtilities.invokeLater(() -> {
+                            TestkitHelper.notify(project, NotificationType.ERROR, "Refresh failed," + ex.getClass().getSimpleName() + ", " + ex.getMessage());
+                        });
+                    }
+                });
             }
         };
 
@@ -191,6 +220,6 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         };
 
         // 将按钮添加到工具窗口标题栏
-        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,refresh,store));
+        toolWindow.setTitleActions(Arrays.asList(curlAction, sql,mcp,store,refresh));
     }
 }

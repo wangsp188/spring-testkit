@@ -26,6 +26,8 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.psi.*;
 import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
+import com.testkit.util.curl.CurlEntity;
+import com.testkit.util.curl.CurlParserUtil;
 import com.intellij.util.ui.JBUI;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
@@ -33,6 +35,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.runtime.InvokerHelper;
+import org.codehaus.groovy.runtime.metaclass.MissingMethodExceptionNoStack;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -54,7 +57,9 @@ import java.util.stream.Collectors;
 
 public class FunctionCallTool extends BasePluginTool {
 
-    public static final Icon FUNCTION_CALL_DISABLE_ICON = IconLoader.getIcon("/icons/function-call-disable.svg", FunctionCallTool.class);
+    // 拦截器图标
+    public static final Icon INTERCEPTOR_ICON = IconLoader.getIcon("/icons/interceptor.svg", FunctionCallTool.class);
+    public static final Icon INTERCEPTOR_DISABLE_ICON = IconLoader.getIcon("/icons/interceptor-disable.svg", FunctionCallTool.class);
 
     public static final Icon PROXY_DISABLE_ICON = IconLoader.getIcon("/icons/proxy-disable.svg", FunctionCallTool.class);
     public static final Icon PROXY_ICON = IconLoader.getIcon("/icons/proxy.svg", FunctionCallTool.class);
@@ -218,7 +223,7 @@ public class FunctionCallTool extends BasePluginTool {
                                 });
                             }
                         };
-                        controllerActionGroup.add(executeAction);
+
                         // 显示生成脚本
                         AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, CONTROLLER_ICON) {
                             @Override
@@ -239,7 +244,7 @@ public class FunctionCallTool extends BasePluginTool {
                             }
                         };
                         controllerActionGroup.add(documentation); // 将动作添加到动作组中
-
+                        controllerActionGroup.add(executeAction);
                     }
                 }
             }
@@ -296,7 +301,7 @@ public class FunctionCallTool extends BasePluginTool {
     private void buildFeignButton(TestkitToolWindow testkitToolWindow) {
         feignCommandButton = new JButton(FEIGN_ICON);
         feignCommandButton.setPreferredSize(new Dimension(32, 32));
-        feignCommandButton.setToolTipText("[FeignClient] Send/Generate feign command");
+        feignCommandButton.setToolTipText("[FeignClient] Generate feign command");
         feignCommandButton.addActionListener(e -> {
             ToolHelper.MethodAction selectedItem = (ToolHelper.MethodAction) actionComboBox.getSelectedItem();
             if (selectedItem == null) {
@@ -330,27 +335,6 @@ public class FunctionCallTool extends BasePluginTool {
                         envs.add(null);
                     }
                     for (String env : envs) {
-
-                        // 显示执行请求
-                        AnAction executeAction = new AnAction("Send request with " + app + ":" + env, "Send Feign request with " + app + ":" + env, AllIcons.Actions.Execute) {
-                            @Override
-                            public void actionPerformed(@NotNull AnActionEvent e) {
-                                Application application = ApplicationManager.getApplication();
-                                ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Sending request, please wait ...", false) {
-
-                                    @Override
-                                    public void run(@NotNull ProgressIndicator indicator) {
-                                        application.runReadAction(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                handleFeignCommand("send",env, script, selectedItem.getMethod());
-                                            }
-                                        });
-                                    }
-                                });
-                            }
-                        };
-                        feignActionGroup.add(executeAction);
                         // 显示生成脚本
                         AnAction documentation = new AnAction("Generate with " + app + ":" + env, "Generate with " + app + ":" + env, FEIGN_ICON) {
                             @Override
@@ -378,26 +362,7 @@ public class FunctionCallTool extends BasePluginTool {
 
 
             if (feignActionGroup.getChildrenCount() == 0) {
-                AnAction defaultExec = new AnAction("Send request with default", "Send Feign request with default script", AllIcons.Actions.Execute) {
-                    @Override
-                    public void actionPerformed(@NotNull AnActionEvent e12) {
-                        Application application = ApplicationManager.getApplication();
-                        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Sending request, please wait ...", false) {
-
-                            @Override
-                            public void run(@NotNull ProgressIndicator indicator) {
-                                application.runReadAction(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        handleFeignCommand("send",null, SettingsStorageHelper.DEF_FEIGN_COMMAND.getScript(), selectedItem.getMethod());
-                                    }
-                                });
-                            }
-                        });
-                    }
-                };
-                feignActionGroup.add(defaultExec);
-                // 没有自定义逻辑，提供默认生成和执行
+                // 没有自定义逻辑，提供默认生成
                 AnAction defaultGen = new AnAction("Generate with default", "Generate Feign command with default script", FEIGN_ICON) {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e12) {
@@ -889,16 +854,73 @@ public class FunctionCallTool extends BasePluginTool {
                 }
             });
         }
-        setOutputText("Generate controller command ...");
+
+        String text = Objects.equals(action, "send") ? "Send request" : "Command generate";
+
+        setOutputText(text+" ...");
         try {
             String ret = invokeControllerScript(script, action, env, httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
+            setOutputText(text+" error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
+
+            // Build friendly error message in English (simplified HTML without complex CSS)
+            String friendlyMessage =
+                    "<html><body>" +
+                            "<p><b>Error:</b> The script failed to compile. Please use only JDK or Groovy classes, do not use classes from your project.</p>" +
+                            "<p><b>Solution:</b></p>" +
+                            "<ol>" +
+                            "<li>Click the <b>Open Settings</b> button below</li>" +
+                            "<li>Select the corresponding app</li>" +
+                            "<li>Modify the script code to fix compilation errors</li>" +
+                            "<li>Try again until compilation succeeds</li>" +
+                            "</ol>" +
+                            "<hr>" +
+                            "<br>" +
+                            "</body></html>";
+            // Show dialog with Settings navigation using helper method
+            TestkitHelper.showErrorWithSettingsNavigation(
+                    getProject(),
+                    "Controller command",
+                    "Controller Command Compilation Fail",
+                    friendlyMessage
+            );
+
+        } catch (MissingMethodExceptionNoStack ex) {
+            ex.printStackTrace();
+            // Show error in output first
+            setOutputText(text+" error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
+
+            // Parse error message to extract method name
+            String errorMsg = ex.getMessage();
+            if(errorMsg!=null && errorMsg.contains("No signature of method")){
+                // Build friendly error message in English (simplified HTML without complex CSS)
+                String friendlyMessage =
+                        "<body>" +
+                                "<p><b>Error:</b> The script is missing the correct signature for <code>generate()</code> method</p>" +
+                                "<p><b>Solution:</b></p>" +
+                                "<ol>" +
+                                "<li>Click the <b>Open Settings</b> button below</li>" +
+                                "<li>Select the corresponding app</li>" +
+                                "<li>Add or modify the <code>generate()</code> function</li>" +
+                                "</ol>" +
+                                "<p><b>Correct generate() method signature:</b></p>" +
+                                "<pre>" +
+                                "def generate(String env, Integer runtimePort, String httpMethod, String path, Map&lt;String, String&gt; params, Map&lt;String, String&gt; requesterHeaders, String jsonBody)" +
+                                "</pre>" +
+                                "<br>" +
+                                "</body>";
+                // Show dialog with Settings navigation using helper method
+                TestkitHelper.showErrorWithSettingsNavigation(
+                        getProject(),
+                        "Controller command", "No signature of method",
+                        friendlyMessage
+                );
+            }
         } catch (Throwable ex) {
             ex.printStackTrace();
-            setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
+            setOutputText(text+" error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
         }
     }
 
@@ -996,13 +1018,68 @@ public class FunctionCallTool extends BasePluginTool {
                 }
             });
         }
-        setOutputText("Generate FeignClient command ...");
+
+        setOutputText("Command generate ...");
         try {
             String ret = invokeFeignScript(script, action, env, commandMeta.getFeignName(), commandMeta.getFeignUrl(), httpMethod, path1, urlParams, jsonBody, headerValues);
             setOutputText(ret);
         } catch (CompilationFailedException ex) {
             ex.printStackTrace();
             setOutputText("Command generate error\nPlease use the classes that come with jdk or groovy, do not use classes in your project\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
+
+            // Build friendly error message in English (simplified HTML without complex CSS)
+            String friendlyMessage =
+                    "<html><body>" +
+                            "<p><b>Error:</b> The script failed to compile. Please use only JDK or Groovy classes, do not use classes from your project.</p>" +
+                            "<p><b>Solution:</b></p>" +
+                            "<ol>" +
+                            "<li>Click the <b>Open Settings</b> button below</li>" +
+                            "<li>Select the corresponding app</li>" +
+                            "<li>Modify the script code to fix compilation errors</li>" +
+                            "<li>Try again until compilation succeeds</li>" +
+                            "</ol>" +
+                            "<hr>" +
+                            "<br>" +
+                            "</body></html>";
+            // Show dialog with Settings navigation using helper method
+            TestkitHelper.showErrorWithSettingsNavigation(
+                    getProject(),
+                    "FeignClient command",
+                    "FeignClient Command Compilation Fail",
+                    friendlyMessage
+            );
+
+        } catch (MissingMethodExceptionNoStack ex) {
+            ex.printStackTrace();
+            // Show error in output first
+            setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
+
+            // Parse error message to extract method name
+            String errorMsg = ex.getMessage();
+            if(errorMsg!=null && errorMsg.contains("No signature of method")){
+                // Build friendly error message in English (simplified HTML without complex CSS)
+                String friendlyMessage =
+                        "<body>" +
+                                "<p><b>Error:</b> The script is missing the correct signature for <code>generate()</code> method</p>" +
+                                "<p><b>Solution:</b></p>" +
+                                "<ol>" +
+                                "<li>Click the <b>Open Settings</b> button below</li>" +
+                                "<li>Select the corresponding app</li>" +
+                                "<li>Add or modify the <code>generate()</code> function</li>" +
+                                "</ol>" +
+                                "<p><b>Correct generate() method signature:</b></p>" +
+                                "<pre>" +
+                                "def generate(String env, String feignName, String feignUrl, String httpMethod, String path, Map&lt;String, String&gt; params, Map&lt;String, String&gt; requesterHeaders, String jsonBody)" +
+                                "</pre>" +
+                                "<br>" +
+                                "</body>";
+                // Show dialog with Settings navigation using helper method
+                TestkitHelper.showErrorWithSettingsNavigation(
+                        getProject(),
+                        "FeignClient command", "No signature of method",
+                        friendlyMessage
+                );
+            }
         } catch (Throwable ex) {
             ex.printStackTrace();
             setOutputText("Command generate error\n" + ex.getClass().getSimpleName() + "\n" + ex.getMessage());
@@ -1013,7 +1090,9 @@ public class FunctionCallTool extends BasePluginTool {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         System.err.println("invoke feign script,fun:"+fun+", env:"+env+", httpMethod:"+httpMethod+", path:"+path+", params:"+ JSON.toJSONString(params)+", jsonBody:"+jsonBody+", headerValues:"+JSON.toJSONString(headerValues));
-        Object build = InvokerHelper.invokeMethod(script, fun, new Object[]{env, feignName, feignUrl, httpMethod, path, params, headerValues, jsonBody});
+        Object[] args = new Object[]{env, feignName, feignUrl, httpMethod, path, params, headerValues, jsonBody};
+
+        Object build = InvokerHelper.invokeMethod(script, fun, args);
         return build == null ? "" : String.valueOf(build);
     }
 
@@ -1023,14 +1102,29 @@ public class FunctionCallTool extends BasePluginTool {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         System.err.println("invoke controller script,fun:"+fun+", env:"+env+", httpMethod:"+httpMethod+", path:"+path+", params:"+ JSON.toJSONString(params)+", jsonBody:"+jsonBody+", headerValues:"+JSON.toJSONString(headerValues));
-        Object build = InvokerHelper.invokeMethod(script, fun, new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody});
+        
+        Object[] args = new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody};
+        
+        // If send() is called, automatically use generate() + curl execution
+        if ("send".equals(fun)) {
+            // Call generate() to get curl command
+            Object curlCommand = InvokerHelper.invokeMethod(script, "generate", args);
+            if (curlCommand == null || String.valueOf(curlCommand).trim().isEmpty()) {
+                throw new RuntimeException("generate() function returned empty curl command");
+            }
+            // Execute the curl command
+            return CurlParserUtil.executeCurlCommand(String.valueOf(curlCommand));
+        }
+        
+        // For other functions (like generate), call directly
+        Object build = InvokerHelper.invokeMethod(script, fun, args);
         return build == null ? "" : String.valueOf(build);
     }
 
 
     protected JPanel createActionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        actionComboBox = addActionComboBox(FunctionCallIconProvider.FUNCTION_CALL_ICON, FUNCTION_CALL_DISABLE_ICON,
+        actionComboBox = addActionComboBox(INTERCEPTOR_ICON, INTERCEPTOR_DISABLE_ICON,
                 "<strong>function-call</strong>\n<ul>\n" +
                         "    <li>spring bean method</li>\n" +
                         "    <li>not main/bean method</li>\n" +
@@ -1067,7 +1161,12 @@ public class FunctionCallTool extends BasePluginTool {
                 }
             }
         });
-        panel.add(useProxyButton, gbc);
+        // 将 useProxyButton 添加到容器面板（如果支持拦截器）
+        addToInterceptorContainer(useProxyButton, gbc);
+        // 如果不支持拦截器，则添加到原面板
+        if (interceptorContainerPanel == null) {
+            panel.add(useProxyButton, gbc);
+        }
 
         runButton = new JButton(AllIcons.Actions.Execute);
         runButton.setToolTipText("Execute this");
@@ -1114,7 +1213,12 @@ public class FunctionCallTool extends BasePluginTool {
         });
 
         gbc.gridx = 4;
-        panel.add(runButton, gbc);
+        // 将 runButton 添加到容器面板（如果支持拦截器）
+        addToInterceptorContainer(runButton, gbc);
+        // 如果不支持拦截器，则添加到原面板
+        if (interceptorContainerPanel == null) {
+            panel.add(runButton, gbc);
+        }
 
         return panel;
     }

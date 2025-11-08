@@ -43,12 +43,14 @@ import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
 import java.util.function.Supplier;
+import java.awt.geom.Ellipse2D;
 
 public abstract class BasePluginTool {
 
@@ -70,6 +72,7 @@ public abstract class BasePluginTool {
     protected EditorTextField jsonInputField;
     protected boolean useInterceptor;
     protected DefaultActionGroup actionGroup;
+    protected JPanel interceptorContainerPanel;  // 拦截器容器面板，用于包裹整行组件
 
     public BasePluginTool(TestkitToolWindow testkitToolWindow) {
         // 初始化panel
@@ -511,21 +514,25 @@ public abstract class BasePluginTool {
 
 
     protected ComboBox addActionComboBox(Icon icon, Icon disableIcon, String tooltips, JPanel topPanel, ActionListener actionListener) {
+        // 创建容器面板包裹整行
+        interceptorContainerPanel = new JPanel(new GridBagLayout());
+        JPanel containerPanel = interceptorContainerPanel;
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.0;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        JButton testBtn = new JButton(icon);
+        JButton testBtn;
         if (icon != disableIcon) {
             useInterceptor = SettingsStorageHelper.isDefaultUseInterceptor(getProject());
+            // 使用带脉冲动画的按钮
+            testBtn = new PulsingInterceptorButton(useInterceptor ? icon : disableIcon, useInterceptor);
             if(useInterceptor){
                 testBtn.setToolTipText("<html>\n" +
                         "<meta charset=\"UTF-8\">\n" +
                         "<strong>Tool interceptor is enable</strong><br>\n" + tooltips + "\n</html>");
             }else{
-                testBtn.setIcon(disableIcon);
                 testBtn.setToolTipText("<html>\n" +
                         "<meta charset=\"UTF-8\">\n" +
                         "<strong>Tool interceptor is disable</strong><br>\n" + tooltips + "\n</html>");
@@ -534,9 +541,11 @@ public abstract class BasePluginTool {
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
+                    PulsingInterceptorButton pulsingBtn = (PulsingInterceptorButton) testBtn;
                     if (testBtn.getIcon() == icon) {
                         useInterceptor = false;
                         testBtn.setIcon(disableIcon);
+                        pulsingBtn.setInterceptorEnabled(false);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>Tool interceptor is disable</strong><br>\n" + tooltips + "\n</html>");
@@ -544,6 +553,7 @@ public abstract class BasePluginTool {
                     } else {
                         useInterceptor = true;
                         testBtn.setIcon(icon);
+                        pulsingBtn.setInterceptorEnabled(true);
                         testBtn.setToolTipText("<html>\n" +
                                 "<meta charset=\"UTF-8\">\n" +
                                 "<strong>Tool interceptor is enable</strong><br>\n" + tooltips + "\n</html>");
@@ -553,6 +563,7 @@ public abstract class BasePluginTool {
             });
         } else {
             useInterceptor = false;
+            testBtn = new JButton(icon);
             testBtn.setToolTipText("<html>\n" +
                     "<meta charset=\"UTF-8\">\n" +
                     "<strong>Unsupport Tool interceptor</strong><br>\n" + tooltips + "\n</html>");
@@ -562,10 +573,9 @@ public abstract class BasePluginTool {
                     TestkitHelper.notify(getProject(), NotificationType.INFORMATION, getTool().getCode() + " don't support Tool-script");
                 }
             });
+            testBtn.setPreferredSize(new Dimension(32, 32));
         }
-
-        testBtn.setPreferredSize(new Dimension(32, 32));
-        topPanel.add(testBtn, gbc);
+        containerPanel.add(testBtn, gbc);
 
         JButton pointButton = new JButton(AllIcons.General.Locate);
         ComboBox actionComboBox = new ComboBox<>();
@@ -601,7 +611,7 @@ public abstract class BasePluginTool {
         pointButton.setToolTipText("Navigate to the selected");
         pointButton.setPreferredSize(new Dimension(32, 32));
         gbc.gridx = 1;
-        topPanel.add(pointButton, gbc);
+        containerPanel.add(pointButton, gbc);
 
 
         actionComboBox.addActionListener(e -> {
@@ -681,8 +691,29 @@ public abstract class BasePluginTool {
         gbc.weightx = 1.0;
         gbc.gridx = 2;
         gbc.gridy = 0;
-        topPanel.add(actionComboBox, gbc);
+        containerPanel.add(actionComboBox, gbc);
+        
+        // 将容器面板添加到 topPanel
+        GridBagConstraints containerGbc = new GridBagConstraints();
+        containerGbc.insets = JBUI.insets(1);
+        containerGbc.fill = GridBagConstraints.HORIZONTAL;
+        containerGbc.weightx = 1.0;
+        containerGbc.gridx = 0;
+        containerGbc.gridy = 0;
+        topPanel.add(containerPanel, containerGbc);
+        
         return actionComboBox;
+    }
+
+    /**
+     * 将组件添加到拦截器容器面板中（用于包裹整行，包括执行按钮）
+     * @param component 要添加的组件
+     * @param gbc GridBagConstraints 约束
+     */
+    protected void addToInterceptorContainer(Component component, GridBagConstraints gbc) {
+        if (interceptorContainerPanel != null) {
+            interceptorContainerPanel.add(component, gbc);
+        }
     }
 
     protected void refreshInputByActionBox(JComboBox actionComboBox) {
@@ -720,5 +751,211 @@ public abstract class BasePluginTool {
 
     public EditorTextField getJsonInputField() {
         return jsonInputField;
+    }
+
+    /**
+     * 带AI风格飘絮粒子动画效果的拦截器按钮
+     */
+    private static class PulsingInterceptorButton extends JButton {
+        private Timer particleTimer;
+        private boolean isEnabled;
+        private static final int TIMER_DELAY = 33; // 约30fps，降低刷新率减少性能压力
+        private static final int PARTICLE_COUNT = 3; // 3个粒子，降低性能开销
+        
+        // AI风格的渐变色（超鲜艳的霓虹色）
+        private static final Color[] PARTICLE_COLORS = {
+            new Color(0xFF00FF), // 霓虹紫
+            new Color(0x00FFFF), // 霓虹青
+            new Color(0xFF00CC), // 霓虹粉
+            new Color(0x9932CC), // 深紫罗兰
+            new Color(0x00BFFF), // 深天蓝
+            new Color(0xFF1493), // 深粉红
+            new Color(0x9370DB), // 中紫罗兰
+            new Color(0x1E90FF), // 道奇蓝
+        };
+        
+        // 粒子类
+        private static class Particle {
+            float x, y;
+            float vx, vy;
+            float size;
+            Color color;
+            float alpha;
+            float life; // 生命周期 0-1
+            
+            Particle(float width, float height, Random random) {
+                reset(width, height, random);
+            }
+            
+            void reset(float width, float height, Random random) {
+                // 随机位置
+                x = random.nextFloat() * width;
+                y = random.nextFloat() * height;
+                // 随机速度（慢速飘动）
+                vx = (random.nextFloat() - 0.5f) * 0.3f;
+                vy = (random.nextFloat() - 0.5f) * 0.3f;
+                // 随机大小（稍微大一点）
+                size = 2.5f + random.nextFloat() * 4;
+                // 随机颜色
+                color = PARTICLE_COLORS[random.nextInt(PARTICLE_COLORS.length)];
+                // 随机透明度（更亮）
+                alpha = 0.5f + random.nextFloat() * 0.4f;
+                // 生命周期
+                life = random.nextFloat();
+            }
+            
+            void update(float width, float height, Random random) {
+                // 更新位置
+                x += vx;
+                y += vy;
+                
+                // 更新生命周期
+                life += 0.01f;
+                if (life > 1.0f) {
+                    life = 0.0f;
+                    // 重新生成粒子
+                    reset(width, height, random);
+                }
+                
+                // 边界处理：如果粒子移出边界，重新生成
+                if (x < -5 || x > width + 5 || y < -5 || y > height + 5) {
+                    reset(width, height, random);
+                }
+            }
+        }
+        
+        private Particle[] particles;
+        private Random random = new Random();
+
+        public PulsingInterceptorButton(Icon icon, boolean enabled) {
+            super(icon);
+            this.isEnabled = enabled;
+            setPreferredSize(new Dimension(32, 32));
+            setContentAreaFilled(false);
+            setBorderPainted(false);
+            setFocusPainted(false);
+            
+            // 初始化粒子
+            particles = new Particle[PARTICLE_COUNT];
+            for (int i = 0; i < PARTICLE_COUNT; i++) {
+                particles[i] = new Particle(32, 32, random);
+            }
+            
+            if (enabled) {
+                startParticleAnimation();
+            }
+        }
+
+        public void setInterceptorEnabled(boolean enabled) {
+            if (this.isEnabled == enabled) {
+                return;
+            }
+            this.isEnabled = enabled;
+            if (enabled) {
+                startParticleAnimation();
+            } else {
+                stopParticleAnimation();
+            }
+            repaint();
+        }
+
+        private void startParticleAnimation() {
+            if (particleTimer != null && particleTimer.isRunning()) {
+                return;
+            }
+            particleTimer = new Timer(TIMER_DELAY, e -> {
+                // 只在按钮可见时运行动画，节省性能
+                if (!isDisplayable() || !isVisible()) {
+                    return;
+                }
+                int width = getWidth();
+                int height = getHeight();
+                // 更新所有粒子
+                for (Particle particle : particles) {
+                    particle.update(width, height, random);
+                }
+                repaint();
+            });
+            particleTimer.start();
+        }
+
+        private void stopParticleAnimation() {
+            if (particleTimer != null) {
+                particleTimer.stop();
+                particleTimer = null;
+            }
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            
+            if (!isEnabled) {
+                return;
+            }
+
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            
+            int width = getWidth();
+            int height = getHeight();
+            
+            // 使用更亮的混合模式
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+            
+            // 绘制所有粒子（优化：减少对象创建）
+            float[] gradientFractions = {0.0f, 0.5f, 1.0f};
+            for (Particle particle : particles) {
+                // 根据生命周期调整透明度（保持更亮）
+                float currentAlpha = particle.alpha * (0.6f + 0.4f * (float)Math.sin(particle.life * Math.PI * 2));
+                
+                // 设置颜色和透明度（增强亮度）
+                Color baseColor = particle.color;
+                // 稍微提亮颜色
+                int r = Math.min(255, baseColor.getRed() + 20);
+                int g2 = Math.min(255, baseColor.getGreen() + 20);
+                int b = Math.min(255, baseColor.getBlue() + 20);
+                
+                int alphaInt = (int)(currentAlpha * 255);
+                Color particleColor = new Color(r, g2, b, alphaInt);
+                
+                // 绘制粒子（使用径向渐变实现光晕效果，光晕范围更大）
+                float radius = particle.size;
+                float glowRadius = radius * 1.5f; // 更大的光晕
+                
+                // 重用gradientFractions数组，减少对象创建
+                Color[] gradientColors = {
+                    particleColor,
+                    new Color(r, g2, b, (int)(currentAlpha * 180)),
+                    new Color(r, g2, b, 0)
+                };
+                
+                RadialGradientPaint gradient = new RadialGradientPaint(
+                    particle.x, particle.y, glowRadius,
+                    gradientFractions,
+                    gradientColors
+                );
+                g2d.setPaint(gradient);
+                
+                // 绘制圆形粒子（更大的光晕范围）
+                int glowSize = (int)(glowRadius * 2);
+                g2d.fillOval(
+                    (int)(particle.x - glowRadius),
+                    (int)(particle.y - glowRadius),
+                    glowSize,
+                    glowSize
+                );
+            }
+            
+            g2d.dispose();
+        }
+
+        @Override
+        public void removeNotify() {
+            super.removeNotify();
+            stopParticleAnimation();
+        }
     }
 }

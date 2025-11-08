@@ -147,39 +147,6 @@ public class SettingsStorageHelper {
                 "    buildCurl(domain, httpMethod, path, params,requesterHeaders,jsonBody)\n" +
                 "}\n" +
                 "\n" +
-                "/**\n" +
-                " * groovy脚本，在idea-plugin容器执行\n" +
-                " * controller send request函数，返回结果会被copy到剪切板\n" +
-                " * <p>\n" +
-                " * 不可使用项目中类，不可使用项目中类，不可使用项目中类\n" +
-                " * <p>\n" +
-                " * 运行代码如下\n" +
-                " * <p>\n" +
-                " * GroovyShell groovyShell = new GroovyShell();\n" +
-                " * Script script = groovyShell.parse(this-code);\n" +
-                " * Object build = InvokerHelper.invokeMethod(script, \"send\", new Object[]{env,  selectedAppPort, httpMethod, path, params, jsonBody});\n" +
-                " * return build == null ? \"\" : String.valueOf(build);\n" +
-                " * <p>\n" +
-                " * 提供以下工具函数\n" +
-                " * http：发起http请求函数\n" +
-                " *\n" +
-                " * @param env        环境，可能为空\n" +
-                " * @param httpMethod GET/POST 等等http方法，非空\n" +
-                " * @param path       /uri 非空\n" +
-                " * @param params     传递的参数，k和v都是string，非空\n" +
-                " * @param requesterHeaders  Map<String,String> 形式请求头，非空\n" +
-                " * @param jsonBody   json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
-                " * @return 返回结果会被copy到剪切板\n" +
-                " */\n" +
-                "def send(String env, Integer runtimePort, String httpMethod, String path, Map<String, String> params, Map<String, String> requesterHeaders, String jsonBody) {\n" +
-                "    String domain = \"http://localhost:8080\"\n" +
-                "    if (env==null && runtimePort != null) {\n" +
-                "        domain = \"http://localhost:\" + runtimePort\n" +
-                "    }\n" +
-                "    String token = getToken(env)\n" +
-                "    requesterHeaders['Authorization'] = \"Bearer ${token}\"\n" +
-                "    http(httpMethod,domain+path,requesterHeaders,params,jsonBody).toJson()\n" +
-                "}\n" +
                 "\n" +
                 "def getToken(env) {\n" +
                 "    // your project logic\n" +
@@ -356,39 +323,6 @@ public class SettingsStorageHelper {
                 "    buildCurl(domain, httpMethod, path, params,requesterHeaders,jsonBody)\n" +
                 "}\n" +
                 "\n" +
-                "\n" +
-                "/**\n" +
-                " * groovy脚本，在idea-plugin容器执行\n" +
-                " * FeignClient send request函数，返回结果会被copy到剪切板\n" +
-                " * <p>\n" +
-                " * 不可使用项目中类，不可使用项目中类，不可使用项目中类\n" +
-                " * <p>\n" +
-                " * 运行代码如下\n" +
-                " * <p>\n" +
-                " * GroovyShell groovyShell = new GroovyShell();\n" +
-                " * Script script = groovyShell.parse(this-code);\n" +
-                " * Object build = InvokerHelper.invokeMethod(script, \"send\", new Object[]{env,  feignName, feignUrl, httpMethod, path, params, jsonBody});\n" +
-                " * return build == null ? \"\" : String.valueOf(build);\n" +
-                " * <p>\n" +
-                " * 提供以下工具函数\n" +
-                " * http：发起http请求函数\n" +
-                " *\n" +
-                " * @param env        环境，可能为空\n" +
-                " * @param feignName    FeignClient.name  非空\n" +
-                " * @param feignUrl        FeignClient.url  可能为空\n" +
-                " * @param httpMethod GET/POST 等等http方法，非空\n" +
-                " * @param path       /uri 非空\n" +
-                " * @param params     传递的参数，k和v都是string，非空\n" +
-                " * @param requesterHeaders  Map<String,String> 形式请求头，非空\n" +
-                " * @param jsonBody   json形式的请求体，字符串类型，非空代表Content-Type: application/json，可能为空\n" +
-                " * @return 返回结果会被copy到剪切板\n" +
-                " */\n" +
-                "def send(String env,String feignName, String feignUrl, String httpMethod, String path, Map<String, String> params, Map<String, String> requesterHeaders, String jsonBody) {\n" +
-                "    String domain = getDomain(feignName,feignUrl)\n" +
-                "    String token = getToken(env)\n" +
-                "    requesterHeaders['Authorization'] = \"Bearer ${token}\"\n" +
-                "    http(httpMethod,domain+path,requesterHeaders,params,jsonBody).toJson()\n" +
-                "}\n" +
                 "\n" +
                 "def getDomain(feignName, feignUrl){\n" +
                 "   if(feignUrl){\n" +
