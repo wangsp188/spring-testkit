@@ -123,6 +123,9 @@ public class TestkitStoreWindow {
 
     protected Set<String> cancelReqs = new HashSet<>(128);
     private String lastReqId;
+    
+    // 防止 refreshVisibleApp 重复执行
+    private final AtomicBoolean isRefreshingVisibleApp = new AtomicBoolean(false);
 
 
     public TestkitStoreWindow(Project project, ToolWindow window) {
@@ -1309,45 +1312,81 @@ public class TestkitStoreWindow {
 
 
     private void refreshVisibleApp() {
-        SwingUtilities.invokeLater(() -> {
-            List<RuntimeHelper.VisibleApp> visibleAppList = RuntimeHelper.getVisibleApps(project.getName()).stream()
-                    .filter(visibleApp -> Objects.equals(appBox.getSelectedItem(), visibleApp.getAppName()))
-                    .toList();
+        // 防止重复执行
+        if (!isRefreshingVisibleApp.compareAndSet(false, true)) {
+            return;
+        }
 
-            // 获取当前列表的内容，用于比较是否有变化
-            List<String> currentItems = new ArrayList<>();
-            for (int i = 0; i < visibleAppComboBox.getItemCount(); i++) {
-                currentItems.add(visibleAppComboBox.getItemAt(i));
-            }
+        try {
+            // 在后台线程中处理数据，避免阻塞 EDT
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                try {
+                    // 获取当前选中的 app（需要在 EDT 上读取）
+                    final String[] selectedApp = new String[1];
+                    ApplicationManager.getApplication().invokeAndWait(() -> {
+                        selectedApp[0] = (String) appBox.getSelectedItem();
+                    });
 
-            // 构建新列表
-            List<String> newItems = visibleAppList.stream()
-                    .map(app -> app.getAppName() +":"+app.getIp()+ ":" + app.getTestkitPort())
-                    .toList();
+                    // 在后台线程中获取和过滤数据
+                    List<RuntimeHelper.VisibleApp> visibleAppList = RuntimeHelper.getVisibleApps(project.getName()).stream()
+                            .filter(visibleApp -> Objects.equals(selectedApp[0], visibleApp.getAppName()))
+                            .collect(Collectors.toList());
 
-            // 如果列表内容没变，直接返回
-            if (new HashSet<>(currentItems).containsAll(newItems) && new HashSet<>(newItems).containsAll(currentItems)) {
-                return;
-            }
+                    // 构建新列表
+                    List<String> newItems = visibleAppList.stream()
+                            .map(app -> app.getAppName() + ":" + app.getIp() + ":" + app.getTestkitPort())
+                            .collect(Collectors.toList());
 
-            // 保存当前选中的项
-            String selectedItem = (String) visibleAppComboBox.getSelectedItem();
+                    // 在 EDT 上获取当前列表内容并比较
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        try {
+                            // 获取当前列表的内容，用于比较是否有变化
+                            List<String> currentItems = new ArrayList<>();
+                            for (int i = 0; i < visibleAppComboBox.getItemCount(); i++) {
+                                currentItems.add(visibleAppComboBox.getItemAt(i));
+                            }
 
-            // 更新列表内容
-            visibleAppComboBox.removeAllItems();
-            for (RuntimeHelper.VisibleApp visibleApp : visibleAppList) {
-                String item = visibleApp.getAppName() +":"+visibleApp.getIp()+ ":" + visibleApp.getTestkitPort();
-                visibleAppComboBox.addItem(item);
-            }
+                            // 优化比较逻辑：先比较大小，再比较内容
+                            if (currentItems.size() == newItems.size()) {
+                                Set<String> currentSet = new HashSet<>(currentItems);
+                                Set<String> newSet = new HashSet<>(newItems);
+                                if (currentSet.equals(newSet)) {
+                                    return; // 内容完全相同，无需更新
+                                }
+                            }
 
-            // 如果之前选中的项还在新列表中，则重新选中它
-            if (selectedItem != null && newItems.contains(selectedItem)) {
-                visibleAppComboBox.setSelectedItem(selectedItem);
-            }
-            
-            windowContent.revalidate();
-            windowContent.repaint();
-        });
+                            // 保存当前选中的项
+                            String selectedItem = (String) visibleAppComboBox.getSelectedItem();
+
+                            // 更新列表内容
+                            visibleAppComboBox.removeAllItems();
+                            for (RuntimeHelper.VisibleApp visibleApp : visibleAppList) {
+                                String item = visibleApp.getAppName() + ":" + visibleApp.getIp() + ":" + visibleApp.getTestkitPort();
+                                visibleAppComboBox.addItem(item);
+                            }
+
+                            // 如果之前选中的项还在新列表中，则重新选中它
+                            if (selectedItem != null && newItems.contains(selectedItem)) {
+                                visibleAppComboBox.setSelectedItem(selectedItem);
+                            }
+                            
+                            // 只更新 ComboBox，不需要更新整个 windowContent
+                            // 这样可以避免触发整个窗口的重新布局
+                            visibleAppComboBox.revalidate();
+                            visibleAppComboBox.repaint();
+                        } finally {
+                            isRefreshingVisibleApp.set(false);
+                        }
+                    });
+                } catch (Throwable e) {
+                    isRefreshingVisibleApp.set(false);
+                    e.printStackTrace();
+                }
+            });
+        } catch (Throwable e) {
+            isRefreshingVisibleApp.set(false);
+            e.printStackTrace();
+        }
     }
 
 
