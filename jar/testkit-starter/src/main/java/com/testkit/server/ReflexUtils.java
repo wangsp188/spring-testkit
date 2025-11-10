@@ -9,6 +9,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.SpringProxy;
@@ -27,9 +29,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.security.Principal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -37,7 +39,6 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 public class ReflexUtils {
     private static final Logger logger = LoggerFactory.getLogger(ReflexUtils.class);
@@ -231,6 +232,71 @@ public class ReflexUtils {
                     }
                 } else if (argType.isEnumType()) {
                     methodArgs[i] = argJson == null || argJson.toString().isEmpty() ? null : Enum.valueOf(argType.getRawClass().asSubclass(Enum.class), argJson.toString());
+                } else if (isHttpServletRequestType(argType)) {
+                    methodArgs[i] = null;
+                    if(argJson!=null && !argJson.toString().isEmpty()){
+                        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+                        try {
+                            // 将argJson转换为JSONObject
+                            String jsonStr = PARSER_MAPPER.writeValueAsString(argJson);
+                            Map<String, Object> requestData = PARSER_MAPPER.readValue(jsonStr, new TypeReference<Map<String, Object>>() {});
+                            
+                            // 设置method
+                            if (requestData.containsKey("method")) {
+                                Object methodObj = requestData.get("method");
+                                if (methodObj != null) {
+                                    mockRequest.setMethod(methodObj.toString());
+                                }
+                            }
+                            
+                            // 设置headers
+                            if (requestData.containsKey("headers")) {
+                                Object headersObj = requestData.get("headers");
+                                if (headersObj != null) {
+                                    Map<String, Object> headersMap = PARSER_MAPPER.convertValue(headersObj, new TypeReference<Map<String, Object>>() {});
+                                    Map<String, String> headers = new HashMap<>();
+                                    for (Map.Entry<String, Object> entry : headersMap.entrySet()) {
+                                        if (entry.getValue() != null) {
+                                            headers.put(entry.getKey(), entry.getValue().toString());
+                                        }
+                                    }
+                                    mockRequest.setHeaders(headers);
+                                }
+                            }
+                            
+                            // 设置parameters，将k-v转换为k-array
+                            if (requestData.containsKey("parameters")) {
+                                Object paramsObj = requestData.get("parameters");
+                                if (paramsObj != null) {
+                                    Map<String, Object> paramsMap = PARSER_MAPPER.convertValue(paramsObj, new TypeReference<Map<String, Object>>() {});
+                                    Map<String, String[]> parameters = new HashMap<>();
+                                    for (Map.Entry<String, Object> entry : paramsMap.entrySet()) {
+                                        if (entry.getValue() != null) {
+                                            // 单个值转为单元素数组
+                                            String[] values;
+                                            if (entry.getValue() instanceof List) {
+                                                // 如果是数组，转换为String[]
+                                                List<?> list = (List<?>) entry.getValue();
+                                                values = new String[list.size()];
+                                                for (int j = 0; j < list.size(); j++) {
+                                                    values[j] = list.get(j) != null ? list.get(j).toString() : null;
+                                                }
+                                            } else {
+                                                // 单个值转为单元素数组
+                                                values = new String[]{entry.getValue().toString()};
+                                            }
+                                            parameters.put(entry.getKey(), values);
+                                        }
+                                    }
+                                    mockRequest.setParameters(parameters);
+                                }
+                            }
+                            
+                            methodArgs[i] = mockRequest;
+                        } catch (Exception e) {
+                            throw new TestkitException("Failed to convert JSON to MockHttpServletRequest: " + e.getMessage());
+                        }
+                    }
                 } else {
                     // 其他类型
                     methodArgs[i] = PARSER_MAPPER.readValue(PARSER_MAPPER.writeValueAsString(argJson), argType);
@@ -256,6 +322,41 @@ public class ReflexUtils {
                 cls == Long.class ||
                 cls == Float.class ||
                 cls == Double.class;
+    }
+
+    /**
+     * 检查是否是 HttpServletRequest 类型（通过类名字符串判断，避免类加载错误）
+     * 只支持 jakarta.servlet.http.HttpServletRequest
+     */
+    private static boolean isHttpServletRequestType(JavaType argType) {
+        if (argType == null) {
+            return false;
+        }
+        // 优先使用 toCanonical() 获取类名字符串，这个方法不会触发类加载
+        try {
+            String canonicalName = argType.toCanonical();
+            if (canonicalName != null) {
+                return canonicalName.equals("jakarta.servlet.http.HttpServletRequest");
+            }
+        } catch (Exception e) {
+            // toCanonical() 失败，忽略继续尝试其他方法
+        }
+        
+        // 如果 toCanonical() 不可用，尝试使用 getRawClass()，但用 try-catch 包裹避免 NoClassDefFoundError
+        try {
+            Class<?> rawClass = argType.getRawClass();
+            if (rawClass != null) {
+                String className = rawClass.getName();
+                return className.equals("jakarta.servlet.http.HttpServletRequest");
+            }
+        } catch (NoClassDefFoundError e) {
+            // 如果类不存在（项目中没有引入servlet依赖），返回 false，不抛出异常
+            return false;
+        } catch (Exception e) {
+            // 其他异常也返回 false
+            return false;
+        }
+        return false;
     }
 
     private static Method findMethod(Class<?> typeClass, String methodName, JavaType[] methodArgTypes) throws NoSuchMethodException, ClassNotFoundException {
@@ -995,4 +1096,192 @@ public class ReflexUtils {
         throw new TestkitException("failed parse class: " + originalName);
     }
 
+    /**
+     * 可序列化的 HttpServletRequest 实现
+     * 用于方法调用时的参数传递
+     */
+    public static class MockHttpServletRequest implements HttpServletRequest, Serializable {
+
+        private String method = "GET";
+        // 核心字段
+        private Map<String, String[]> parameters = new HashMap<>();
+        private Map<String, String> headers = new HashMap<>();
+
+        // 构造函数
+        public MockHttpServletRequest() {}
+
+        // 核心方法实现
+        @Override
+        public String getParameter(String name) {
+            String[] values = parameters.get(name);
+            return values != null && values.length > 0 ? values[0] : null;
+        }
+
+        @Override
+        public Map<String, String[]> getParameterMap() {
+            return parameters;
+        }
+
+        @Override
+        public String getHeader(String name) {
+            return headers.get(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaderNames() {
+            return Collections.enumeration(headers.keySet());
+        }
+
+        @Override
+        public Enumeration<String> getHeaders(String name) {
+            String value = headers.get(name);
+            if (value != null) {
+                return Collections.enumeration(Arrays.asList(value));
+            }
+            return Collections.emptyEnumeration();
+        }
+
+        // Setter 方法
+        public void setParameters(Map<String, String[]> parameters) {
+            this.parameters = parameters != null ? parameters : new HashMap<>();
+        }
+
+        public void setHeaders(Map<String, String> headers) {
+            this.headers = headers != null ? headers : new HashMap<>();
+        }
+
+        public void setMethod(String method) {
+            this.method = method;
+        }
+
+        public Map<String, String[]> getParameters() {
+            return parameters;
+        }
+
+        public Map<String, String> getHeaders() {
+            return headers;
+        }
+
+        // 其他必需的方法实现
+        @Override public String getMethod() { return method; }
+        @Override public String getRequestURI() { return null; }
+        @Override public String getQueryString() { return null; }
+        @Override public String getContextPath() { return ""; }
+        @Override public String getServletPath() { return ""; }
+        @Override public String getPathInfo() { return null; }
+        @Override public String getRemoteAddr() { return "127.0.0.1"; }
+        @Override public int getRemotePort() { return 8080; }
+        @Override public String getServerName() { return "localhost"; }
+        @Override public int getServerPort() { return 8080; }
+        @Override public String getScheme() { return "http"; }
+        @Override public String getProtocol() { return "HTTP/1.1"; }
+        @Override public String getContentType() { return null; }
+        @Override public String getCharacterEncoding() { return "UTF-8"; }
+        @Override public int getContentLength() { return -1; }
+        @Override public long getContentLengthLong() { return -1L; }
+        @Override public Enumeration<String> getParameterNames() { return Collections.emptyEnumeration(); }
+        @Override public String[] getParameterValues(String name) { return null; }
+        @Override public int getIntHeader(String name) { return -1; }
+        @Override public long getDateHeader(String name) { return -1L; }
+        @Override public String getPathTranslated() { return null; }
+        @Override public String getRemoteUser() { return null; }
+        @Override public String getAuthType() { return null; }
+        @Override public Cookie[] getCookies() { return new Cookie[0]; }
+        @Override public String getRequestedSessionId() { return null; }
+        @Override public StringBuffer getRequestURL() { return new StringBuffer(); }
+        @Override public HttpSession getSession(boolean create) { return null; }
+        @Override public HttpSession getSession() { return null; }
+        @Override public String changeSessionId() { return null; }
+        @Override public boolean isRequestedSessionIdValid() { return false; }
+        @Override public boolean isRequestedSessionIdFromCookie() { return false; }
+        @Override public boolean isRequestedSessionIdFromURL() { return false; }
+
+        @Override
+        public boolean authenticate(HttpServletResponse response) throws IOException, ServletException {
+            return false;
+        }
+
+        @Override
+        public void login(String username, String password) throws ServletException {
+
+        }
+
+        @Override
+        public void logout() throws ServletException {
+
+        }
+
+        @Override
+        public Collection<Part> getParts() throws IOException, ServletException {
+            return List.of();
+        }
+
+        @Override
+        public Part getPart(String name) throws IOException, ServletException {
+            return null;
+        }
+
+        @Override
+        public <T extends HttpUpgradeHandler> T upgrade(Class<T> handlerClass) throws IOException, ServletException {
+            return null;
+        }
+
+        @Override public boolean isSecure() { return false; }
+        @Override public boolean isUserInRole(String role) { return false; }
+        @Override public Principal getUserPrincipal() { return null; }
+        @Override public Object getAttribute(String name) { return null; }
+        @Override public Enumeration<String> getAttributeNames() { return Collections.emptyEnumeration(); }
+        @Override public void setAttribute(String name, Object o) {}
+        @Override public void removeAttribute(String name) {}
+        @Override public void setCharacterEncoding(String env) throws UnsupportedEncodingException {}
+        @Override public Locale getLocale() { return Locale.getDefault(); }
+        @Override public Enumeration<Locale> getLocales() { return Collections.enumeration(Arrays.asList(Locale.getDefault())); }
+        @Override public RequestDispatcher getRequestDispatcher(String path) { return null; }
+        @Override public ServletContext getServletContext() { return null; }
+        @Override public AsyncContext startAsync() throws IllegalStateException { return null; }
+        @Override public AsyncContext startAsync(ServletRequest servletRequest, ServletResponse servletResponse) throws IllegalStateException { return null; }
+        @Override public boolean isAsyncStarted() { return false; }
+        @Override public boolean isAsyncSupported() { return false; }
+        @Override public AsyncContext getAsyncContext() { return null; }
+        @Override public DispatcherType getDispatcherType() { return DispatcherType.REQUEST; }
+
+        @Override
+        public String getRequestId() {
+            return "";
+        }
+
+        @Override
+        public String getProtocolRequestId() {
+            return "";
+        }
+
+        @Override
+        public ServletConnection getServletConnection() {
+            return null;
+        }
+
+        @Override public ServletInputStream getInputStream() throws IOException { return new ServletInputStream() {
+            @Override
+            public boolean isFinished() {
+                return false;
+            }
+
+            @Override
+            public boolean isReady() {
+                return false;
+            }
+
+            @Override
+            public void setReadListener(ReadListener readListener) {
+
+            }
+
+            @Override public int read() throws IOException { return -1; } }; }
+        @Override public BufferedReader getReader() throws IOException { return new BufferedReader(new StringReader("")); }
+        @Override public String getLocalAddr() { return "127.0.0.1"; }
+        @Override public String getLocalName() { return "localhost"; }
+        @Override public int getLocalPort() { return 8080; }
+        @Override public String getRemoteHost() { return "localhost"; }
+    }
+    
 }

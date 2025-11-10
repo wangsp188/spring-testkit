@@ -219,12 +219,18 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
             if (parameterClass == null) {
                 continue;
             }
+
+            // 放过 HttpServletRequest 及其子类
+            if (ToolHelper.isHttpServletRequestType(parameterClass.getQualifiedName())) {
+                continue;
+            }
+
             // 判断是否是Collection或Map
             if (parameterClass.isEnum() || serializableClasses.contains(parameterClass.getQualifiedName())) {
                 continue;
             }
 
-            if (parameterClass == null || parameterClass.isInterface() || parameterClass.hasModifierProperty(PsiModifier.ABSTRACT)) {
+            if (parameterClass.isInterface() || parameterClass.hasModifierProperty(PsiModifier.ABSTRACT)) {
                 return false;
             }
         }

@@ -44,6 +44,7 @@ import com.intellij.ui.*;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import com.testkit.util.curl.CurlParserUtil;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
@@ -1108,7 +1109,22 @@ public class TestkitStoreWindow {
         GroovyShell groovyShell = new GroovyShell();
         Script script = groovyShell.parse(code);
         System.err.println("invoke controller script,fun:"+fun+", env:"+env+", httpMethod:"+httpMethod+", path:"+path+", params:"+ JSON.toJSONString(params)+", jsonBody:"+jsonBody+", headerValues:"+JSON.toJSONString(headerValues));
-        Object build = InvokerHelper.invokeMethod(script, fun, new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody});
+
+        Object[] args = new Object[]{env, selectedApp == null ? null : selectedApp.buildWebPort(), httpMethod, path, params, headerValues, jsonBody};
+
+        // If send() is called, automatically use generate() + curl execution
+        if ("send".equals(fun)) {
+            // Call generate() to get curl command
+            Object curlCommand = InvokerHelper.invokeMethod(script, "generate", args);
+            if (curlCommand == null || String.valueOf(curlCommand).trim().isEmpty()) {
+                throw new RuntimeException("generate() function returned empty curl command");
+            }
+            // Execute the curl command
+            return CurlParserUtil.executeCurlCommand(String.valueOf(curlCommand));
+        }
+
+        // For other functions (like generate), call directly
+        Object build = InvokerHelper.invokeMethod(script, fun, args);
         return build == null ? "" : String.valueOf(build);
     }
 

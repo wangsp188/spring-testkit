@@ -333,6 +333,9 @@ public class ToolHelper {
                 initParams.put(name, sdf.format(new Date()));
             } else if (isEnumType(type)) {
                 initParams.put(name, getFirstEnumConstant(type));
+            } else if (isHttpServletRequestType(type.getCanonicalText())) {
+                // 为 HttpServletRequest 类型生成默认参数
+                initParams.put(name, generateSimpleHttpServletRequestArgs(method));
             } else {
                 try {
                     if (isCollectionType(type)) {
@@ -875,6 +878,83 @@ public class ToolHelper {
         }
 
         return result +"<<END>>";
+    }
+
+    /**
+     * 检查是否是 HttpServletRequest 类型
+     * 只支持 jakarta.servlet.http.HttpServletRequest
+     */
+    public static boolean isHttpServletRequestType(String typeName) {
+        return typeName != null && typeName.equals("jakarta.servlet.http.HttpServletRequest");
+    }
+
+    /**
+     * 生成 HttpServletRequest 的默认参数
+     */
+    private static Map<String, Object> generateSimpleHttpServletRequestArgs(PsiMethod method) {
+        // 创建默认的 HttpServletRequest 参数
+        Map<String, Object> defaultArgs = new HashMap<>();
+        // 参数和头部
+        JSONObject parameters = new JSONObject();
+        defaultArgs.put("parameters", parameters);
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        headers.put("User-Agent", "Testkit/1.0");
+        headers.put("Accept", "application/json");
+        defaultArgs.put("headers", headers);
+        
+        // 根据psiMethod的注解获取HTTP method
+        String httpMethod = extractHttpMethodFromAnnotations(method);
+        defaultArgs.put("method", httpMethod);
+        
+        return defaultArgs;
+    }
+    
+    /**
+     * 从方法注解中提取HTTP方法
+     */
+    private static String extractHttpMethodFromAnnotations(PsiMethod method) {
+        if (method == null) {
+            return "GET";
+        }
+        
+        String[] requestMethodAnnotations = new String[]{
+                "org.springframework.web.bind.annotation.RequestMapping",
+                "org.springframework.web.bind.annotation.GetMapping",
+                "org.springframework.web.bind.annotation.PostMapping",
+                "org.springframework.web.bind.annotation.PutMapping",
+                "org.springframework.web.bind.annotation.DeleteMapping",
+                "org.springframework.web.bind.annotation.PatchMapping"
+        };
+        
+        // 检查方法级别的注解
+        for (String annotationFqn : requestMethodAnnotations) {
+            PsiAnnotation methodAnnotation = method.getModifierList().findAnnotation(annotationFqn);
+            if (methodAnnotation == null) {
+                continue;
+            }
+            
+            if (annotationFqn.contains("GetMapping")) {
+                return "GET";
+            } else if (annotationFqn.contains("PostMapping")) {
+                return "POST";
+            } else if (annotationFqn.contains("PutMapping")) {
+                return "PUT";
+            } else if (annotationFqn.contains("DeleteMapping")) {
+                return "DELETE";
+            } else if (annotationFqn.contains("PatchMapping")) {
+                return "PATCH";
+            } else if (annotationFqn.contains("RequestMapping")) {
+                // 从注解中的method属性取出一个 method,注意,method 是个数组,随便取一个就好
+                String mappingMethod = getAnnotationValueText(methodAnnotation.findAttributeValue("method"));
+                if (StringUtils.isNotBlank(mappingMethod)) {
+                    return mappingMethod.toUpperCase();
+                }
+            }
+        }
+        
+        // 默认返回GET
+        return "GET";
     }
 
     public static class MethodAction {
