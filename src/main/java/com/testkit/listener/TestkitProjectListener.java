@@ -73,7 +73,9 @@ public class TestkitProjectListener implements ProjectActivity {
                             @Override
                             public void run() {
                                 String title = TestkitHelper.getPluginName();
-                                String content = "New version available (v" + last.getVersion() + ") for your IDE";
+                                String content = "New version available (v" + last.getVersion() + ")" +
+                                        (last.getReleaseNotes() != null && !last.getReleaseNotes().isEmpty() ? 
+                                                "\n\n" + last.getReleaseNotes() : "");
                                 Notification notification = new Notification(title, title, content, NotificationType.INFORMATION);
                                 notification.addAction(NotificationAction.createSimple("Install now", new Runnable() {
                                     @Override
