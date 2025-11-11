@@ -428,7 +428,14 @@ public abstract class BasePluginTool {
                                                         "<ul>" +
                                                         "<li>Go to the <b>Tool interceptor</b> page</li>" +
                                                         "<li>Set up pre-execution configuration to inject user information into the context<br>like this  SecurityContextHolder.getContext().setAuthentication(your authentication);</li>" +
+                                                        "<li>Click the interceptor toggle to the left of the locate button in the testkit panel</li>" +
                                                         "<li>This will make user information available in your method execution</li>" +
+                                                        "</ul>" +
+                                                        "</li>" +
+                                                        "<li><b>Option 3: Use flexible-test feature to bypass authentication:</b>" +
+                                                        "<ul>" +
+                                                        "<li>Use the <b>flexible-test</b> functionality to test your target code</li>" +
+                                                        "<li>This allows you to bypass authentication and test the target code directly</li>" +
                                                         "</ul>" +
                                                         "</li>" +
                                                         "</ol>" +
