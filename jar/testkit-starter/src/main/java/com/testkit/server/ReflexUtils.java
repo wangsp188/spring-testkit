@@ -65,6 +65,8 @@ public class ReflexUtils {
         SimpleModule module = new SimpleModule();
         // 注册 Date 反序列化器
         module.addDeserializer(Date.class, new CustomDateDeserializer());
+        // 注册 Date 序列化器
+        module.addSerializer(Date.class, new CustomDateSerializer());
         // 配置 ObjectMapper 在序列化时包含 null 值
         SIMPLE_MAPPER.setSerializationInclusion(JsonInclude.Include.ALWAYS);
         // 关键：使用字段序列化，禁用方法序列化
@@ -482,6 +484,19 @@ public class ReflexUtils {
                 return dateFormat.parse(date);
             } catch (ParseException e) {
                 throw new TestkitException("Date parse error: " + date);
+            }
+        }
+    }
+
+    // 自定义 Date 序列化，输出格式化字符串
+    public static class CustomDateSerializer extends com.fasterxml.jackson.databind.JsonSerializer<Date> {
+        @Override
+        public void serialize(Date value, com.fasterxml.jackson.core.JsonGenerator gen, com.fasterxml.jackson.databind.SerializerProvider serializers) throws IOException {
+            if (value == null) {
+                gen.writeNull();
+            } else {
+                // 使用 yyyy-MM-dd HH:mm:ss 格式序列化
+                gen.writeString(dateFormat.format(value));
             }
         }
     }
@@ -1094,6 +1109,71 @@ public class ReflexUtils {
             }
         }
         throw new TestkitException("failed parse class: " + originalName);
+    }
+
+    /**
+     * 从Spring容器中获取Bean
+     * 逻辑：
+     * 1. 如果指定了beanName，直接按名称获取
+     * 2. 如果未指定beanName，按类型查找：
+     *    - 只有1个bean: 直接返回
+     *    - 多个bean: 尝试用类名首字母小写作为默认beanName再次获取
+     *    - 0个bean: 抛异常
+     *
+     * @param app Spring应用上下文
+     * @param beanName Bean名称(可为空)
+     * @param typeClass Bean类型
+     * @return Bean实例
+     * @throws TestkitException 当找不到bean或有多个bean且无法确定时
+     */
+    public static Object getBean(org.springframework.context.ApplicationContext app, String beanName, Class<?> typeClass) {
+        Object bean = null;
+        
+        if (beanName == null || beanName.trim().isEmpty()) {
+            // 尝试按类型获取所有bean
+            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
+            
+            if (beansOfType.isEmpty()) {
+                throw new TestkitException("Cannot find bean of type " + typeClass + " in Spring context");
+            } else if (beansOfType.size() == 1) {
+                // 只有一个bean，直接使用
+                bean = beansOfType.values().iterator().next();
+            } else {
+                // 有多个bean，尝试用类型首字母小写作为beanName
+                String defaultBeanName = getDefaultBeanName(typeClass);
+                try {
+                    bean = app.getBean(defaultBeanName, typeClass);
+                } catch (org.springframework.beans.BeansException e) {
+                    throw new TestkitException("Found multiple beans of type " + typeClass 
+                        + ", tried default name '" + defaultBeanName + "' but failed. Please specify beanName explicitly.");
+                }
+            }
+        } else {
+            // beanName不为空，直接获取
+            try {
+                bean = app.getBean(beanName, typeClass);
+            } catch (org.springframework.beans.BeansException e) {
+                throw new TestkitException("Cannot find bean '" + beanName + "' of type " + typeClass 
+                    + " in Spring context: " + e.getMessage());
+            }
+        }
+        
+        return bean;
+    }
+
+    /**
+     * 获取默认的bean名称（类名首字母小写）
+     * 这是Spring的默认bean命名规则
+     * 
+     * @param typeClass Bean类型
+     * @return 默认bean名称，例如: UserService -> userService, MyController -> myController
+     */
+    private static String getDefaultBeanName(Class<?> typeClass) {
+        String simpleName = typeClass.getSimpleName();
+        if (simpleName.isEmpty()) {
+            return simpleName;
+        }
+        return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
     }
 
     /**

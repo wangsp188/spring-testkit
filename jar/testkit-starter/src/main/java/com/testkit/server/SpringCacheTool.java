@@ -87,22 +87,7 @@ public class SpringCacheTool implements TestkitTool {
             throw new TestkitException("typeClass is not Cache");
         }
         ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
-        Object bean = null;
-        if (beanName == null || beanName.trim().isEmpty()) {
-            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
-            if (beansOfType.isEmpty()) {
-                throw new TestkitException("can not find " + typeClass + " in this spring");
-            } else if (beansOfType.size() > 1) {
-                throw new TestkitException("no union bean of type " + typeClass + " in this spring");
-            }
-            bean = beansOfType.values().iterator().next();
-        } else {
-            try {
-                bean = app.getBean(beanName, typeClass);
-            } catch (BeansException e) {
-                throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
-            }
-        }
+        Object bean = ReflexUtils.getBean(app, beanName, typeClass);
         Class<?> finalTypeClass = typeClass;
         Object finalBean = bean;
         return new PrepareRet() {

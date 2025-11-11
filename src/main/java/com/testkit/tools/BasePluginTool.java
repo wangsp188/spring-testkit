@@ -370,9 +370,10 @@ public abstract class BasePluginTool {
             @Override
             public void run(ProgressIndicator indicator) {
                 // 发起任务请求，获取请求ID
+                JSONObject request = null;
                 JSONObject response = null;
                 try {
-                    JSONObject request = submit.get();
+                    request = submit.get();
                     if (request == null) {
                         return;
                     }
@@ -389,7 +390,7 @@ public abstract class BasePluginTool {
                 lastReqId = reqId;
                 triggerBtn.setIcon(AllIcons.Actions.Suspend);
                 setOutputText("req is send\nreqId:" + reqId, null);
-
+                String method = request.getString("method");
                 try {
                     HashMap<String, Object> map = new HashMap<>();
                     map.put("method", "get_task_ret");
@@ -409,7 +410,33 @@ public abstract class BasePluginTool {
                                 List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
                                 });
                                 if (!result.getBooleanValue("success")) {
-                                    setOutputText("req is error\n" + result.getString("message"), profile);
+                                    String message = result.getString("message");
+                                    setOutputText("req is error\n" + message, profile);
+                                    if(Objects.equals(method,"function-call") && message !=null && (message.contains("AuthenticationCredentialsNotFoundException") || message.contains("An Authentication object was not found in the SecurityContext"))){
+                                        String friendlyMessage =
+                                                "<html><body>" +
+                                                        "<p><b>Error:</b>Your request may have been intercepted by Spring Security due to missing authentication.</p>" +
+                                                        "<p><b>Solutions:</b></p>" +
+                                                        "<ol>" +
+                                                        "<li><b>Option 1: If your API does not need user information:</b>" +
+                                                        "<ul>" +
+                                                        "<li>Click the <b>Proxy</b> button next to the Run button</li>" +
+                                                        "<li>This will invoke the original object directly and bypass the authentication proxy</li>" +
+                                                        "</ul>" +
+                                                        "</li>" +
+                                                        "<li><b>Option 2: If your API requires user information:</b>" +
+                                                        "<ul>" +
+                                                        "<li>Go to the <b>Tool interceptor</b> page</li>" +
+                                                        "<li>Set up pre-execution configuration to inject user information into the context<br>like this  SecurityContextHolder.getContext().setAuthentication(your authentication);</li>" +
+                                                        "<li>This will make user information available in your method execution</li>" +
+                                                        "</ul>" +
+                                                        "</li>" +
+                                                        "</ol>" +
+                                                        "<hr>" +
+                                                        "<br>" +
+                                                        "</body></html>";
+                                        TestkitHelper.showErrorWithSettingsNavigation(getProject(),"Tool interceptor","Authentication required",friendlyMessage);
+                                    }
                                 } else {
                                     Object data = result.get("data");
                                     if (data == null) {

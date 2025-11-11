@@ -89,7 +89,7 @@ public class TestkitHelper {
         }
         
         SwingUtilities.invokeLater(() -> {
-            String[] options = {"Open Settings"};
+            String[] options = {"Open "+panelName};
             int choice = Messages.showDialog(
                 project,
                 message,

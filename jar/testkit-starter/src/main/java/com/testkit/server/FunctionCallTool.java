@@ -37,22 +37,7 @@ public class FunctionCallTool implements TestkitTool {
             throw new TestkitException("can not find class: " + typeClassStr + ", please check");
         }
         ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
-        Object bean = null;
-        if (beanName == null || beanName.trim().isEmpty()) {
-            Map<String, ?> beansOfType = app.getBeansOfType(typeClass);
-            if (beansOfType.isEmpty()) {
-                throw new TestkitException("can not find " + typeClass + " in this spring");
-            } else if (beansOfType.size() > 1) {
-                throw new TestkitException("no union bean of type " + typeClass + " in this spring");
-            }
-            bean = beansOfType.values().iterator().next();
-        } else {
-            try {
-                bean = app.getBean(beanName, typeClass);
-            } catch (BeansException e) {
-                throw new TestkitException("can not find " + typeClass + " in this spring," + e.getMessage());
-            }
-        }
+        Object bean = ReflexUtils.getBean(app, beanName, typeClass);
         if (original && ReflexUtils.isAopProxy(bean)) {
             try {
                 bean = ReflexUtils.getTargetObject(bean);
