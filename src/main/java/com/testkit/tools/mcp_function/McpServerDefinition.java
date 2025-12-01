@@ -180,7 +180,8 @@ public class McpServerDefinition {
         }
 
         public String buildDisplayName() {
-            return name + "(" + serverKey + ")";
+//            return name + "(" + serverKey + ")";
+            return serverKey + "->" + name;
         }
 
         public FunctionType getType() {

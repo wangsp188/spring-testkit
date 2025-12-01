@@ -17,6 +17,11 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,11 +81,25 @@ public class McpAdapter {
                     errors.put(key, "config is empty");
                     continue;
                 }
-                mcpClient = initMcpServer(value);
-                McpServerDefinition serverDefinition = new McpServerDefinition();
-                serverDefinition.setConfig(value);
-                serverDefinition.setDefinitions(fetchToolDefinition(key, mcpClient));
-                servers.put(key, serverDefinition);
+            mcpClient = initMcpServer(value);
+            McpServerDefinition serverDefinition = new McpServerDefinition();
+            serverDefinition.setConfig(value);
+            
+            // 获取所有工具定义
+            List<McpServerDefinition.McpFunctionDefinition> allDefinitions = fetchToolDefinition(key, mcpClient);
+            
+            // 如果配置了 testkit-tools，则只保留指定的工具
+            List<String> allowedTools = filterTools(value);
+            if (allowedTools != null) {
+                List<McpServerDefinition.McpFunctionDefinition> filteredDefinitions = allDefinitions.stream()
+                    .filter(def -> allowedTools.contains(def.getName()))
+                    .collect(Collectors.toList());
+                serverDefinition.setDefinitions(filteredDefinitions);
+            } else {
+                serverDefinition.setDefinitions(allDefinitions);
+            }
+            
+            servers.put(key, serverDefinition);
             } catch (Throwable e) {
                 System.err.println("init mcp-server fail, key:" + key);
                 e.printStackTrace();
@@ -103,6 +122,80 @@ public class McpAdapter {
             }
         }
         return new McpInitRet(errors, servers);
+    }
+
+    private static List<String> filterTools(JSONObject value) {
+        // 首先检查当前配置中是否有 testkit-tools
+        List<String> testkitTools = value.getObject("testkit-tools", new TypeReference<List<String>>() {});
+        if (testkitTools != null) {
+            return testkitTools;
+        }
+        
+        // 如果当前配置没有，尝试从模板文件中查找
+        return findToolsFromTemplate(value);
+    }
+    
+    private static List<String> findToolsFromTemplate(JSONObject currentConfig) {
+        try {
+            // 构建模板文件路径
+            String userHome = System.getProperty("user.home");
+            Path templatePath = Paths.get(userHome, ".ccitools", "ccitools", "mcp-template.json");
+            File templateFile = templatePath.toFile();
+            
+            if (!templateFile.exists()) {
+                return null;
+            }
+            
+            // 读取模板文件
+            String content = new String(Files.readAllBytes(templatePath), StandardCharsets.UTF_8);
+            JSONObject templateJson = JSONObject.parseObject(content);
+            JSONObject templateServers = templateJson.getJSONObject("mcpServers");
+            
+            if (MapUtils.isEmpty(templateServers)) {
+                return null;
+            }
+            
+            // 获取当前配置的 args 最后一个参数（仅适用于 stdio 模式）
+            String currentLastArg = getLastArg(currentConfig);
+            if (currentLastArg == null) {
+                return null;
+            }
+            
+            // 遍历模板中的所有 server，查找匹配的
+            for (String serverKey : templateServers.keySet()) {
+                JSONObject templateServerConfig = templateServers.getJSONObject(serverKey);
+                if (templateServerConfig == null) {
+                    continue;
+                }
+                
+                String templateLastArg = getLastArg(templateServerConfig);
+                if (currentLastArg.equals(templateLastArg)) {
+                    // 找到匹配的配置，返回其 testkit-tools
+                    List<String> tools = templateServerConfig.getObject("testkit-tools", new TypeReference<List<String>>() {});
+                    if (tools != null) {
+                        return tools;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to read mcp-template.json: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    private static String getLastArg(JSONObject config) {
+        // 只处理 stdio 模式（有 command 字段）
+        if (!config.containsKey("command")) {
+            return null;
+        }
+        
+        JSONArray args = config.getJSONArray("args");
+        if (args == null || args.isEmpty()) {
+            return null;
+        }
+        
+        return args.getString(args.size() - 1);
     }
 
 

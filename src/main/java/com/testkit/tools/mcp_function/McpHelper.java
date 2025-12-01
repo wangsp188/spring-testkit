@@ -33,6 +33,8 @@ public class McpHelper {
 
     private static final Set<TestkitToolWindow> subscribeWindows = new HashSet<>();
 
+    private static final Object LOCK = new Object();
+
     static {
         JSONObject mcpJson = fetchMcpJson();
         new Thread(new Runnable() {
@@ -118,11 +120,16 @@ public class McpHelper {
     }
 
     public static Map<String,McpServerDefinition> getServers() {
-        return servers;
+        synchronized (LOCK) {
+            return new HashMap<>(servers);
+        }
     }
 
     public static ToolExecutionResult callTool(String serverKey, String toolName, JSONObject args) {
-        McpServerDefinition serverDefinition = servers.get(serverKey);
+        McpServerDefinition serverDefinition;
+        synchronized (LOCK) {
+            serverDefinition = servers.get(serverKey);
+        }
         if (serverDefinition == null) {
             throw new IllegalArgumentException("serverKey:" + serverKey + " not found");
         }
@@ -155,22 +162,30 @@ public class McpHelper {
         if (window == null) {
             throw new IllegalArgumentException("window can not be null");
         }
-        subscribeWindows.add(window);
+        synchronized (LOCK) {
+            subscribeWindows.add(window);
+            // 如果 MCP servers 已经初始化完成，立即触发一次刷新
+            if (!servers.isEmpty()) {
+                window.refreshMcpFunctions();
+            }
+        }
     }
 
 
     public static void refreshServers(Map<String,McpServerDefinition> newServers) {
-        servers.clear();
-        servers.putAll(newServers);
-        Iterator<TestkitToolWindow> iterator = subscribeWindows.iterator();
-        while (iterator.hasNext()) {
-            TestkitToolWindow window = iterator.next();
-            Project project = window.getProject();
-            if (project.isDisposed()) {
-                iterator.remove();
-                continue;
+        synchronized (LOCK) {
+            servers.clear();
+            servers.putAll(newServers);
+            Iterator<TestkitToolWindow> iterator = subscribeWindows.iterator();
+            while (iterator.hasNext()) {
+                TestkitToolWindow window = iterator.next();
+                Project project = window.getProject();
+                if (project.isDisposed()) {
+                    iterator.remove();
+                    continue;
+                }
+                window.refreshMcpFunctions();
             }
-            window.refreshMcpFunctions();
         }
     }
 
