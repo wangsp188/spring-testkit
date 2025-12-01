@@ -6,6 +6,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
+import com.intellij.lang.Language;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.IconLoader;
@@ -298,8 +299,24 @@ public class McpFunctionTool extends BasePluginTool {
             }
             return comboBox;
         }
-        if (Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())
-                || Objects.equals(type, McpServerDefinition.ArgType.NUMBER.getCode())
+        if (Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())) {
+            // 当属性名包含 sql 时，使用 SQL 语法高亮的输入框
+            if (name != null && name.toLowerCase().contains("sql")) {
+                Language language = com.intellij.openapi.fileTypes.PlainTextLanguage.INSTANCE;
+                try {
+                    language = (Language) Class.forName("com.intellij.sql.psi.SqlLanguage").getDeclaredField("INSTANCE").get(null);
+                } catch (Throwable e) {
+                    // SQL 插件未安装，fallback 到纯文本
+                }
+                LanguageTextField sqlField = new LanguageTextField(language, getProject(), valueObj == null ? "" : String.valueOf(valueObj), false);
+                JBScrollPane scrollPane = new JBScrollPane(sqlField);
+                // 设置为 5 行高度
+                scrollPane.setPreferredSize(new Dimension(scrollPane.getPreferredSize().width, 100));
+                return scrollPane;
+            }
+            return new JBTextField(valueObj == null ? "" : String.valueOf(valueObj));
+        }
+        if (Objects.equals(type, McpServerDefinition.ArgType.NUMBER.getCode())
                 || Objects.equals(type, McpServerDefinition.ArgType.INTEGER.getCode())) {
             JBTextField textField = new JBTextField(valueObj == null ? "" : String.valueOf(valueObj));
             return textField;
@@ -367,17 +384,22 @@ public class McpFunctionTool extends BasePluginTool {
                         }
                     }
                 } else if (comp instanceof JScrollPane) {
-                    // 复杂类型：内部是 LanguageTextField(JSON)
                     Component view = ((JScrollPane) comp).getViewport().getView();
                     if (view instanceof LanguageTextField) {
                         String txt = ((LanguageTextField) view).getText();
                         if (txt == null || txt.isBlank()) {
                             val = null;
                         } else {
-                            try {
-                                val = com.alibaba.fastjson.JSON.parse(txt);
-                            } catch (Throwable e) {
-                                errors.add("'" + name + "' must be valid JSON.");
+                            // STRING 类型的 SQL 输入框：直接取文本
+                            if (Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())) {
+                                val = txt;
+                            } else {
+                                // 复杂类型：需要解析 JSON
+                                try {
+                                    val = com.alibaba.fastjson.JSON.parse(txt);
+                                } catch (Throwable e) {
+                                    errors.add("'" + name + "' must be valid JSON.");
+                                }
                             }
                         }
                     }
