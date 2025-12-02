@@ -85,9 +85,9 @@ public class CurlDialog extends JDialog {
         add(panelMain);
         pack();
         resizeDialog();
-        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
         getRootPane().registerKeyboardAction(
-                e -> dispose(),
+                e -> setVisible(false),
                 KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
                 JComponent.WHEN_IN_FOCUSED_WINDOW
         );

@@ -873,18 +873,21 @@ public class TestkitToolWindow {
 
     public void findSpringBootApplicationClasses() {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-
+            // 在后台线程中执行索引查询操作（慢操作）
+            List<RuntimeHelper.AppMeta> apps = RuntimeHelper.getAppMetas(project.getName());
+            if (apps == null || apps.isEmpty()) {
+                apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
+            }
+            
+            // 将查询结果保存为 final 变量，传递到 EDT 线程
+            final List<RuntimeHelper.AppMeta> finalApps = apps;
+            
             // 当所有的操作完成后，更新UI或进一步处理结果
             // 用UI相关的操作需要放在EDT上执行
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
-
-                    List<RuntimeHelper.AppMeta> apps = RuntimeHelper.getAppMetas(project.getName());
-                    if (apps == null || apps.isEmpty()) {
-                        apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
-                    }
-                    List<String> appNames = apps.stream().map(new Function<RuntimeHelper.AppMeta, String>() {
+                    List<String> appNames = finalApps.stream().map(new Function<RuntimeHelper.AppMeta, String>() {
                         @Override
                         public String apply(RuntimeHelper.AppMeta appMeta) {
                             return appMeta.getApp();
