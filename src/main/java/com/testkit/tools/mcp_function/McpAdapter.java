@@ -323,6 +323,11 @@ public class McpAdapter {
                     type = McpServerDefinition.ArgType.OBJECT.getCode();
                 }else if (value instanceof JsonArraySchema){
                     type = McpServerDefinition.ArgType.ARRAY.getCode();
+                    // 如果 items 是 enum 类型，提取枚举值作为 typeExtension
+                    JsonSchemaElement items = ((JsonArraySchema) value).items();
+                    if (items instanceof JsonEnumSchema) {
+                        typeExtension = ((JsonEnumSchema) items).enumValues();
+                    }
                 }else if(value instanceof JsonBooleanSchema){
                     type = McpServerDefinition.ArgType.BOOLEAN.getCode();
                 }else if(value instanceof JsonNumberSchema){

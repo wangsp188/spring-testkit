@@ -245,7 +245,11 @@ public class McpFunctionTool extends BasePluginTool {
             rbc.gridx = 0;
             rbc.gridy = 0;
 
-            JLabel label = new JLabel((required ? "*" : "") + name + (Objects.equals(type, McpServerDefinition.ArgType.ENUM.getCode()) || Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())?"":" (" + type + ")"));
+            boolean hiddenPrefix = Objects.equals(type, McpServerDefinition.ArgType.ENUM.getCode())
+                    || Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())
+                    || (Objects.equals(type, McpServerDefinition.ArgType.ARRAY.getCode()) && schema.typeExtension()!=null)
+                    ;
+            JLabel label = new JLabel((required ? "*" : "") + name + (hiddenPrefix ?"":" (" + type + ")"));
             if (description != null && !description.isEmpty()) {
                 label.setToolTipText(description);
             }
@@ -298,6 +302,28 @@ public class McpFunctionTool extends BasePluginTool {
                 comboBox.setSelectedItem(String.valueOf(valueObj));
             }
             return comboBox;
+        }
+        // ARRAY 类型且有 typeExtension（可选列表）：使用多选 CheckBox
+        if (Objects.equals(type, McpServerDefinition.ArgType.ARRAY.getCode())) {
+            java.util.List<?> enums = (java.util.List<?>) schema.typeExtension();
+            if (enums != null && !enums.isEmpty()) {
+                JPanel checkBoxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
+                Set<String> selectedSet = new HashSet<>();
+                if (valueObj instanceof java.util.List) {
+                    for (Object v : (java.util.List<?>) valueObj) {
+                        selectedSet.add(String.valueOf(v));
+                    }
+                }
+                for (Object enumVal : enums) {
+                    String optionStr = String.valueOf(enumVal);
+                    JCheckBox checkBox = new JCheckBox(optionStr);
+                    checkBox.setSelected(selectedSet.contains(optionStr));
+                    checkBoxPanel.add(checkBox);
+                }
+                JBScrollPane scrollPane = new JBScrollPane(checkBoxPanel);
+                scrollPane.setPreferredSize(new Dimension(scrollPane.getPreferredSize().width, 60));
+                return scrollPane;
+            }
         }
         if (Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())) {
             // 当属性名包含 sql 时，使用 SQL 语法高亮的输入框
@@ -385,7 +411,17 @@ public class McpFunctionTool extends BasePluginTool {
                     }
                 } else if (comp instanceof JScrollPane) {
                     Component view = ((JScrollPane) comp).getViewport().getView();
-                    if (view instanceof LanguageTextField) {
+                    if (view instanceof JPanel) {
+                        // ARRAY 类型多选 CheckBox 面板
+                        JPanel checkBoxPanel = (JPanel) view;
+                        ArrayList<String> selectedValues = new ArrayList<>();
+                        for (Component c : checkBoxPanel.getComponents()) {
+                            if (c instanceof JCheckBox && ((JCheckBox) c).isSelected()) {
+                                selectedValues.add(((JCheckBox) c).getText());
+                            }
+                        }
+                        val = selectedValues;
+                    } else if (view instanceof LanguageTextField) {
                         String txt = ((LanguageTextField) view).getText();
                         if (txt == null || txt.isBlank()) {
                             val = null;
