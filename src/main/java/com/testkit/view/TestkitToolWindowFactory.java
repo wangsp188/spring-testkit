@@ -102,6 +102,91 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
     }
 
     @Override
+    public void init(@org.jetbrains.annotations.NotNull ToolWindow toolWindow) {
+        // 项目启动时就开始探测 RuntimeApp，更新图标角标
+        Project project = ((com.intellij.openapi.wm.impl.ToolWindowImpl) toolWindow).getProject();
+        startRuntimeAppDetection(project, toolWindow);
+    }
+
+    /**
+     * 启动后台探测任务，检测 RuntimeApp 连接状态并更新图标
+     */
+    private void startRuntimeAppDetection(Project project, ToolWindow toolWindow) {
+        java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleWithFixedDelay(() -> {
+            try {
+                // 如果 TestkitToolWindow 已经初始化，让它来负责探测（避免重复）
+                TestkitToolWindow testkitToolWindow = windows.get(project);
+                if (testkitToolWindow != null) {
+                    // TestkitToolWindow 已初始化，由它内部的定时任务负责
+                    return;
+                }
+
+                // TestkitToolWindow 未初始化，由 Factory 负责探测并更新图标
+                int connectedCount = detectConnectedApps(project);
+                // 更新图标
+                SwingUtilities.invokeLater(() -> {
+                    if (connectedCount > 0) {
+                        toolWindow.setIcon(TestkitToolWindow.createBadgeIcon(TestkitToolWindow.TOOLWINDOW_ICON, connectedCount));
+                    } else {
+                        toolWindow.setIcon(TestkitToolWindow.TOOLWINDOW_ICON);
+                    }
+                });
+            } catch (Throwable e) {
+                // ignore
+            }
+        }, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+
+        // 项目关闭时停止探测
+        project.getMessageBus().connect().subscribe(
+                com.intellij.openapi.project.ProjectManager.TOPIC,
+                new com.intellij.openapi.project.ProjectManagerListener() {
+                    @Override
+                    public void projectClosing(@org.jetbrains.annotations.NotNull Project closingProject) {
+                        if (closingProject.equals(project)) {
+                            executor.shutdown();
+                        }
+                    }
+                }
+        );
+    }
+
+    /**
+     * 检测已连接的 RuntimeApp 数量
+     */
+    private int detectConnectedApps(Project project) {
+        java.util.Set<String> connectedApps = new java.util.LinkedHashSet<>();
+        java.util.List<String> localItems = com.testkit.RuntimeHelper.loadProjectRuntimes(project.getName());
+        if (localItems != null) {
+            connectedApps.addAll(localItems);
+        }
+        java.util.List<String> tempApps = com.testkit.RuntimeHelper.getTempApps(project.getName());
+        if (tempApps != null) {
+            connectedApps.addAll(tempApps);
+        }
+
+        int count = 0;
+        java.util.HashMap<String, String> requestData = new java.util.HashMap<>();
+        requestData.put("method", "hi");
+
+        for (String item : connectedApps) {
+            if (item == null) continue;
+            com.testkit.RuntimeHelper.VisibleApp visibleApp = com.testkit.RuntimeHelper.parseApp(item);
+            try {
+                com.testkit.util.HttpUtil.sendPost(
+                        "http://" + (visibleApp.judgeIsLocal() ? "localhost" : visibleApp.getIp()) + ":" + visibleApp.getTestkitPort() + "/",
+                        requestData, com.alibaba.fastjson.JSONObject.class, null, null
+                );
+                count++;
+            } catch (Throwable e) {
+                // 连接失败，不计数
+            }
+        }
+        return count;
+    }
+
+
+    @Override
     public void createToolWindowContent(Project project, ToolWindow toolWindow) {
         if (isRegisterWindow(project)) {
             System.err.println("project:" + project.getName() + "已存在window");
@@ -172,6 +257,9 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                 // 所有耗时操作都在后台线程执行，避免阻塞 EDT
                 ApplicationManager.getApplication().executeOnPooledThread(() -> {
                     try {
+
+                        testkitToolWindow.refreshVisibleApp();
+
                         // 1. 查找 Spring Boot 应用类（已经在后台线程中执行）
                         testkitToolWindow.findSpringBootApplicationClasses();
                         

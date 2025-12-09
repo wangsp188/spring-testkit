@@ -135,7 +135,7 @@ public class FlexibleTestTool extends BasePluginTool {
         gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.NONE;
         gbc.weightx = 0.0;
-        gbc.gridx = 3;
+        gbc.gridx = 4;  // 在 toolSwitchButton 之后
         gbc.gridy = 0;
 
         JButton runButton = new JButton(AllIcons.Actions.Execute);

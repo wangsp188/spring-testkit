@@ -1142,7 +1142,7 @@ public class FunctionCallTool extends BasePluginTool {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = JBUI.insets(1);
         gbc.fill = GridBagConstraints.NONE;
-        gbc.gridx = 3;
+        gbc.gridx = 4;  // 在 toolSwitchButton 之后
         gbc.gridy = 0;
 
         // Add the radio button
@@ -1212,7 +1212,7 @@ public class FunctionCallTool extends BasePluginTool {
             }
         });
 
-        gbc.gridx = 4;
+        gbc.gridx = 5;
         // 将 runButton 添加到容器面板（如果支持拦截器）
         addToInterceptorContainer(runButton, gbc);
         // 如果不支持拦截器，则添加到原面板

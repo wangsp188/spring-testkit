@@ -73,6 +73,8 @@ public abstract class BasePluginTool {
     protected boolean useInterceptor;
     protected DefaultActionGroup actionGroup;
     protected JPanel interceptorContainerPanel;  // 拦截器容器面板，用于包裹整行组件
+    // 工具切换按钮引用，用于更新图标
+    protected JButton toolSwitchButton;
 
     public BasePluginTool(TestkitToolWindow testkitToolWindow) {
         // 初始化panel
@@ -90,6 +92,10 @@ public abstract class BasePluginTool {
 
     public JPanel getPanel() {
         return panel;
+    }
+
+    public JPanel getInterceptorContainerPanel() {
+        return interceptorContainerPanel;
     }
 
     public Project getProject() {
@@ -313,6 +319,79 @@ public abstract class BasePluginTool {
             }
         };
         actionGroup.add(storeAction);
+    }
+
+    /**
+     * 创建工具切换按钮（图标按钮 + 弹出菜单）
+     */
+    private JButton createToolSwitchButton() {
+        // 获取当前选中的工具（从 toolBox 获取，因为 this.tool 在此时可能还没设置）
+        String currentToolName = (String) toolWindow.getToolBox().getSelectedItem();
+        PluginToolEnum currentToolEnum = PluginToolEnum.getByCode(currentToolName);
+        Icon currentIcon = getToolIcon(currentToolEnum);
+
+        toolSwitchButton = new JButton(currentIcon);
+        toolSwitchButton.setPreferredSize(new Dimension(32, 32));
+        toolSwitchButton.setToolTipText("Switch tool: " + (currentToolName != null ? currentToolName : "unknown"));
+
+        toolSwitchButton.addActionListener(e -> {
+            // 获取当前选中的工具
+            String nowToolName = (String) toolWindow.getToolBox().getSelectedItem();
+            PluginToolEnum nowToolEnum = PluginToolEnum.getByCode(nowToolName);
+
+            // 创建弹出菜单
+            DefaultActionGroup actionGroup = new DefaultActionGroup();
+
+            for (PluginToolEnum toolEnum : PluginToolEnum.values()) {
+                Icon icon = getToolIcon(toolEnum);
+                String name = toolEnum.getCode();
+                boolean isCurrentTool = toolEnum == nowToolEnum;
+
+                AnAction action = new AnAction(isCurrentTool ? "✓ " + name : name, "Switch to " + name, icon) {
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent event) {
+                        // 切换工具
+                        toolWindow.getToolBox().setSelectedItem(name);
+                        // 更新当前按钮图标
+                        updateToolSwitchButtonIcon(toolEnum);
+                    }
+                };
+                actionGroup.add(action);
+            }
+
+            // 显示弹出菜单
+            com.intellij.openapi.ui.JBPopupMenu popupMenu = (com.intellij.openapi.ui.JBPopupMenu)
+                    com.intellij.openapi.actionSystem.ActionManager.getInstance()
+                            .createActionPopupMenu("ToolSwitchPopup", actionGroup).getComponent();
+            popupMenu.show(toolSwitchButton, 0, toolSwitchButton.getHeight());
+        });
+
+        return toolSwitchButton;
+    }
+
+    /**
+     * 更新工具切换按钮的图标
+     */
+    public void updateToolSwitchButtonIcon(PluginToolEnum toolEnum) {
+        if (toolSwitchButton != null) {
+            toolSwitchButton.setIcon(getToolIcon(toolEnum));
+            toolSwitchButton.setToolTipText("Switch tool: " + (toolEnum != null ? toolEnum.getCode() : "unknown"));
+        }
+    }
+
+    /**
+     * 根据工具类型获取对应图标
+     */
+    private Icon getToolIcon(PluginToolEnum toolEnum) {
+        if (toolEnum == null) {
+            return AllIcons.Actions.Help;
+        }
+        return switch (toolEnum) {
+            case FUNCTION_CALL -> com.testkit.tools.function_call.FunctionCallIconProvider.FUNCTION_CALL_ICON;
+            case FLEXIBLE_TEST -> com.testkit.tools.flexible_test.FlexibleTestIconProvider.FLEXIBLE_TEST_ICON;
+            case MAPPER_SQL -> com.testkit.tools.mapper_sql.MapperSqlIconProvider.MAPPER_SQL_ICON;
+            case MCP_FUNCTION -> com.testkit.tools.mcp_function.McpFunctionTool.MCP_FUNCTION_ICON;
+        };
     }
 
     protected abstract boolean hasActionBox();
@@ -557,6 +636,12 @@ public abstract class BasePluginTool {
         gbc.weightx = 0.0;
         gbc.gridx = 0;
         gbc.gridy = 0;
+
+        // 1. 添加工具切换按钮到最左边（gridx=0）
+        JButton toolSwitchBtn = createToolSwitchButton();
+        containerPanel.add(toolSwitchBtn, gbc);
+
+        // 2. 拦截器按钮稍后添加到方法下拉框右侧
         JButton testBtn;
         if (icon != disableIcon) {
             useInterceptor = SettingsStorageHelper.isDefaultUseInterceptor(getProject());
@@ -609,7 +694,10 @@ public abstract class BasePluginTool {
             });
             testBtn.setPreferredSize(new Dimension(32, 32));
         }
-        containerPanel.add(testBtn, gbc);
+        // 拦截器按钮稍后添加
+
+        // 3. 定位按钮 (gridx=1)
+        gbc.gridx = 1;
 
         JButton pointButton = new JButton(AllIcons.General.Locate);
         ComboBox actionComboBox = new ComboBox<>();
@@ -644,7 +732,6 @@ public abstract class BasePluginTool {
         });
         pointButton.setToolTipText("Navigate to the selected");
         pointButton.setPreferredSize(new Dimension(32, 32));
-        gbc.gridx = 1;
         containerPanel.add(pointButton, gbc);
 
 
@@ -721,6 +808,7 @@ public abstract class BasePluginTool {
                 }
             }
         });
+        // 4. 方法下拉框 (gridx=2)
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
         gbc.gridx = 2;
@@ -735,6 +823,15 @@ public abstract class BasePluginTool {
         containerGbc.gridx = 0;
         containerGbc.gridy = 0;
         topPanel.add(containerPanel, containerGbc);
+
+        // 5. 拦截器按钮放在方法下拉框的右侧 (gridx=3)
+        // 只在支持拦截器的工具下显示（icon != disableIcon 表示支持）
+        if (icon != disableIcon) {
+            gbc.gridx = 3;
+            gbc.weightx = 0.0;
+            gbc.fill = GridBagConstraints.NONE;
+            containerPanel.add(testBtn, gbc);
+        }
         
         return actionComboBox;
     }
@@ -866,7 +963,7 @@ public abstract class BasePluginTool {
             this.isEnabled = enabled;
             setPreferredSize(new Dimension(32, 32));
             setContentAreaFilled(false);
-            setBorderPainted(false);
+            setBorderPainted(true);
             setFocusPainted(false);
             
             // 初始化粒子

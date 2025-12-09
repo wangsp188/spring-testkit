@@ -74,6 +74,8 @@ public class TestkitToolWindow {
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
     private static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
+    // ToolWindow 原始图标
+    public static final Icon TOOLWINDOW_ICON = IconLoader.getIcon("/icons/spring-testkit.svg", TestkitToolWindow.class);
 
 
     private Project project;
@@ -85,6 +87,8 @@ public class TestkitToolWindow {
 
     private JPanel appPanel;
     private JComboBox<String> appBox;
+    private JButton killButton; // kill 进程按钮
+    private JPanel rightAppPanel; // RuntimeApp 面板（包含 appBox 和 killButton）
 
     private SettingsDialog settingsDialog;
     private CurlDialog curlDialog;
@@ -222,6 +226,13 @@ public class TestkitToolWindow {
         curlDialog = new CurlDialog(this);
         sqlDialog = new SqlDialog(this);
         mcpServerDialog = new MCPServerDialog(this);
+
+        // toolBox 初始化（不添加到 topPanel，将在 BasePluginTool 的第二行显示）
+        // 注意：必须在创建工具之前初始化，因为工具面板会引用 toolBox
+        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode(),PluginToolEnum.MCP_FUNCTION.getCode()});
+        toolBox.setToolTipText("Tool list");
+        toolBox.setPreferredSize(new Dimension(120, 32));
+        toolBox.addActionListener(e -> onSwitchTool());
 //        下方用一个东西撑起来整个window的下半部分
 //        当切换toolbox时根据选中的内容，从tools中找出对应的tool，然后用内部的内容填充该部分
 //        初始化所有tool的面板，但是不加载
@@ -229,13 +240,6 @@ public class TestkitToolWindow {
         tools.put(PluginToolEnum.FLEXIBLE_TEST, new FlexibleTestTool(this));
         tools.put(PluginToolEnum.MAPPER_SQL, new MapperSqlTool(this));
         tools.put(PluginToolEnum.MCP_FUNCTION, new McpFunctionTool(this));
-        // 添加 toolBox 到 topPanel
-        toolBox = new ComboBox<>(new String[]{PluginToolEnum.FUNCTION_CALL.getCode(), PluginToolEnum.FLEXIBLE_TEST.getCode(), PluginToolEnum.MAPPER_SQL.getCode(),PluginToolEnum.MCP_FUNCTION.getCode()});
-        toolBox.setToolTipText("Tool list");
-        toolBox.setPreferredSize(new Dimension(120, 32));
-//        toolBox.setEnabled(false);
-        toolBox.addActionListener(e -> onSwitchTool());
-        topPanel.add(toolBox);
 
 
         appPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
@@ -447,11 +451,68 @@ public class TestkitToolWindow {
         // 将左侧按钮组添加到主面板西侧
         outPanel.add(topPanel, BorderLayout.WEST);
         // 应用标签
-        JPanel rightAppPanel = new JPanel(new BorderLayout(2, 2));
+        rightAppPanel = new JPanel(new BorderLayout(2, 2));
 
         rightAppPanel.add(appPanel, BorderLayout.WEST);
         // 设置扩展策略
         rightAppPanel.add(appBox, BorderLayout.CENTER);
+
+        // 添加 kill 进程按钮到 appBox 右边
+        killButton = new JButton(AllIcons.Actions.GC);
+        killButton.setToolTipText("⚠️ DANGER: Kill the process using the testkit port (local only)");
+        killButton.setPreferredSize(new Dimension(32, 32));
+        // 设置红色前景色，使其更加醒目和具有警告性
+        killButton.setForeground(new Color(220, 53, 69)); // 红色
+        killButton.setFocusPainted(false);
+        killButton.setBorderPainted(true);
+        // 设置鼠标悬停时的效果
+        killButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                killButton.setBackground(new Color(220, 53, 69, 30)); // 半透明红色背景
+            }
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                killButton.setBackground(null);
+            }
+        });
+        killButton.addActionListener(e -> {
+            String selectedItem = (String) appBox.getSelectedItem();
+            if (selectedItem == null) {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Please select an app first");
+                return;
+            }
+
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedItem);
+            if (visibleApp == null) {
+                TestkitHelper.notify(project, NotificationType.ERROR, "Failed to parse app: " + selectedItem);
+                return;
+            }
+
+            // 检查是否是 local app
+            if (!visibleApp.judgeIsLocal()) {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Only local apps can be killed. Current app IP: " + visibleApp.getIp());
+                return;
+            }
+
+            int port = visibleApp.getTestkitPort();
+            String appName = visibleApp.getAppName();
+
+            // 确认弹窗
+            int result = Messages.showYesNoDialog(
+                    project,
+                    "Are you sure you want to kill the process using port " + port + "?\n" +
+                            "App: " + appName + "\n" +
+                            "This action cannot be undone.",
+                    "Confirm Kill Process",
+                    Messages.getWarningIcon()
+            );
+
+            if (result == Messages.YES) {
+                killProcessByPort(port, appName);
+            }
+        });
+        rightAppPanel.add(killButton, BorderLayout.EAST);
 
         // 将右侧面板添加到主面板东侧
         outPanel.add(rightAppPanel, BorderLayout.CENTER);
@@ -658,7 +719,7 @@ public class TestkitToolWindow {
         return outputPanel;
     }
 
-    private void refreshVisibleApp() {
+    void refreshVisibleApp() {
         Set<String> newItems = new LinkedHashSet<>();
         List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
         if (localItems != null) {
@@ -753,8 +814,100 @@ public class TestkitToolWindow {
 
                 //更新索引
                 TestkitHelper.refresh(project);
+                // 更新 ToolWindow 图标角标
+                updateToolWindowIcon(newItems.size());
             }
         });
+    }
+
+    /**
+     * 更新 ToolWindow 图标，当有连接的 RuntimeApp 时显示角标
+     * @param connectedCount 已连接的 RuntimeApp 数量
+     */
+    public void updateToolWindowIcon(int connectedCount) {
+        if (window == null) {
+            return;
+        }
+
+        if (connectedCount > 0) {
+            // 创建带角标的图标
+            Icon badgeIcon = createBadgeIcon(TOOLWINDOW_ICON, connectedCount);
+            window.setIcon(badgeIcon);
+        } else {
+            // 恢复原始图标
+            window.setIcon(TOOLWINDOW_ICON);
+        }
+    }
+
+    /**
+     * 创建带数字角标的图标
+     * @param baseIcon 基础图标
+     * @param count 角标数字
+     * @return 带角标的图标
+     */
+    static Icon createBadgeIcon(Icon baseIcon, int count) {
+        return new com.intellij.openapi.util.ScalableIcon() {
+            private float scale = 1.0f;
+            private Icon scaledBaseIcon = baseIcon;
+
+            @Override
+            public float getScale() {
+                return scale;
+            }
+
+            @Override
+            public com.intellij.openapi.util.ScalableIcon scale(float scaleFactor) {
+                this.scale = scaleFactor;
+                // 如果基础图标也支持缩放，则同时缩放
+                if (baseIcon instanceof com.intellij.openapi.util.ScalableIcon) {
+                    this.scaledBaseIcon = ((com.intellij.openapi.util.ScalableIcon) baseIcon).scale(scaleFactor);
+                }
+                return this;
+            }
+
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                // 绘制基础图标（使用可能已缩放的版本）
+                scaledBaseIcon.paintIcon(c, g, x, y);
+
+                // 绘制角标
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                // 角标位置（左上角）
+                String text = count > 9 ? "9+" : String.valueOf(count);
+                int badgeSize = count > 9 ? 10 : 8; // 9+ 时稍大一点
+                int badgeX = x;
+                int badgeY = y;
+
+                // 绘制绿色圆形背景
+                g2d.setColor(new Color(40, 167, 69)); // 绿色
+                g2d.fillOval(badgeX, badgeY, badgeSize, badgeSize);
+
+                // 绘制白色数字
+                g2d.setColor(Color.WHITE);
+                g2d.setFont(new Font("Arial", Font.BOLD, count > 9 ? 6 : 7));
+                FontMetrics fm = g2d.getFontMetrics();
+                int textWidth = fm.stringWidth(text);
+                int textHeight = fm.getAscent();
+                int textX = badgeX + (badgeSize - textWidth) / 2;
+                int textY = badgeY + (badgeSize + textHeight) / 2 - 1;
+                g2d.drawString(text, textX, textY);
+
+                g2d.dispose();
+            }
+
+            @Override
+            public int getIconWidth() {
+                return scaledBaseIcon.getIconWidth();
+            }
+
+            @Override
+            public int getIconHeight() {
+                return scaledBaseIcon.getIconHeight();
+            }
+        };
     }
 
     private void openTipsDoc() {
@@ -840,8 +993,10 @@ public class TestkitToolWindow {
             return;
         }
 
-        appPanel.setVisible(tool.needAppBox());
-        appBox.setVisible(tool.needAppBox());
+        boolean showRuntimeApp = tool.needAppBox();
+        appPanel.setVisible(showRuntimeApp);
+        appBox.setVisible(showRuntimeApp);
+        killButton.setVisible(showRuntimeApp); // kill 按钮只在显示 RuntimeApp 时显示
         whitePanel.setVisible(false);
         // 隐藏所有工具面板，并显示选中工具面板
         for (BasePluginTool t : tools.values()) {
@@ -850,6 +1005,8 @@ public class TestkitToolWindow {
 
         // 显示当前选中的工具面板
         tool.getPanel().setVisible(true);
+        // 更新工具切换按钮的图标
+        tool.updateToolSwitchButtonIcon(PluginToolEnum.getByCode(selectedTool));
         // 刷新界面
         windowContent.revalidate();
         windowContent.repaint();
@@ -949,6 +1106,10 @@ public class TestkitToolWindow {
         return project;
     }
 
+    public JComboBox<String> getToolBox() {
+        return toolBox;
+    }
+
     public void setOutputText(String outputText) {
         outputTextPane.setText(outputText);
     }
@@ -968,6 +1129,50 @@ public class TestkitToolWindow {
                 windowContent.repaint();
             });
         }
+    }
+
+    /**
+     * 根据端口号查找并 kill 进程
+     * @param port 端口号
+     * @param appName 应用名称（用于日志）
+     */
+    public void killProcessByPort(int port, String appName) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Killing process on port " + port + "...", false) {
+            @Override
+            public void run(ProgressIndicator indicator) {
+                try {
+                    // ★★★ 一条命令完成：查找端口进程 → 过滤掉 IDEA → 杀掉第一个匹配的进程 ★★★
+                    String command = String.format(
+                            "for pid in $(lsof -ti:%d -sTCP:LISTEN 2>/dev/null); do " +
+                                    "ps -p $pid -o comm= 2>/dev/null | grep -qvi idea && kill -9 $pid 2>/dev/null && echo $pid && break; " +
+                                    "done",
+                            port
+                    );
+
+                    Process process = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                    String killedPid = reader.readLine();
+                    int exitCode = process.waitFor();
+
+                    if (killedPid != null && !killedPid.trim().isEmpty()) {
+                        String message = "Successfully killed process (PID: " + killedPid.trim() + ") using port " + port;
+                        if (appName != null && !appName.isEmpty()) {
+                            message += "\nApp: " + appName;
+                        }
+                        TestkitHelper.notify(project, NotificationType.INFORMATION, message);
+                        // 刷新 app 列表
+                        ApplicationManager.getApplication().invokeLater(() -> refreshVisibleApp());
+                    } else {
+                        TestkitHelper.notify(project, NotificationType.WARNING,
+                                "No non-IDEA process found using port " + port);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    TestkitHelper.notify(project, NotificationType.ERROR,
+                            "Error killing process on port " + port + ": " + e.getMessage());
+                }
+            }
+        });
     }
 
 
