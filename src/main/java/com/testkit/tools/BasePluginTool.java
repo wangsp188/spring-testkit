@@ -332,7 +332,7 @@ public abstract class BasePluginTool {
 
         toolSwitchButton = new JButton(currentIcon);
         toolSwitchButton.setPreferredSize(new Dimension(32, 32));
-        toolSwitchButton.setToolTipText("Switch tool: " + (currentToolName != null ? currentToolName : "unknown"));
+        // tooltip 由 addActionComboBox 方法设置，包含支持的 case 信息
 
         toolSwitchButton.addActionListener(e -> {
             // 获取当前选中的工具
@@ -375,7 +375,7 @@ public abstract class BasePluginTool {
     public void updateToolSwitchButtonIcon(PluginToolEnum toolEnum) {
         if (toolSwitchButton != null) {
             toolSwitchButton.setIcon(getToolIcon(toolEnum));
-            toolSwitchButton.setToolTipText("Switch tool: " + (toolEnum != null ? toolEnum.getCode() : "unknown"));
+            // tooltip 不在这里设置，保留 addActionComboBox 中设置的支持 case 信息
         }
     }
 
@@ -507,7 +507,7 @@ public abstract class BasePluginTool {
                                                         "<ul>" +
                                                         "<li>Go to the <b>Tool interceptor</b> page</li>" +
                                                         "<li>Set up pre-execution configuration to inject user information into the context<br>like this  SecurityContextHolder.getContext().setAuthentication(your authentication);</li>" +
-                                                        "<li>Click the interceptor toggle to the left of the locate button in the testkit panel</li>" +
+                                                        "<li>Click the interceptor toggle to the left of the execute button in the testkit panel to toggle interceptor on/off.</li>" +
                                                         "<li>This will make user information available in your method execution</li>" +
                                                         "</ul>" +
                                                         "</li>" +
@@ -639,6 +639,10 @@ public abstract class BasePluginTool {
 
         // 1. 添加工具切换按钮到最左边（gridx=0）
         JButton toolSwitchBtn = createToolSwitchButton();
+        // 设置 switch tool 按钮的 tooltip 包含支持的 case 信息
+        toolSwitchBtn.setToolTipText("<html>\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                tooltips + "\n</html>");
         containerPanel.add(toolSwitchBtn, gbc);
 
         // 2. 拦截器按钮稍后添加到方法下拉框右侧
@@ -648,13 +652,9 @@ public abstract class BasePluginTool {
             // 使用带脉冲动画的按钮
             testBtn = new PulsingInterceptorButton(useInterceptor ? icon : disableIcon, useInterceptor);
             if(useInterceptor){
-                testBtn.setToolTipText("<html>\n" +
-                        "<meta charset=\"UTF-8\">\n" +
-                        "<strong>Tool interceptor is enable</strong><br>\n" + tooltips + "\n</html>");
+                testBtn.setToolTipText("Tool interceptor is enable");
             }else{
-                testBtn.setToolTipText("<html>\n" +
-                        "<meta charset=\"UTF-8\">\n" +
-                        "<strong>Tool interceptor is disable</strong><br>\n" + tooltips + "\n</html>");
+                testBtn.setToolTipText("Tool interceptor is disable");
             }
 
             testBtn.addActionListener(new ActionListener() {
@@ -665,17 +665,13 @@ public abstract class BasePluginTool {
                         useInterceptor = false;
                         testBtn.setIcon(disableIcon);
                         pulsingBtn.setInterceptorEnabled(false);
-                        testBtn.setToolTipText("<html>\n" +
-                                "<meta charset=\"UTF-8\">\n" +
-                                "<strong>Tool interceptor is disable</strong><br>\n" + tooltips + "\n</html>");
+                        testBtn.setToolTipText("Tool interceptor is disable");
                         TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is disable in " + getTool().getCode());
                     } else {
                         useInterceptor = true;
                         testBtn.setIcon(icon);
                         pulsingBtn.setInterceptorEnabled(true);
-                        testBtn.setToolTipText("<html>\n" +
-                                "<meta charset=\"UTF-8\">\n" +
-                                "<strong>Tool interceptor is enable</strong><br>\n" + tooltips + "\n</html>");
+                        testBtn.setToolTipText("Tool interceptor is enable");
                         TestkitHelper.notify(getProject(), NotificationType.INFORMATION, "Tool interceptor is enable in " + getTool().getCode());
                     }
                 }
@@ -683,9 +679,7 @@ public abstract class BasePluginTool {
         } else {
             useInterceptor = false;
             testBtn = new JButton(icon);
-            testBtn.setToolTipText("<html>\n" +
-                    "<meta charset=\"UTF-8\">\n" +
-                    "<strong>Unsupport Tool interceptor</strong><br>\n" + tooltips + "\n</html>");
+            testBtn.setToolTipText("Unsupport Tool interceptor");
             testBtn.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
