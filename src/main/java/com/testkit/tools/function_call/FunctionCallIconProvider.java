@@ -185,9 +185,9 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         if (module == null) {
             return "not_find_module";
         }
-        if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
-            return "disable_side_server";
-        }
+//        if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
+//            return "disable_side_server";
+//        }
         if (!psiMethod.getModifierList().hasModifierProperty(PsiModifier.PUBLIC)) {
             return "not_public";
         }
@@ -283,11 +283,11 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
                 return "no_app_meta";
             }
         }
-        if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
-            if (!FunctionCallIconProvider.isRequestMethod(psiMethod)) {
-                return "no_side_server";
-            }
-        }
+//        if (!SettingsStorageHelper.isEnableSideServer(psiMethod.getProject())) {
+//            if (!FunctionCallIconProvider.isRequestMethod(psiMethod)) {
+//                return "no_side_server";
+//            }
+//        }
 
         if (containsSpringInitializationMethod(containingClass, psiMethod)) {
             return "bean_method";
@@ -767,9 +767,9 @@ public class FunctionCallIconProvider implements LineMarkerProvider {
         if (!RuntimeHelper.hasAppMeta(psiClass.getProject().getName())) {
             return "no_app_meta";
         }
-        if (!SettingsStorageHelper.isEnableSideServer(psiClass.getProject())) {
-            return "disable_side_server";
-        }
+//        if (!SettingsStorageHelper.isEnableSideServer(psiClass.getProject())) {
+//            return "disable_side_server";
+//        }
         return null;
     }
 

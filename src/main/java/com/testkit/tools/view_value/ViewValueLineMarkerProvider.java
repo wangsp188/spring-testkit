@@ -8,6 +8,9 @@ import com.testkit.SettingsStorageHelper;
 import com.testkit.tools.ToolHelper;
 import com.testkit.util.HttpUtil;
 import com.testkit.util.JsonUtil;
+import com.testkit.util.RemoteScriptCallUtils;
+import com.testkit.view.TestkitToolWindow;
+import com.testkit.view.TestkitToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
@@ -38,6 +41,9 @@ import java.util.function.Predicate;
 
 public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
+    // Remote Script 超时配置
+    private static final int REMOTE_SUBMIT_TIMEOUT = 30;     // 提交请求超时 30 秒
+    private static final int REMOTE_RESULT_TIMEOUT = 600;    // 获取结果超时 600 秒
 
     @Override
     public LineMarkerInfo<PsiIdentifier> getLineMarkerInfo(PsiElement element) {
@@ -111,8 +117,9 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                                 continue;
                             }
                             for (RuntimeHelper.VisibleApp visibleApp : list) {
-                                //显示的一个图标加上标题
-                                AnAction documentation = new AnAction("View the value of " + visibleApp.getAppName() + ":" + visibleApp.getTestkitPort(), "View the value of " + visibleApp.getAppName() + ":" + visibleApp.getTestkitPort(), null) {
+                                //显示的一个图标加上标题，包含 IP 以区分不同实例
+                                String displayName = visibleApp.getAppName() + " (" + visibleApp.getIp() + ":" + visibleApp.getTestkitPort() + ")";
+                                AnAction documentation = new AnAction("View the value of " + displayName, "View the value of " + displayName, null) {
                                     @Override
                                     public void actionPerformed(@NotNull AnActionEvent e) {
                                         handleClick(containingClass, (PsiField) psiElement.getParent(), visibleApp);
@@ -179,8 +186,8 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
             }
         }
 
-        if (!RuntimeHelper.hasAppMeta(field.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(field.getProject())) {
-            return "no_side_server_app";
+        if (!RuntimeHelper.hasAppMeta(field.getProject().getName())) {
+            return "no_meta_data";
         }
 
         // 2. 必须是非静态方法
@@ -233,20 +240,33 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
                             submitRequest.put("params", value);
 
-                            JSONObject submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class,5,5);
+                            // Step 1: 提交请求，获取 reqId
+                            JSONObject submitRet;
+                            if (visibleApp.isRemoteScript()) {
+                                submitRet = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, submitRequest, REMOTE_SUBMIT_TIMEOUT);
+                            } else {
+                                submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class, 5, 5);
+                            }
+
                             if (submitRet == null || !submitRet.getBooleanValue("success") || submitRet.getString("data") == null) {
-                                TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "submit req error \n" + submitRet.getString("message"));
+                                TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "submit req error \n" + (submitRet != null ? submitRet.getString("message") : "null response"));
                                 return;
                             }
 
+                            // Step 2: 获取任务结果
                             String reqId = submitRet.getString("data");
-                            HashMap<String, Object> map = new HashMap<>();
-                            map.put("method", "get_task_ret");
-                            HashMap<Object, Object> params = new HashMap<>();
-                            params.put("reqId", reqId);
-                            map.put("params", params);
+                            JSONObject getResultReq = new JSONObject();
+                            getResultReq.put("method", "get_task_ret");
+                            JSONObject reqParams = new JSONObject();
+                            reqParams.put("reqId", reqId);
+                            getResultReq.put("params", reqParams);
 
-                            JSONObject result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", map, JSONObject.class,5,5);
+                            JSONObject result;
+                            if (visibleApp.isRemoteScript()) {
+                                result = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
+                            } else {
+                                result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", getResultReq, JSONObject.class, 5, 5);
+                            }
                             if (result == null) {
                                 TestkitHelper.notify(psiField.getProject(), NotificationType.ERROR, "req is error\n result is null");
                             } else if (!result.getBooleanValue("success")) {

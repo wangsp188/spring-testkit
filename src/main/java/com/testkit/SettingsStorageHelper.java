@@ -656,6 +656,26 @@ public class SettingsStorageHelper {
         saveProjectConfig(project, projectConfig);
     }
 
+    /**
+     * 获取远程脚本路径
+     */
+    public static String getRemoteScriptPath(Project project) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        return projectConfig != null ? projectConfig.getRemoteScriptPath() : null;
+    }
+
+    /**
+     * 设置远程脚本路径
+     */
+    public static void setRemoteScriptPath(Project project, String path) {
+        ProjectConfig projectConfig = loadProjectConfig(project);
+        if (projectConfig == null) {
+            projectConfig = new ProjectConfig();
+        }
+        projectConfig.setRemoteScriptPath(path);
+        saveProjectConfig(project, projectConfig);
+    }
+
     public static void setDefaultUseInterceptor(Project project, boolean defaultUse) {
         ProjectConfig projectConfig = loadProjectConfig(project);
         if (projectConfig == null) {
@@ -939,6 +959,7 @@ public class SettingsStorageHelper {
         private SqlConfig sqlConfig;
         private CliConfig cliConfig;
         private boolean startupAnalyzer;
+        private String remoteScriptPath;
 
         public String getFlexibleTestPackage() {
             return flexibleTestPackage;
@@ -1034,6 +1055,14 @@ public class SettingsStorageHelper {
 
         public void setStartupAnalyzer(boolean startupAnalyzer) {
             this.startupAnalyzer = startupAnalyzer;
+        }
+
+        public String getRemoteScriptPath() {
+            return remoteScriptPath;
+        }
+
+        public void setRemoteScriptPath(String remoteScriptPath) {
+            this.remoteScriptPath = remoteScriptPath;
         }
     }
 
@@ -1379,7 +1408,7 @@ public class SettingsStorageHelper {
             }
 
             if (envKey!=null && !envKey.trim().isBlank()) {
-                command.append("-Dtestkit.cli.env-key=").append(envKey.trim()).append(" ");
+                command.append("-Dtestkit.env-key=").append(envKey.trim()).append(" ");
             }
 
             command.append("-jar ");

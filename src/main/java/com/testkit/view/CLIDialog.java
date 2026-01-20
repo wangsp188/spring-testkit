@@ -112,7 +112,7 @@ public class CLIDialog extends JDialog {
         // 环境键参数
         JPanel envKeyPanel = new JPanel(new BorderLayout());
         envKeyPanel.setToolTipText("The property key for the deployment environment of the target jvm");
-        envKeyPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.cli.env-key=</code></html>"), BorderLayout.WEST);
+        envKeyPanel.add(new JLabel("<html><code style='color:#e83e8c'>-Dtestkit.env-key=</code></html>"), BorderLayout.WEST);
         JBTextField envKeyField = new JBTextField(cliConfig.getEnvKey()==null?"spring.profiles.active":cliConfig.getEnvKey());
         envKeyField.getEmptyText().setText("like spring.profiles.active means the deployment environment of the target jvm");
         envKeyPanel.add(envKeyField, BorderLayout.CENTER);

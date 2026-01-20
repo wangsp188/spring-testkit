@@ -83,6 +83,8 @@ public class TestkitCLI {
         System.out.println(RED + "App: " + runningApp.getApp() + RESET);
         System.out.println(RED + "Ip: " + runningApp.getIp() + RESET);
         System.out.println(RED + "Testkit port: " + runningApp.getPort() + RESET);
+        System.out.println(RED + "Env: " + (runningApp.getEnv() != null ? runningApp.getEnv() : "-") + RESET);
+        System.out.println(RED + "EnableTrace: " + runningApp.isEnableTrace() + RESET);
         // 启动交互式命令行
         startCommandLoop(br, "localhost",runningApp.getPort(), ctxAtc.get());
     }
@@ -270,7 +272,8 @@ public class TestkitCLI {
         }
 
 
-        String envKey = System.getProperty("testkit.cli.env-key", null);
+        // 兼容新旧配置 key
+        String envKey = System.getProperty("testkit.env-key", System.getProperty("testkit.cli.env-key", null));
         if (envKey == null) {
             System.out.print(GREEN + "[Optional] Please enter the property key for the deploy environment in the target JVM: " + RESET);
             String input = br.readLine().trim();

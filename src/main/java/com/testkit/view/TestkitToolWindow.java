@@ -12,7 +12,7 @@ import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBTextField;
-import com.intellij.util.ui.JBUI;
+import com.testkit.RemoteScriptExecutor;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -45,6 +45,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.testkit.tools.mcp_function.MCPServerDialog;
 import com.testkit.tools.mcp_function.McpFunctionTool;
 import com.testkit.util.HttpUtil;
+import com.testkit.util.RemoteScriptCallUtils;
 import com.intellij.ui.jcef.JBCefBrowser;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
@@ -55,6 +56,7 @@ import org.cef.handler.CefLoadHandlerAdapter;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -65,6 +67,9 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -74,9 +79,157 @@ public class TestkitToolWindow {
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
     private static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
+    private static final Icon connectionIcon = IconLoader.getIcon("/icons/connection.svg", TestkitToolWindow.class);
     // ToolWindow 原始图标
     public static final Icon TOOLWINDOW_ICON = IconLoader.getIcon("/icons/spring-testkit.svg", TestkitToolWindow.class);
 
+    // Remote Script 函数说明
+    private static final String REMOTE_SCRIPT_INFO = """
+================================================================================
+                        Remote Script 函数规范
+================================================================================
+
+插件会调用 Groovy 脚本中的三个函数，脚本需要实现以下接口：
+
+────────────────────────────────────────────────────────────────────────────────
+1. loadInfra()
+────────────────────────────────────────────────────────────────────────────────
+   功能: 获取可用的 App 和 Partition 列表
+   参数: 无
+   返回: Map<String, List<String>>
+         Key   = appName (对应 Spring Boot 启动类名，如 "WebApplication")
+         Value = partition 列表 (如 ["us01", "qa01", "dev01"])
+   
+   示例返回:
+   [
+       "WebApplication"    : ["us01", "qa01"],
+       "ApiWebApplication" : ["us01"]
+   ]
+
+────────────────────────────────────────────────────────────────────────────────
+2. loadInstances(String appName, String partition)
+────────────────────────────────────────────────────────────────────────────────
+   功能: 获取指定 App + Partition 下的实例列表
+   参数: appName   - 应用名
+         partition - 分区名
+   返回: List<Map> 实例信息列表
+   
+   必填字段:
+     - ip           : String  实例标识（显示用，会存储为 [partition]ip 格式）
+     - port         : int     Testkit 端口
+     - env          : String  环境标识（如 "prod", "qa"）
+     - success      : boolean 是否可用
+     - errorMessage : String  错误信息（success=false 时）
+   
+   可选字段:
+     - enableTrace  : boolean 是否支持 Trace（默认 false）
+     - expireTime   : long    过期时间 UTC 时间戳（默认 24 小时后过期）
+   
+   示例返回:
+   [
+       [ip: "pod-001", port: 18080, success: true,  errorMessage: "", enableTrace: true, env: "prod"],
+       [ip: "pod-002", port: 18080, success: false, errorMessage: "Connection refused"]
+   ]
+
+────────────────────────────────────────────────────────────────────────────────
+3. sendRequest(String appName, String partition, String ip, int port, Map request)
+────────────────────────────────────────────────────────────────────────────────
+   功能: 向指定实例发送请求（转发到 Testkit Server）
+   参数: appName   - 应用名
+         partition - 分区名
+         ip        - 实例标识（与 loadInstances 返回的 ip 对应）
+         port      - Testkit 端口
+         request   - 请求对象 Map
+   返回: Map 响应结果（透传 Testkit Server 响应）
+   
+   request 结构:
+     - method      : String            请求方法
+     - params      : Map<String,String> 请求参数
+     - trace       : boolean           是否追踪（可选）
+     - prepare     : boolean           是否预处理（可选）
+     - interceptor : String            拦截器配置（可选）
+   
+   常见 method 值:
+     - "hi"           : 健康检查
+     - "function-call": 提交[function-call]任务
+     - "flexible-test": 提交[flexible-test]任务
+     - "view-value"   : 查看变量值
+     - "get_task_ret" : 获取任务结果
+     - "stop_task"    : 停止任务
+
+================================================================================
+                              Demo Script
+================================================================================
+
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
+// ==================== 1. loadInfra ====================
+def loadInfra() {
+// 可以返回自己服务的集群架构定义，在后面的api中会使用这些当作参数
+    return [
+        "WebApplication": ["dev01", "qa01", "us01"]
+    ]
+}
+
+// ==================== 2. loadInstances ====================
+// 注意: 需要先在目标机器上通过 testkit-cli attach 启动 Testkit Server，如果目标机器默认启动则可以忽略
+//       success=true 表示 Testkit Server 已启动且可连接
+//       success=false 表示启动失败或连接不上，errorMessage 填写原因
+def loadInstances(String appName, String partition) {
+    def pods = getPodList(appName, partition)  // 获取 pod 列表（自行实现）
+    
+    return pods.collect { pod ->
+        def result = [
+            ip   : pod.name,
+            port : 18080,
+            env  : partition
+        ]
+        try {
+            // 1) 通过 SSH/kubectl 在目标机器上启动 testkit-cli（如果未启动）
+            def resp =  startTestkitCli(pod.ip, appName)
+            result.success      = resp.success == true
+            result.errorMessage = result.success ? "" : (resp.message ?: "Unknown error")
+            result.enableTrace  = resp.data?.enableTrace ?: false
+        } catch (Exception e) {
+            result.success      = false
+            result.errorMessage = e.message ?: "Connection failed"
+            result.enableTrace  = false
+        }
+        return result
+    }
+}
+
+// ==================== 3. sendRequest ====================
+// 如果目标 IP 可直连，直接发送 HTTP POST 请求即可
+def sendRequest(String appName, String partition, String ip, int port, Map request) {
+    def address = getAddress(ip, partition)  // 根据 ip 获取实际地址（自行实现）
+    return httpPost("http://${address}:${port}/", request)
+}
+
+// ==================== 辅助函数 ====================
+def httpPost(String url, Map data) {
+    def conn = new URL(url).openConnection()
+    conn.setConnectTimeout(5000)
+    conn.setReadTimeout(600000)
+    conn.setRequestMethod("POST")
+    conn.setDoOutput(true)
+    conn.setRequestProperty("Content-Type", "application/json")
+    conn.outputStream.withWriter { it << JsonOutput.toJson(data) }
+    return new JsonSlurper().parseText(conn.inputStream.text)
+}
+
+// TODO: 实现以下函数
+// def getPodList(appName, partition) { ... }
+// def getAddress(ip, partition) { ... }
+// def startTestkitCli(podIp, appName) { ... }
+
+================================================================================
+""";
+
+    // Remote Script 超时配置
+    private static final int LOAD_INFRA_TIMEOUT = 30;       // loadInfra 超时 30 秒
+    private static final int LOAD_INSTANCES_TIMEOUT = 60;   // loadInstances 超时 60 秒
 
     private Project project;
     private ToolWindow window;
@@ -243,185 +396,10 @@ public class TestkitToolWindow {
 
 
         appPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
-        ActionButton addBtn = new ActionButton(new AnAction("No automatic refresh or remote connection?", null, AllIcons.General.InlineAdd) {
+        ActionButton addBtn = new ActionButton(new AnAction("Add Remote Connection", null, connectionIcon) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-                // 创建面板
-                JPanel panel = new JPanel();
-                panel.setLayout(new GridBagLayout());
-                panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
-                GridBagConstraints gbc = new GridBagConstraints();
-                gbc.fill = GridBagConstraints.HORIZONTAL;
-                gbc.insets = JBUI.insets(5);
-
-                List<RuntimeHelper.AppMeta> appMetas = RuntimeHelper.getAppMetas(project.getName());
-                if (CollectionUtils.isEmpty(appMetas)) {
-                    TestkitHelper.alert(project, Messages.getErrorIcon(), "No app metas found, Pls wait index refresh");
-                    return;
-                }
-
-                // 创建下拉框
-                String[] options = appMetas.stream().map(RuntimeHelper.AppMeta::getApp).toArray(String[]::new);
-                ComboBox<String> comboBox = new ComboBox<>(options);
-
-                // 创建两个文本框
-                JBTextField ipField = new JBTextField("localhost");
-                ipField.getEmptyText().setText("Which ip connect to? Support remote connection, localhost is equivalent to 127.0.0.1");
-                ipField.setEditable(true);
-                ipField.setEnabled(true);
-                ipField.setFocusable(true);
-                JBTextField portField = new JBTextField("18080");
-                portField.getEmptyText().setText("It is generally ${tomcat_port}+10000");
-                portField.setEditable(true);
-                portField.setEnabled(true);
-                portField.setFocusable(true);
-
-                // 创建提交按钮
-                JButton injectButton = new JButton("Dynamic inject", cmdIcon);
-                injectButton.setToolTipText("If the Testkit-server is not injected when the project starts, Then we provided the ability to dynamically inject runtime projects");
-                JButton saveButton = new JButton("Test&Add connection", AllIcons.General.InlineAdd);
-                saveButton.setToolTipText("Manual add the connection information of testkit-server, Support remote connection");
-
-                // 添加组件到面板
-                gbc.gridx = 0;
-                gbc.gridy = 0;
-                JLabel appLabel = new JLabel("App:");
-                appLabel.setLabelFor(comboBox);
-                appLabel.setToolTipText("Which app domain you want connect to");
-                panel.add(appLabel, gbc);
-                gbc.gridx = 1;
-                panel.add(comboBox, gbc);
-
-                gbc.gridx = 0;
-                gbc.gridy = 1;
-                JLabel ipLabel = new JLabel("Ip:");
-                ipLabel.setToolTipText("Which ip you want connect to, Support remote connection, localhost is equivalent to 127.0.0.1");
-                panel.add(ipLabel, gbc);
-                gbc.gridx = 1;
-                panel.add(ipField, gbc);
-
-                gbc.gridx = 0;
-                gbc.gridy = 2;
-                JLabel portLabel = new JLabel("Testkit Port:");
-                portLabel.setToolTipText("The port occupied by testkit startup is generally the project tomcat port +10000");
-                panel.add(portLabel, gbc);
-                gbc.gridx = 1;
-                panel.add(portField, gbc);
-
-                gbc.gridx = 0;
-                gbc.gridy = 3;
-//                gbc.gridwidth = 2;
-                panel.add(injectButton, gbc);
-                gbc.gridx = 1;
-                panel.add(saveButton, gbc);
-
-                // 创建弹出框
-                JBPopupFactory popupFactory = JBPopupFactory.getInstance();
-                JBPopup popup = popupFactory.createComponentPopupBuilder(panel, portField)
-                        .setRequestFocus(true)
-                        .setFocusable(true)
-                        .setTitle("Manual configure the connector")
-                        .setMovable(true)
-                        .setResizable(false)
-                        .createPopup();
-
-
-                // 添加提交按钮事件
-                injectButton.addActionListener(actionEvent -> {
-                    //copy
-                    DefaultActionGroup copyGroup = new DefaultActionGroup();
-                    //显示的一个图标加上标题
-                    AnAction copyDirect = new AnAction("Step1: Click here to Copy and execute this cmd, According to the guided injection capacity", "Step1: Click here to Copy and execute this cmd, According to the guided injection capacity", AllIcons.Actions.Copy) {
-                        @Override
-                        public void actionPerformed(@NotNull AnActionEvent e) {
-                            SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(project);
-                            StringBuilder command = new StringBuilder("java ");
-                            String ctx = cliConfig.getCtx();
-                            if (ctx != null && ctx.trim().split("#").length == 2) {
-                                command.append("-Dtestkit.cli.ctx=").append(ctx.trim()).append(" ");
-                            }
-                            String envKey = cliConfig.getEnvKey();
-                            if (envKey != null && !envKey.trim().isBlank()) {
-                                command.append("-Dtestkit.cli.env-key=").append(envKey.trim()).append(" ");
-                            }
-
-                            String cliPath = Paths.get(
-                                    PathManager.getPluginsPath(),
-                                    TestkitHelper.PLUGIN_ID,
-                                    "lib",
-                                    "testkit-cli-1.0.jar"
-                            ).toFile().getAbsolutePath();
-                            command.append("-jar \"" + cliPath + "\"");
-                            TestkitHelper.copyToClipboard(project, command.toString(), "CMD copy success\nYou can run this in terminal to  dynamic inject plugin.");
-                        }
-                    };
-                    copyGroup.add(copyDirect); // 将动作添加到动作组中
-
-                    //显示的一个图标加上标题
-                    AnAction infoAction = new AnAction("Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", "Step2: Fill in the information of successful injection in the form on the right and \"Add connection\"", AllIcons.Actions.Edit) {
-                        @Override
-                        public void actionPerformed(@NotNull AnActionEvent e) {
-                            TestkitHelper.notify(project, NotificationType.INFORMATION, "After the injection is successful\nplease fill it in manually according to the injection information");
-                        }
-                    };
-                    copyGroup.add(infoAction); // 将动作添加到动作组中
-
-                    JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance().createActionPopupMenu("CopyFunctionCallPopup", copyGroup).getComponent();
-                    popupMenu.show(injectButton, 0, 0);
-                });
-
-                // 添加提交按钮事件
-                saveButton.addActionListener(actionEvent -> {
-                    String selectedApp = (String) comboBox.getSelectedItem();
-                    String ipStr = ipField.getText().trim();
-                    String portStr = portField.getText().trim();
-                    if (selectedApp == null) {
-                        TestkitHelper.notify(project, NotificationType.ERROR, "Select app to connect to");
-                        return;
-                    }
-                    if (StringUtils.isBlank(ipStr) || !StringUtils.isNumeric(portStr)) {
-                        TestkitHelper.notify(project, NotificationType.ERROR, "host and port must be not null, port must be Numeric");
-                        return;
-                    }
-
-                    ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing test connection " + ipStr + ":" + portStr + ", please wait ...", false) {
-                        @Override
-                        public void run(ProgressIndicator indicator) {
-                            String ip = ipStr.equals("localhost") || ipStr.equals("127.0.0.1") ? "local" : ipStr;
-                            try {
-                                HashMap<String, String> requestData = new HashMap<>();
-                                requestData.put("method", "hi");
-                                // 发送请求获取实时数据
-                                JSONObject response = HttpUtil.sendPost("http://" + (ip.equals("local") ? "localhost" : ip) + ":" + portStr + "/", requestData, JSONObject.class, 5,5);
-                                String app = response.getJSONObject("data").getString("app");
-                                if (!Objects.equals(selectedApp, app)) {
-                                    TestkitHelper.notify(project, NotificationType.ERROR, "Connected to " + ip + ":" + portStr + " success<br>but app not match, expect is " + selectedApp + ", got " + app);
-                                    return;
-                                }
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                TestkitHelper.notify(project, NotificationType.ERROR, "Connected to " + selectedApp + ":" + ip + ":" + portStr + " failed<br>" + e.getMessage());
-                                return;
-                            }
-                            List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
-                            if (tempApps.contains(selectedApp + ":" + ip + ":" + portStr)) {
-                                TestkitHelper.notify(project, NotificationType.WARNING, selectedApp + ":" + ip + ":" + portStr + "already exists in " + tempApps);
-                                return;
-                            }
-                            tempApps.add(selectedApp + ":" + ip + ":" + portStr);
-                            RuntimeHelper.setTempApps(project.getName(), tempApps);
-                            TestkitHelper.notify(project, NotificationType.INFORMATION, "Add connection success<br>" + selectedApp + ":" + ip + ":" + portStr);
-                            //关闭弹窗
-                            SwingUtilities.invokeLater(() -> {
-                                popup.cancel();
-                            });
-                        }
-                    });
-
-                });
-
-                // 显示弹出框
-                popup.show(new RelativePoint(appPanel, new Point(0, 0)));
+                showConnectionConfigPopup();
             }
         }, null, "1", new Dimension(16, 32));
         // 添加 VisibleApp Label
@@ -459,7 +437,7 @@ public class TestkitToolWindow {
 
         // 添加 kill 进程按钮到 appBox 右边
         killButton = new JButton(AllIcons.Actions.GC);
-        killButton.setToolTipText("⚠️ DANGER: Kill the process using the testkit port (local only)");
+        killButton.setToolTipText("⚠️ Stop/Kill: Local app kills process, Remote app sends stop request and removes from list");
         killButton.setPreferredSize(new Dimension(32, 32));
         // 设置红色前景色，使其更加醒目和具有警告性
         killButton.setForeground(new Color(220, 53, 69)); // 红色
@@ -489,9 +467,28 @@ public class TestkitToolWindow {
                 return;
             }
 
+            // 检查是否是 remote app
+            if (visibleApp.isRemoteScript()) {
+                // Remote app: 仅从列表移除，不停止远程服务
+                int result = Messages.showYesNoDialog(
+                        project,
+                        "Remove this remote instance from list?\n" +
+                                "App: " + visibleApp.getAppName() + "\n" +
+                                "IP: " + visibleApp.getRemoteIp() + "\n\n" +
+                                "(Note: This only disconnects from plugin, the remote service will NOT be stopped)",
+                        "Remove Remote Instance",
+                        Messages.getQuestionIcon()
+                );
+
+                if (result == Messages.YES) {
+                    removeRemoteInstance(visibleApp, selectedItem);
+                }
+                return;
+            }
+
             // 检查是否是 local app
             if (!visibleApp.judgeIsLocal()) {
-                TestkitHelper.notify(project, NotificationType.WARNING, "Only local apps can be killed. Current app IP: " + visibleApp.getIp());
+                TestkitHelper.notify(project, NotificationType.WARNING, "Only local or remote apps can be stopped. Current app IP: " + visibleApp.getIp());
                 return;
             }
 
@@ -537,7 +534,7 @@ public class TestkitToolWindow {
                     });
                     System.out.println("刷新app任务,"+project.getName()+"," + active[0] + "," + new Date());
                     if (active[0]) {
-                        refreshVisibleApp();
+                        refreshVisibleApp(true);
                     }
                 } catch (Throwable e) {
                     System.err.println("刷新app失败,"+project.getName());
@@ -719,7 +716,11 @@ public class TestkitToolWindow {
         return outputPanel;
     }
 
-    void refreshVisibleApp() {
+    /**
+     * 刷新可见应用列表
+     * @param skipRemote 是否跳过 remote 类型的连接探活
+     */
+    synchronized void refreshVisibleApp(boolean skipRemote) {
         Set<String> newItems = new LinkedHashSet<>();
         List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
         if (localItems != null) {
@@ -744,33 +745,94 @@ public class TestkitToolWindow {
 
             // 获取 visibleApp 实例
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
+
+            // remote 类型的连接处理
+            if (visibleApp.isRemoteScript()) {
+                if (skipRemote) {
+                    // 检查是否过期
+                    if (RuntimeHelper.isConnectionExpired(item)) {
+                        System.out.println("链接探活:remote 已过期，移除:" + item);
+                        iterator.remove();
+                        List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
+                        if (tempApps1.contains(item)) {
+                            tempApps1.remove(item);
+                            RuntimeHelper.setTempApps(project.getName(), tempApps1);
+                        }
+                        RuntimeHelper.removeConnectionMeta(item);  // 清理元数据
+                        continue;
+                    }
+                    // 未过期，跳过探活，保留原有的 trace 状态
+                    System.out.println("链接探活:跳过 remote 类型:" + item);
+                    newMap.put(item, RuntimeHelper.isEnableTrace(item));
+                    continue;
+                }
+                // 不跳过时，通过脚本探活
+                try {
+                    String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
+                    if (StringUtils.isNotBlank(scriptPath)) {
+                        JSONObject hiReq = new JSONObject();
+                        hiReq.put("method", "hi");
+                        JSONObject resp = RemoteScriptCallUtils.sendRequest(project, visibleApp, hiReq, 5);
+                        if (resp.getBooleanValue("success")) {
+                            boolean enableTrace = false;
+                            JSONObject data = resp.getJSONObject("data");
+                            if (data != null) {
+                                enableTrace = data.getBooleanValue("enableTrace");
+                            }
+                            System.out.println("链接探活(remote):" + item + ",true," + enableTrace);
+                            newMap.put(item, enableTrace);
+                        } else {
+                            throw new RuntimeException(resp.getString("message"));
+                        }
+                    } else {
+                        // 没有配置脚本，保留原状态
+                        newMap.put(item, RuntimeHelper.isEnableTrace(item));
+                    }
+                } catch (Exception e) {
+                    System.out.println("链接探活(remote):" + item + ",false," + e.getMessage());
+                    // 探活失败，从列表中移除
+                    iterator.remove();
+                    List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
+                    if (tempApps1.contains(item)) {
+                        tempApps1.remove(item);
+                        RuntimeHelper.setTempApps(project.getName(), tempApps1);
+                    }
+                }
+                continue;
+            }
+
             try {
                 // 发送请求获取实时数据
                 JSONObject response = HttpUtil.sendPost("http://" + (visibleApp.judgeIsLocal() ? "localhost" : visibleApp.getIp()) + ":" + visibleApp.getTestkitPort() + "/", requestData, JSONObject.class, null,null);
-                boolean enableTrace = response.getJSONObject("data").getBooleanValue("enableTrace");
-                System.out.println("链接探活:"+item+",true,"+enableTrace);
+                JSONObject data = response.getJSONObject("data");
+                boolean enableTrace = data.getBooleanValue("enableTrace");
+                String env = data.getString("env");
+                System.out.println("链接探活:"+item+",true,"+enableTrace+",env="+env);
                 newMap.put(item, enableTrace);
+                // 更新 env 到元数据（local/manual 连接不设过期时间，用 Long.MAX_VALUE）
+                RuntimeHelper.updateConnectionMeta(item, enableTrace, env, Long.MAX_VALUE);
             }catch (Throwable e) {
                 e.printStackTrace();
-                iterator.remove();
                 System.out.println("链接探活:"+item+",false,");
 
                 if(e instanceof ConnectException && e.getMessage()!=null && e.getMessage().contains("Connection refused") ) {
-                    //将这个加入到临时的链接集里
+                    // Connection refused 表示服务已停止，从列表中移除
+                    iterator.remove();
                     List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
                     if (tempApps1.contains(item)) {
                         tempApps1.remove(item);
                         RuntimeHelper.setTempApps(project.getName(),tempApps1);
                     }
-                }else{
-                    //将这个加入到临时的链接集里
+                    RuntimeHelper.removeApp(project.getName(), visibleApp);
+                } else {
+                    // 其他错误（超时等）暂时保留连接，加入临时列表
+                    newMap.put(item, RuntimeHelper.isEnableTrace(item));  // 保留原有 trace 状态
                     List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
                     if (!tempApps1.contains(item)) {
                         tempApps1.add(item);
                         RuntimeHelper.setTempApps(project.getName(),tempApps1);
                     }
                 }
-                RuntimeHelper.removeApp(project.getName(), visibleApp);
             }
         }
 
@@ -1161,7 +1223,7 @@ public class TestkitToolWindow {
                         }
                         TestkitHelper.notify(project, NotificationType.INFORMATION, message);
                         // 刷新 app 列表
-                        ApplicationManager.getApplication().invokeLater(() -> refreshVisibleApp());
+                        ApplicationManager.getApplication().invokeLater(() -> refreshVisibleApp(true));
                     } else {
                         TestkitHelper.notify(project, NotificationType.WARNING,
                                 "No non-IDEA process found using port " + port);
@@ -1176,6 +1238,586 @@ public class TestkitToolWindow {
     }
 
 
+
+    /**
+     * 移除远程实例（仅从列表移除，不发送 stop 请求）
+     * @param visibleApp 远程应用
+     * @param connectionStr 连接字符串
+     */
+    private void removeRemoteInstance(RuntimeHelper.VisibleApp visibleApp, String connectionStr) {
+        // 从 tempApps 中移除
+        List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+        tempApps.remove(connectionStr);
+        RuntimeHelper.setTempApps(project.getName(), tempApps);
+
+        // 从 RuntimeHelper 中移除
+        RuntimeHelper.removeApp(project.getName(), visibleApp);
+
+        // 刷新列表
+        refreshVisibleApp(true);
+
+        TestkitHelper.notify(project, NotificationType.INFORMATION,
+                "Remote instance removed from list: " + visibleApp.getRemoteIp() + "\n(Remote service is not stopped, only disconnected from plugin)");
+    }
+
+    // ==================== Connection Config Popup ====================
+
+    /**
+     * 显示连接配置弹窗（合并 Remote Instance 和 Manual Configure）
+     */
+    private void showConnectionConfigPopup() {
+        // 创建弹出框引用
+        final JBPopup[] popupHolder = new JBPopup[1];
+
+        // 创建合并面板
+        JPanel mainPanel = createCombinedConnectionPanel(popupHolder);
+        mainPanel.setPreferredSize(new Dimension(520, 420));
+
+        // 创建弹出框
+        JBPopupFactory popupFactory = JBPopupFactory.getInstance();
+        JBPopup popup = popupFactory.createComponentPopupBuilder(mainPanel, mainPanel)
+                .setRequestFocus(true)
+                .setFocusable(true)
+                .setTitle("Add Remote Connection")
+                .setMovable(true)
+                .setResizable(true)
+                .createPopup();
+
+        popupHolder[0] = popup;
+
+        // 显示弹出框
+        popup.show(new RelativePoint(appPanel, new Point(0, 0)));
+    }
+
+    /**
+     * 创建合并的连接配置面板（Remote Instance + Manual Configure）
+     */
+    private JPanel createCombinedConnectionPanel(JBPopup[] popupHolder) {
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // ==================== 上半部分：Remote Instance ====================
+        JPanel remotePanel = new JPanel(new BorderLayout(5, 5));
+        remotePanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createEtchedBorder(), "Remote Instance",
+                javax.swing.border.TitledBorder.LEFT, javax.swing.border.TitledBorder.TOP));
+
+        // 脚本路径配置
+        JPanel scriptPanel = new JPanel(new BorderLayout(5, 0));
+
+        // 左侧：Info 按钮 + Script 标签
+        JPanel scriptLeftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        JButton scriptInfoBtn = new JButton(AllIcons.General.Information);
+        scriptInfoBtn.setToolTipText("View example infra script");
+        scriptInfoBtn.setPreferredSize(new Dimension(26, 22));
+        scriptLeftPanel.add(scriptInfoBtn);
+        scriptLeftPanel.add(new JLabel("Remote Script:"));
+        scriptPanel.add(scriptLeftPanel, BorderLayout.WEST);
+
+        String savedPath = SettingsStorageHelper.getRemoteScriptPath(project);
+        String defaultPath = System.getProperty("user.home") + "/.ccitools/src/ccitools/scripts/testkit_cci_connector.groovy";
+        JBTextField scriptPathField = new JBTextField(savedPath != null ? savedPath : defaultPath);
+        scriptPathField.getEmptyText().setText("Groovy script path");
+        scriptPanel.add(scriptPathField, BorderLayout.CENTER);
+
+        JPanel scriptBtnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        JButton saveBtn = new JButton(AllIcons.Actions.MenuSaveall);
+        saveBtn.setToolTipText("Save path");
+        saveBtn.setPreferredSize(new Dimension(26, 22));
+        JButton viewBtn = new JButton(AllIcons.Actions.Preview);
+        viewBtn.setToolTipText("View script");
+        viewBtn.setPreferredSize(new Dimension(26, 22));
+        scriptBtnPanel.add(saveBtn);
+        scriptBtnPanel.add(viewBtn);
+        scriptPanel.add(scriptBtnPanel, BorderLayout.EAST);
+
+        // App/Partition 选择（Refresh 按钮放在最左边）
+        JPanel selectPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
+        JButton refreshBtn = new JButton(AllIcons.Actions.Refresh);
+        refreshBtn.setToolTipText("Refresh infra");
+        refreshBtn.setPreferredSize(new Dimension(26, 24));
+        selectPanel.add(refreshBtn);
+        selectPanel.add(new JLabel("App:"));
+        ComboBox<String> infraAppBox = new ComboBox<>();
+        infraAppBox.setPreferredSize(new Dimension(120, 24));
+        selectPanel.add(infraAppBox);
+        selectPanel.add(new JLabel("Partition:"));
+        ComboBox<String> partitionBox = new ComboBox<>();
+        partitionBox.setPreferredSize(new Dimension(100, 24));
+        selectPanel.add(partitionBox);
+        JButton loadMachinesBtn = new JButton("Load", AllIcons.Actions.Search);
+        loadMachinesBtn.setToolTipText("Load instances from remote script");
+        loadMachinesBtn.setEnabled(false);
+        selectPanel.add(loadMachinesBtn);
+
+        JPanel remoteTopPanel = new JPanel(new BorderLayout(5, 3));
+        remoteTopPanel.add(scriptPanel, BorderLayout.NORTH);
+        remoteTopPanel.add(selectPanel, BorderLayout.CENTER);
+
+        // 实例表格
+        String[] columnNames = {"IP", "Port", "Env", "Status", "Action"};
+        javax.swing.table.DefaultTableModel tableModel = new javax.swing.table.DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 4;  // Action 列（IP=0, Port=1, Env=2, Status=3, Action=4）
+            }
+        };
+        JTable instanceTable = new JTable(tableModel);
+        instanceTable.setRowHeight(26);
+        instanceTable.getColumnModel().getColumn(0).setPreferredWidth(140);  // IP
+        instanceTable.getColumnModel().getColumn(1).setPreferredWidth(50);   // Port
+        instanceTable.getColumnModel().getColumn(1).setMaxWidth(60);
+        instanceTable.getColumnModel().getColumn(2).setPreferredWidth(60);   // Env
+        instanceTable.getColumnModel().getColumn(2).setMaxWidth(80);
+        instanceTable.getColumnModel().getColumn(3).setPreferredWidth(50);   // Status
+        instanceTable.getColumnModel().getColumn(3).setMaxWidth(80);
+        instanceTable.getColumnModel().getColumn(4).setPreferredWidth(65);   // Action
+        instanceTable.getColumnModel().getColumn(4).setMaxWidth(70);
+
+        List<RemoteScriptExecutor.InstanceInfo> instanceDataList = new ArrayList<>();
+
+        // Status 列渲染器 - 支持 Tooltip 显示完整错误信息
+        instanceTable.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                if (row < instanceDataList.size()) {
+                    RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
+                    if (inst.isSuccess()) {
+                        label.setText("✅");
+                        label.setToolTipText("Connection OK");
+                    } else {
+                        label.setText("❌ Error");
+                        label.setForeground(new Color(200, 100, 100));
+                        String errorMsg = inst.getErrorMessage();
+                        if (StringUtils.isNotBlank(errorMsg)) {
+                            // 使用 HTML 格式，支持换行和更好的展示
+                            String htmlTooltip = "<html><div style='width:300px;'><b>Error:</b><br>" +
+                                    escapeHtml(errorMsg) + "</div></html>";
+                            label.setToolTipText(htmlTooltip);
+                        } else {
+                            label.setToolTipText("Connection failed");
+                        }
+                    }
+                }
+                return label;
+            }
+
+            private String escapeHtml(String text) {
+                return text.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace("\n", "<br>");
+            }
+        });
+
+        // 操作列渲染器
+        instanceTable.getColumnModel().getColumn(4).setCellRenderer((table, value, isSelected, hasFocus, row, column) -> {
+            if (row < instanceDataList.size() && instanceDataList.get(row).isSuccess()) {
+                JButton btn = new JButton("Add", connectionIcon);
+                btn.setToolTipText("Add to connections");
+                btn.setHorizontalTextPosition(SwingConstants.RIGHT);
+                btn.setIconTextGap(2);
+                btn.setMargin(new Insets(0, 2, 0, 2));
+                btn.setFont(btn.getFont().deriveFont(11f));
+                return btn;
+            }
+            JLabel lbl = new JLabel("—");
+            lbl.setHorizontalAlignment(SwingConstants.CENTER);
+            lbl.setForeground(Color.GRAY);
+            return lbl;
+        });
+
+        // 操作列编辑器
+        instanceTable.getColumnModel().getColumn(4).setCellEditor(new javax.swing.DefaultCellEditor(new JCheckBox()) {
+            private JButton button = new JButton("Add", connectionIcon);
+            private int currentRow = -1;
+            {
+                button.setHorizontalTextPosition(SwingConstants.RIGHT);
+                button.setIconTextGap(2);
+                button.setMargin(new Insets(0, 2, 0, 2));
+                button.setFont(button.getFont().deriveFont(11f));
+                button.addActionListener(e -> {
+                    if (currentRow >= 0 && currentRow < instanceDataList.size()) {
+                        RemoteScriptExecutor.InstanceInfo instance = instanceDataList.get(currentRow);
+                        if (instance.isSuccess()) {
+                            addInstanceToConnections(instance, popupHolder);
+                        }
+                    }
+                    fireEditingStopped();
+                });
+            }
+            @Override
+            public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                currentRow = row;
+                return (row < instanceDataList.size() && instanceDataList.get(row).isSuccess()) ? button : new JLabel("—");
+            }
+            @Override
+            public Object getCellEditorValue() { return ""; }
+        });
+
+        JBScrollPane tableScroll = new JBScrollPane(instanceTable);
+        tableScroll.setPreferredSize(new Dimension(480, 120));
+
+        JLabel statusLabel = new JLabel("Configure script to load remote machines");
+        statusLabel.setForeground(Color.GRAY);
+        statusLabel.setFont(statusLabel.getFont().deriveFont(Font.ITALIC, 11f));
+
+        remotePanel.add(remoteTopPanel, BorderLayout.NORTH);
+        remotePanel.add(tableScroll, BorderLayout.CENTER);
+        remotePanel.add(statusLabel, BorderLayout.SOUTH);
+
+        // 存储 infra 数据
+        final Map<String, List<String>>[] infraDataHolder = new Map[]{null};
+
+        // Load Infra Action
+        Runnable loadInfraAction = () -> {
+            String scriptPath = scriptPathField.getText().trim();
+            if (StringUtils.isBlank(scriptPath)) return;
+            SettingsStorageHelper.setRemoteScriptPath(project, scriptPath);
+
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Loading...", false) {
+                @Override
+                public void run(ProgressIndicator indicator) {
+                    try {
+                        RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
+                        Map<String, List<String>> infraData = executor.loadInfra(LOAD_INFRA_TIMEOUT);
+
+                        // 获取当前项目中的 app 列表
+                        List<RuntimeHelper.AppMeta> projectApps = RuntimeHelper.getAppMetas(project.getName());
+                        Set<String> projectAppNames = projectApps.stream()
+                                .map(RuntimeHelper.AppMeta::getApp)
+                                .collect(java.util.stream.Collectors.toSet());
+
+                        // 过滤 infraData，只保留当前项目中存在的 app
+                        Map<String, List<String>> filteredData = new LinkedHashMap<>();
+                        int totalApps = infraData != null ? infraData.size() : 0;
+                        int filteredCount = 0;
+                        if (infraData != null) {
+                            for (Map.Entry<String, List<String>> entry : infraData.entrySet()) {
+                                if (projectAppNames.contains(entry.getKey())) {
+                                    filteredData.put(entry.getKey(), entry.getValue());
+                                } else {
+                                    filteredCount++;
+                                }
+                            }
+                        }
+                        infraDataHolder[0] = filteredData;
+
+                        final int finalFilteredCount = filteredCount;
+                        final int finalTotalApps = totalApps;
+                        SwingUtilities.invokeLater(() -> {
+                            infraAppBox.removeAllItems();
+                            partitionBox.removeAllItems();
+                            tableModel.setRowCount(0);
+                            instanceDataList.clear();
+                            if (!filteredData.isEmpty()) {
+                                filteredData.keySet().forEach(infraAppBox::addItem);
+                                String statusText = "✅ " + filteredData.size() + " app(s) loaded";
+                                if (finalFilteredCount > 0) {
+                                    statusText += " (" + finalFilteredCount + "/" + finalTotalApps + " filtered out - not in project)";
+                                }
+                                statusLabel.setText(statusText);
+                                statusLabel.setForeground(new Color(100, 150, 100));
+                                loadMachinesBtn.setEnabled(true);
+                            } else if (finalTotalApps > 0) {
+                                statusLabel.setText("⚠️ " + finalTotalApps + " app(s) from script not found in project");
+                                statusLabel.setForeground(new Color(200, 150, 50));
+                            } else {
+                                statusLabel.setText("⚠️ No data");
+                                statusLabel.setForeground(new Color(200, 150, 50));
+                            }
+                        });
+                    } catch (Exception ex) {
+                        SwingUtilities.invokeLater(() -> {
+                            statusLabel.setText("❌ " + ex.getMessage());
+                            statusLabel.setForeground(new Color(200, 100, 100));
+                        });
+                    }
+                }
+            });
+        };
+
+        // 按钮事件
+        saveBtn.addActionListener(e -> {
+            String path = scriptPathField.getText().trim();
+            if (StringUtils.isBlank(path)) {
+                Messages.showWarningDialog(project, "Script path is empty", "Save Path");
+                return;
+            }
+            SettingsStorageHelper.setRemoteScriptPath(project, path);
+            loadInfraAction.run();
+        });
+
+        viewBtn.addActionListener(e -> {
+            String path = scriptPathField.getText().trim();
+            if (StringUtils.isBlank(path)) {
+                Messages.showWarningDialog(project, "Script path is empty", "View Script");
+                return;
+            }
+            File f = new File(path);
+            if (!f.exists()) {
+                Messages.showErrorDialog(project, "Script file not found: " + path, "View Script");
+                return;
+            }
+            try {
+                JTextArea ta = new JTextArea(java.nio.file.Files.readString(f.toPath()));
+                ta.setEditable(false);
+                ta.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+                JBScrollPane sp = new JBScrollPane(ta);
+                sp.setPreferredSize(new Dimension(600, 400));
+                JBPopupFactory.getInstance().createComponentPopupBuilder(sp, ta)
+                        .setTitle("Script: " + f.getName()).setMovable(true).setResizable(true)
+                        .createPopup().showInFocusCenter();
+            } catch (Exception ignored) {}
+        });
+
+        scriptInfoBtn.addActionListener(e -> {
+            JTextArea ta = new JTextArea(REMOTE_SCRIPT_INFO);
+            ta.setEditable(false);
+            ta.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+            ta.setCaretPosition(0);
+            JBScrollPane sp = new JBScrollPane(ta);
+            sp.setPreferredSize(new Dimension(750, 750));
+            JBPopupFactory.getInstance().createComponentPopupBuilder(sp, ta)
+                    .setTitle("Remote Script API Reference").setMovable(true).setResizable(true)
+                    .createPopup().showInFocusCenter();
+        });
+
+        refreshBtn.addActionListener(e -> loadInfraAction.run());
+
+        infraAppBox.addActionListener(e -> {
+            String app = (String) infraAppBox.getSelectedItem();
+            partitionBox.removeAllItems();
+            tableModel.setRowCount(0);
+            instanceDataList.clear();
+            if (app != null && infraDataHolder[0] != null) {
+                List<String> parts = infraDataHolder[0].get(app);
+                if (parts != null) parts.forEach(partitionBox::addItem);
+            }
+        });
+
+        loadMachinesBtn.addActionListener(e -> {
+            String app = (String) infraAppBox.getSelectedItem();
+            String part = (String) partitionBox.getSelectedItem();
+            if (app == null || part == null) return;
+            String scriptPath = scriptPathField.getText().trim();
+
+            // 加载开始时立即清空表格，避免用户点击旧数据
+            tableModel.setRowCount(0);
+            instanceDataList.clear();
+            statusLabel.setText("⏳ Loading...");
+            statusLabel.setForeground(Color.GRAY);
+
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Loading instances...", false) {
+                @Override
+                public void run(ProgressIndicator indicator) {
+                    try {
+                        List<RemoteScriptExecutor.InstanceInfo> instances = new RemoteScriptExecutor(scriptPath).loadInstances(app, part, LOAD_INSTANCES_TIMEOUT);
+                        SwingUtilities.invokeLater(() -> {
+                            if (instances != null && !instances.isEmpty()) {
+                                for (RemoteScriptExecutor.InstanceInfo inst : instances) {
+                                    instanceDataList.add(inst);
+                                    // Env 为 null 时显示 "-"，Status 显示由渲染器处理
+                                    String envDisplay = inst.getEnv() != null && !inst.getEnv().isEmpty() ? inst.getEnv() : "-";
+                                    tableModel.addRow(new Object[]{inst.getIp(), inst.getPort(), envDisplay, "", ""});
+                                }
+                                long ok = instances.stream().filter(RemoteScriptExecutor.InstanceInfo::isSuccess).count();
+                                statusLabel.setText("✅ " + instances.size() + " instances, " + ok + " available");
+                                statusLabel.setForeground(new Color(100, 150, 100));
+                            } else {
+                                statusLabel.setText("⚠️ No instances");
+                                statusLabel.setForeground(new Color(200, 150, 50));
+                            }
+                        });
+                    } catch (Exception ex) {
+                        SwingUtilities.invokeLater(() -> {
+                            statusLabel.setText("❌ " + ex.getMessage());
+                            statusLabel.setForeground(new Color(200, 100, 100));
+                        });
+                    }
+                }
+            });
+        });
+
+        // 自动加载
+        if (StringUtils.isNotBlank(savedPath) && new File(savedPath).exists()) {
+            SwingUtilities.invokeLater(loadInfraAction::run);
+        }
+
+        // ==================== 下半部分：Manual Configure ====================
+        JPanel manualPanel = new JPanel(new BorderLayout(5, 5));
+        manualPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createEtchedBorder(), "Manual Configure",
+                javax.swing.border.TitledBorder.LEFT, javax.swing.border.TitledBorder.TOP));
+
+        JPanel manualInputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+
+        List<RuntimeHelper.AppMeta> appMetas = RuntimeHelper.getAppMetas(project.getName());
+        String[] appOptions = CollectionUtils.isEmpty(appMetas)
+                ? new String[]{"(No apps)"}
+                : appMetas.stream().map(RuntimeHelper.AppMeta::getApp).toArray(String[]::new);
+        ComboBox<String> manualAppBox = new ComboBox<>(appOptions);
+        manualAppBox.setPreferredSize(new Dimension(100, 24));
+
+        JBTextField ipField = new JBTextField("localhost");
+        ipField.setPreferredSize(new Dimension(100, 24));
+        ipField.setToolTipText("IP address");
+
+        JBTextField portField = new JBTextField("18080");
+        portField.setPreferredSize(new Dimension(60, 24));
+        portField.setToolTipText("Testkit port");
+
+        JButton addManualBtn = new JButton("Add", connectionIcon);
+        addManualBtn.setToolTipText("Test connection and add");
+
+        JButton injectBtn = new JButton(AllIcons.General.Information);
+        injectBtn.setToolTipText("Dynamic inject guide - for projects not started with Testkit");
+        injectBtn.setPreferredSize(new Dimension(26, 24));
+
+        manualInputPanel.add(injectBtn);
+        manualInputPanel.add(new JLabel("App:"));
+        manualInputPanel.add(manualAppBox);
+        manualInputPanel.add(new JLabel("IP:"));
+        manualInputPanel.add(ipField);
+        manualInputPanel.add(new JLabel("Port:"));
+        manualInputPanel.add(portField);
+        manualInputPanel.add(addManualBtn);
+
+        manualPanel.add(manualInputPanel, BorderLayout.CENTER);
+
+        // Dynamic inject 按钮事件
+        injectBtn.addActionListener(e -> {
+            DefaultActionGroup copyGroup = new DefaultActionGroup();
+            AnAction copyDirect = new AnAction("Step1: Copy CLI command to inject Testkit into running project",
+                    "Copy and execute this command in terminal", AllIcons.Actions.Copy) {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent ev) {
+                    SettingsStorageHelper.CliConfig cliConfig = SettingsStorageHelper.getCliConfig(project);
+                    StringBuilder command = new StringBuilder("java ");
+                    String ctx = cliConfig.getCtx();
+                    if (ctx != null && ctx.trim().split("#").length == 2) {
+                        command.append("-Dtestkit.cli.ctx=").append(ctx.trim()).append(" ");
+                    }
+                    String envKey = cliConfig.getEnvKey();
+                    if (envKey != null && !envKey.trim().isBlank()) {
+                        command.append("-Dtestkit.env-key=").append(envKey.trim()).append(" ");
+                    }
+                    String cliPath = Paths.get(
+                            PathManager.getPluginsPath(),
+                            TestkitHelper.PLUGIN_ID,
+                            "lib",
+                            "testkit-cli-1.0.jar"
+                    ).toFile().getAbsolutePath();
+                    command.append("-jar \"").append(cliPath).append("\"");
+                    TestkitHelper.copyToClipboard(project, command.toString(),
+                            "CLI command copied!\nPaste and run in terminal to inject Testkit into running project.");
+                }
+            };
+            copyGroup.add(copyDirect);
+
+            AnAction infoAction = new AnAction("Step2: Fill in App/IP/Port from injection output, then click Add",
+                    "After injection succeeds, fill in the connection info", AllIcons.Actions.Edit) {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent ev) {
+                    TestkitHelper.notify(project, NotificationType.INFORMATION,
+                            "After injection succeeds:\n" +
+                            "1. Check the output for App name and Port\n" +
+                            "2. Fill in App, IP (localhost), Port above\n" +
+                            "3. Click 'Add' to connect");
+                }
+            };
+            copyGroup.add(infoAction);
+
+            JBPopupMenu popupMenu = (JBPopupMenu) ActionManager.getInstance()
+                    .createActionPopupMenu("DynamicInjectPopup", copyGroup).getComponent();
+            popupMenu.show(injectBtn, 0, injectBtn.getHeight());
+        });
+
+        // Manual Add 按钮事件
+        addManualBtn.addActionListener(e -> {
+            String app = (String) manualAppBox.getSelectedItem();
+            String ip = ipField.getText().trim();
+            String port = portField.getText().trim();
+
+            if (app == null || app.equals("(No apps)") || StringUtils.isBlank(ip) || !StringUtils.isNumeric(port)) {
+                TestkitHelper.notify(project, NotificationType.ERROR, "Please fill in all fields correctly");
+                return;
+            }
+
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Testing connection...", false) {
+                @Override
+                public void run(ProgressIndicator indicator) {
+                    String ipStr = ip.equals("localhost") || ip.equals("127.0.0.1") ? "local" : ip;
+                    try {
+                        HashMap<String, String> req = new HashMap<>();
+                        req.put("method", "hi");
+                        JSONObject resp = HttpUtil.sendPost("http://" + (ipStr.equals("local") ? "localhost" : ipStr) + ":" + port + "/", req, JSONObject.class, 5, 5);
+                        String respApp = resp.getJSONObject("data").getString("app");
+                        if (!Objects.equals(app, respApp)) {
+                            TestkitHelper.notify(project, NotificationType.ERROR, "App mismatch: expected " + app + ", got " + respApp);
+                            return;
+                        }
+                    } catch (Exception ex) {
+                        TestkitHelper.notify(project, NotificationType.ERROR, "Connection failed: " + ex.getMessage());
+                        return;
+                    }
+
+                    List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+                    String connStr = app + ":" + ipStr + ":" + port;
+                    if (tempApps.contains(connStr)) {
+                        TestkitHelper.notify(project, NotificationType.WARNING, "Already exists: " + connStr);
+                        return;
+                    }
+                    tempApps.add(connStr);
+                    RuntimeHelper.setTempApps(project.getName(), tempApps);
+                    TestkitHelper.notify(project, NotificationType.INFORMATION, "Added: " + connStr);
+
+                    if (popupHolder[0] != null) {
+                        SwingUtilities.invokeLater(() -> popupHolder[0].cancel());
+                    }
+                }
+            });
+        });
+
+        // ==================== 组装 ====================
+        panel.add(remotePanel, BorderLayout.CENTER);
+        panel.add(manualPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    /**
+     * 添加实例到连接列表
+     */
+    private void addInstanceToConnections(RemoteScriptExecutor.InstanceInfo instance, JBPopup[] popupHolder) {
+        String connectionStr = instance.toConnectionString();
+
+        // 检查 appBox 中是否已存在（包括 tempApps 和 localItems）
+        for (int i = 0; i < appBox.getItemCount(); i++) {
+            if (connectionStr.equals(appBox.getItemAt(i))) {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Already connected: " + connectionStr);
+                return;
+            }
+        }
+
+        List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+        tempApps.add(connectionStr);
+        RuntimeHelper.setTempApps(project.getName(), tempApps);
+
+        // 更新连接元数据（trace、env、expireTime）
+        RuntimeHelper.updateConnectionMeta(
+            connectionStr,
+            instance.isEnableTrace(),
+            instance.getEnv(),
+            instance.getExpireTime()
+        );
+
+        // 刷新 appBox
+        refreshVisibleApp(true);
+
+        TestkitHelper.notify(project, NotificationType.INFORMATION, "Added: " + connectionStr);
+    }
 
 }
 

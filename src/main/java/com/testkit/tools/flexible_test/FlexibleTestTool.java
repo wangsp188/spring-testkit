@@ -155,7 +155,7 @@ public class FlexibleTestTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerTestkitServerTask(runButton, AllIcons.Actions.Execute, app.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerTestkitServerTask(runButton, AllIcons.Actions.Execute, app, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         String jsonInput = jsonInputField.getDocument().getText();

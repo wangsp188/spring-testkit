@@ -37,7 +37,7 @@ public class GenerateFlexibleTestAction extends AnAction {
             return;
         }
 
-        if (!RuntimeHelper.hasAppMeta(psiFile.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(psiFile.getProject())) {
+        if (!RuntimeHelper.hasAppMeta(psiFile.getProject().getName())) {
             e.getPresentation().setVisible(false);
             return;
         }

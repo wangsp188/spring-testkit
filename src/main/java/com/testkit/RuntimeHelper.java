@@ -22,7 +22,8 @@ public class RuntimeHelper {
 
     private static final String APPS_DIR = ".spring-testkit/apps";
 
-    private static final Map<String, Boolean> traceMap = new HashMap<>();
+    // 连接元数据：connectionStr -> ConnectionMeta（包含 local 和 remote 连接）
+    private static final Map<String, ConnectionMeta> connectionMetaMap = new HashMap<>();
 
     private static final Map<String, VisibleApp> selectedApps = new HashMap<>();
 
@@ -65,19 +66,90 @@ public class RuntimeHelper {
     }
 
 
+    // ==================== Connection Meta 相关方法 ====================
+
+    /**
+     * 更新连接的元数据
+     */
+    public static void updateConnectionMeta(String connectionStr, boolean enableTrace, String env, long expireTime) {
+        if (connectionStr == null) {
+            return;
+        }
+        ConnectionMeta meta = connectionMetaMap.computeIfAbsent(connectionStr, k -> new ConnectionMeta());
+        meta.setEnableTrace(enableTrace);
+        meta.setEnv(env);
+        meta.setExpireTime(expireTime);
+    }
+
+    /**
+     * 获取连接的元数据
+     */
+    public static ConnectionMeta getConnectionMeta(String connectionStr) {
+        if (connectionStr == null) {
+            return null;
+        }
+        return connectionMetaMap.get(connectionStr);
+    }
+
+    /**
+     * 移除连接的元数据
+     */
+    public static void removeConnectionMeta(String connectionStr) {
+        if (connectionStr != null) {
+            connectionMetaMap.remove(connectionStr);
+        }
+    }
+
+    /**
+     * 批量更新 trace 状态
+     */
     public static void updateTraces(Map<String, Boolean> traces) {
         if (traces == null) {
             return;
         }
-        traceMap.putAll(traces);
+        for (Map.Entry<String, Boolean> entry : traces.entrySet()) {
+            String connectionStr = entry.getKey();
+            ConnectionMeta meta = connectionMetaMap.computeIfAbsent(connectionStr, k -> new ConnectionMeta());
+            meta.setEnableTrace(entry.getValue() != null && entry.getValue());
+        }
     }
 
-    public static boolean isEnableTrace(String app) {
-        if (app == null) {
+    public static boolean isEnableTrace(String connectionStr) {
+        if (connectionStr == null) {
             return false;
         }
-        Boolean trace = traceMap.get(app);
-        return trace != null && trace;
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null && meta.isEnableTrace();
+    }
+
+    public static String getEnv(String connectionStr) {
+        if (connectionStr == null) {
+            return null;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null ? meta.getEnv() : null;
+    }
+
+    public static long getExpireTime(String connectionStr) {
+        if (connectionStr == null) {
+            return 0;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null ? meta.getExpireTime() : 0;
+    }
+
+    /**
+     * 检查连接是否已过期（仅对 remote 连接有意义）
+     */
+    public static boolean isConnectionExpired(String connectionStr) {
+        if (connectionStr == null) {
+            return true;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        if (meta == null) {
+            return true; // 没有元数据视为已过期
+        }
+        return System.currentTimeMillis() > meta.getExpireTime();
     }
 
     public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls, List<String> writes) {
@@ -337,6 +409,34 @@ public class RuntimeHelper {
             return "local".equals(ip);
         }
 
+        /**
+         * 判断是否是通过 Groovy 脚本连接的远程机器
+         * IP 格式为 [partition]ip
+         */
+        public boolean isRemoteScript() {
+            return ip != null && ip.startsWith("[");
+        }
+
+        /**
+         * 获取远程实例标识（从 [partition]ip 中提取 ip）
+         */
+        public String getRemoteIp() {
+            if (isRemoteScript() && ip.contains("]")) {
+                return ip.substring(ip.indexOf("]") + 1);
+            }
+            return null;
+        }
+
+        /**
+         * 获取远程实例的 partition（从 [partition]ip 中提取 partition）
+         */
+        public String getRemotePartition() {
+            if (isRemoteScript() && ip.contains("]")) {
+                return ip.substring(1, ip.indexOf("]"));
+            }
+            return null;
+        }
+
         public String getAppName() {
             return appName;
         }
@@ -377,6 +477,56 @@ public class RuntimeHelper {
         @Override
         public int hashCode() {
             return Objects.hash(appName, ip, testkitPort);
+        }
+
+        public String toConnectionString() {
+            return appName + ":" + ip + ":" + testkitPort;
+        }
+    }
+
+    /**
+     * 连接元数据（包含 local 和 remote 连接的元信息）
+     */
+    public static class ConnectionMeta {
+        private boolean enableTrace;
+        private String env;
+        private long expireTime;  // 过期时间（UTC 时间戳）
+
+        public boolean isEnableTrace() {
+            return enableTrace;
+        }
+
+        public void setEnableTrace(boolean enableTrace) {
+            this.enableTrace = enableTrace;
+        }
+
+        public String getEnv() {
+            return env;
+        }
+
+        public void setEnv(String env) {
+            this.env = env;
+        }
+
+        public long getExpireTime() {
+            return expireTime;
+        }
+
+        public void setExpireTime(long expireTime) {
+            this.expireTime = expireTime;
+        }
+
+        public boolean isExpired() {
+            return System.currentTimeMillis() > expireTime;
+        }
+
+        @Override
+        public String toString() {
+            return "ConnectionMeta{" +
+                    "enableTrace=" + enableTrace +
+                    ", env='" + env + '\'' +
+                    ", expireTime=" + expireTime +
+                    '}';
         }
     }
 }

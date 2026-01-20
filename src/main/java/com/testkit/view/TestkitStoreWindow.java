@@ -22,6 +22,7 @@ import com.testkit.tools.flexible_test.FlexibleTestIconProvider;
 import com.testkit.util.Container;
 import com.testkit.util.HttpUtil;
 import com.testkit.util.JsonUtil;
+import com.testkit.util.RemoteScriptCallUtils;
 import com.intellij.icons.AllIcons;
 import com.intellij.json.JsonLanguage;
 import com.intellij.notification.NotificationType;
@@ -79,6 +80,11 @@ public class TestkitStoreWindow {
     public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", TestkitStoreWindow.class);
 
     public static final Icon STORE_ICON = IconLoader.getIcon("/icons/testkit-store.svg", TestkitStoreWindow.class);
+
+    // Remote Script 超时配置
+    private static final int REMOTE_SUBMIT_TIMEOUT = 30;     // 提交请求超时 30 秒
+    private static final int REMOTE_RESULT_TIMEOUT = 600;    // 获取结果超时 600 秒
+    private static final int REMOTE_CANCEL_TIMEOUT = 30;     // 取消请求超时 30 秒
 
 
 
@@ -773,10 +779,10 @@ public class TestkitStoreWindow {
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
-                triggerHttpTask(getKeyButton, FunctionCallTool.KIcon, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerHttpTask(getKeyButton, FunctionCallTool.KIcon, visibleApp, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        return buildCacheParams("build_cache_key", finalMeta,visibleApp, finalArgs);
+                        return buildCacheParams("build_cache_key", finalMeta, visibleApp, finalArgs);
                     }
                 });
             }
@@ -819,10 +825,10 @@ public class TestkitStoreWindow {
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
-                triggerHttpTask(getValButton, AllIcons.Actions.Find, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerHttpTask(getValButton, AllIcons.Actions.Find, visibleApp, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        return buildCacheParams("get_cache",finalMeta,visibleApp, finalArgs);
+                        return buildCacheParams("get_cache", finalMeta, visibleApp, finalArgs);
                     }
                 });
             }
@@ -865,10 +871,10 @@ public class TestkitStoreWindow {
                 }
                 ReqStorageHelper.FunctionCallMeta finalMeta = meta;
                 JSONObject finalArgs = args;
-                triggerHttpTask(delValButton, AllIcons.Actions.GC, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerHttpTask(delValButton, AllIcons.Actions.GC, visibleApp, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
-                        return buildCacheParams("delete_cache",finalMeta,visibleApp, finalArgs);
+                        return buildCacheParams("delete_cache", finalMeta, visibleApp, finalArgs);
                     }
                 });
             }
@@ -1685,7 +1691,7 @@ public class TestkitStoreWindow {
             return;
         }
 
-        triggerHttpTask(executeButton, AllIcons.Actions.Execute, visibleApp.getTestkitPort(), new Supplier<JSONObject>() {
+        triggerHttpTask(executeButton, AllIcons.Actions.Execute, visibleApp, new Supplier<JSONObject>() {
             @Override
             public JSONObject get() {
                 if (item.getType() == ReqStorageHelper.ItemType.function_call) {
@@ -1724,7 +1730,73 @@ public class TestkitStoreWindow {
     }
 
 
-    private void triggerHttpTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
+    private void triggerHttpTask(JButton triggerBtn, Icon executeIcon, RuntimeHelper.VisibleApp visibleApp, Supplier<JSONObject> submit) {
+        if (visibleApp == null) {
+            setOutputText("No application selected", null);
+            return;
+        }
+
+        boolean isRemoteScript = visibleApp.isRemoteScript();
+        int sidePort = isRemoteScript ? -1 : visibleApp.getTestkitPort();
+
+        // Non-localhost request requires user confirmation
+        if (!visibleApp.judgeIsLocal() && !AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
+            // 获取 env（从存储中查询）
+            String connectionStr = visibleApp.getAppName() + ":" + visibleApp.getIp() + ":" + visibleApp.getTestkitPort();
+            String env = RuntimeHelper.getEnv(connectionStr);
+            String envDisplay = (env != null && !env.isEmpty()) ? env : "-";
+
+            // 获取 interceptor 状态（从当前选中的 item 的 meta 中）
+            boolean useInterceptor = false;
+            if (selectedItem != null) {
+                if (selectedItem.getType() == ReqStorageHelper.ItemType.function_call) {
+                    ReqStorageHelper.FunctionCallMeta meta = selectedItem.metaObj(ReqStorageHelper.FunctionCallMeta.class);
+                    useInterceptor = meta != null && meta.isUseInterceptor();
+                } else if (selectedItem.getType() == ReqStorageHelper.ItemType.flexible_test) {
+                    ReqStorageHelper.FlexibleTestMeta meta = selectedItem.metaObj(ReqStorageHelper.FlexibleTestMeta.class);
+                    useInterceptor = meta != null && meta.isUseInterceptor();
+                }
+            }
+
+            // 根据连接类型构建不同的确认信息
+            String instanceInfo;
+            if (isRemoteScript) {
+                instanceInfo = String.format("Partition: %s\nInstance: %s:%d",
+                    visibleApp.getRemotePartition(),
+                    visibleApp.getRemoteIp(),
+                    visibleApp.getTestkitPort());
+            } else {
+                instanceInfo = String.format("Instance: %s:%d",
+                    visibleApp.getIp(),
+                    visibleApp.getTestkitPort());
+            }
+            
+            String confirmMsg = String.format(
+                "Request will execute directly on remote instance.\n" +
+                "    Proceed with caution and avoid write operations if possible.\n\n" +
+                "App: %s\n" +
+                "%s\n" +
+                "Env: %s\n" +
+                "Interceptor: %s",
+                visibleApp.getAppName(),
+                instanceInfo,
+                envDisplay,
+                useInterceptor ? "ON" : "OFF"
+            );
+            int result = Messages.showYesNoDialog(
+                project,
+                confirmMsg,
+                "Remote Request Confirmation",
+                "Execute",
+                "Cancel",
+                Messages.getWarningIcon()
+            );
+            if (result != Messages.YES) {
+                return;
+            }
+        }
+
+        // 取消逻辑
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
             if (lastReqId == null) {
                 triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
@@ -1734,12 +1806,17 @@ public class TestkitStoreWindow {
             new SwingWorker<JSONObject, Void>() {
                 @Override
                 protected JSONObject doInBackground() throws Exception {
-                    HashMap<String, Object> map = new HashMap<>();
-                    map.put("method", "stop_task");
-                    HashMap<Object, Object> params = new HashMap<>();
+                    JSONObject req = new JSONObject();
+                    req.put("method", "stop_task");
+                    JSONObject params = new JSONObject();
                     params.put("reqId", lastReqId);
-                    map.put("params", params);
-                    return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,5,30);
+                    req.put("params", params);
+
+                    if (isRemoteScript) {
+                        return RemoteScriptCallUtils.sendRequest(project, visibleApp, req, REMOTE_CANCEL_TIMEOUT);
+                    } else {
+                        return HttpUtil.sendPost("http://localhost:" + sidePort + "/", req, JSONObject.class, 5, 30);
+                    }
                 }
 
                 @Override
@@ -1765,8 +1842,19 @@ public class TestkitStoreWindow {
             public void run(ProgressIndicator indicator) {
                 // 发起任务请求，获取请求ID
                 JSONObject response = null;
+                JSONObject request = null;
                 try {
-                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", submit.get(), JSONObject.class,5,30);
+                    request = submit.get();
+                    if (request == null) {
+                        return;
+                    }
+
+                    // Step 1: 提交请求，获取 reqId
+                    if (isRemoteScript) {
+                        response = RemoteScriptCallUtils.sendRequest(project, visibleApp, request, REMOTE_SUBMIT_TIMEOUT);
+                    } else {
+                        response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class, 5, 30);
+                    }
                 } catch (Throwable e) {
                     setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
                     return;
@@ -1785,13 +1873,19 @@ public class TestkitStoreWindow {
                 setOutputText("req is send\nreqId:" + reqId, null);
 
                 try {
-                    HashMap<String, Object> map = new HashMap<>();
-                    map.put("method", "get_task_ret");
-                    HashMap<Object, Object> params = new HashMap<>();
+                    // Step 2: 获取任务结果
+                    JSONObject getResultReq = new JSONObject();
+                    getResultReq.put("method", "get_task_ret");
+                    JSONObject params = new JSONObject();
                     params.put("reqId", reqId);
-                    map.put("params", params);
+                    getResultReq.put("params", params);
 
-                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,5,600);
+                    JSONObject result;
+                    if (isRemoteScript) {
+                        result = RemoteScriptCallUtils.sendRequest(project, visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
+                    } else {
+                        result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", getResultReq, JSONObject.class, 5, 600);
+                    }
 
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (cancelReqs.remove(reqId)) {

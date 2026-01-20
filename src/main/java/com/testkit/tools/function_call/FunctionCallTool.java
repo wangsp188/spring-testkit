@@ -116,7 +116,7 @@ public class FunctionCallTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerTestkitServerTask(getKeyButton, KIcon, app.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerTestkitServerTask(getKeyButton, KIcon, app, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return handleCacheAction("build_cache_key");
@@ -136,7 +136,7 @@ public class FunctionCallTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerTestkitServerTask(getValButton, AllIcons.Actions.Find, app.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerTestkitServerTask(getValButton, AllIcons.Actions.Find, app, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return handleCacheAction("get_cache");
@@ -156,7 +156,7 @@ public class FunctionCallTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerTestkitServerTask(delValButton, AllIcons.Actions.GC, app.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerTestkitServerTask(delValButton, AllIcons.Actions.GC, app, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         return handleCacheAction("delete_cache");
@@ -1185,7 +1185,7 @@ public class FunctionCallTool extends BasePluginTool {
                             Messages.getErrorIcon());
                     return;
                 }
-                triggerTestkitServerTask(runButton, AllIcons.Actions.Execute, app.getTestkitPort(), new Supplier<JSONObject>() {
+                triggerTestkitServerTask(runButton, AllIcons.Actions.Execute, app, new Supplier<JSONObject>() {
                     @Override
                     public JSONObject get() {
                         String jsonInput = jsonInputField.getText();

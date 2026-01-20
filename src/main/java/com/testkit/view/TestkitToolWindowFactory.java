@@ -172,6 +172,13 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         for (String item : connectedApps) {
             if (item == null) continue;
             com.testkit.RuntimeHelper.VisibleApp visibleApp = com.testkit.RuntimeHelper.parseApp(item);
+
+            // 跳过 remote 类型的连接（通过脚本管理，不需要探测）
+            if (visibleApp.isRemoteScript()) {
+                count++; // remote 类型也算作已连接
+                continue;
+            }
+
             try {
                 com.testkit.util.HttpUtil.sendPost(
                         "http://" + (visibleApp.judgeIsLocal() ? "localhost" : visibleApp.getIp()) + ":" + visibleApp.getTestkitPort() + "/",
@@ -258,7 +265,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                 ApplicationManager.getApplication().executeOnPooledThread(() -> {
                     try {
 
-                        testkitToolWindow.refreshVisibleApp();
+                        testkitToolWindow.refreshVisibleApp(false);
 
                         // 1. 查找 Spring Boot 应用类（已经在后台线程中执行）
                         testkitToolWindow.findSpringBootApplicationClasses();

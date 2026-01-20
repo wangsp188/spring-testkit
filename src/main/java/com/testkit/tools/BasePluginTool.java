@@ -37,6 +37,7 @@ import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBScrollPane;
 import com.testkit.util.HttpUtil;
+import com.testkit.util.RemoteScriptCallUtils;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 import org.apache.commons.collections.CollectionUtils;
@@ -57,6 +58,11 @@ public abstract class BasePluginTool {
     public static final Icon JSON_ICON = IconLoader.getIcon("/icons/json.svg", BasePluginTool.class);
     public static final Icon CMD_ICON = IconLoader.getIcon("/icons/cmd.svg", BasePluginTool.class);
 
+
+    // Remote Script 超时配置
+    private static final int REMOTE_SUBMIT_TIMEOUT = 30;     // 提交请求超时 30 秒
+    private static final int REMOTE_RESULT_TIMEOUT = 600;    // 获取结果超时 600 秒
+    private static final int REMOTE_CANCEL_TIMEOUT = 30;     // 取消请求超时 30 秒
 
     protected Set<String> cancelReqs = new HashSet<>(128);
     protected String lastReqId;
@@ -405,12 +411,73 @@ public abstract class BasePluginTool {
     public abstract void onSwitchAction(PsiElement psiElement);
 
 
-    protected void triggerTestkitServerTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
+    /**
+     * 触发 Testkit Server 任务（支持远程脚本调用）
+     *
+     * @param triggerBtn 触发按钮
+     * @param executeIcon 执行图标
+     * @param visibleApp 目标应用（支持 remote_ 类型）
+     * @param submit 请求提供者
+     */
+    protected void triggerTestkitServerTask(JButton triggerBtn, Icon executeIcon, RuntimeHelper.VisibleApp visibleApp, Supplier<JSONObject> submit) {
+        if (visibleApp == null) {
+            setOutputText("No application selected");
+            return;
+        }
+
         if (AllIcons.Hierarchy.MethodNotDefined.equals(triggerBtn.getIcon())) {
             return;
         }
 
+        boolean isRemoteScript = visibleApp.isRemoteScript();
+        int sidePort = isRemoteScript ? -1 : visibleApp.getTestkitPort();
 
+        // Non-localhost request requires user confirmation
+        if (!visibleApp.judgeIsLocal() && !AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
+            // 获取 env（从存储中查询）
+            String connectionStr = visibleApp.getAppName() + ":" + visibleApp.getIp() + ":" + visibleApp.getTestkitPort();
+            String env = RuntimeHelper.getEnv(connectionStr);
+            String envDisplay = (env != null && !env.isEmpty()) ? env : "-";
+
+            // 根据连接类型构建不同的确认信息
+            String instanceInfo;
+            if (isRemoteScript) {
+                instanceInfo = String.format("Partition: %s\nInstance: %s:%d",
+                    visibleApp.getRemotePartition(),
+                    visibleApp.getRemoteIp(),
+                    visibleApp.getTestkitPort());
+            } else {
+                instanceInfo = String.format("Instance: %s:%d",
+                    visibleApp.getIp(),
+                    visibleApp.getTestkitPort());
+            }
+
+            String confirmMsg = String.format(
+                "Request will execute directly on remote instance.\n" +
+                "    Proceed with caution and avoid write operations if possible.\n\n" +
+                "App: %s\n" +
+                "%s\n" +
+                "Env: %s\n" +
+                "Interceptor: %s",
+                visibleApp.getAppName(),
+                instanceInfo,
+                envDisplay,
+                useInterceptor ? "ON" : "OFF"
+            );
+            int result = Messages.showYesNoDialog(
+                getProject(),
+                confirmMsg,
+                "Remote Request Confirmation",
+                "Execute",
+                "Cancel",
+                Messages.getWarningIcon()
+            );
+            if (result != Messages.YES) {
+                return;
+            }
+        }
+
+        // 取消逻辑
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
             if (lastReqId == null) {
                 triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
@@ -420,12 +487,17 @@ public abstract class BasePluginTool {
             new SwingWorker<JSONObject, Void>() {
                 @Override
                 protected JSONObject doInBackground() throws Exception {
-                    HashMap<String, Object> map = new HashMap<>();
-                    map.put("method", "stop_task");
-                    HashMap<Object, Object> params = new HashMap<>();
+                    JSONObject req = new JSONObject();
+                    req.put("method", "stop_task");
+                    JSONObject params = new JSONObject();
                     params.put("reqId", lastReqId);
-                    map.put("params", params);
-                    return HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,5,30);
+                    req.put("params", params);
+
+                    if (isRemoteScript) {
+                        return RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, req, REMOTE_CANCEL_TIMEOUT);
+                    } else {
+                        return HttpUtil.sendPost("http://localhost:" + sidePort + "/", req, JSONObject.class, 5, 30);
+                    }
                 }
 
                 @Override
@@ -445,10 +517,10 @@ public abstract class BasePluginTool {
             }.execute();
             return;
         }
+
         ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), "Processing " + getTool().getCode() + ", please wait ...", false) {
             @Override
             public void run(ProgressIndicator indicator) {
-                // 发起任务请求，获取请求ID
                 JSONObject request = null;
                 JSONObject response = null;
                 try {
@@ -456,94 +528,49 @@ public abstract class BasePluginTool {
                     if (request == null) {
                         return;
                     }
-                    response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class,5,30);
+
+                    // Step 1: 提交请求，获取 reqId
+                    if (isRemoteScript) {
+                        response = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, request, REMOTE_SUBMIT_TIMEOUT);
+                    } else {
+                        response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class, 5, 30);
+                    }
                 } catch (Throwable e) {
                     setOutputText("submit req error \n" + ToolHelper.getStackTrace(e), null);
                     return;
                 }
-                if (response == null || !response.getBooleanValue("success") || response.getString("data") == null) {
-                    setOutputText("submit req error \n" + response.getString("message"), null);
+
+                if (response == null || !response.getBooleanValue("success") || response.get("data") == null) {
+                    setOutputText("submit req error \n" + (response != null ? response.getString("message") : "null response"), null);
                     return;
                 }
+
                 String reqId = response.getString("data");
                 lastReqId = reqId;
                 triggerBtn.setIcon(AllIcons.Actions.Suspend);
                 setOutputText("req is send\nreqId:" + reqId, null);
                 String method = request.getString("method");
-                try {
-                    HashMap<String, Object> map = new HashMap<>();
-                    map.put("method", "get_task_ret");
-                    HashMap<Object, Object> params = new HashMap<>();
-                    params.put("reqId", reqId);
-                    map.put("params", params);
 
-                    JSONObject result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", map, JSONObject.class,5,600);
+                try {
+                    // Step 2: 获取任务结果
+                    JSONObject getResultReq = new JSONObject();
+                    getResultReq.put("method", "get_task_ret");
+                    JSONObject params = new JSONObject();
+                    params.put("reqId", reqId);
+                    getResultReq.put("params", params);
+
+                    JSONObject result;
+                    if (isRemoteScript) {
+                        result = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
+                    } else {
+                        result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", getResultReq, JSONObject.class, 5, 600);
+                    }
 
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (cancelReqs.remove(reqId)) {
                             System.out.println("请求已被取消，结果丢弃");
                         } else {
-                            if (result == null) {
-                                setOutputText("req is error\n result is null", null);
-                            } else {
-                                List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {
-                                });
-                                if (!result.getBooleanValue("success")) {
-                                    String message = result.getString("message");
-                                    setOutputText("req is error\n" + message, profile);
-                                    if(Objects.equals(method,"function-call") && message !=null && (message.contains("AuthenticationCredentialsNotFoundException") || message.contains("An Authentication object was not found in the SecurityContext"))){
-                                        String friendlyMessage =
-                                                "<html><body>" +
-                                                        "<p><b>Error:</b>Your request may have been intercepted by Spring Security due to missing authentication.</p>" +
-                                                        "<p><b>Solutions:</b></p>" +
-                                                        "<ol>" +
-                                                        "<li><b>Option 1: If your API does not need user information:</b>" +
-                                                        "<ul>" +
-                                                        "<li>Click the <b>Proxy</b> button next to the Run button</li>" +
-                                                        "<li>This will invoke the original object directly and bypass the authentication proxy</li>" +
-                                                        "</ul>" +
-                                                        "</li>" +
-                                                        "<li><b>Option 2: If your API requires user information:</b>" +
-                                                        "<ul>" +
-                                                        "<li>Go to the <b>Tool interceptor</b> page</li>" +
-                                                        "<li>Set up pre-execution configuration to inject user information into the context<br>like this  SecurityContextHolder.getContext().setAuthentication(your authentication);</li>" +
-                                                        "<li>Click the interceptor toggle to the left of the execute button in the testkit panel to toggle interceptor on/off.</li>" +
-                                                        "<li>This will make user information available in your method execution</li>" +
-                                                        "</ul>" +
-                                                        "</li>" +
-                                                        "<li><b>Option 3: Use flexible-test feature to bypass authentication:</b>" +
-                                                        "<ul>" +
-                                                        "<li>Use the <b>flexible-test</b> functionality to test your target code</li>" +
-                                                        "<li>This allows you to bypass authentication and test the target code directly</li>" +
-                                                        "</ul>" +
-                                                        "</li>" +
-                                                        "</ol>" +
-                                                        "<hr>" +
-                                                        "<br>" +
-                                                        "</body></html>";
-                                        TestkitHelper.showErrorWithSettingsNavigation(getProject(),"Tool interceptor","Authentication required",friendlyMessage);
-                                    }
-                                } else {
-                                    Object data = result.get("data");
-                                    if (data == null) {
-                                        setOutputText("null", profile);
-                                    } else if (data instanceof String
-                                            || data instanceof Byte
-                                            || data instanceof Short
-                                            || data instanceof Integer
-                                            || data instanceof Long
-                                            || data instanceof Float
-                                            || data instanceof Double
-                                            || data instanceof Character
-                                            || data instanceof Boolean
-                                            || data.getClass().isEnum()) {
-                                        setOutputText(data.toString(), profile);
-                                    } else {
-                                        setOutputText(JsonUtil.formatObj(data), profile);
-                                    }
-                                }
-                            }
-
+                            handleResult(triggerBtn, executeIcon, result, method);
                         }
                         triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
                     });
@@ -555,6 +582,91 @@ public abstract class BasePluginTool {
                 }
             }
         });
+    }
+
+    /**
+     * 处理请求结果
+     */
+    private void handleResult(JButton triggerBtn, Icon executeIcon, JSONObject result, String method) {
+        if (result == null) {
+            setOutputText("req is error\n result is null", null);
+            triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+            return;
+        }
+
+        List<Map<String, String>> profile = result.getObject("profile", new TypeReference<List<Map<String, String>>>() {});
+
+        if (!result.getBooleanValue("success")) {
+            String message = result.getString("message");
+            setOutputText("req is error\n" + message, profile);
+
+            // 认证错误提示（仅 function-call）
+            if (Objects.equals(method, "function-call") && message != null &&
+                (message.contains("AuthenticationCredentialsNotFoundException") ||
+                 message.contains("An Authentication object was not found in the SecurityContext"))) {
+                String friendlyMessage =
+                        "<html><body>" +
+                                "<p><b>Error:</b>Your request may have been intercepted by Spring Security due to missing authentication.</p>" +
+                                "<p><b>Solutions:</b></p>" +
+                                "<ol>" +
+                                "<li><b>Option 1: If your API does not need user information:</b>" +
+                                "<ul>" +
+                                "<li>Click the <b>Proxy</b> button next to the Run button</li>" +
+                                "<li>This will invoke the original object directly and bypass the authentication proxy</li>" +
+                                "</ul>" +
+                                "</li>" +
+                                "<li><b>Option 2: If your API requires user information:</b>" +
+                                "<ul>" +
+                                "<li>Go to the <b>Tool interceptor</b> page</li>" +
+                                "<li>Set up pre-execution configuration to inject user information into the context<br>like this  SecurityContextHolder.getContext().setAuthentication(your authentication);</li>" +
+                                "<li>Click the interceptor toggle to the left of the execute button in the testkit panel to toggle interceptor on/off.</li>" +
+                                "<li>This will make user information available in your method execution</li>" +
+                                "</ul>" +
+                                "</li>" +
+                                "<li><b>Option 3: Use flexible-test feature to bypass authentication:</b>" +
+                                "<ul>" +
+                                "<li>Use the <b>flexible-test</b> functionality to test your target code</li>" +
+                                "<li>This allows you to bypass authentication and test the target code directly</li>" +
+                                "</ul>" +
+                                "</li>" +
+                                "</ol>" +
+                                "<hr>" +
+                                "<br>" +
+                                "</body></html>";
+                TestkitHelper.showErrorWithSettingsNavigation(getProject(), "Tool interceptor", "Authentication required", friendlyMessage);
+            }
+        } else {
+            Object data = result.get("data");
+            if (data == null) {
+                setOutputText("null", profile);
+            } else if (data instanceof String
+                    || data instanceof Byte
+                    || data instanceof Short
+                    || data instanceof Integer
+                    || data instanceof Long
+                    || data instanceof Float
+                    || data instanceof Double
+                    || data instanceof Character
+                    || data instanceof Boolean
+                    || data.getClass().isEnum()) {
+                setOutputText(data.toString(), profile);
+            } else {
+                setOutputText(JsonUtil.formatObj(data), profile);
+            }
+        }
+        triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
+    }
+
+    /**
+     * 触发 Testkit Server 任务（兼容旧接口，直接传端口）
+     */
+    protected void triggerTestkitServerTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
+        // 创建一个临时的 VisibleApp 用于调用统一方法
+        RuntimeHelper.VisibleApp tempApp = new RuntimeHelper.VisibleApp();
+        tempApp.setAppName("temp");
+        tempApp.setIp("localhost");
+        tempApp.setTestkitPort(sidePort);
+        triggerTestkitServerTask(triggerBtn, executeIcon, tempApp, submit);
     }
 
     protected void triggerLocalTask(JButton triggerBtn, Icon executeIcon, String msg, Supplier<String> submit) {
@@ -808,7 +920,7 @@ public abstract class BasePluginTool {
         gbc.gridx = 2;
         gbc.gridy = 0;
         containerPanel.add(actionComboBox, gbc);
-        
+
         // 将容器面板添加到 topPanel
         GridBagConstraints containerGbc = new GridBagConstraints();
         containerGbc.insets = JBUI.insets(1);
@@ -826,7 +938,7 @@ public abstract class BasePluginTool {
             gbc.fill = GridBagConstraints.NONE;
             containerPanel.add(testBtn, gbc);
         }
-        
+
         return actionComboBox;
     }
 
@@ -886,7 +998,7 @@ public abstract class BasePluginTool {
         private boolean isEnabled;
         private static final int TIMER_DELAY = 33; // 约30fps，降低刷新率减少性能压力
         private static final int PARTICLE_COUNT = 3; // 3个粒子，降低性能开销
-        
+
         // AI风格的渐变色（超鲜艳的霓虹色）
         private static final Color[] PARTICLE_COLORS = {
             new Color(0xFF00FF), // 霓虹紫
@@ -898,7 +1010,7 @@ public abstract class BasePluginTool {
             new Color(0x9370DB), // 中紫罗兰
             new Color(0x1E90FF), // 道奇蓝
         };
-        
+
         // 粒子类
         private static class Particle {
             float x, y;
@@ -907,11 +1019,11 @@ public abstract class BasePluginTool {
             Color color;
             float alpha;
             float life; // 生命周期 0-1
-            
+
             Particle(float width, float height, Random random) {
                 reset(width, height, random);
             }
-            
+
             void reset(float width, float height, Random random) {
                 // 随机位置
                 x = random.nextFloat() * width;
@@ -928,12 +1040,12 @@ public abstract class BasePluginTool {
                 // 生命周期
                 life = random.nextFloat();
             }
-            
+
             void update(float width, float height, Random random) {
                 // 更新位置
                 x += vx;
                 y += vy;
-                
+
                 // 更新生命周期
                 life += 0.01f;
                 if (life > 1.0f) {
@@ -941,14 +1053,14 @@ public abstract class BasePluginTool {
                     // 重新生成粒子
                     reset(width, height, random);
                 }
-                
+
                 // 边界处理：如果粒子移出边界，重新生成
                 if (x < -5 || x > width + 5 || y < -5 || y > height + 5) {
                     reset(width, height, random);
                 }
             }
         }
-        
+
         private Particle[] particles;
         private Random random = new Random();
 
@@ -959,13 +1071,13 @@ public abstract class BasePluginTool {
             setContentAreaFilled(false);
             setBorderPainted(true);
             setFocusPainted(false);
-            
+
             // 初始化粒子
             particles = new Particle[PARTICLE_COUNT];
             for (int i = 0; i < PARTICLE_COUNT; i++) {
                 particles[i] = new Particle(32, 32, random);
             }
-            
+
             if (enabled) {
                 startParticleAnimation();
             }
@@ -1015,7 +1127,7 @@ public abstract class BasePluginTool {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            
+
             if (!isEnabled) {
                 return;
             }
@@ -1023,47 +1135,47 @@ public abstract class BasePluginTool {
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            
+
             int width = getWidth();
             int height = getHeight();
-            
+
             // 使用更亮的混合模式
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
-            
+
             // 绘制所有粒子（优化：减少对象创建）
             float[] gradientFractions = {0.0f, 0.5f, 1.0f};
             for (Particle particle : particles) {
                 // 根据生命周期调整透明度（保持更亮）
                 float currentAlpha = particle.alpha * (0.6f + 0.4f * (float)Math.sin(particle.life * Math.PI * 2));
-                
+
                 // 设置颜色和透明度（增强亮度）
                 Color baseColor = particle.color;
                 // 稍微提亮颜色
                 int r = Math.min(255, baseColor.getRed() + 20);
                 int g2 = Math.min(255, baseColor.getGreen() + 20);
                 int b = Math.min(255, baseColor.getBlue() + 20);
-                
+
                 int alphaInt = (int)(currentAlpha * 255);
                 Color particleColor = new Color(r, g2, b, alphaInt);
-                
+
                 // 绘制粒子（使用径向渐变实现光晕效果，光晕范围更大）
                 float radius = particle.size;
                 float glowRadius = radius * 1.5f; // 更大的光晕
-                
+
                 // 重用gradientFractions数组，减少对象创建
                 Color[] gradientColors = {
                     particleColor,
                     new Color(r, g2, b, (int)(currentAlpha * 180)),
                     new Color(r, g2, b, 0)
                 };
-                
+
                 RadialGradientPaint gradient = new RadialGradientPaint(
                     particle.x, particle.y, glowRadius,
                     gradientFractions,
                     gradientColors
                 );
                 g2d.setPaint(gradient);
-                
+
                 // 绘制圆形粒子（更大的光晕范围）
                 int glowSize = (int)(glowRadius * 2);
                 g2d.fillOval(
@@ -1073,7 +1185,7 @@ public abstract class BasePluginTool {
                     glowSize
                 );
             }
-            
+
             g2d.dispose();
         }
 

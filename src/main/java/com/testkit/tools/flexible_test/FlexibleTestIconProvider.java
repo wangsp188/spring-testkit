@@ -104,8 +104,8 @@ public class FlexibleTestIconProvider implements LineMarkerProvider {
             return "not_find_virtualFile";
         }
 
-        if(!RuntimeHelper.hasAppMeta(modifierList.getProject().getName()) || !SettingsStorageHelper.isEnableSideServer(modifierList.getProject())){
-            return "disable_side_server";
+        if(!RuntimeHelper.hasAppMeta(modifierList.getProject().getName())){
+            return "no_app";
         }
         // 获取文件的完整路径
         String filePath = virtualFile.getPath();
