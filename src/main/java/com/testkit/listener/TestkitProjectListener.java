@@ -204,14 +204,6 @@ public class TestkitProjectListener implements ProjectActivity {
 
         JButton installButton = new JButton("Install Now");
         installButton.setPreferredSize(new Dimension(120, 32));
-        installButton.addActionListener(e -> {
-            boolean ok = UpdaterUtil.installFromZip(zipPath, project);
-            if (ok) {
-                showRestartNotification(project, lastVersion.getVersion());
-            } else {
-                TestkitHelper.notify(project, NotificationType.WARNING, "Install failed. Please open folder and install via Plugins > Install from Disk.");
-            }
-        });
 
         JButton openFolderButton = new JButton("Open Folder");
         openFolderButton.setPreferredSize(new Dimension(120, 32));
@@ -236,9 +228,20 @@ public class TestkitProjectListener implements ProjectActivity {
                 .setResizable(false)
                 .setRequestFocus(true)
                 .setCancelOnClickOutside(false)
-                .setCancelKeyEnabled(false)
+                .setCancelKeyEnabled(true)  // 允许ESC键关闭，这样标题栏会显示关闭按钮
                 .setCancelOnWindowDeactivation(false)
                 .createPopup();
+
+        // 设置按钮事件（需要在popup创建后）
+        installButton.addActionListener(e -> {
+            boolean ok = UpdaterUtil.installFromZip(zipPath, project);
+            if (ok) {
+                popup.cancel();  // 关闭update弹窗
+                showRestartNotification(project, lastVersion.getVersion());
+            } else {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Install failed. Please open folder and install via Plugins > Install from Disk.");
+            }
+        });
 
         laterButton.addActionListener(e -> popup.cancel());
 
@@ -247,27 +250,56 @@ public class TestkitProjectListener implements ProjectActivity {
     }
 
     /**
-     * 显示重启 IDE 的通知
+     * 显示重启 IDE 的通知（居中弹窗）
      */
     private static void showRestartNotification(Project project, String version) {
-        String title = TestkitHelper.getPluginName();
-        String content = "Plugin v" + version + " installed successfully. Restart IDE to apply changes.";
-        Notification notification = new Notification(title, title, content, NotificationType.INFORMATION);
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
 
-        notification.addAction(NotificationAction.createSimple("Restart Now", new Runnable() {
-            @Override
-            public void run() {
-                ApplicationManager.getApplication().restart();
-            }
-        }));
+        // 成功消息
+        JLabel messageLabel = new JLabel("✅ Plugin v" + version + " installed successfully!");
+        messageLabel.setFont(messageLabel.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(messageLabel, BorderLayout.NORTH);
 
-        notification.addAction(NotificationAction.createSimple("Restart Later", new Runnable() {
-            @Override
-            public void run() {
-                notification.expire();
-            }
-        }));
+        // 提示信息
+        JLabel tipLabel = new JLabel("<html><div style='text-align: center; padding: 10px;'>Please restart IDE to apply changes.</div></html>");
+        tipLabel.setFont(tipLabel.getFont().deriveFont(12f));
+        panel.add(tipLabel, BorderLayout.CENTER);
 
-        Notifications.Bus.notify(notification, project);
+        // 按钮面板
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+
+        JButton restartNowButton = new JButton("Restart Now");
+        restartNowButton.setPreferredSize(new Dimension(120, 32));
+
+        JButton restartLaterButton = new JButton("Restart Later");
+        restartLaterButton.setPreferredSize(new Dimension(120, 32));
+
+        buttonPanel.add(restartNowButton);
+        buttonPanel.add(restartLaterButton);
+
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        // 创建居中弹窗
+        JBPopup popup = JBPopupFactory.getInstance()
+                .createComponentPopupBuilder(panel, restartNowButton)
+                .setTitle(TestkitHelper.getPluginName() + " - Installation Complete")
+                .setMovable(true)
+                .setResizable(false)
+                .setRequestFocus(true)
+                .setCancelOnClickOutside(false)
+                .setCancelKeyEnabled(true)  // 允许ESC键关闭，这样标题栏会显示关闭按钮
+                .setCancelOnWindowDeactivation(false)
+                .createPopup();
+
+        restartNowButton.addActionListener(e -> {
+            popup.cancel();
+            ApplicationManager.getApplication().restart();
+        });
+
+        restartLaterButton.addActionListener(e -> popup.cancel());
+
+        // 居中显示
+        popup.showCenteredInCurrentWindow(project);
     }
 }
