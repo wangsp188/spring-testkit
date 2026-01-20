@@ -7,6 +7,7 @@ import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.psi.*;
+import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.util.JsonUtil;
