@@ -83,24 +83,24 @@ public class TestkitToolWindow {
     // ToolWindow 原始图标
     public static final Icon TOOLWINDOW_ICON = IconLoader.getIcon("/icons/spring-testkit.svg", TestkitToolWindow.class);
 
-    // Remote Script 函数说明
+    // Remote Script API Reference
     private static final String REMOTE_SCRIPT_INFO = """
 ================================================================================
-                        Remote Script 函数规范
+                        Remote Script API Reference
 ================================================================================
 
-插件会调用 Groovy 脚本中的三个函数，脚本需要实现以下接口：
+The plugin calls three functions in the Groovy script. Implement these functions:
 
 ────────────────────────────────────────────────────────────────────────────────
 1. loadInfra()
 ────────────────────────────────────────────────────────────────────────────────
-   功能: 获取可用的 App 和 Partition 列表
-   参数: 无
-   返回: Map<String, List<String>>
-         Key   = appName (对应 Spring Boot 启动类名，如 "WebApplication")
-         Value = partition 列表 (如 ["us01", "qa01", "dev01"])
+   Purpose: Get available Apps and Partitions
+   Parameters: None
+   Returns: Map<String, List<String>>
+         Key   = appName (Spring Boot main class name, e.g., "WebApplication")
+         Value = partition list (e.g., ["us01", "qa01", "dev01"])
    
-   示例返回:
+   Example:
    [
        "WebApplication"    : ["us01", "qa01"],
        "ApiWebApplication" : ["us01"]
@@ -109,23 +109,23 @@ public class TestkitToolWindow {
 ────────────────────────────────────────────────────────────────────────────────
 2. loadInstances(String appName, String partition)
 ────────────────────────────────────────────────────────────────────────────────
-   功能: 获取指定 App + Partition 下的实例列表
-   参数: appName   - 应用名
-         partition - 分区名
-   返回: List<Map> 实例信息列表
+   Purpose: Get instance list for specified App + Partition
+   Parameters: appName   - Application name
+               partition - Partition name
+   Returns: List<Map> - Instance information list
    
-   必填字段:
-     - ip           : String  实例标识（显示用，会存储为 [partition]ip 格式）
-     - port         : int     Testkit 端口
-     - env          : String  环境标识（如 "prod", "qa"）
-     - success      : boolean 是否可用
-     - errorMessage : String  错误信息（success=false 时）
+   Required fields:
+     - ip           : String  Instance identifier (stored as [partition]ip)
+     - port         : int     Testkit port
+     - env          : String  Environment identifier (e.g., "prod", "qa")
+     - success      : boolean Availability status
+     - errorMessage : String  Error message (when success=false)
    
-   可选字段:
-     - enableTrace  : boolean 是否支持 Trace（默认 false）
-     - expireTime   : long    过期时间 UTC 时间戳（默认 24 小时后过期）
+   Optional fields:
+     - enableTrace  : boolean Trace support (default: false)
+     - expireTime   : long    Expiration time UTC timestamp (default: 24h later)
    
-   示例返回:
+   Example:
    [
        [ip: "pod-001", port: 18080, success: true,  errorMessage: "", enableTrace: true, env: "prod"],
        [ip: "pod-002", port: 18080, success: false, errorMessage: "Connection refused"]
@@ -134,28 +134,28 @@ public class TestkitToolWindow {
 ────────────────────────────────────────────────────────────────────────────────
 3. sendRequest(String appName, String partition, String ip, int port, Map request)
 ────────────────────────────────────────────────────────────────────────────────
-   功能: 向指定实例发送请求（转发到 Testkit Server）
-   参数: appName   - 应用名
-         partition - 分区名
-         ip        - 实例标识（与 loadInstances 返回的 ip 对应）
-         port      - Testkit 端口
-         request   - 请求对象 Map
-   返回: Map 响应结果（透传 Testkit Server 响应）
+   Purpose: Send request to specified instance (forward to Testkit Server)
+   Parameters: appName   - Application name
+               partition - Partition name
+               ip        - Instance identifier (from loadInstances)
+               port      - Testkit port
+               request   - Request object Map
+   Returns: Map - Response result (forwarded from Testkit Server)
    
-   request 结构:
-     - method      : String            请求方法
-     - params      : Map<String,String> 请求参数
-     - trace       : boolean           是否追踪（可选）
-     - prepare     : boolean           是否预处理（可选）
-     - interceptor : String            拦截器配置（可选）
+   Request structure:
+     - method      : String             Request method
+     - params      : Map<String,String> Request parameters
+     - trace       : boolean            Enable tracing (optional)
+     - prepare     : boolean            Enable preprocessing (optional)
+     - interceptor : String             Interceptor config (optional)
    
-   常见 method 值:
-     - "hi"           : 健康检查
-     - "function-call": 提交[function-call]任务
-     - "flexible-test": 提交[flexible-test]任务
-     - "view-value"   : 查看变量值
-     - "get_task_ret" : 获取任务结果
-     - "stop_task"    : 停止任务
+   Common method values:
+     - "hi"           : Health check
+     - "function-call": Submit [function-call] task
+     - "flexible-test": Submit [flexible-test] task
+     - "view-value"   : View variable value
+     - "get_task_ret" : Get task result
+     - "stop_task"    : Stop task
 
 ================================================================================
                               Demo Script
@@ -166,18 +166,18 @@ import groovy.json.JsonOutput
 
 // ==================== 1. loadInfra ====================
 def loadInfra() {
-// 可以返回自己服务的集群架构定义，在后面的api中会使用这些当作参数
+    // Return your service cluster architecture definition
     return [
         "WebApplication": ["dev01", "qa01", "us01"]
     ]
 }
 
 // ==================== 2. loadInstances ====================
-// 注意: 需要先在目标机器上通过 testkit-cli attach 启动 Testkit Server，如果目标机器默认启动则可以忽略
-//       success=true 表示 Testkit Server 已启动且可连接
-//       success=false 表示启动失败或连接不上，errorMessage 填写原因
+// Note: Testkit Server must be started on target machine via testkit-cli attach
+//       success=true  means Testkit Server is running and connectable
+//       success=false means startup failed or unreachable, fill errorMessage
 def loadInstances(String appName, String partition) {
-    def pods = getPodList(appName, partition)  // 获取 pod 列表（自行实现）
+    def pods = getPodList(appName, partition)  // Get pod list (implement yourself)
     
     return pods.collect { pod ->
         def result = [
@@ -186,8 +186,8 @@ def loadInstances(String appName, String partition) {
             env  : partition
         ]
         try {
-            // 1) 通过 SSH/kubectl 在目标机器上启动 testkit-cli（如果未启动）
-            def resp =  startTestkitCli(pod.ip, appName)
+            // 1) Start testkit-cli on target machine via SSH/kubectl (if not started)
+            def resp = startTestkitCli(pod.ip, appName)
             result.success      = resp.success == true
             result.errorMessage = result.success ? "" : (resp.message ?: "Unknown error")
             result.enableTrace  = resp.data?.enableTrace ?: false
@@ -201,13 +201,13 @@ def loadInstances(String appName, String partition) {
 }
 
 // ==================== 3. sendRequest ====================
-// 如果目标 IP 可直连，直接发送 HTTP POST 请求即可
+// If target IP is directly accessible, send HTTP POST request
 def sendRequest(String appName, String partition, String ip, int port, Map request) {
-    def address = getAddress(ip, partition)  // 根据 ip 获取实际地址（自行实现）
+    def address = getAddress(ip, partition)  // Get actual address from ip (implement yourself)
     return httpPost("http://${address}:${port}/", request)
 }
 
-// ==================== 辅助函数 ====================
+// ==================== Helper Functions ====================
 def httpPost(String url, Map data) {
     def conn = new URL(url).openConnection()
     conn.setConnectTimeout(5000)
@@ -219,7 +219,7 @@ def httpPost(String url, Map data) {
     return new JsonSlurper().parseText(conn.inputStream.text)
 }
 
-// TODO: 实现以下函数
+// TODO: Implement these functions
 // def getPodList(appName, partition) { ... }
 // def getAddress(ip, partition) { ... }
 // def startTestkitCli(podIp, appName) { ... }
@@ -1281,6 +1281,9 @@ def httpPost(String url, Map data) {
                 .setTitle("Add Remote Connection")
                 .setMovable(true)
                 .setResizable(true)
+                .setCancelOnClickOutside(false)      // 防止点击外部关闭
+//                .setCancelKeyEnabled(false)          // 禁用 ESC 键关闭
+                .setCancelOnWindowDeactivation(false) // 防止窗口失焦时关闭（切屏）
                 .createPopup();
 
         popupHolder[0] = popup;
@@ -1375,6 +1378,9 @@ def httpPost(String url, Map data) {
         instanceTable.getColumnModel().getColumn(4).setMaxWidth(70);
 
         List<RemoteScriptExecutor.InstanceInfo> instanceDataList = new ArrayList<>();
+        
+        // 用于记录最后一次 Load Instances 请求的时间戳，防止旧请求结果覆盖新请求
+        final long[] lastLoadTimestamp = new long[]{0};
 
         // Status 列渲染器 - 支持 Tooltip 显示完整错误信息
         instanceTable.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
@@ -1476,6 +1482,14 @@ def httpPost(String url, Map data) {
             if (StringUtils.isBlank(scriptPath)) return;
             SettingsStorageHelper.setRemoteScriptPath(project, scriptPath);
 
+            // 禁用刷新按钮，防止重复点击
+            refreshBtn.setEnabled(false);
+            statusLabel.setText("⏳ Loading infra...");
+            statusLabel.setForeground(Color.GRAY);
+            
+            // Refresh 时重置时间戳，避免旧的 Load 请求结果在 Refresh 后显示
+            lastLoadTimestamp[0] = 0;
+
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Loading...", false) {
                 @Override
                 public void run(ProgressIndicator indicator) {
@@ -1527,11 +1541,26 @@ def httpPost(String url, Map data) {
                                 statusLabel.setText("⚠️ No data");
                                 statusLabel.setForeground(new Color(200, 150, 50));
                             }
+                            // 重新启用刷新按钮
+                            refreshBtn.setEnabled(true);
                         });
                     } catch (Exception ex) {
                         SwingUtilities.invokeLater(() -> {
-                            statusLabel.setText("❌ " + ex.getMessage());
+                            // 构建错误提示信息
+                            String errorMsg = ex.getMessage();
+                            boolean isTimeout = errorMsg != null && (
+                                errorMsg.toLowerCase().contains("timeout") || 
+                                errorMsg.toLowerCase().contains("timed out")
+                            );
+                            
+                            if (isTimeout) {
+                                statusLabel.setText("❌ Timeout - May need authentication. Complete auth and retry.");
+                            } else {
+                                statusLabel.setText("❌ " + errorMsg);
+                            }
                             statusLabel.setForeground(new Color(200, 100, 100));
+                            // 重新启用刷新按钮
+                            refreshBtn.setEnabled(true);
                         });
                     }
                 }
@@ -1591,6 +1620,8 @@ def httpPost(String url, Map data) {
             partitionBox.removeAllItems();
             tableModel.setRowCount(0);
             instanceDataList.clear();
+            // 切换 App 时重置时间戳，避免旧的 Load 请求结果显示
+            lastLoadTimestamp[0] = 0;
             if (app != null && infraDataHolder[0] != null) {
                 List<String> parts = infraDataHolder[0].get(app);
                 if (parts != null) parts.forEach(partitionBox::addItem);
@@ -1603,11 +1634,17 @@ def httpPost(String url, Map data) {
             if (app == null || part == null) return;
             String scriptPath = scriptPathField.getText().trim();
 
+            // 生成新的时间戳，标识这次请求
+            long currentTimestamp = System.currentTimeMillis();
+            lastLoadTimestamp[0] = currentTimestamp;
+
             // 加载开始时立即清空表格，避免用户点击旧数据
             tableModel.setRowCount(0);
             instanceDataList.clear();
-            statusLabel.setText("⏳ Loading...");
+            statusLabel.setText("⏳ Loading instances...");
             statusLabel.setForeground(Color.GRAY);
+            // 禁用加载按钮，防止重复点击
+            loadMachinesBtn.setEnabled(false);
 
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Loading instances...", false) {
                 @Override
@@ -1615,6 +1652,12 @@ def httpPost(String url, Map data) {
                     try {
                         List<RemoteScriptExecutor.InstanceInfo> instances = new RemoteScriptExecutor(scriptPath).loadInstances(app, part, LOAD_INSTANCES_TIMEOUT);
                         SwingUtilities.invokeLater(() -> {
+                            // 检查时间戳，如果不是最新的请求，就忽略结果
+                            if (currentTimestamp != lastLoadTimestamp[0]) {
+                                System.out.println("Ignoring old load request result, timestamp: " + currentTimestamp + ", latest: " + lastLoadTimestamp[0]);
+                                return;
+                            }
+                            
                             if (instances != null && !instances.isEmpty()) {
                                 for (RemoteScriptExecutor.InstanceInfo inst : instances) {
                                     instanceDataList.add(inst);
@@ -1629,19 +1672,45 @@ def httpPost(String url, Map data) {
                                 statusLabel.setText("⚠️ No instances");
                                 statusLabel.setForeground(new Color(200, 150, 50));
                             }
+                            // 重新启用加载按钮
+                            loadMachinesBtn.setEnabled(true);
                         });
                     } catch (Exception ex) {
                         SwingUtilities.invokeLater(() -> {
-                            statusLabel.setText("❌ " + ex.getMessage());
+                            // 检查时间戳，如果不是最新的请求，就忽略错误
+                            if (currentTimestamp != lastLoadTimestamp[0]) {
+                                System.out.println("Ignoring old load request error, timestamp: " + currentTimestamp + ", latest: " + lastLoadTimestamp[0]);
+                                return;
+                            }
+                            
+                            // 构建错误提示信息
+                            String errorMsg = ex.getMessage();
+                            boolean isTimeout = errorMsg != null && (
+                                errorMsg.toLowerCase().contains("timeout") || 
+                                errorMsg.toLowerCase().contains("timed out")
+                            );
+                            
+                            if (isTimeout) {
+                                statusLabel.setText("❌ Timeout - May need authentication. Complete auth and retry.");
+                            } else {
+                                statusLabel.setText("❌ " + errorMsg);
+                            }
                             statusLabel.setForeground(new Color(200, 100, 100));
+                            // 重新启用加载按钮
+                            loadMachinesBtn.setEnabled(true);
                         });
                     }
                 }
             });
         });
 
-        // 自动加载
-        if (StringUtils.isNotBlank(savedPath) && new File(savedPath).exists()) {
+        // 自动加载：优先用 savedPath，否则用 defaultPath
+        String autoLoadPath = StringUtils.isNotBlank(savedPath) ? savedPath : defaultPath;
+        if (new File(autoLoadPath).exists()) {
+            // 如果用的是 defaultPath，先设置到文本框
+            if (StringUtils.isBlank(savedPath)) {
+                scriptPathField.setText(defaultPath);
+            }
             SwingUtilities.invokeLater(loadInfraAction::run);
         }
 
@@ -1780,9 +1849,24 @@ def httpPost(String url, Map data) {
             });
         });
 
+        // ==================== 底部关闭按钮 ====================
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(manualPanel, BorderLayout.CENTER);
+        
+        JPanel closePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
+        JButton closeButton = new JButton("Close");
+        closeButton.setToolTipText("Close this dialog");
+        closeButton.addActionListener(e -> {
+            if (popupHolder[0] != null) {
+                popupHolder[0].cancel();
+            }
+        });
+        closePanel.add(closeButton);
+        bottomPanel.add(closePanel, BorderLayout.SOUTH);
+
         // ==================== 组装 ====================
         panel.add(remotePanel, BorderLayout.CENTER);
-        panel.add(manualPanel, BorderLayout.SOUTH);
+        panel.add(bottomPanel, BorderLayout.SOUTH);
 
         return panel;
     }
