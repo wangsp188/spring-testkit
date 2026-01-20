@@ -27,8 +27,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.ui.components.JBScrollPane;
+import javax.swing.*;
+import java.awt.*;
 
 public class TestkitProjectListener implements ProjectActivity {
 
@@ -72,36 +78,7 @@ public class TestkitProjectListener implements ProjectActivity {
                         ApplicationManager.getApplication().invokeLater(new Runnable() {
                             @Override
                             public void run() {
-                                String title = TestkitHelper.getPluginName();
-                                String content = "New version available (v" + last.getVersion() + ")" +
-                                        (last.getReleaseNotes() != null && !last.getReleaseNotes().isEmpty() ? 
-                                                "\n\n" + last.getReleaseNotes() : "");
-                                Notification notification = new Notification(title, title, content, NotificationType.INFORMATION);
-                                notification.addAction(NotificationAction.createSimple("Install now", new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        boolean ok = UpdaterUtil.installFromZip(zipPath, project);
-                                        if (ok) {
-                                            // 安装成功，显示重启提示
-                                            showRestartNotification(project, last.getVersion());
-                                        } else {
-                                            TestkitHelper.notify(project, NotificationType.WARNING, "Install failed. Please open folder and install via Plugins > Install from Disk.");
-                                        }
-                                    }
-                                }));
-                                notification.addAction(NotificationAction.createSimple("Open folder", new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        UpdaterUtil.revealFile(zipPath);
-                                    }
-                                }));
-                                notification.addAction(NotificationAction.createSimple("Later", new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        notification.expire();
-                                    }
-                                }));
-                                Notifications.Bus.notify(notification, project);
+                                showUpdateDialog(project, last, zipPath);
                             }
                         });
                     }
@@ -188,27 +165,109 @@ public class TestkitProjectListener implements ProjectActivity {
     }
 
     /**
+     * 显示更新对话框（居中显示）
+     */
+    private static void showUpdateDialog(Project project, UpdaterUtil.LastVersion lastVersion, String zipPath) {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+
+        // 标题
+        JLabel titleLabel = new JLabel("🎉 New Version Available");
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16f));
+        panel.add(titleLabel, BorderLayout.NORTH);
+
+        // Release Notes 内容
+        JPanel contentPanel = new JPanel(new BorderLayout(5, 5));
+
+        JLabel versionLabel = new JLabel("Version: " + lastVersion.getVersion());
+        versionLabel.setFont(versionLabel.getFont().deriveFont(Font.BOLD, 14f));
+        contentPanel.add(versionLabel, BorderLayout.NORTH);
+
+        if (lastVersion.getReleaseNotes() != null && !lastVersion.getReleaseNotes().isEmpty()) {
+            JTextArea notesArea = new JTextArea(lastVersion.getReleaseNotes());
+            notesArea.setEditable(false);
+            notesArea.setLineWrap(true);
+            notesArea.setWrapStyleWord(true);
+            notesArea.setFont(notesArea.getFont().deriveFont(12f));
+            notesArea.setBackground(panel.getBackground());
+
+            JBScrollPane scrollPane = new JBScrollPane(notesArea);
+            scrollPane.setPreferredSize(new Dimension(500, 200));
+            scrollPane.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
+            contentPanel.add(scrollPane, BorderLayout.CENTER);
+        }
+
+        panel.add(contentPanel, BorderLayout.CENTER);
+
+        // 按钮面板
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+
+        JButton installButton = new JButton("Install Now");
+        installButton.setPreferredSize(new Dimension(120, 32));
+        installButton.addActionListener(e -> {
+            boolean ok = UpdaterUtil.installFromZip(zipPath, project);
+            if (ok) {
+                showRestartNotification(project, lastVersion.getVersion());
+            } else {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Install failed. Please open folder and install via Plugins > Install from Disk.");
+            }
+        });
+
+        JButton openFolderButton = new JButton("Open Folder");
+        openFolderButton.setPreferredSize(new Dimension(120, 32));
+        openFolderButton.addActionListener(e -> {
+            UpdaterUtil.revealFile(zipPath);
+        });
+
+        JButton laterButton = new JButton("Later");
+        laterButton.setPreferredSize(new Dimension(120, 32));
+
+        buttonPanel.add(installButton);
+        buttonPanel.add(openFolderButton);
+        buttonPanel.add(laterButton);
+
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        // 创建居中弹窗
+        JBPopup popup = JBPopupFactory.getInstance()
+                .createComponentPopupBuilder(panel, installButton)
+                .setTitle(TestkitHelper.getPluginName()+" Update")
+                .setMovable(true)
+                .setResizable(false)
+                .setRequestFocus(true)
+                .setCancelOnClickOutside(false)
+                .setCancelKeyEnabled(false)
+                .setCancelOnWindowDeactivation(false)
+                .createPopup();
+
+        laterButton.addActionListener(e -> popup.cancel());
+
+        // 居中显示
+        popup.showCenteredInCurrentWindow(project);
+    }
+
+    /**
      * 显示重启 IDE 的通知
      */
     private static void showRestartNotification(Project project, String version) {
         String title = TestkitHelper.getPluginName();
         String content = "Plugin v" + version + " installed successfully. Restart IDE to apply changes.";
         Notification notification = new Notification(title, title, content, NotificationType.INFORMATION);
-        
+
         notification.addAction(NotificationAction.createSimple("Restart Now", new Runnable() {
             @Override
             public void run() {
                 ApplicationManager.getApplication().restart();
             }
         }));
-        
+
         notification.addAction(NotificationAction.createSimple("Restart Later", new Runnable() {
             @Override
             public void run() {
                 notification.expire();
             }
         }));
-        
+
         Notifications.Bus.notify(notification, project);
     }
 }
