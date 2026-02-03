@@ -521,7 +521,7 @@ public class ArthasDialog extends DialogWrapper {
     }
 
     @Override
-    protected Action @Nullable [] createActions() {
+    protected Action [] createActions() {
         // No buttons (ESC to close)
         return new Action[]{};
     }

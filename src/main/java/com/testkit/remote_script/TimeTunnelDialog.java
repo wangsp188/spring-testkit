@@ -571,7 +571,7 @@ public class TimeTunnelDialog extends DialogWrapper {
     }
 
     @Override
-    protected Action @Nullable [] createActions() {
+    protected Action [] createActions() {
         // Remove OK button
         return new Action[0];
     }
