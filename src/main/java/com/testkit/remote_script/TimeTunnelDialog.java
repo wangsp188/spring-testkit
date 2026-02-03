@@ -10,6 +10,7 @@ import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -18,6 +19,7 @@ import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.util.RemoteScriptCallUtils;
+import com.testkit.view.CurlDialog;
 import com.testkit.view.TestkitToolWindow;
 import com.testkit.view.TestkitToolWindowFactory;
 import org.apache.commons.lang3.StringUtils;
@@ -39,6 +41,9 @@ import java.util.stream.Collectors;
  * 优化版布局：左右分割，每个 instance 有独立的状态和操作按钮
  */
 public class TimeTunnelDialog extends DialogWrapper {
+
+    public static final Icon CLEAR_ICON = IconLoader.getIcon("/icons/clear.svg", TimeTunnelDialog.class);
+
 
     private final Project project;
     private final String className;
@@ -648,7 +653,7 @@ public class TimeTunnelDialog extends DialogWrapper {
             loadBtn.addActionListener(e -> loadRecords());
             headerPanel.add(loadBtn);
 
-            clearBtn = createIconButton(AllIcons.Actions.ClearCash, "Clear records");
+            clearBtn = createIconButton(CLEAR_ICON, "Clear records");
             clearBtn.addActionListener(e -> clearRecords());
             headerPanel.add(clearBtn);
 
@@ -1002,7 +1007,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                         
                         // Reset icon after 2 seconds
                         Timer timer = new Timer(2000, e -> {
-                            clearBtn.setIcon(AllIcons.Actions.ClearCash);
+                            clearBtn.setIcon(CLEAR_ICON);
                             clearBtn.setToolTipText("Clear records");
                         });
                         timer.setRepeats(false);
@@ -1019,7 +1024,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                                 "Clear records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
                         
                         Timer timer = new Timer(2000, ev -> {
-                            clearBtn.setIcon(AllIcons.Actions.ClearCash);
+                            clearBtn.setIcon(CLEAR_ICON);
                             clearBtn.setToolTipText("Clear records");
                         });
                         timer.setRepeats(false);
