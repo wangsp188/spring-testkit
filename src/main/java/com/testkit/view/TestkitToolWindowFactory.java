@@ -3,11 +3,11 @@ package com.testkit.view;
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationType;
-import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
-import com.intellij.util.messages.MessageBusConnection;
+import com.testkit.remote_script.RemoteScriptExecutor;
+import com.testkit.RuntimeHelper;
+import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
 import com.testkit.coding_guidelines.CodingGuidelinesHelper;
-import com.testkit.tools.BasePluginTool;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -25,10 +25,12 @@ import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
 import com.testkit.tools.mcp_function.McpAdapter;
 import com.testkit.tools.mcp_function.McpHelper;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -72,6 +74,38 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
         });
     }
 
+    /**
+     * Show remote connection config popup
+     * @param project current project
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     */
+    public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded) {
+        showConnectionConfigPopup(project, onConnectionAdded, true);
+    }
+
+    /**
+     * Show remote connection config popup
+     * @param project current project
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show Manual Configure section
+     */
+    public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded, boolean showManualConfig) {
+        showConnectionConfigPopup(project, onConnectionAdded, showManualConfig, null);
+    }
+
+    /**
+     * Show remote connection config popup with app filter
+     * @param project current project
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show Manual Configure section
+     * @param allowedAppNames if not null, only show these apps in the list
+     */
+    public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames) {
+        getOrInitToolWindow(project, testkitToolWindow -> {
+            testkitToolWindow.showConnectionConfigPopup(onConnectionAdded, showManualConfig, allowedAppNames);
+        });
+    }
+
     private static void getOrInitToolWindow(Project project, Consumer<TestkitToolWindow> consumer) {
         TestkitToolWindow toolWindow = windows.get(project);
 
@@ -103,9 +137,41 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
 
     @Override
     public void init(@org.jetbrains.annotations.NotNull ToolWindow toolWindow) {
-        // 项目启动时就开始探测 RuntimeApp，更新图标角标
+        // Get project from toolWindow
         Project project = ((com.intellij.openapi.wm.impl.ToolWindowImpl) toolWindow).getProject();
+        
+        // Check Arthas support immediately (doesn't depend on loadInfra)
+        checkArthasSupport(project);
+        
+        // Start RuntimeApp detection task
         startRuntimeAppDetection(project, toolWindow);
+    }
+
+    /**
+     * Check if remote script supports Arthas (independent of loadInfra)
+     */
+    private void checkArthasSupport(Project project) {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            try {
+                String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
+                if (StringUtils.isBlank(scriptPath)) {
+                    return;
+                }
+                
+                RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
+                if (!executor.isValid()) {
+                    return;
+                }
+                
+                boolean arthasSupported = executor.isArthasSupported(5);
+                RuntimeHelper.setArthasSupported(arthasSupported);
+                System.out.println("[Testkit] Arthas feature enabled: " + arthasSupported + 
+                        " (checked on init)");
+            } catch (Throwable e) {
+                // Ignore errors during init check
+                System.err.println("[Testkit] Failed to check Arthas support on init: " + e.getMessage());
+            }
+        });
     }
 
     /**
@@ -174,7 +240,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             com.testkit.RuntimeHelper.VisibleApp visibleApp = com.testkit.RuntimeHelper.parseApp(item);
 
             // 跳过 remote 类型的连接（通过脚本管理，不需要探测）
-            if (visibleApp.isRemoteScript()) {
+            if (visibleApp.isRemoteInstance()) {
                 count++; // remote 类型也算作已连接
                 continue;
             }

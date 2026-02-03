@@ -2,7 +2,7 @@ package com.testkit.util;
 
 import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.project.Project;
-import com.testkit.RemoteScriptExecutor;
+import com.testkit.remote_script.RemoteScriptExecutor;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import org.apache.commons.lang3.StringUtils;
@@ -22,7 +22,7 @@ public class RemoteScriptCallUtils {
      * 判断是否是远程脚本类型的连接
      */
     public static boolean isRemoteScriptConnection(RuntimeHelper.VisibleApp app) {
-        return app != null && app.isRemoteScript();
+        return app != null && app.isRemoteInstance();
     }
 
     /**

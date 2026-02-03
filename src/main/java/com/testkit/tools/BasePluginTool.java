@@ -52,7 +52,6 @@ import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
 import java.util.function.Supplier;
-import java.awt.geom.Ellipse2D;
 
 public abstract class BasePluginTool {
 
@@ -430,8 +429,8 @@ public abstract class BasePluginTool {
             return;
         }
 
-        boolean isRemoteScript = visibleApp.isRemoteScript();
-        int sidePort = isRemoteScript ? -1 : visibleApp.getTestkitPort();
+        boolean isRemoteInstance = visibleApp.isRemoteInstance();
+        int sidePort = isRemoteInstance ? -1 : visibleApp.getTestkitPort();
 
         // Non-localhost request requires user confirmation
         if (!visibleApp.judgeIsLocal() && !AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {
@@ -442,7 +441,7 @@ public abstract class BasePluginTool {
 
             // 根据连接类型构建不同的确认信息
             String instanceInfo;
-            if (isRemoteScript) {
+            if (isRemoteInstance) {
                 instanceInfo = String.format("Partition: %s\nInstance: %s:%d",
                     visibleApp.getRemotePartition(),
                     visibleApp.getRemoteIp(),
@@ -494,7 +493,7 @@ public abstract class BasePluginTool {
                     params.put("reqId", lastReqId);
                     req.put("params", params);
 
-                    if (isRemoteScript) {
+                    if (isRemoteInstance) {
                         return RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, req, REMOTE_CANCEL_TIMEOUT);
                     } else {
                         return HttpUtil.sendPost("http://localhost:" + sidePort + "/", req, JSONObject.class, 5, 30);
@@ -531,7 +530,7 @@ public abstract class BasePluginTool {
                     }
 
                     // Step 1: 提交请求，获取 reqId
-                    if (isRemoteScript) {
+                    if (isRemoteInstance) {
                         response = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, request, REMOTE_SUBMIT_TIMEOUT);
                     } else {
                         response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class, 5, 30);
@@ -561,7 +560,7 @@ public abstract class BasePluginTool {
                     getResultReq.put("params", params);
 
                     JSONObject result;
-                    if (isRemoteScript) {
+                    if (isRemoteInstance) {
                         result = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
                     } else {
                         result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", getResultReq, JSONObject.class, 5, 600);
@@ -658,17 +657,6 @@ public abstract class BasePluginTool {
         triggerBtn.setIcon(executeIcon == null ? AllIcons.Actions.Execute : executeIcon);
     }
 
-    /**
-     * 触发 Testkit Server 任务（兼容旧接口，直接传端口）
-     */
-    protected void triggerTestkitServerTask(JButton triggerBtn, Icon executeIcon, int sidePort, Supplier<JSONObject> submit) {
-        // 创建一个临时的 VisibleApp 用于调用统一方法
-        RuntimeHelper.VisibleApp tempApp = new RuntimeHelper.VisibleApp();
-        tempApp.setAppName("temp");
-        tempApp.setIp("localhost");
-        tempApp.setTestkitPort(sidePort);
-        triggerTestkitServerTask(triggerBtn, executeIcon, tempApp, submit);
-    }
 
     protected void triggerLocalTask(JButton triggerBtn, Icon executeIcon, String msg, Supplier<String> submit) {
         if (AllIcons.Actions.Suspend.equals(triggerBtn.getIcon())) {

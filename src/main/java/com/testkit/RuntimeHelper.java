@@ -37,6 +37,9 @@ public class RuntimeHelper {
     private static final Map<String, List<String>> tempApps = new HashMap<>();
 
     private static boolean enableMapperSql = false;
+    
+    // Global Arthas support flag (determined by remote script's isArthasSupported function)
+    private static volatile boolean arthasSupported = false;
 
 
     public static boolean isEnableMapperSql() {
@@ -45,6 +48,20 @@ public class RuntimeHelper {
 
     public static void setEnableMapperSql(boolean enableMapperSql) {
         RuntimeHelper.enableMapperSql = enableMapperSql;
+    }
+
+    /**
+     * Check if Arthas is supported (determined by remote script)
+     */
+    public static boolean isArthasSupported() {
+        return arthasSupported;
+    }
+
+    /**
+     * Set Arthas support flag
+     */
+    public static void setArthasSupported(boolean supported) {
+        RuntimeHelper.arthasSupported = supported;
     }
 
     public static VisibleApp getSelectedApp(String project) {
@@ -71,7 +88,7 @@ public class RuntimeHelper {
     /**
      * 更新连接的元数据
      */
-    public static void updateConnectionMeta(String connectionStr, boolean enableTrace, String env, long expireTime) {
+    public static void updateConnectionMeta(String connectionStr, boolean enableTrace, String env, long expireTime, Integer arthasPort) {
         if (connectionStr == null) {
             return;
         }
@@ -79,6 +96,7 @@ public class RuntimeHelper {
         meta.setEnableTrace(enableTrace);
         meta.setEnv(env);
         meta.setExpireTime(expireTime);
+        meta.setArthasPort(arthasPort);
     }
 
     /**
@@ -136,6 +154,22 @@ public class RuntimeHelper {
         }
         ConnectionMeta meta = connectionMetaMap.get(connectionStr);
         return meta != null ? meta.getExpireTime() : 0;
+    }
+
+    public static Integer getArthasPort(String connectionStr) {
+        if (connectionStr == null) {
+            return null;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null ? meta.getArthasPort() : null;
+    }
+
+    public static boolean isArthasEnabled(String connectionStr) {
+        if (connectionStr == null) {
+            return false;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null && meta.isArthasEnabled();
     }
 
     /**
@@ -224,6 +258,36 @@ public class RuntimeHelper {
         return visibleApps1 == null ? new ArrayList<>() : visibleApps1;
     }
 
+    /**
+     * 添加单个 VisibleApp 到 visibleApps（避免重复）
+     * 用于 remote script 加载的 instance 直接写入
+     */
+    public static void addVisibleApp(String project, VisibleApp app) {
+        if (project == null || app == null) {
+            return;
+        }
+        List<VisibleApp> apps = visibleApps.computeIfAbsent(project, k -> new ArrayList<>());
+        // 检查是否已存在（按 connectionString 判断）
+        String connStr = app.toConnectionString();
+        boolean exists = apps.stream().anyMatch(a -> connStr.equals(a.toConnectionString()));
+        if (!exists) {
+            apps.add(app);
+        }
+    }
+
+    /**
+     * 从 visibleApps 中移除指定的 app
+     */
+    public static void removeVisibleApp(String project, VisibleApp app) {
+        if (project == null || app == null) {
+            return;
+        }
+        List<VisibleApp> apps = visibleApps.get(project);
+        if (apps != null) {
+            String connStr = app.toConnectionString();
+            apps.removeIf(a -> connStr.equals(a.toConnectionString()));
+        }
+    }
 
     public static boolean hasAppMeta(String project) {
         if (project == null) {
@@ -413,7 +477,7 @@ public class RuntimeHelper {
          * 判断是否是通过 Groovy 脚本连接的远程机器
          * IP 格式为 [partition]ip
          */
-        public boolean isRemoteScript() {
+        public boolean isRemoteInstance() {
             return ip != null && ip.startsWith("[");
         }
 
@@ -421,7 +485,7 @@ public class RuntimeHelper {
          * 获取远程实例标识（从 [partition]ip 中提取 ip）
          */
         public String getRemoteIp() {
-            if (isRemoteScript() && ip.contains("]")) {
+            if (isRemoteInstance() && ip.contains("]")) {
                 return ip.substring(ip.indexOf("]") + 1);
             }
             return null;
@@ -431,7 +495,7 @@ public class RuntimeHelper {
          * 获取远程实例的 partition（从 [partition]ip 中提取 partition）
          */
         public String getRemotePartition() {
-            if (isRemoteScript() && ip.contains("]")) {
+            if (isRemoteInstance() && ip.contains("]")) {
                 return ip.substring(1, ip.indexOf("]"));
             }
             return null;
@@ -491,6 +555,7 @@ public class RuntimeHelper {
         private boolean enableTrace;
         private String env;
         private long expireTime;  // 过期时间（UTC 时间戳）
+        private Integer arthasPort;  // Arthas 端口，非空表示支持 Arthas
 
         public boolean isEnableTrace() {
             return enableTrace;
@@ -516,8 +581,20 @@ public class RuntimeHelper {
             this.expireTime = expireTime;
         }
 
+        public Integer getArthasPort() {
+            return arthasPort;
+        }
+
+        public void setArthasPort(Integer arthasPort) {
+            this.arthasPort = arthasPort;
+        }
+
         public boolean isExpired() {
             return System.currentTimeMillis() > expireTime;
+        }
+
+        public boolean isArthasEnabled() {
+            return arthasPort != null && arthasPort > 0;
         }
 
         @Override
@@ -526,6 +603,7 @@ public class RuntimeHelper {
                     "enableTrace=" + enableTrace +
                     ", env='" + env + '\'' +
                     ", expireTime=" + expireTime +
+                    ", arthasPort=" + arthasPort +
                     '}';
         }
     }

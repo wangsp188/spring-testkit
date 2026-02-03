@@ -50,7 +50,6 @@ import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.ibatis.io.ResolverUtil;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.jetbrains.annotations.NotNull;
@@ -58,8 +57,6 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.UnsupportedEncodingException;
@@ -1736,7 +1733,7 @@ public class TestkitStoreWindow {
             return;
         }
 
-        boolean isRemoteScript = visibleApp.isRemoteScript();
+        boolean isRemoteScript = visibleApp.isRemoteInstance();
         int sidePort = isRemoteScript ? -1 : visibleApp.getTestkitPort();
 
         // Non-localhost request requires user confirmation

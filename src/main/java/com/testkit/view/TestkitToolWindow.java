@@ -10,9 +10,8 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.wm.WindowManager;
-import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBTextField;
-import com.testkit.RemoteScriptExecutor;
+import com.testkit.remote_script.RemoteScriptExecutor;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
@@ -67,9 +66,6 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -79,153 +75,12 @@ public class TestkitToolWindow {
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
     private static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
-    private static final Icon connectionIcon = IconLoader.getIcon("/icons/connection.svg", TestkitToolWindow.class);
+    public static final Icon connectionIcon = IconLoader.getIcon("/icons/connection.svg", TestkitToolWindow.class);
+//    public static final Icon connectionIcon = AllIcons.Webreferences.Server;
+    public static final Icon arthasIcon = IconLoader.getIcon("/icons/arthas.svg", TestkitToolWindow.class);
     // ToolWindow 原始图标
     public static final Icon TOOLWINDOW_ICON = IconLoader.getIcon("/icons/spring-testkit.svg", TestkitToolWindow.class);
 
-    // Remote Script API Reference
-    private static final String REMOTE_SCRIPT_INFO = """
-================================================================================
-                        Remote Script API Reference
-================================================================================
-
-The plugin calls three functions in the Groovy script. Implement these functions:
-
-────────────────────────────────────────────────────────────────────────────────
-1. loadInfra()
-────────────────────────────────────────────────────────────────────────────────
-   Purpose: Get available Apps and Partitions
-   Parameters: None
-   Returns: Map<String, List<String>>
-         Key   = appName (Spring Boot main class name, e.g., "WebApplication")
-         Value = partition list (e.g., ["us01", "qa01", "dev01"])
-   
-   Example:
-   [
-       "WebApplication"    : ["us01", "qa01"],
-       "ApiWebApplication" : ["us01"]
-   ]
-
-────────────────────────────────────────────────────────────────────────────────
-2. loadInstances(String appName, String partition)
-────────────────────────────────────────────────────────────────────────────────
-   Purpose: Get instance list for specified App + Partition
-   Parameters: appName   - Application name
-               partition - Partition name
-   Returns: List<Map> - Instance information list
-   
-   Required fields:
-     - ip           : String  Instance identifier (stored as [partition]ip)
-     - port         : int     Testkit port
-     - env          : String  Environment identifier (e.g., "prod", "qa")
-     - success      : boolean Availability status
-     - errorMessage : String  Error message (when success=false)
-   
-   Optional fields:
-     - enableTrace  : boolean Trace support (default: false)
-     - expireTime   : long    Expiration time UTC timestamp (default: 24h later)
-   
-   Example:
-   [
-       [ip: "pod-001", port: 18080, success: true,  errorMessage: "", enableTrace: true, env: "prod"],
-       [ip: "pod-002", port: 18080, success: false, errorMessage: "Connection refused"]
-   ]
-
-────────────────────────────────────────────────────────────────────────────────
-3. sendRequest(String appName, String partition, String ip, int port, Map request)
-────────────────────────────────────────────────────────────────────────────────
-   Purpose: Send request to specified instance (forward to Testkit Server)
-   Parameters: appName   - Application name
-               partition - Partition name
-               ip        - Instance identifier (from loadInstances)
-               port      - Testkit port
-               request   - Request object Map
-   Returns: Map - Response result (forwarded from Testkit Server)
-   
-   Request structure:
-     - method      : String             Request method
-     - params      : Map<String,String> Request parameters
-     - trace       : boolean            Enable tracing (optional)
-     - prepare     : boolean            Enable preprocessing (optional)
-     - interceptor : String             Interceptor config (optional)
-   
-   Common method values:
-     - "hi"           : Health check
-     - "function-call": Submit [function-call] task
-     - "flexible-test": Submit [flexible-test] task
-     - "view-value"   : View variable value
-     - "get_task_ret" : Get task result
-     - "stop_task"    : Stop task
-
-================================================================================
-                              Demo Script
-================================================================================
-
-import groovy.json.JsonSlurper
-import groovy.json.JsonOutput
-
-// ==================== 1. loadInfra ====================
-def loadInfra() {
-    // Return your service cluster architecture definition
-    return [
-        "WebApplication": ["dev01", "qa01", "us01"]
-    ]
-}
-
-// ==================== 2. loadInstances ====================
-// Note: Testkit Server must be started on target machine via testkit-cli attach
-//       success=true  means Testkit Server is running and connectable
-//       success=false means startup failed or unreachable, fill errorMessage
-def loadInstances(String appName, String partition) {
-    def pods = getPodList(appName, partition)  // Get pod list (implement yourself)
-    
-    return pods.collect { pod ->
-        def result = [
-            ip   : pod.name,
-            port : 18080,
-            env  : partition
-        ]
-        try {
-            // 1) Start testkit-cli on target machine via SSH/kubectl (if not started)
-            def resp = startTestkitCli(pod.ip, appName)
-            result.success      = resp.success == true
-            result.errorMessage = result.success ? "" : (resp.message ?: "Unknown error")
-            result.enableTrace  = resp.data?.enableTrace ?: false
-        } catch (Exception e) {
-            result.success      = false
-            result.errorMessage = e.message ?: "Connection failed"
-            result.enableTrace  = false
-        }
-        return result
-    }
-}
-
-// ==================== 3. sendRequest ====================
-// If target IP is directly accessible, send HTTP POST request
-def sendRequest(String appName, String partition, String ip, int port, Map request) {
-    def address = getAddress(ip, partition)  // Get actual address from ip (implement yourself)
-    return httpPost("http://${address}:${port}/", request)
-}
-
-// ==================== Helper Functions ====================
-def httpPost(String url, Map data) {
-    def conn = new URL(url).openConnection()
-    conn.setConnectTimeout(5000)
-    conn.setReadTimeout(600000)
-    conn.setRequestMethod("POST")
-    conn.setDoOutput(true)
-    conn.setRequestProperty("Content-Type", "application/json")
-    conn.outputStream.withWriter { it << JsonOutput.toJson(data) }
-    return new JsonSlurper().parseText(conn.inputStream.text)
-}
-
-// TODO: Implement these functions
-// def getPodList(appName, partition) { ... }
-// def getAddress(ip, partition) { ... }
-// def startTestkitCli(podIp, appName) { ... }
-
-================================================================================
-""";
 
     // Remote Script 超时配置
     private static final int LOAD_INFRA_TIMEOUT = 30;       // loadInfra 超时 30 秒
@@ -240,13 +95,15 @@ def httpPost(String url, Map data) {
 
     private JPanel appPanel;
     private JComboBox<String> appBox;
+    private JButton arthasButton; // Arthas 按钮
     private JButton killButton; // kill 进程按钮
-    private JPanel rightAppPanel; // RuntimeApp 面板（包含 appBox 和 killButton）
+    private JPanel rightAppPanel; // RuntimeApp 面板（包含 appBox、arthasButton 和 killButton）
 
     private SettingsDialog settingsDialog;
     private CurlDialog curlDialog;
     private SqlDialog sqlDialog;
     private MCPServerDialog mcpServerDialog;
+    private ArthasDialog arthasDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
@@ -424,6 +281,13 @@ def httpPost(String url, Map data) {
             } else {
                 appBox.setForeground(defColor);
             }
+            
+            // 控制 arthasButton 显示/隐藏
+            if (selectedItem != null && RuntimeHelper.isArthasEnabled(selectedItem)) {
+                arthasButton.setVisible(true);
+            } else {
+                arthasButton.setVisible(false);
+            }
         });
 
         // 将左侧按钮组添加到主面板西侧
@@ -434,6 +298,44 @@ def httpPost(String url, Map data) {
         rightAppPanel.add(appPanel, BorderLayout.WEST);
         // 设置扩展策略
         rightAppPanel.add(appBox, BorderLayout.CENTER);
+
+        // 创建右侧按钮面板（包含 arthasButton 和 killButton）
+        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        
+        // 添加 Arthas 按钮
+        arthasButton = new JButton(arthasIcon);
+        arthasButton.setToolTipText("🔧 Arthas: Execute diagnostic commands (jad, tt, trace, ognl, etc.)");
+        arthasButton.setPreferredSize(new Dimension(32, 32));
+        arthasButton.setFocusPainted(false);
+        arthasButton.setBorderPainted(true);
+        arthasButton.setVisible(false); // 默认隐藏
+        arthasButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                arthasButton.setBackground(new Color(100, 150, 200, 30)); // 半透明蓝色背景
+            }
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                arthasButton.setBackground(null);
+            }
+        });
+        arthasButton.addActionListener(e -> {
+            String selectedItem = (String) appBox.getSelectedItem();
+            if (selectedItem == null) {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Please select an app first");
+                return;
+            }
+
+            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedItem);
+            if (visibleApp == null || !RuntimeHelper.isArthasEnabled(selectedItem)) {
+                TestkitHelper.notify(project, NotificationType.WARNING, "Selected app does not support Arthas");
+                return;
+            }
+
+            // TODO: 打开 Arthas 命令对话框
+            showArthasDialog(visibleApp);
+        });
+        buttonsPanel.add(arthasButton);
 
         // 添加 kill 进程按钮到 appBox 右边
         killButton = new JButton(AllIcons.Actions.GC);
@@ -468,7 +370,7 @@ def httpPost(String url, Map data) {
             }
 
             // 检查是否是 remote app
-            if (visibleApp.isRemoteScript()) {
+            if (visibleApp.isRemoteInstance()) {
                 // Remote app: 仅从列表移除，不停止远程服务
                 int result = Messages.showYesNoDialog(
                         project,
@@ -509,7 +411,10 @@ def httpPost(String url, Map data) {
                 killProcessByPort(port, appName);
             }
         });
-        rightAppPanel.add(killButton, BorderLayout.EAST);
+        buttonsPanel.add(killButton);
+        
+        // 将按钮面板添加到 rightAppPanel 的右侧
+        rightAppPanel.add(buttonsPanel, BorderLayout.EAST);
 
         // 将右侧面板添加到主面板东侧
         outPanel.add(rightAppPanel, BorderLayout.CENTER);
@@ -720,7 +625,7 @@ def httpPost(String url, Map data) {
      * 刷新可见应用列表
      * @param skipRemote 是否跳过 remote 类型的连接探活
      */
-    synchronized void refreshVisibleApp(boolean skipRemote) {
+    public synchronized void refreshVisibleApp(boolean skipRemote) {
         Set<String> newItems = new LinkedHashSet<>();
         List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
         if (localItems != null) {
@@ -747,7 +652,7 @@ def httpPost(String url, Map data) {
             RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(item);
 
             // remote 类型的连接处理
-            if (visibleApp.isRemoteScript()) {
+            if (visibleApp.isRemoteInstance()) {
                 if (skipRemote) {
                     // 检查是否过期
                     if (RuntimeHelper.isConnectionExpired(item)) {
@@ -810,7 +715,7 @@ def httpPost(String url, Map data) {
                 System.out.println("链接探活:"+item+",true,"+enableTrace+",env="+env);
                 newMap.put(item, enableTrace);
                 // 更新 env 到元数据（local/manual 连接不设过期时间，用 Long.MAX_VALUE）
-                RuntimeHelper.updateConnectionMeta(item, enableTrace, env, Long.MAX_VALUE);
+                RuntimeHelper.updateConnectionMeta(item, enableTrace, env, Long.MAX_VALUE, null);
             }catch (Throwable e) {
                 e.printStackTrace();
                 System.out.println("链接探活:"+item+",false,");
@@ -842,6 +747,20 @@ def httpPost(String url, Map data) {
 // 记录当前选中的项
                 String selectedItem = (String) appBox.getSelectedItem();
 
+                // 获取当前 visibleApps 中通过 remote script 直接添加的连接（有 arthasPort 的 remote instance）
+                // 这些连接需要保留，不能被 newItems 覆盖
+                Set<String> newItemsSet = new HashSet<>(newItems);
+                List<RuntimeHelper.VisibleApp> remoteScriptApps = RuntimeHelper.getVisibleApps(project.getName()).stream()
+                        .filter(app -> app.isRemoteInstance() && RuntimeHelper.isArthasEnabled(app.toConnectionString()))
+                        .filter(app -> !newItemsSet.contains(app.toConnectionString()))  // 不在 newItems 中的
+                        .toList();
+
+                // 合并 newItems 和需要保留的 remoteScriptApps
+                Set<String> finalItems = new LinkedHashSet<>(newItems);
+                for (RuntimeHelper.VisibleApp app : remoteScriptApps) {
+                    finalItems.add(app.toConnectionString());
+                }
+
                 // 获取当前下拉框中的所有项
                 List<String> currentItems = new ArrayList<>();
                 for (int i = 0; i < appBox.getItemCount(); i++) {
@@ -851,14 +770,14 @@ def httpPost(String url, Map data) {
                 // 更新 monitorMap
                 RuntimeHelper.updateTraces(newMap);
                 // 比较新旧项是否有变化
-                boolean hasChanges = !(newItems.isEmpty() && currentItems.isEmpty()) && !new HashSet<>(newItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(newItems);
+                boolean hasChanges = !(finalItems.isEmpty() && currentItems.isEmpty()) && !new HashSet<>(finalItems).containsAll(currentItems) || !new HashSet<>(currentItems).containsAll(finalItems);
                 if (!hasChanges) {
                     return;
                 }
                 // 更新下拉框内容
                 appBox.removeAllItems();
                 ArrayList<RuntimeHelper.VisibleApp> objects = new ArrayList<>();
-                for (String item : newItems) {
+                for (String item : finalItems) {
                     objects.add(RuntimeHelper.parseApp(item));
                     appBox.addItem(item);
                 }
@@ -877,7 +796,7 @@ def httpPost(String url, Map data) {
                 //更新索引
                 TestkitHelper.refresh(project);
                 // 更新 ToolWindow 图标角标
-                updateToolWindowIcon(newItems.size());
+                updateToolWindowIcon(finalItems.size());
             }
         });
     }
@@ -1059,6 +978,15 @@ def httpPost(String url, Map data) {
         appPanel.setVisible(showRuntimeApp);
         appBox.setVisible(showRuntimeApp);
         killButton.setVisible(showRuntimeApp); // kill 按钮只在显示 RuntimeApp 时显示
+        
+        // arthas 按钮只在显示 RuntimeApp 且当前选中支持 Arthas 时显示
+        if (showRuntimeApp) {
+            String selectedItem = (String) appBox.getSelectedItem();
+            arthasButton.setVisible(selectedItem != null && RuntimeHelper.isArthasEnabled(selectedItem));
+        } else {
+            arthasButton.setVisible(false);
+        }
+        
         whitePanel.setVisible(false);
         // 隐藏所有工具面板，并显示选中工具面板
         for (BasePluginTool t : tools.values()) {
@@ -1245,57 +1173,106 @@ def httpPost(String url, Map data) {
      * @param connectionStr 连接字符串
      */
     private void removeRemoteInstance(RuntimeHelper.VisibleApp visibleApp, String connectionStr) {
-        // 从 tempApps 中移除
+        // 从 tempApps 中移除（manual 添加的连接）
         List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
         tempApps.remove(connectionStr);
         RuntimeHelper.setTempApps(project.getName(), tempApps);
 
-        // 从 RuntimeHelper 中移除
+        // 从 visibleApps 中移除（remote script 添加的连接）
+        RuntimeHelper.removeVisibleApp(project.getName(), visibleApp);
+
+        // 从 localRuntimes 中移除（本地连接）
         RuntimeHelper.removeApp(project.getName(), visibleApp);
 
-        // 刷新列表
-        refreshVisibleApp(true);
+        // 清理 connectionMeta
+        RuntimeHelper.removeConnectionMeta(connectionStr);
+
+        // 刷新 appBox UI
+        appBox.removeItem(connectionStr);
 
         TestkitHelper.notify(project, NotificationType.INFORMATION,
                 "Remote instance removed from list: " + visibleApp.getRemoteIp() + "\n(Remote service is not stopped, only disconnected from plugin)");
     }
 
+    /**
+     * 显示 Arthas 命令对话框
+     * @param visibleApp 目标应用（可选，用于预选实例）
+     */
+    private void showArthasDialog(RuntimeHelper.VisibleApp visibleApp) {
+        // 每次都创建新的对话框实例（DialogWrapper 关闭后不能重复使用）
+        arthasDialog = new ArthasDialog(project);
+        arthasDialog.show();
+    }
+
     // ==================== Connection Config Popup ====================
 
     /**
-     * 显示连接配置弹窗（合并 Remote Instance 和 Manual Configure）
+     * Show connection config popup (combined Remote Instance and Manual Configure)
      */
     private void showConnectionConfigPopup() {
-        // 创建弹出框引用
+        showConnectionConfigPopup(null, true);
+    }
+
+    /**
+     * Show connection config popup with optional callback
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     */
+    public void showConnectionConfigPopup(Runnable onConnectionAdded) {
+        showConnectionConfigPopup(onConnectionAdded, true, null);
+    }
+
+    /**
+     * Show connection config popup with optional callback and manual config visibility
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show the Manual Configure section
+     */
+    public void showConnectionConfigPopup(Runnable onConnectionAdded, boolean showManualConfig) {
+        showConnectionConfigPopup(onConnectionAdded, showManualConfig, null);
+    }
+
+    /**
+     * Show connection config popup with optional callback, manual config visibility, and app filter
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show the Manual Configure section
+     * @param allowedAppNames if not null, only show these apps in the list
+     */
+    public void showConnectionConfigPopup(Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames) {
+        // Create popup holder
         final JBPopup[] popupHolder = new JBPopup[1];
 
-        // 创建合并面板
-        JPanel mainPanel = createCombinedConnectionPanel(popupHolder);
-        mainPanel.setPreferredSize(new Dimension(520, 420));
+        // Create combined panel
+        JPanel mainPanel = createCombinedConnectionPanel(popupHolder, onConnectionAdded, showManualConfig, allowedAppNames);
+        mainPanel.setPreferredSize(new Dimension(550, showManualConfig ? 420 : 320));
 
-        // 创建弹出框
+        // Create popup
         JBPopupFactory popupFactory = JBPopupFactory.getInstance();
         JBPopup popup = popupFactory.createComponentPopupBuilder(mainPanel, mainPanel)
                 .setRequestFocus(true)
                 .setFocusable(true)
-                .setTitle("Add Remote Connection")
+                .setTitle("Connect Remote Instance")
                 .setMovable(true)
                 .setResizable(true)
-                .setCancelOnClickOutside(false)      // 防止点击外部关闭
-//                .setCancelKeyEnabled(false)          // 禁用 ESC 键关闭
-                .setCancelOnWindowDeactivation(false) // 防止窗口失焦时关闭（切屏）
+                .setCancelOnClickOutside(false)
+                .setCancelOnWindowDeactivation(false)
                 .createPopup();
 
         popupHolder[0] = popup;
 
-        // 显示弹出框
-        popup.show(new RelativePoint(appPanel, new Point(0, 0)));
+        // Show popup in center of IDE
+        popup.showCenteredInCurrentWindow(project);
     }
 
     /**
-     * 创建合并的连接配置面板（Remote Instance + Manual Configure）
+     * Create combined connection config panel (Remote Instance + Manual Configure)
      */
     private JPanel createCombinedConnectionPanel(JBPopup[] popupHolder) {
+        return createCombinedConnectionPanel(popupHolder, null, true, null);
+    }
+
+    /**
+     * Create combined connection config panel with optional callback
+     */
+    private JPanel createCombinedConnectionPanel(JBPopup[] popupHolder, Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames) {
         JPanel panel = new JPanel(new BorderLayout(8, 8));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -1349,7 +1326,7 @@ def httpPost(String url, Map data) {
         partitionBox.setPreferredSize(new Dimension(100, 24));
         selectPanel.add(partitionBox);
         JButton loadMachinesBtn = new JButton("Load", AllIcons.Actions.Search);
-        loadMachinesBtn.setToolTipText("Load instances from remote script");
+        loadMachinesBtn.setToolTipText("Load instances by remote script");
         loadMachinesBtn.setEnabled(false);
         selectPanel.add(loadMachinesBtn);
 
@@ -1358,11 +1335,12 @@ def httpPost(String url, Map data) {
         remoteTopPanel.add(selectPanel, BorderLayout.CENTER);
 
         // 实例表格
-        String[] columnNames = {"IP", "Port", "Env", "Status", "Action"};
+        // Columns: IP=0, Port=1, Env=2, Arthas=3, Status=4, Action=5
+        String[] columnNames = {"IP", "Port", "Env", "Arthas", "Status", "Action"};
         javax.swing.table.DefaultTableModel tableModel = new javax.swing.table.DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 4;  // Action 列（IP=0, Port=1, Env=2, Status=3, Action=4）
+                return column == 5;  // Action 列
             }
         };
         JTable instanceTable = new JTable(tableModel);
@@ -1372,18 +1350,41 @@ def httpPost(String url, Map data) {
         instanceTable.getColumnModel().getColumn(1).setMaxWidth(60);
         instanceTable.getColumnModel().getColumn(2).setPreferredWidth(60);   // Env
         instanceTable.getColumnModel().getColumn(2).setMaxWidth(80);
-        instanceTable.getColumnModel().getColumn(3).setPreferredWidth(50);   // Status
-        instanceTable.getColumnModel().getColumn(3).setMaxWidth(80);
-        instanceTable.getColumnModel().getColumn(4).setPreferredWidth(65);   // Action
-        instanceTable.getColumnModel().getColumn(4).setMaxWidth(70);
+        instanceTable.getColumnModel().getColumn(3).setPreferredWidth(50);   // Arthas
+        instanceTable.getColumnModel().getColumn(3).setMaxWidth(60);
+        instanceTable.getColumnModel().getColumn(4).setPreferredWidth(50);   // Status
+        instanceTable.getColumnModel().getColumn(4).setMaxWidth(80);
+        instanceTable.getColumnModel().getColumn(5).setPreferredWidth(65);   // Action
+        instanceTable.getColumnModel().getColumn(5).setMaxWidth(70);
 
         List<RemoteScriptExecutor.InstanceInfo> instanceDataList = new ArrayList<>();
         
         // 用于记录最后一次 Load Instances 请求的时间戳，防止旧请求结果覆盖新请求
         final long[] lastLoadTimestamp = new long[]{0};
 
-        // Status 列渲染器 - 支持 Tooltip 显示完整错误信息
+        // Arthas 列渲染器 - 显示是否支持 Arthas
         instanceTable.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                if (row < instanceDataList.size()) {
+                    RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
+                    if (inst.isArthasEnabled()) {
+                        label.setText("✅");
+                        label.setToolTipText("Arthas enabled (port: " + inst.getArthasPort() + ")");
+                    } else {
+                        label.setText("—");
+                        label.setForeground(Color.GRAY);
+                        label.setToolTipText("Arthas not available");
+                    }
+                }
+                return label;
+            }
+        });
+
+        // Status 列渲染器 - 支持 Tooltip 显示完整错误信息
+        instanceTable.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
@@ -1417,9 +1418,26 @@ def httpPost(String url, Map data) {
             }
         });
 
-        // 操作列渲染器
-        instanceTable.getColumnModel().getColumn(4).setCellRenderer((table, value, isSelected, hasFocus, row, column) -> {
+        // 操作列渲染器 - 检查是否已添加到连接列表
+        instanceTable.getColumnModel().getColumn(5).setCellRenderer((table, value, isSelected, hasFocus, row, column) -> {
             if (row < instanceDataList.size() && instanceDataList.get(row).isSuccess()) {
+                RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
+                // Check if already added to connections (check both visibleApps and tempApps)
+                String connectionStr = inst.toConnectionString();
+                boolean alreadyAdded = RuntimeHelper.getVisibleApps(project.getName()).stream()
+                        .anyMatch(app -> app.toConnectionString().equals(connectionStr));
+                if (!alreadyAdded) {
+                    List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+                    alreadyAdded = tempApps != null && tempApps.contains(connectionStr);
+                }
+                
+                if (alreadyAdded) {
+                    JLabel lbl = new JLabel("✅");
+                    lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                    lbl.setToolTipText("Already added to connections");
+                    return lbl;
+                }
+                
                 JButton btn = new JButton("Add", connectionIcon);
                 btn.setToolTipText("Add to connections");
                 btn.setHorizontalTextPosition(SwingConstants.RIGHT);
@@ -1434,8 +1452,8 @@ def httpPost(String url, Map data) {
             return lbl;
         });
 
-        // 操作列编辑器
-        instanceTable.getColumnModel().getColumn(4).setCellEditor(new javax.swing.DefaultCellEditor(new JCheckBox()) {
+        // 操作列编辑器 - 检查是否已添加到连接列表
+        instanceTable.getColumnModel().getColumn(5).setCellEditor(new javax.swing.DefaultCellEditor(new JCheckBox()) {
             private JButton button = new JButton("Add", connectionIcon);
             private int currentRow = -1;
             {
@@ -1447,16 +1465,36 @@ def httpPost(String url, Map data) {
                     if (currentRow >= 0 && currentRow < instanceDataList.size()) {
                         RemoteScriptExecutor.InstanceInfo instance = instanceDataList.get(currentRow);
                         if (instance.isSuccess()) {
-                            addInstanceToConnections(instance, popupHolder);
+                            addInstanceToConnections(instance, popupHolder, onConnectionAdded);
                         }
                     }
+                    // Stop editing first, then refresh table to update status
                     fireEditingStopped();
+                    tableModel.fireTableRowsUpdated(currentRow, currentRow);
+                    instanceTable.repaint();
                 });
             }
             @Override
             public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
                 currentRow = row;
-                return (row < instanceDataList.size() && instanceDataList.get(row).isSuccess()) ? button : new JLabel("—");
+                if (row < instanceDataList.size() && instanceDataList.get(row).isSuccess()) {
+                    RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
+                    // Check if already added (check both visibleApps and tempApps)
+                    String connectionStr = inst.toConnectionString();
+                    boolean alreadyAdded = RuntimeHelper.getVisibleApps(project.getName()).stream()
+                            .anyMatch(app -> app.toConnectionString().equals(connectionStr));
+                    if (!alreadyAdded) {
+                        List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+                        alreadyAdded = tempApps != null && tempApps.contains(connectionStr);
+                    }
+                    if (alreadyAdded) {
+                        JLabel lbl = new JLabel("✅");
+                        lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                        return lbl;
+                    }
+                    return button;
+                }
+                return new JLabel("—");
             }
             @Override
             public Object getCellEditorValue() { return ""; }
@@ -1497,7 +1535,13 @@ def httpPost(String url, Map data) {
                         RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                         Map<String, List<String>> infraData = executor.loadInfra(LOAD_INFRA_TIMEOUT);
 
-                        // 获取当前项目中的 app 列表
+                        // Check if Arthas is supported by the script (call isArthasSupported() function)
+                        boolean arthasSupported = executor.isArthasSupported(5);
+                        RuntimeHelper.setArthasSupported(arthasSupported);
+                        System.out.println("[Testkit] Arthas feature enabled: " + arthasSupported + 
+                                " (If false, ensure your script has 'def isArthasSupported() { return true }' and click Refresh)");
+
+                        // Get app list from current project
                         List<RuntimeHelper.AppMeta> projectApps = RuntimeHelper.getAppMetas(project.getName());
                         Set<String> projectAppNames = projectApps.stream()
                                 .map(RuntimeHelper.AppMeta::getApp)
@@ -1509,11 +1553,17 @@ def httpPost(String url, Map data) {
                         int filteredCount = 0;
                         if (infraData != null) {
                             for (Map.Entry<String, List<String>> entry : infraData.entrySet()) {
-                                if (projectAppNames.contains(entry.getKey())) {
-                                    filteredData.put(entry.getKey(), entry.getValue());
-                                } else {
+                                // Filter by project apps
+                                if (!projectAppNames.contains(entry.getKey())) {
                                     filteredCount++;
+                                    continue;
                                 }
+                                // Additional filter by allowedAppNames if specified
+                                if (allowedAppNames != null && !allowedAppNames.contains(entry.getKey())) {
+                                    filteredCount++;
+                                    continue;
+                                }
+                                filteredData.put(entry.getKey(), entry.getValue());
                             }
                         }
                         infraDataHolder[0] = filteredData;
@@ -1554,7 +1604,7 @@ def httpPost(String url, Map data) {
                             );
                             
                             if (isTimeout) {
-                                statusLabel.setText("❌ Timeout - May need authentication. Complete auth and retry.");
+                                statusLabel.setText("❌ Timeout - May be caused by authentication process timeout. login and retry.");
                             } else {
                                 statusLabel.setText("❌ " + errorMsg);
                             }
@@ -1602,7 +1652,7 @@ def httpPost(String url, Map data) {
         });
 
         scriptInfoBtn.addActionListener(e -> {
-            JTextArea ta = new JTextArea(REMOTE_SCRIPT_INFO);
+            JTextArea ta = new JTextArea(RemoteScriptExecutor.REMOTE_SCRIPT_INFO);
             ta.setEditable(false);
             ta.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
             ta.setCaretPosition(0);
@@ -1661,9 +1711,10 @@ def httpPost(String url, Map data) {
                             if (instances != null && !instances.isEmpty()) {
                                 for (RemoteScriptExecutor.InstanceInfo inst : instances) {
                                     instanceDataList.add(inst);
-                                    // Env 为 null 时显示 "-"，Status 显示由渲染器处理
+                                    // Env 为 null 时显示 "-"，Arthas/Status/Action 由渲染器处理
                                     String envDisplay = inst.getEnv() != null && !inst.getEnv().isEmpty() ? inst.getEnv() : "-";
-                                    tableModel.addRow(new Object[]{inst.getIp(), inst.getPort(), envDisplay, "", ""});
+                                    // Columns: IP, Port, Env, Arthas, Status, Action
+                                    tableModel.addRow(new Object[]{inst.getIp(), inst.getPort(), envDisplay, "", "", ""});
                                 }
                                 long ok = instances.stream().filter(RemoteScriptExecutor.InstanceInfo::isSuccess).count();
                                 statusLabel.setText("✅ " + instances.size() + " instances, " + ok + " available");
@@ -1691,7 +1742,7 @@ def httpPost(String url, Map data) {
                             );
                             
                             if (isTimeout) {
-                                statusLabel.setText("❌ Timeout - May need authentication. Complete auth and retry.");
+                                statusLabel.setText("❌ Timeout - May be caused by authentication process timeout. login and retry.");
                             } else {
                                 statusLabel.setText("❌ " + errorMsg);
                             }
@@ -1737,7 +1788,7 @@ def httpPost(String url, Map data) {
         portField.setPreferredSize(new Dimension(60, 24));
         portField.setToolTipText("Testkit port");
 
-        JButton addManualBtn = new JButton("Add", connectionIcon);
+        JButton addManualBtn = new JButton("Test&Add", connectionIcon);
         addManualBtn.setToolTipText("Test connection and add");
 
         JButton injectBtn = new JButton(AllIcons.General.Information);
@@ -1758,6 +1809,15 @@ def httpPost(String url, Map data) {
         // Dynamic inject 按钮事件
         injectBtn.addActionListener(e -> {
             DefaultActionGroup copyGroup = new DefaultActionGroup();
+            AnAction networkNote = new AnAction("Note: Ensure network connectivity to the target instance",
+                    "Network must be reachable for connection to work", AllIcons.General.Information) {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent ev) {
+                    // Just a note, no action needed
+                }
+            };
+            copyGroup.add(networkNote);
+            copyGroup.addSeparator();
             AnAction copyDirect = new AnAction("Step1: Copy CLI command to inject Testkit into running project",
                     "Copy and execute this command in terminal", AllIcons.Actions.Copy) {
                 @Override
@@ -1840,6 +1900,10 @@ def httpPost(String url, Map data) {
                     }
                     tempApps.add(connStr);
                     RuntimeHelper.setTempApps(project.getName(), tempApps);
+
+                    // 更新 connectionMeta（manual 连接没有 arthasPort，expireTime 用 MAX_VALUE 表示不过期）
+                    RuntimeHelper.updateConnectionMeta(connStr, false, null, Long.MAX_VALUE, null);
+
                     TestkitHelper.notify(project, NotificationType.INFORMATION, "Added: " + connStr);
 
                     if (popupHolder[0] != null) {
@@ -1849,56 +1913,50 @@ def httpPost(String url, Map data) {
             });
         });
 
-        // ==================== 底部关闭按钮 ====================
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(manualPanel, BorderLayout.CENTER);
-        
-        JPanel closePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
-        JButton closeButton = new JButton("Close");
-        closeButton.setToolTipText("Close this dialog");
-        closeButton.addActionListener(e -> {
-            if (popupHolder[0] != null) {
-                popupHolder[0].cancel();
-            }
-        });
-        closePanel.add(closeButton);
-        bottomPanel.add(closePanel, BorderLayout.SOUTH);
-
         // ==================== 组装 ====================
         panel.add(remotePanel, BorderLayout.CENTER);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        if (showManualConfig) {
+            panel.add(manualPanel, BorderLayout.SOUTH);
+        }
 
         return panel;
     }
 
     /**
-     * 添加实例到连接列表
+     * Add instance to connection list (from Remote Script)
+     * 直接写入 visibleApps，不走 tempApps
      */
-    private void addInstanceToConnections(RemoteScriptExecutor.InstanceInfo instance, JBPopup[] popupHolder) {
+    private void addInstanceToConnections(RemoteScriptExecutor.InstanceInfo instance, JBPopup[] popupHolder, Runnable onConnectionAdded) {
         String connectionStr = instance.toConnectionString();
 
-        // 检查 appBox 中是否已存在（包括 tempApps 和 localItems）
-        for (int i = 0; i < appBox.getItemCount(); i++) {
-            if (connectionStr.equals(appBox.getItemAt(i))) {
-                TestkitHelper.notify(project, NotificationType.WARNING, "Already connected: " + connectionStr);
-                return;
-            }
+        // Check if already exists in visibleApps
+        boolean exists = RuntimeHelper.getVisibleApps(project.getName()).stream()
+                .anyMatch(app -> connectionStr.equals(app.toConnectionString()));
+        if (exists) {
+            TestkitHelper.notify(project, NotificationType.WARNING, "Already connected: " + connectionStr);
+            return;
         }
 
-        List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
-        tempApps.add(connectionStr);
-        RuntimeHelper.setTempApps(project.getName(), tempApps);
+        // 直接写入 visibleApps（不走 tempApps）
+        RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(connectionStr);
+        RuntimeHelper.addVisibleApp(project.getName(), visibleApp);
 
-        // 更新连接元数据（trace、env、expireTime）
+        // Update connection metadata (trace, env, expireTime, arthasPort)
         RuntimeHelper.updateConnectionMeta(
             connectionStr,
             instance.isEnableTrace(),
             instance.getEnv(),
-            instance.getExpireTime()
+            instance.getExpireTime(),
+            instance.getArthasPort()
         );
 
-        // 刷新 appBox
-        refreshVisibleApp(true);
+        // 更新 appBox UI
+        appBox.addItem(connectionStr);
+        
+        // Call callback if provided
+        if (onConnectionAdded != null) {
+            onConnectionAdded.run();
+        }
 
         TestkitHelper.notify(project, NotificationType.INFORMATION, "Added: " + connectionStr);
     }

@@ -4,13 +4,10 @@ import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.ui.Messages;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
-import com.testkit.SettingsStorageHelper;
 import com.testkit.tools.ToolHelper;
 import com.testkit.util.HttpUtil;
 import com.testkit.util.JsonUtil;
 import com.testkit.util.RemoteScriptCallUtils;
-import com.testkit.view.TestkitToolWindow;
-import com.testkit.view.TestkitToolWindowFactory;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
@@ -33,7 +30,6 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.event.MouseEvent;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -242,7 +238,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
                             // Step 1: 提交请求，获取 reqId
                             JSONObject submitRet;
-                            if (visibleApp.isRemoteScript()) {
+                            if (visibleApp.isRemoteInstance()) {
                                 submitRet = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, submitRequest, REMOTE_SUBMIT_TIMEOUT);
                             } else {
                                 submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class, 5, 5);
@@ -262,7 +258,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             getResultReq.put("params", reqParams);
 
                             JSONObject result;
-                            if (visibleApp.isRemoteScript()) {
+                            if (visibleApp.isRemoteInstance()) {
                                 result = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
                             } else {
                                 result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", getResultReq, JSONObject.class, 5, 5);
