@@ -482,27 +482,55 @@ public class TimeTunnelDialog extends DialogWrapper {
 
     private void removeInstance(RuntimeHelper.VisibleApp inst) {
         String connStr = inst.toConnectionString();
-        
+
         // Remove from dialog-local lists only (don't affect global state)
         currentInstances.remove(inst);
         arthasApps.remove(inst);  // Prevent it from coming back within this dialog session
-        
-        // Remove from UI
+
+        // Remove from UI - try by key first
         InstancePanel panel = instancePanelMap.remove(connStr);
-        if (panel != null) {
-            instanceListPanel.remove(panel);
-            // Also remove the vertical strut after it
-            Component[] components = instanceListPanel.getComponents();
-            for (int i = 0; i < components.length - 1; i++) {
-                if (components[i] == panel && components[i + 1] instanceof Box.Filler) {
-                    instanceListPanel.remove(components[i + 1]);
+
+        // Fallback: if not found by key, search by instance reference
+        if (panel == null) {
+            String foundKey = null;
+            for (Map.Entry<String, InstancePanel> entry : instancePanelMap.entrySet()) {
+                if (entry.getValue().instance == inst) {
+                    foundKey = entry.getKey();
                     break;
                 }
             }
+            if (foundKey != null) {
+                panel = instancePanelMap.remove(foundKey);
+                System.out.println("[TimeTunnel] Found panel by instance reference, key was: " + foundKey + " vs expected: " + connStr);
+            }
+        }
+
+        if (panel != null) {
+            // First, find the panel's index and the strut after it (before removing)
+            Component[] components = instanceListPanel.getComponents();
+            int panelIndex = -1;
+            for (int i = 0; i < components.length; i++) {
+                if (components[i] == panel) {
+                    panelIndex = i;
+                    break;
+                }
+            }
+
+            // Remove the strut after panel (if exists)
+            if (panelIndex >= 0 && panelIndex + 1 < components.length
+                    && components[panelIndex + 1] instanceof Box.Filler) {
+                instanceListPanel.remove(components[panelIndex + 1]);
+            }
+
+            // Then remove the panel
+            instanceListPanel.remove(panel);
+
             instanceListPanel.revalidate();
             instanceListPanel.repaint();
+        } else {
+            System.out.println("[TimeTunnel] Warning: panel not found for instance: " + connStr);
         }
-        
+
         System.out.println("[TimeTunnel] Removed instance from dialog: " + connStr);
     }
 
