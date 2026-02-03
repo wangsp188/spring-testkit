@@ -212,7 +212,7 @@ public class TestkitServer {
             return;
         }
         if (loadByCli) {
-            logger.error(msg, e);
+            logger.warn("{}, error:{}", msg, getNoneTestkitStackTrace(e));
         } else {
             System.err.println(msg + e);
             e.printStackTrace();
