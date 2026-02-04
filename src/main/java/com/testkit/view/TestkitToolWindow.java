@@ -439,7 +439,7 @@ public class TestkitToolWindow {
                     });
                     System.out.println("刷新app任务,"+project.getName()+"," + active[0] + "," + new Date());
                     if (active[0]) {
-                        refreshVisibleApp(true);
+                        refreshVisibleApp();
                     }
                 } catch (Throwable e) {
                     System.err.println("刷新app失败,"+project.getName());
@@ -623,9 +623,8 @@ public class TestkitToolWindow {
 
     /**
      * 刷新可见应用列表
-     * @param skipRemote 是否跳过 remote 类型的连接探活
      */
-    public synchronized void refreshVisibleApp(boolean skipRemote) {
+    public synchronized void refreshVisibleApp() {
         Set<String> newItems = new LinkedHashSet<>();
         List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
         if (localItems != null) {
@@ -653,28 +652,23 @@ public class TestkitToolWindow {
 
             // remote 类型的连接处理
             if (visibleApp.isRemoteInstance()) {
-                if (skipRemote) {
-                    // 检查是否过期
-                    if (RuntimeHelper.isConnectionExpired(item)) {
-                        System.out.println("链接探活:remote 已过期，移除:" + item);
-                        iterator.remove();
-                        List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
-                        if (tempApps1.contains(item)) {
-                            tempApps1.remove(item);
-                            RuntimeHelper.setTempApps(project.getName(), tempApps1);
-                        }
-                        RuntimeHelper.removeConnectionMeta(item);  // 清理元数据
-                        continue;
+                // 1. 先检查是否过期，过期则直接移除
+                if (RuntimeHelper.isConnectionExpired(item)) {
+                    System.out.println("链接探活:remote 已过期，移除:" + item);
+                    iterator.remove();
+                    List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
+                    if (tempApps1.contains(item)) {
+                        tempApps1.remove(item);
+                        RuntimeHelper.setTempApps(project.getName(), tempApps1);
                     }
-                    // 未过期，跳过探活，保留原有的 trace 状态
-                    System.out.println("链接探活:跳过 remote 类型:" + item);
-                    newMap.put(item, RuntimeHelper.isEnableTrace(item));
+                    RuntimeHelper.removeConnectionMeta(item);  // 清理元数据
                     continue;
                 }
-                // 不跳过时，通过脚本探活
+
+                // 2. 未过期，通过脚本探活
                 try {
                     String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
-                    if (StringUtils.isNotBlank(scriptPath)) {
+                    if (StringUtils.isBlank(scriptPath)) {
                         JSONObject hiReq = new JSONObject();
                         hiReq.put("method", "hi");
                         JSONObject resp = RemoteScriptCallUtils.sendRequest(project, visibleApp, hiReq, 5);
@@ -693,14 +687,21 @@ public class TestkitToolWindow {
                         // 没有配置脚本，保留原状态
                         newMap.put(item, RuntimeHelper.isEnableTrace(item));
                     }
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     System.out.println("链接探活(remote):" + item + ",false," + e.getMessage());
-                    // 探活失败，从列表中移除
-                    iterator.remove();
-                    List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
-                    if (tempApps1.contains(item)) {
-                        tempApps1.remove(item);
-                        RuntimeHelper.setTempApps(project.getName(), tempApps1);
+                    // 检查是否是 refused 错误
+                    if (e.getMessage() != null && (e.getMessage().toLowerCase().contains("connection refused") || e.getMessage().toLowerCase().contains("not exist") || e.getMessage().toLowerCase().contains("not found"))) {
+                        // refused 错误，移除连接
+                        iterator.remove();
+                        List<String> tempApps1 = RuntimeHelper.getTempApps(project.getName());
+                        if (tempApps1.contains(item)) {
+                            tempApps1.remove(item);
+                            RuntimeHelper.setTempApps(project.getName(), tempApps1);
+                        }
+                        RuntimeHelper.removeConnectionMeta(item);
+                    } else {
+                        // 其他错误，保留原状态
+                        newMap.put(item, RuntimeHelper.isEnableTrace(item));
                     }
                 }
                 continue;
@@ -1151,7 +1152,7 @@ public class TestkitToolWindow {
                         }
                         TestkitHelper.notify(project, NotificationType.INFORMATION, message);
                         // 刷新 app 列表
-                        ApplicationManager.getApplication().invokeLater(() -> refreshVisibleApp(true));
+                        ApplicationManager.getApplication().invokeLater(() -> refreshVisibleApp());
                     } else {
                         TestkitHelper.notify(project, NotificationType.WARNING,
                                 "No non-IDEA process found using port " + port);
@@ -1181,9 +1182,6 @@ public class TestkitToolWindow {
         // 从 visibleApps 中移除（remote script 添加的连接）
         RuntimeHelper.removeVisibleApp(project.getName(), visibleApp);
 
-        // 从 localRuntimes 中移除（本地连接）
-        RuntimeHelper.removeApp(project.getName(), visibleApp);
-
         // 清理 connectionMeta
         RuntimeHelper.removeConnectionMeta(connectionStr);
 
@@ -1211,14 +1209,6 @@ public class TestkitToolWindow {
      */
     private void showConnectionConfigPopup() {
         showConnectionConfigPopup(null, true);
-    }
-
-    /**
-     * Show connection config popup with optional callback
-     * @param onConnectionAdded callback when a connection is added (can be null)
-     */
-    public void showConnectionConfigPopup(Runnable onConnectionAdded) {
-        showConnectionConfigPopup(onConnectionAdded, true, null);
     }
 
     /**
@@ -1536,7 +1526,7 @@ public class TestkitToolWindow {
                         Map<String, List<String>> infraData = executor.loadInfra(LOAD_INFRA_TIMEOUT);
 
                         // Check if Arthas is supported by the script (call isArthasSupported() function)
-                        boolean arthasSupported = executor.isArthasSupported(5);
+                        boolean arthasSupported = executor.isArthasSupported();
                         RuntimeHelper.setArthasSupported(arthasSupported);
                         System.out.println("[Testkit] Arthas feature enabled: " + arthasSupported + 
                                 " (If false, ensure your script has 'def isArthasSupported() { return true }' and click Refresh)");
@@ -1631,12 +1621,12 @@ public class TestkitToolWindow {
         viewBtn.addActionListener(e -> {
             String path = scriptPathField.getText().trim();
             if (StringUtils.isBlank(path)) {
-                Messages.showWarningDialog(project, "Script path is empty", "View Script");
+                TestkitHelper.notify(project,NotificationType.WARNING,"Script path is empty");
                 return;
             }
             File f = new File(path);
             if (!f.exists()) {
-                Messages.showErrorDialog(project, "Script file not found: " + path, "View Script");
+                TestkitHelper.notify(project,NotificationType.ERROR,"Script file not found: " + path);
                 return;
             }
             try {
@@ -1924,20 +1914,24 @@ public class TestkitToolWindow {
 
     /**
      * Add instance to connection list (from Remote Script)
-     * 直接写入 visibleApps，不走 tempApps
+     * 写入 tempApps，与 Manual Config 保持一致，确保 refreshVisibleApp 时不会丢失
      */
     private void addInstanceToConnections(RemoteScriptExecutor.InstanceInfo instance, JBPopup[] popupHolder, Runnable onConnectionAdded) {
         String connectionStr = instance.toConnectionString();
 
-        // Check if already exists in visibleApps
-        boolean exists = RuntimeHelper.getVisibleApps(project.getName()).stream()
-                .anyMatch(app -> connectionStr.equals(app.toConnectionString()));
-        if (exists) {
+        // Check if already exists in tempApps or localRuntimes
+        List<String> tempApps = RuntimeHelper.getTempApps(project.getName());
+        List<String> localItems = RuntimeHelper.loadProjectRuntimes(project.getName());
+        if (tempApps.contains(connectionStr) || (localItems != null && localItems.contains(connectionStr))) {
             TestkitHelper.notify(project, NotificationType.WARNING, "Already connected: " + connectionStr);
             return;
         }
 
-        // 直接写入 visibleApps（不走 tempApps）
+        // 写入 tempApps（与 Manual Config 保持一致，确保 refreshVisibleApp 时不会丢失）
+        tempApps.add(connectionStr);
+        RuntimeHelper.setTempApps(project.getName(), tempApps);
+
+        // 同时写入 visibleApps 缓存（确保 getRemoteScriptApps 能立即获取到）
         RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(connectionStr);
         RuntimeHelper.addVisibleApp(project.getName(), visibleApp);
 

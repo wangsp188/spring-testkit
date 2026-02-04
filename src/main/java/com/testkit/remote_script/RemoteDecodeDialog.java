@@ -202,7 +202,7 @@ public class RemoteDecodeDialog extends DialogWrapper {
                         instance.getRemoteIp(),
                         arthasPort,
                         params,
-                        30
+                        RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                 );
 
                 String code = extractCode(result);

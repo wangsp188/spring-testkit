@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.intellij.openapi.ui.Messages;
 import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
+import com.testkit.remote_script.RemoteScriptExecutor;
 import com.testkit.tools.ToolHelper;
 import com.testkit.util.HttpUtil;
 import com.testkit.util.JsonUtil;
@@ -37,9 +38,6 @@ import java.util.function.Predicate;
 
 public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
-    // Remote Script 超时配置
-    private static final int REMOTE_SUBMIT_TIMEOUT = 30;     // 提交请求超时 30 秒
-    private static final int REMOTE_RESULT_TIMEOUT = 600;    // 获取结果超时 600 秒
 
     @Override
     public LineMarkerInfo<PsiIdentifier> getLineMarkerInfo(PsiElement element) {
@@ -239,7 +237,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
                             // Step 1: 提交请求，获取 reqId
                             JSONObject submitRet;
                             if (visibleApp.isRemoteInstance()) {
-                                submitRet = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, submitRequest, REMOTE_SUBMIT_TIMEOUT);
+                                submitRet = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, submitRequest, RemoteScriptExecutor.REMOTE_SUBMIT_TIMEOUT);
                             } else {
                                 submitRet = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", submitRequest, JSONObject.class, 5, 5);
                             }
@@ -259,7 +257,7 @@ public class ViewValueLineMarkerProvider implements LineMarkerProvider {
 
                             JSONObject result;
                             if (visibleApp.isRemoteInstance()) {
-                                result = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
+                                result = RemoteScriptCallUtils.sendRequest(psiField.getProject(), visibleApp, getResultReq, RemoteScriptExecutor.REMOTE_RESULT_TIMEOUT);
                             } else {
                                 result = HttpUtil.sendPost("http://localhost:" + visibleApp.getTestkitPort() + "/", getResultReq, JSONObject.class, 5, 5);
                             }

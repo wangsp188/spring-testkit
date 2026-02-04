@@ -10,6 +10,7 @@ import com.intellij.psi.*;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.TestkitHelper;
+import com.testkit.remote_script.RemoteScriptExecutor;
 import com.testkit.util.JsonUtil;
 import com.testkit.view.TestkitStoreWindowFactory;
 import com.testkit.view.TestkitToolWindow;
@@ -59,10 +60,6 @@ public abstract class BasePluginTool {
     public static final Icon CMD_ICON = IconLoader.getIcon("/icons/cmd.svg", BasePluginTool.class);
 
 
-    // Remote Script 超时配置
-    private static final int REMOTE_SUBMIT_TIMEOUT = 30;     // 提交请求超时 30 秒
-    private static final int REMOTE_RESULT_TIMEOUT = 600;    // 获取结果超时 600 秒
-    private static final int REMOTE_CANCEL_TIMEOUT = 30;     // 取消请求超时 30 秒
 
     protected Set<String> cancelReqs = new HashSet<>(128);
     protected String lastReqId;
@@ -494,7 +491,7 @@ public abstract class BasePluginTool {
                     req.put("params", params);
 
                     if (isRemoteInstance) {
-                        return RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, req, REMOTE_CANCEL_TIMEOUT);
+                        return RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, req, RemoteScriptExecutor.REMOTE_CANCEL_TIMEOUT);
                     } else {
                         return HttpUtil.sendPost("http://localhost:" + sidePort + "/", req, JSONObject.class, 5, 30);
                     }
@@ -531,7 +528,7 @@ public abstract class BasePluginTool {
 
                     // Step 1: 提交请求，获取 reqId
                     if (isRemoteInstance) {
-                        response = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, request, REMOTE_SUBMIT_TIMEOUT);
+                        response = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, request, RemoteScriptExecutor.REMOTE_SUBMIT_TIMEOUT);
                     } else {
                         response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class, 5, 30);
                     }
@@ -561,7 +558,7 @@ public abstract class BasePluginTool {
 
                     JSONObject result;
                     if (isRemoteInstance) {
-                        result = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
+                        result = RemoteScriptCallUtils.sendRequest(getProject(), visibleApp, getResultReq, RemoteScriptExecutor.REMOTE_RESULT_TIMEOUT);
                     } else {
                         result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", getResultReq, JSONObject.class, 5, 600);
                     }

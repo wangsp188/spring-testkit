@@ -186,6 +186,43 @@ public class RuntimeHelper {
         return System.currentTimeMillis() > meta.getExpireTime();
     }
 
+    /**
+     * 获取 TimeTunnel 状态
+     * @param connectionStr 连接字符串
+     * @param methodKey className#methodName
+     * @return 状态名称 (READY/RECORDING)，如果不存在返回 null
+     */
+    public static String getTtState(String connectionStr, String methodKey) {
+        if (connectionStr == null || methodKey == null) {
+            return null;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null ? meta.getTtState(methodKey) : null;
+    }
+
+    /**
+     * 设置 TimeTunnel 状态
+     * @param connectionStr 连接字符串
+     * @param methodKey className#methodName
+     * @param state 状态名称 (READY/RECORDING)，传 null 表示删除
+     */
+    public static void setTtState(String connectionStr, String methodKey, String state) {
+        if (connectionStr == null || methodKey == null) {
+            return;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        if (meta == null) {
+            // 如果 meta 不存在且要设置状态，创建一个新的
+            if (state != null) {
+                meta = new ConnectionMeta();
+                connectionMetaMap.put(connectionStr, meta);
+            } else {
+                return;
+            }
+        }
+        meta.setTtState(methodKey, state);
+    }
+
     public static void updateValidDatasources(String project, List<SettingsStorageHelper.DatasourceConfig> datasources, List<String> ddls, List<String> writes) {
         if (project == null) {
             return;
@@ -556,6 +593,8 @@ public class RuntimeHelper {
         private String env;
         private long expireTime;  // 过期时间（UTC 时间戳）
         private Integer arthasPort;  // Arthas 端口，非空表示支持 Arthas
+        // TimeTunnel 状态缓存，key: className#methodName, value: 状态名称 (READY/RECORDING)
+        private Map<String, String> ttStates = new HashMap<>();
 
         public boolean isEnableTrace() {
             return enableTrace;
@@ -597,6 +636,18 @@ public class RuntimeHelper {
             return arthasPort != null && arthasPort > 0;
         }
 
+        public String getTtState(String methodKey) {
+            return ttStates.get(methodKey);
+        }
+
+        public void setTtState(String methodKey, String state) {
+            if (state == null) {
+                ttStates.remove(methodKey);
+            } else {
+                ttStates.put(methodKey, state);
+            }
+        }
+
         @Override
         public String toString() {
             return "ConnectionMeta{" +
@@ -604,6 +655,7 @@ public class RuntimeHelper {
                     ", env='" + env + '\'' +
                     ", expireTime=" + expireTime +
                     ", arthasPort=" + arthasPort +
+                    ", ttStates=" + ttStates +
                     '}';
         }
     }

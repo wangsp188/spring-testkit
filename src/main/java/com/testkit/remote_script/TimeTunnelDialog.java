@@ -44,7 +44,6 @@ public class TimeTunnelDialog extends DialogWrapper {
 
     public static final Icon CLEAR_ICON = IconLoader.getIcon("/icons/clear.svg", TimeTunnelDialog.class);
 
-
     private final Project project;
     private final String className;
     private final String methodName;
@@ -151,6 +150,13 @@ public class TimeTunnelDialog extends DialogWrapper {
         partitionBox.addActionListener(e -> onPartitionChanged());
         panel.add(partitionBox);
 
+        // Refresh button (直接从 visibleApps 刷新)
+        JButton refreshBtn = new JButton(AllIcons.Actions.Refresh);
+        refreshBtn.setToolTipText("Refresh instances from visibleApps");
+        refreshBtn.setPreferredSize(new Dimension(28, 28));
+        refreshBtn.addActionListener(e -> refreshArthasApps());
+        panel.add(refreshBtn);
+
         // Add connection button
         JButton addConnectionBtn = new JButton(TestkitToolWindow.connectionIcon);
         addConnectionBtn.setToolTipText("Add remote connection");
@@ -240,11 +246,6 @@ public class TimeTunnelDialog extends DialogWrapper {
 
         // Toolbar
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
-        
-        JButton refreshAllBtn = new JButton("Refresh Instances", AllIcons.Actions.Refresh);
-        refreshAllBtn.setToolTipText("Health check all instances");
-        refreshAllBtn.addActionListener(e -> refreshAllInstances());
-        toolbarPanel.add(refreshAllBtn);
         
         JButton startAllBtn = new JButton("Start All", AllIcons.Actions.Execute);
         startAllBtn.setToolTipText("Start recording on all instances");
@@ -389,12 +390,17 @@ public class TimeTunnelDialog extends DialogWrapper {
             "<html><center>No instances available<br><br>Click 📎 button to add</center></html>";
 
     /**
-     * Rebuild all instance panels
+     * Rebuild instance panels (增量更新，保留已有 panel 的 state)
      */
     private void rebuildInstancePanels() {
         if (instanceListPanel == null) {
             return;
         }
+        
+        // 保存旧的 panel map，用于复用
+        Map<String, InstancePanel> oldPanelMap = new LinkedHashMap<>(instancePanelMap);
+        
+        // 清空 UI 但复用已有的 panel
         instanceListPanel.removeAll();
         instancePanelMap.clear();
         
@@ -409,8 +415,13 @@ public class TimeTunnelDialog extends DialogWrapper {
             instanceListPanel.add(hintWrapper);
         } else {
             for (RuntimeHelper.VisibleApp inst : currentInstances) {
-                InstancePanel panel = new InstancePanel(inst);
-                instancePanelMap.put(inst.toConnectionString(), panel);
+                String connStr = inst.toConnectionString();
+                // 复用已有的 panel（保留 state），或创建新的
+                InstancePanel panel = oldPanelMap.get(connStr);
+                if (panel == null) {
+                    panel = new InstancePanel(inst);
+                }
+                instancePanelMap.put(connStr, panel);
                 instanceListPanel.add(panel);
                 instanceListPanel.add(Box.createVerticalStrut(5));
             }
@@ -424,28 +435,6 @@ public class TimeTunnelDialog extends DialogWrapper {
     }
 
     // ==================== Batch Operations ====================
-
-    private void refreshAllInstances() {
-        // First, trigger TestkitToolWindow refresh to sync global state
-        com.testkit.view.TestkitToolWindow toolWindow = TestkitToolWindowFactory.getToolWindow(project);
-        if (toolWindow != null) {
-            // Run in background to avoid blocking UI
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                toolWindow.refreshVisibleApp(false);  // false = don't skip remote health check
-                
-                // After global refresh, update local arthasApps and rebuild UI
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    arthasApps = ArthasLineMarkerProvider.getRemoteScriptApps(project.getName());
-                    onPartitionChanged();
-                });
-            });
-        } else {
-            // Fallback: just check health of current instances
-            for (InstancePanel panel : new ArrayList<>(instancePanelMap.values())) {
-                panel.checkHealth();
-            }
-        }
-    }
 
     private void startAllRecording() {
         for (InstancePanel panel : instancePanelMap.values()) {
@@ -478,60 +467,6 @@ public class TimeTunnelDialog extends DialogWrapper {
             command.append(" '").append(condition).append("'");
         }
         return command.toString();
-    }
-
-    private void removeInstance(RuntimeHelper.VisibleApp inst) {
-        String connStr = inst.toConnectionString();
-
-        // Remove from dialog-local lists only (don't affect global state)
-        currentInstances.remove(inst);
-        arthasApps.remove(inst);  // Prevent it from coming back within this dialog session
-
-        // Remove from UI - try by key first
-        InstancePanel panel = instancePanelMap.remove(connStr);
-
-        // Fallback: if not found by key, search by instance reference
-        if (panel == null) {
-            String foundKey = null;
-            for (Map.Entry<String, InstancePanel> entry : instancePanelMap.entrySet()) {
-                if (entry.getValue().instance == inst) {
-                    foundKey = entry.getKey();
-                    break;
-                }
-            }
-            if (foundKey != null) {
-                panel = instancePanelMap.remove(foundKey);
-                System.out.println("[TimeTunnel] Found panel by instance reference, key was: " + foundKey + " vs expected: " + connStr);
-            }
-        }
-
-        if (panel != null) {
-            // First, find the panel's index and the strut after it (before removing)
-            Component[] components = instanceListPanel.getComponents();
-            int panelIndex = -1;
-            for (int i = 0; i < components.length; i++) {
-                if (components[i] == panel) {
-                    panelIndex = i;
-                    break;
-                }
-            }
-
-            // Remove the strut after panel (if exists)
-            if (panelIndex >= 0 && panelIndex + 1 < components.length
-                    && components[panelIndex + 1] instanceof Box.Filler) {
-                instanceListPanel.remove(components[panelIndex + 1]);
-            }
-
-            // Then remove the panel
-            instanceListPanel.remove(panel);
-
-            instanceListPanel.revalidate();
-            instanceListPanel.repaint();
-        } else {
-            System.out.println("[TimeTunnel] Warning: panel not found for instance: " + connStr);
-        }
-
-        System.out.println("[TimeTunnel] Removed instance from dialog: " + connStr);
     }
 
     private void showDetail(String text) {
@@ -605,7 +540,20 @@ public class TimeTunnelDialog extends DialogWrapper {
 
         InstancePanel(RuntimeHelper.VisibleApp instance) {
             this.instance = instance;
+            // 从 ConnectionMeta 恢复状态
+            String cachedState = RuntimeHelper.getTtState(instance.toConnectionString(), getMethodKey());
+            if (cachedState != null) {
+                try {
+                    this.state = InstanceState.valueOf(cachedState);
+                } catch (IllegalArgumentException ignored) {
+                    // 无效状态，使用默认值
+                }
+            }
             initUI();
+        }
+        
+        private String getMethodKey() {
+            return className + "#" + methodName;
         }
 
         private void initUI() {
@@ -641,35 +589,6 @@ public class TimeTunnelDialog extends DialogWrapper {
             statusLabel.setFont(statusLabel.getFont().deriveFont(Font.BOLD, 11f));
             headerPanel.add(statusLabel);
 
-            headerPanel.add(Box.createHorizontalStrut(2));
-
-            // Delete button (after status)
-            JButton deleteBtn = createIconButton(AllIcons.Actions.GC, "Remove this instance");
-            deleteBtn.addActionListener(e -> {
-                // Check if recording
-                if (state == InstanceState.RECORDING) {
-                    JOptionPane.showMessageDialog(
-                        TimeTunnelDialog.this.getContentPane(),
-                        "Cannot remove instance while recording.\nPlease stop recording first.",
-                        "Cannot Remove",
-                        JOptionPane.WARNING_MESSAGE
-                    );
-                    return;
-                }
-                
-                int result = JOptionPane.showConfirmDialog(
-                    TimeTunnelDialog.this.getContentPane(),
-                    "Remove instance " + instance.getRemoteIp() + " from list?",
-                    "Confirm Remove",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE
-                );
-                if (result == JOptionPane.YES_OPTION) {
-                    removeInstance(instance);
-                }
-            });
-            headerPanel.add(deleteBtn);
-
             headerPanel.add(Box.createHorizontalGlue());
 
             // Action buttons (icons only)
@@ -695,6 +614,34 @@ public class TimeTunnelDialog extends DialogWrapper {
             
             updateRecordsPanel();
             add(recordsPanel, BorderLayout.CENTER);
+            
+            // 同步按钮状态（从缓存恢复时需要）
+            syncButtonState();
+        }
+        
+        private void syncButtonState() {
+            switch (state) {
+                case READY:
+                    actionBtn.setIcon(AllIcons.Actions.Execute);
+                    actionBtn.setToolTipText("Start recording");
+                    actionBtn.setEnabled(true);
+                    loadBtn.setEnabled(true);
+                    break;
+                case RECORDING:
+                    actionBtn.setIcon(AllIcons.Actions.Suspend);
+                    actionBtn.setToolTipText("Stop recording");
+                    actionBtn.setEnabled(true);
+                    loadBtn.setEnabled(true);
+                    break;
+                case LOADING:
+                    actionBtn.setEnabled(false);
+                    loadBtn.setEnabled(false);
+                    break;
+                case STOPPING:
+                    actionBtn.setEnabled(false);
+                    loadBtn.setEnabled(true);
+                    break;
+            }
         }
 
         private JButton createIconButton(Icon icon, String tooltip) {
@@ -736,6 +683,11 @@ public class TimeTunnelDialog extends DialogWrapper {
             statusLabel.setText("[" + newState.label + "]");
             statusLabel.setForeground(newState.color);
             
+            // 保存状态到 ConnectionMeta（只缓存 READY 和 RECORDING 状态，中间状态不缓存）
+            if (newState == InstanceState.READY || newState == InstanceState.RECORDING) {
+                RuntimeHelper.setTtState(instance.toConnectionString(), getMethodKey(), newState.name());
+            }
+            
             // Update action button
             switch (newState) {
                 case READY:
@@ -767,35 +719,6 @@ public class TimeTunnelDialog extends DialogWrapper {
             } else if (state == InstanceState.RECORDING) {
                 stopRecording();
             }
-        }
-
-        void checkHealth() {
-            updateState(InstanceState.LOADING);
-            
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                try {
-                    JSONObject hiReq = new JSONObject();
-                    hiReq.put("method", "hi");
-                    JSONObject resp = RemoteScriptCallUtils.sendRequest(project, instance, hiReq, 5);
-                    
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        if (resp.getBooleanValue("success")) {
-                            updateState(InstanceState.READY);
-                        } else {
-                            // Health check failed, remove instance
-                            TestkitHelper.notify(project, NotificationType.WARNING, 
-                                    "Instance " + instance.getRemoteIp() + " is unavailable, removing...");
-                            removeInstance(instance);
-                        }
-                    });
-                } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        TestkitHelper.notify(project, NotificationType.WARNING, 
-                                "Instance " + instance.getRemoteIp() + " check failed: " + e.getMessage());
-                        removeInstance(instance);
-                    });
-                }
-            });
         }
 
         void startRecording() {
@@ -834,7 +757,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             instance.getRemoteIp(),
                             arthasPort,
                             params,
-                            60
+                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
 
                     ApplicationManager.getApplication().invokeLater(() -> {
@@ -874,7 +797,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                                 instance.getRemoteIp(),
                                 arthasPort,
                                 params,
-                                5
+                                RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                         );
                     }
 
@@ -931,7 +854,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             instance.getRemoteIp(),
                             arthasPort,
                             params,
-                            60
+                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
                     
                     List<TtRecord> newRecords = TtRecord.parse(result, instance.getRemoteIp());
@@ -1023,7 +946,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             instance.getRemoteIp(),
                             arthasPort,
                             params,
-                            30
+                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
 
                     ApplicationManager.getApplication().invokeLater(() -> {
@@ -1175,7 +1098,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             instance.getRemoteIp(),
                             RuntimeHelper.getArthasPort(instance.toConnectionString()),
                             params,
-                            60
+                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
 
                     ApplicationManager.getApplication().invokeLater(() -> 
@@ -1223,7 +1146,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             instance.getRemoteIp(),
                             RuntimeHelper.getArthasPort(instance.toConnectionString()),
                             params,
-                            60  // Fixed 60s timeout for replay
+                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
 
                     ApplicationManager.getApplication().invokeLater(() -> 

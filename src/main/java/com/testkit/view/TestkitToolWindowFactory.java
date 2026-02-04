@@ -163,7 +163,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                     return;
                 }
                 
-                boolean arthasSupported = executor.isArthasSupported(5);
+                boolean arthasSupported = executor.isArthasSupported();
                 RuntimeHelper.setArthasSupported(arthasSupported);
                 System.out.println("[Testkit] Arthas feature enabled: " + arthasSupported + 
                         " (checked on init)");
@@ -331,7 +331,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                 ApplicationManager.getApplication().executeOnPooledThread(() -> {
                     try {
 
-                        testkitToolWindow.refreshVisibleApp(false);
+                        testkitToolWindow.refreshVisibleApp();
 
                         // 1. 查找 Spring Boot 应用类（已经在后台线程中执行）
                         testkitToolWindow.findSpringBootApplicationClasses();

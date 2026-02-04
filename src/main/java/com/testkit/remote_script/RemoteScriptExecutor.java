@@ -24,6 +24,12 @@ import java.util.concurrent.*;
 public class RemoteScriptExecutor {
 
 
+    // Remote Script 超时配置
+    public static final int REMOTE_SUBMIT_TIMEOUT = 60;     // 提交请求超时 60 秒
+    public static final int REMOTE_RESULT_TIMEOUT = 300;    // 获取结果超时 300 秒
+    public static final int REMOTE_CANCEL_TIMEOUT = 60;     // 取消请求超时 60 秒
+    public static final int REMOTE_ARTHAS_TIMEOUT = 300;
+
     // Remote Script API Reference
     public static final String REMOTE_SCRIPT_INFO = """
 ================================================================================
@@ -537,8 +543,7 @@ def httpPost(String url, Map data) {
     public Object sendArthasRequest(String appName, String partition, String ip, int port, Map<String, Object> params, int timeout) {
         long startTime = System.currentTimeMillis();
         String target = appName + ":[" + partition + "]" + ip + ":" + port;
-        String command = params != null ? String.valueOf(params.get("command")) : "null";
-        
+
         Future<Object> future = executor.submit(() -> {
             Script script = getScript();
             return script.invokeMethod("sendArthasRequest", new Object[]{appName, partition, ip, port, params});
@@ -564,10 +569,9 @@ def httpPost(String url, Map data) {
     /**
      * Check if Arthas is supported by the remote script
      * Calls the script's isArthasSupported() function
-     * @param timeout timeout in seconds
      * @return true if supported, false otherwise
      */
-    public boolean isArthasSupported(int timeout) {
+    public boolean isArthasSupported() {
         long startTime = System.currentTimeMillis();
         
         Future<Boolean> future = executor.submit(() -> {
@@ -591,12 +595,12 @@ def httpPost(String url, Map data) {
         });
 
         try {
-            Boolean result = future.get(timeout, TimeUnit.SECONDS);
+            Boolean result = future.get(5, TimeUnit.SECONDS);
             log("isArthasSupported", System.currentTimeMillis() - startTime, "OK", "result=" + result);
             return result != null && result;
         } catch (TimeoutException e) {
             future.cancel(true);
-            log("isArthasSupported", System.currentTimeMillis() - startTime, "TIMEOUT", "timeout=" + timeout + "s");
+            log("isArthasSupported", System.currentTimeMillis() - startTime, "TIMEOUT", "timeout=" + 5 + "s");
             return false;
         } catch (Exception e) {
             log("isArthasSupported", System.currentTimeMillis() - startTime, "ERROR", "error=" + e.getMessage());

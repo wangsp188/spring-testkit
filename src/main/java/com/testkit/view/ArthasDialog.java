@@ -380,7 +380,7 @@ public class ArthasDialog extends DialogWrapper {
                 params.put("command", command);
 
                 Object result = executor.sendArthasRequest(
-                        appName, partition, ip, arthasPort, params, 30
+                        appName, partition, ip, arthasPort, params, RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                 );
 
                 // Display result

@@ -14,6 +14,7 @@ import com.testkit.TestkitHelper;
 import com.testkit.RuntimeHelper;
 import com.testkit.SettingsStorageHelper;
 import com.testkit.ReqStorageHelper;
+import com.testkit.remote_script.RemoteScriptExecutor;
 import com.testkit.tools.PluginToolEnum;
 import com.testkit.tools.ToolHelper;
 import com.testkit.tools.function_call.FunctionCallIconProvider;
@@ -77,12 +78,6 @@ public class TestkitStoreWindow {
     public static final Icon UNKNOWN_ICON = IconLoader.getIcon("/icons/unknown.svg", TestkitStoreWindow.class);
 
     public static final Icon STORE_ICON = IconLoader.getIcon("/icons/testkit-store.svg", TestkitStoreWindow.class);
-
-    // Remote Script 超时配置
-    private static final int REMOTE_SUBMIT_TIMEOUT = 30;     // 提交请求超时 30 秒
-    private static final int REMOTE_RESULT_TIMEOUT = 600;    // 获取结果超时 600 秒
-    private static final int REMOTE_CANCEL_TIMEOUT = 30;     // 取消请求超时 30 秒
-
 
 
     private Project project;
@@ -1810,7 +1805,7 @@ public class TestkitStoreWindow {
                     req.put("params", params);
 
                     if (isRemoteScript) {
-                        return RemoteScriptCallUtils.sendRequest(project, visibleApp, req, REMOTE_CANCEL_TIMEOUT);
+                        return RemoteScriptCallUtils.sendRequest(project, visibleApp, req, RemoteScriptExecutor.REMOTE_CANCEL_TIMEOUT);
                     } else {
                         return HttpUtil.sendPost("http://localhost:" + sidePort + "/", req, JSONObject.class, 5, 30);
                     }
@@ -1848,7 +1843,7 @@ public class TestkitStoreWindow {
 
                     // Step 1: 提交请求，获取 reqId
                     if (isRemoteScript) {
-                        response = RemoteScriptCallUtils.sendRequest(project, visibleApp, request, REMOTE_SUBMIT_TIMEOUT);
+                        response = RemoteScriptCallUtils.sendRequest(project, visibleApp, request, RemoteScriptExecutor.REMOTE_SUBMIT_TIMEOUT);
                     } else {
                         response = HttpUtil.sendPost("http://localhost:" + sidePort + "/", request, JSONObject.class, 5, 30);
                     }
@@ -1879,7 +1874,7 @@ public class TestkitStoreWindow {
 
                     JSONObject result;
                     if (isRemoteScript) {
-                        result = RemoteScriptCallUtils.sendRequest(project, visibleApp, getResultReq, REMOTE_RESULT_TIMEOUT);
+                        result = RemoteScriptCallUtils.sendRequest(project, visibleApp, getResultReq, RemoteScriptExecutor.REMOTE_RESULT_TIMEOUT);
                     } else {
                         result = HttpUtil.sendPost("http://localhost:" + sidePort + "/", getResultReq, JSONObject.class, 5, 600);
                     }
