@@ -75,6 +75,7 @@ public class TestkitHelper {
         TestkitHelper.notify(project, NotificationType.INFORMATION, copyMsg == null ? "Copy success" : copyMsg);
     }
 
+
     /**
      * Show error dialog with option to open Settings and navigate to specific panel
      *

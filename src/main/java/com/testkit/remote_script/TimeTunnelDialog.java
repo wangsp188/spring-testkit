@@ -7,7 +7,11 @@ import com.intellij.json.JsonLanguage;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.ex.EditorEx;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import org.jetbrains.annotations.NotNull;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.util.IconLoader;
@@ -725,72 +729,36 @@ public class TimeTunnelDialog extends DialogWrapper {
             String command = buildTtCommand();
             updateState(InstanceState.LOADING);
             
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
-                if (StringUtils.isBlank(scriptPath)) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        updateState(InstanceState.READY);
-                        TestkitHelper.notify(project, NotificationType.ERROR, "Remote script not configured");
-                    });
-                    return;
-                }
-
-                try {
-                    RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
-                    String connStr = instance.toConnectionString();
-                    Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Start Recording: " + instance.getRemoteIp(), false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    indicator.setText("Starting tt recording...");
                     
-                    if (arthasPort == null) {
+                    String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
+                    if (StringUtils.isBlank(scriptPath)) {
                         ApplicationManager.getApplication().invokeLater(() -> {
                             updateState(InstanceState.READY);
-                            TestkitHelper.notify(project, NotificationType.ERROR, 
-                                    "Arthas port not found for " + instance.getRemoteIp());
+                            TestkitHelper.notify(project, NotificationType.ERROR, "Remote script not configured");
                         });
                         return;
                     }
 
-                    Map<String, Object> params = new HashMap<>();
-                    params.put("command", command);
-                    executor.sendArthasRequest(
-                            instance.getAppName(),
-                            instance.getRemotePartition(),
-                            instance.getRemoteIp(),
-                            arthasPort,
-                            params,
-                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
-                    );
+                    try {
+                        RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
+                        String connStr = instance.toConnectionString();
+                        Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
+                        
+                        if (arthasPort == null) {
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                updateState(InstanceState.READY);
+                                TestkitHelper.notify(project, NotificationType.ERROR, 
+                                        "Arthas port not found for " + instance.getRemoteIp());
+                            });
+                            return;
+                        }
 
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        updateState(InstanceState.RECORDING);
-                    });
-
-                } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        updateState(InstanceState.READY);
-                        TestkitHelper.notify(project, NotificationType.ERROR, 
-                                "Start recording failed on " + instance.getRemoteIp() + ": " + e.getMessage());
-                    });
-                }
-            });
-        }
-
-        void stopRecording() {
-            updateState(InstanceState.STOPPING);
-            
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
-                if (StringUtils.isBlank(scriptPath)) {
-                    ApplicationManager.getApplication().invokeLater(() -> updateState(InstanceState.READY));
-                    return;
-                }
-
-                try {
-                    RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
-                    Integer arthasPort = RuntimeHelper.getArthasPort(instance.toConnectionString());
-                    
-                    if (arthasPort != null) {
                         Map<String, Object> params = new HashMap<>();
-                        params.put("command", "reset");
+                        params.put("command", command);
                         executor.sendArthasRequest(
                                 instance.getAppName(),
                                 instance.getRemotePartition(),
@@ -799,16 +767,67 @@ public class TimeTunnelDialog extends DialogWrapper {
                                 params,
                                 RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                         );
+
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            updateState(InstanceState.RECORDING);
+                        });
+
+                    } catch (Exception e) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            updateState(InstanceState.READY);
+                            TestkitHelper.notify(project, NotificationType.ERROR, 
+                                    "Start recording failed on " + instance.getRemoteIp() + ": " + e.getMessage());
+                        });
+                    }
+                }
+            });
+        }
+
+        void stopRecording() {
+            updateState(InstanceState.STOPPING);
+            
+            // 构建 reset 命令：reset className methodName
+            String cls = classField.getText().trim();
+            String method = methodField.getText().trim();
+            String resetCommand = "reset " + cls + " " + method;
+            
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Stop Recording: " + instance.getRemoteIp(), false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    indicator.setText("Stopping tt recording...");
+                    
+                    String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
+                    if (StringUtils.isBlank(scriptPath)) {
+                        ApplicationManager.getApplication().invokeLater(() -> updateState(InstanceState.READY));
+                        return;
                     }
 
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        updateState(InstanceState.READY);
-                    });
+                    try {
+                        RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
+                        Integer arthasPort = RuntimeHelper.getArthasPort(instance.toConnectionString());
+                        
+                        if (arthasPort != null) {
+                            Map<String, Object> params = new HashMap<>();
+                            params.put("command", resetCommand);
+                            executor.sendArthasRequest(
+                                    instance.getAppName(),
+                                    instance.getRemotePartition(),
+                                    instance.getRemoteIp(),
+                                    arthasPort,
+                                    params,
+                                    RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
+                            );
+                        }
 
-                } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        updateState(InstanceState.READY);
-                    });
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            updateState(InstanceState.READY);
+                        });
+
+                    } catch (Exception e) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            updateState(InstanceState.READY);
+                        });
+                    }
                 }
             });
         }
@@ -817,82 +836,87 @@ public class TimeTunnelDialog extends DialogWrapper {
             loadBtn.setIcon(AllIcons.Process.Step_1);
             loadBtn.setEnabled(false);
             
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
-                if (StringUtils.isBlank(scriptPath)) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        loadBtn.setIcon(AllIcons.Actions.Refresh);
-                        loadBtn.setEnabled(true);
-                        TestkitHelper.notify(project, NotificationType.ERROR, "Remote script not configured");
-                    });
-                    return;
-                }
-
-                try {
-                    RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
-                    String connStr = instance.toConnectionString();
-                    Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Load Records: " + instance.getRemoteIp(), false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    indicator.setText("Loading tt records...");
                     
-                    if (arthasPort == null) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        loadBtn.setIcon(AllIcons.Actions.Refresh);
-                        loadBtn.setEnabled(true);
-                        TestkitHelper.notify(project, NotificationType.ERROR, 
-                                "Arthas port not found for " + instance.getRemoteIp());
-                    });
+                    String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
+                    if (StringUtils.isBlank(scriptPath)) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            loadBtn.setIcon(AllIcons.Actions.Refresh);
+                            loadBtn.setEnabled(true);
+                            TestkitHelper.notify(project, NotificationType.ERROR, "Remote script not configured");
+                        });
                         return;
                     }
 
-                    Map<String, Object> params = new HashMap<>();
-                    // Note: tt -l doesn't support -n, it lists all records in memory
-                    // The -n param only works with tt -t (start recording)
-                    params.put("command", "tt -l");
-                    
-                    Object result = executor.sendArthasRequest(
-                            instance.getAppName(),
-                            instance.getRemotePartition(),
-                            instance.getRemoteIp(),
-                            arthasPort,
-                            params,
-                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
-                    );
-                    
-                    List<TtRecord> newRecords = TtRecord.parse(result, instance.getRemoteIp());
-                    newRecords.sort(Comparator.comparing(TtRecord::getTimestamp).reversed());
+                    try {
+                        RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
+                        String connStr = instance.toConnectionString();
+                        Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
+                        
+                        if (arthasPort == null) {
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                loadBtn.setIcon(AllIcons.Actions.Refresh);
+                                loadBtn.setEnabled(true);
+                                TestkitHelper.notify(project, NotificationType.ERROR, 
+                                        "Arthas port not found for " + instance.getRemoteIp());
+                            });
+                            return;
+                        }
 
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        records = newRecords;
-                        updateRecordsPanel();
-                        loadBtn.setIcon(AllIcons.Actions.Checked);
-                        loadBtn.setToolTipText("Loaded " + records.size() + " records");
-                        loadBtn.setEnabled(true);
+                        Map<String, Object> params = new HashMap<>();
+                        // Note: tt -l doesn't support -n, it lists all records in memory
+                        // The -n param only works with tt -t (start recording)
+                        params.put("command", "tt -l");
                         
-                        // Reset icon after 2 seconds
-                        Timer timer = new Timer(2000, e -> {
-                            loadBtn.setIcon(AllIcons.Actions.Refresh);
-                            loadBtn.setToolTipText("Load records (tt -l)");
-                        });
-                        timer.setRepeats(false);
-                        timer.start();
-                    });
+                        Object result = executor.sendArthasRequest(
+                                instance.getAppName(),
+                                instance.getRemotePartition(),
+                                instance.getRemoteIp(),
+                                arthasPort,
+                                params,
+                                RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
+                        );
+                        
+                        List<TtRecord> newRecords = TtRecord.parse(result, instance.getRemoteIp());
+                        newRecords.sort(Comparator.comparing(TtRecord::getTimestamp).reversed());
 
-                } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        loadBtn.setIcon(AllIcons.General.Error);
-                        loadBtn.setToolTipText("Load failed: " + e.getMessage());
-                        loadBtn.setEnabled(true);
-                        
-                        // Notify user
-                        TestkitHelper.notify(project, NotificationType.ERROR, 
-                                "Load records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
-                        
-                        Timer timer = new Timer(2000, ev -> {
-                            loadBtn.setIcon(AllIcons.Actions.Refresh);
-                            loadBtn.setToolTipText("Load records (tt -l)");
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            records = newRecords;
+                            updateRecordsPanel();
+                            loadBtn.setIcon(AllIcons.Actions.Checked);
+                            loadBtn.setToolTipText("Loaded " + records.size() + " records");
+                            loadBtn.setEnabled(true);
+                            
+                            // Reset icon after 2 seconds
+                            Timer timer = new Timer(2000, e -> {
+                                loadBtn.setIcon(AllIcons.Actions.Refresh);
+                                loadBtn.setToolTipText("Load records (tt -l)");
+                            });
+                            timer.setRepeats(false);
+                            timer.start();
                         });
-                        timer.setRepeats(false);
-                        timer.start();
-                    });
+
+                    } catch (Exception e) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            loadBtn.setIcon(AllIcons.General.Error);
+                            loadBtn.setToolTipText("Load failed: " + e.getMessage());
+                            loadBtn.setEnabled(true);
+                            
+                            // Notify user
+                            TestkitHelper.notify(project, NotificationType.ERROR, 
+                                    "Load records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
+                            
+                            Timer timer = new Timer(2000, ev -> {
+                                loadBtn.setIcon(AllIcons.Actions.Refresh);
+                                loadBtn.setToolTipText("Load records (tt -l)");
+                            });
+                            timer.setRepeats(false);
+                            timer.start();
+                        });
+                    }
                 }
             });
         }
@@ -913,74 +937,79 @@ public class TimeTunnelDialog extends DialogWrapper {
             clearBtn.setEnabled(false);
             clearBtn.setToolTipText("Clearing...");
             
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
-                if (StringUtils.isBlank(scriptPath)) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        clearBtn.setEnabled(true);
-                        clearBtn.setToolTipText("Clear records");
-                        TestkitHelper.notify(project, NotificationType.ERROR, "Remote script not configured");
-                    });
-                    return;
-                }
-
-                try {
-                    RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
-                    Integer arthasPort = RuntimeHelper.getArthasPort(instance.toConnectionString());
-                    if (arthasPort == null) {
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Clear Records: " + instance.getRemoteIp(), false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    indicator.setText("Clearing tt records...");
+                    
+                    String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
+                    if (StringUtils.isBlank(scriptPath)) {
                         ApplicationManager.getApplication().invokeLater(() -> {
                             clearBtn.setEnabled(true);
                             clearBtn.setToolTipText("Clear records");
-                            TestkitHelper.notify(project, NotificationType.ERROR, 
-                                    "Arthas port not found for " + instance.getRemoteIp());
+                            TestkitHelper.notify(project, NotificationType.ERROR, "Remote script not configured");
                         });
                         return;
                     }
 
-                    Map<String, Object> params = new HashMap<>();
-                    params.put("command", "tt --delete-all");
-                    
-                    executor.sendArthasRequest(
-                            instance.getAppName(),
-                            instance.getRemotePartition(),
-                            instance.getRemoteIp(),
-                            arthasPort,
-                            params,
-                            RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
-                    );
+                    try {
+                        RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
+                        Integer arthasPort = RuntimeHelper.getArthasPort(instance.toConnectionString());
+                        if (arthasPort == null) {
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                clearBtn.setEnabled(true);
+                                clearBtn.setToolTipText("Clear records");
+                                TestkitHelper.notify(project, NotificationType.ERROR, 
+                                        "Arthas port not found for " + instance.getRemoteIp());
+                            });
+                            return;
+                        }
 
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        records.clear();
-                        updateRecordsPanel();
-                        clearBtn.setIcon(AllIcons.Actions.Checked);
-                        clearBtn.setToolTipText("Cleared");
-                        clearBtn.setEnabled(true);
+                        Map<String, Object> params = new HashMap<>();
+                        params.put("command", "tt --delete-all");
                         
-                        // Reset icon after 2 seconds
-                        Timer timer = new Timer(2000, e -> {
-                            clearBtn.setIcon(CLEAR_ICON);
-                            clearBtn.setToolTipText("Clear records");
-                        });
-                        timer.setRepeats(false);
-                        timer.start();
-                    });
+                        executor.sendArthasRequest(
+                                instance.getAppName(),
+                                instance.getRemotePartition(),
+                                instance.getRemoteIp(),
+                                arthasPort,
+                                params,
+                                RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
+                        );
 
-                } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        clearBtn.setIcon(AllIcons.General.Error);
-                        clearBtn.setToolTipText("Clear failed: " + e.getMessage());
-                        clearBtn.setEnabled(true);
-                        
-                        TestkitHelper.notify(project, NotificationType.ERROR, 
-                                "Clear records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
-                        
-                        Timer timer = new Timer(2000, ev -> {
-                            clearBtn.setIcon(CLEAR_ICON);
-                            clearBtn.setToolTipText("Clear records");
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            records.clear();
+                            updateRecordsPanel();
+                            clearBtn.setIcon(AllIcons.Actions.Checked);
+                            clearBtn.setToolTipText("Cleared");
+                            clearBtn.setEnabled(true);
+                            
+                            // Reset icon after 2 seconds
+                            Timer timer = new Timer(2000, e -> {
+                                clearBtn.setIcon(CLEAR_ICON);
+                                clearBtn.setToolTipText("Clear records");
+                            });
+                            timer.setRepeats(false);
+                            timer.start();
                         });
-                        timer.setRepeats(false);
-                        timer.start();
-                    });
+
+                    } catch (Exception e) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            clearBtn.setIcon(AllIcons.General.Error);
+                            clearBtn.setToolTipText("Clear failed: " + e.getMessage());
+                            clearBtn.setEnabled(true);
+                            
+                            TestkitHelper.notify(project, NotificationType.ERROR, 
+                                    "Clear records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
+                            
+                            Timer timer = new Timer(2000, ev -> {
+                                clearBtn.setIcon(CLEAR_ICON);
+                                clearBtn.setToolTipText("Clear records");
+                            });
+                            timer.setRepeats(false);
+                            timer.start();
+                        });
+                    }
                 }
             });
         }

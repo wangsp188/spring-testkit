@@ -567,6 +567,46 @@ def httpPost(String url, Map data) {
     }
 
     /**
+     * 向指定实例发送文件操作请求（上传或下载）
+     * @param appName 应用名
+     * @param partition 分区
+     * @param ip 实例 IP（实际是 pod name）
+     * @param options 操作参数 Map，包含：
+     *                - action: "download" 或 "upload"
+     *                - remotePath: Pod 上的文件路径
+     *                - localPath: 本地文件路径
+     *                - content: 要上传的内容（upload 时可选）
+     *                - timeout: 超时时间（可选）
+     * @return 响应结果
+     */
+    public Object sendFileRequest(String appName, String partition, String ip, Map<String, Object> options) {
+        long startTime = System.currentTimeMillis();
+        String target = appName + ":[" + partition + "]" + ip;
+        int timeout = options.containsKey("timeout") ? ((Number) options.get("timeout")).intValue() : 300;
+
+        Future<Object> future = executor.submit(() -> {
+            Script script = getScript();
+            return script.invokeMethod("sendFileRequest", new Object[]{appName, partition, ip, options});
+        });
+
+        try {
+            Object result = future.get(timeout, TimeUnit.SECONDS);
+            log("sendFileRequest", System.currentTimeMillis() - startTime, "OK", 
+                    "target=" + target + ", options=" + options + ", result=" + result);
+            return result;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            log("sendFileRequest", System.currentTimeMillis() - startTime, "TIMEOUT", 
+                    "target=" + target + ", options=" + options + ", timeout=" + timeout + "s");
+            throw new RuntimeException("sendFileRequest() timeout after " + timeout + " seconds", e);
+        } catch (Exception e) {
+            log("sendFileRequest", System.currentTimeMillis() - startTime, "ERROR", 
+                    "target=" + target + ", options=" + options + ", error=" + e.getMessage());
+            throw new RuntimeException("Failed to execute sendFileRequest(): " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Check if Arthas is supported by the remote script
      * Calls the script's isArthasSupported() function
      * @return true if supported, false otherwise
