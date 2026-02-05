@@ -1364,8 +1364,7 @@ public class TestkitToolWindow {
                         label.setText("✅");
                         label.setToolTipText("Arthas enabled (port: " + inst.getArthasPort() + ")");
                     } else {
-                        label.setText("—");
-                        label.setForeground(Color.GRAY);
+                        label.setText("❌");
                         label.setToolTipText("Arthas not available");
                     }
                 }
@@ -1508,6 +1507,16 @@ public class TestkitToolWindow {
         Runnable loadInfraAction = () -> {
             String scriptPath = scriptPathField.getText().trim();
             if (StringUtils.isBlank(scriptPath)) return;
+
+            // 先检查脚本文件是否存在
+            File scriptFile = new File(scriptPath);
+            if (!scriptFile.exists()) {
+                // 特殊处理 cci_connector.groovy - 引导用户安装 CCI Tools
+                TestkitHelper.alert(project, Messages.getErrorIcon(),
+                        "Script file not found:\n" + scriptPath);
+                return;
+            }
+
             SettingsStorageHelper.setRemoteScriptPath(project, scriptPath);
 
             // 禁用刷新按钮，防止重复点击
@@ -1592,13 +1601,19 @@ public class TestkitToolWindow {
                                 errorMsg.toLowerCase().contains("timeout") || 
                                 errorMsg.toLowerCase().contains("timed out")
                             );
-                            
+
+                            // 用 notify 提醒详细信息
                             if (isTimeout) {
-                                statusLabel.setText("❌ Timeout - May be caused by authentication process timeout. login and retry.");
+                                statusLabel.setText("❌ Load infra timeout");
+                                TestkitHelper.notify(project, NotificationType.ERROR,
+                                        "Load infra timeout. May be caused by authentication process timeout. Please login and retry.");
                             } else {
-                                statusLabel.setText("❌ " + errorMsg);
+                                statusLabel.setText("❌ Failed to load infra");
+                                TestkitHelper.notify(project, NotificationType.ERROR,
+                                        "Failed to load infra: " + errorMsg);
                             }
                             statusLabel.setForeground(new Color(200, 100, 100));
+
                             // 重新启用刷新按钮
                             refreshBtn.setEnabled(true);
                         });

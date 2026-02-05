@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 
 /**
  * Remote Script Groovy 脚本执行器
- * 
+ *
  * 用户脚本需要实现以下三个函数：
  * 1. loadInfra() - 返回 Map<appName, List<partition>>
  * 2. loadInstances(appName, partition) - 返回实例列表
@@ -184,6 +184,40 @@ The plugin calls functions in the Groovy script. Implement these functions:
    
    Other commands: data = raw command output (String or parsed JSON)
 
+────────────────────────────────────────────────────────────────────────────────
+6. sendFileRequest(String appName, String partition, String ip, Map options)
+                                                                    [Optional]
+────────────────────────────────────────────────────────────────────────────────
+   Purpose: Upload or download files to/from specified instance
+   
+   When to implement: Required when Arthas is supported (isArthasSupported=true)
+   Used by:
+     - Profiler: Download profiler result files (e.g., flame graph HTML)
+     - Hot Deploy: Upload compiled class files for hot reloading
+   
+   Parameters: appName   - Application name
+               partition - Partition name
+               ip        - Instance identifier
+               options   - File operation options Map
+   
+   Options structure:
+     - action     : String (required) - "download" or "upload"
+     - remotePath : String (required) - File path on the remote pod
+     - localPath  : String (optional) - Local file path
+     - content    : String (optional) - Content to upload (for upload action)
+     - timeout    : int    (optional) - Timeout in seconds (default: 300)
+   
+   Response structure:
+   {
+       "success" : boolean,    // true=success, false=failure
+       "message" : String,     // error message (when success=false)
+       "data"    : Object      // file content for download, or upload result
+   }
+   
+   Example usage:
+     Download: [action: "download", remotePath: "/app/config/app.properties"]
+     Upload:   [action: "upload", remotePath: "/tmp/test.txt", content: "Hello"]
+
 ================================================================================
                               Demo Script
 ================================================================================
@@ -342,10 +376,10 @@ def httpPost(String url, Map data) {
         if (!isValid()) {
             throw new IOException("Invalid script path: " + scriptPath);
         }
-        
+
         File file = new File(scriptPath);
         long currentModified = file.lastModified();
-        
+
         // 如果文件被修改过，重新编译
         if (compiledScript == null || currentModified != lastModified) {
             String scriptContent = Files.readString(file.toPath());
@@ -353,11 +387,11 @@ def httpPost(String url, Map data) {
             compiledScript = shell.parse(scriptContent);
             lastModified = currentModified;
             System.out.println("[RemoteScriptExecutor] Script loaded/reloaded: " + scriptPath);
-            
+
             // Auto-refresh Arthas support flag when script is reloaded
             refreshArthasSupportAsync();
         }
-        
+
         return compiledScript;
     }
 
@@ -392,19 +426,19 @@ def httpPost(String url, Map data) {
     @SuppressWarnings("unchecked")
     public Map<String, List<String>> loadInfra(int timeout) {
         long startTime = System.currentTimeMillis();
-        
+
         Future<Map<String, List<String>>> future = executor.submit(() -> {
             Script script = getScript();
             Object result = script.invokeMethod("loadInfra", new Object[]{});
-            
+
             if (result instanceof Map) {
                 Map<String, List<String>> infraMap = new LinkedHashMap<>();
                 Map<?, ?> rawMap = (Map<?, ?>) result;
-                
+
                 for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
                     String appName = String.valueOf(entry.getKey());
                     List<String> partitions = new ArrayList<>();
-                    
+
                     Object value = entry.getValue();
                     if (value instanceof List) {
                         for (Object item : (List<?>) value) {
@@ -415,7 +449,7 @@ def httpPost(String url, Map data) {
                 }
                 return infraMap;
             }
-            
+
             return Collections.emptyMap();
         });
 
@@ -443,13 +477,13 @@ def httpPost(String url, Map data) {
     @SuppressWarnings("unchecked")
     public List<InstanceInfo> loadInstances(String appName, String partition, int timeout) {
         long startTime = System.currentTimeMillis();
-        
+
         Future<List<InstanceInfo>> future = executor.submit(() -> {
             Script script = getScript();
             Object result = script.invokeMethod("loadInstances", new Object[]{appName, partition});
-            
+
             List<InstanceInfo> instances = new ArrayList<>();
-            
+
             if (result instanceof List) {
                 for (Object item : (List<?>) result) {
                     if (item instanceof Map) {
@@ -473,22 +507,22 @@ def httpPost(String url, Map data) {
                     }
                 }
             }
-            
+
             return instances;
         });
 
         try {
             List<InstanceInfo> result = future.get(timeout, TimeUnit.SECONDS);
-            log("loadInstances", System.currentTimeMillis() - startTime, "OK", 
+            log("loadInstances", System.currentTimeMillis() - startTime, "OK",
                     "params={appName=" + appName + ", partition=" + partition + "}, result=" + result);
             return result;
         } catch (TimeoutException e) {
             future.cancel(true);
-            log("loadInstances", System.currentTimeMillis() - startTime, "TIMEOUT", 
+            log("loadInstances", System.currentTimeMillis() - startTime, "TIMEOUT",
                     "params={appName=" + appName + ", partition=" + partition + "}, timeout=" + timeout + "s");
             throw new RuntimeException("loadInstances() timeout after " + timeout + " seconds", e);
         } catch (Exception e) {
-            log("loadInstances", System.currentTimeMillis() - startTime, "ERROR", 
+            log("loadInstances", System.currentTimeMillis() - startTime, "ERROR",
                     "params={appName=" + appName + ", partition=" + partition + "}, error=" + e.getMessage());
             throw new RuntimeException("Failed to execute loadInstances(): " + e.getMessage(), e);
         }
@@ -507,7 +541,7 @@ def httpPost(String url, Map data) {
     public Object sendRequest(String appName, String partition, String ip, int port, Map<String, Object> request, int timeout) {
         long startTime = System.currentTimeMillis();
         String target = appName + ":[" + partition + "]" + ip + ":" + port;
-        
+
         Future<Object> future = executor.submit(() -> {
             Script script = getScript();
             return script.invokeMethod("sendRequest", new Object[]{appName, partition, ip, port, request});
@@ -515,16 +549,16 @@ def httpPost(String url, Map data) {
 
         try {
             Object result = future.get(timeout, TimeUnit.SECONDS);
-            log("sendRequest", System.currentTimeMillis() - startTime, "OK", 
+            log("sendRequest", System.currentTimeMillis() - startTime, "OK",
                     "target=" + target + ", request=" + request + ", result=" + result);
             return result;
         } catch (TimeoutException e) {
             future.cancel(true);
-            log("sendRequest", System.currentTimeMillis() - startTime, "TIMEOUT", 
+            log("sendRequest", System.currentTimeMillis() - startTime, "TIMEOUT",
                     "target=" + target + ", request=" + request + ", timeout=" + timeout + "s");
             throw new RuntimeException("sendRequest() timeout after " + timeout + " seconds", e);
         } catch (Exception e) {
-            log("sendRequest", System.currentTimeMillis() - startTime, "ERROR", 
+            log("sendRequest", System.currentTimeMillis() - startTime, "ERROR",
                     "target=" + target + ", request=" + request + ", error=" + e.getMessage());
             throw new RuntimeException("Failed to execute sendRequest(): " + e.getMessage(), e);
         }
@@ -551,16 +585,16 @@ def httpPost(String url, Map data) {
 
         try {
             Object result = future.get(timeout, TimeUnit.SECONDS);
-            log("sendArthasRequest", System.currentTimeMillis() - startTime, "OK", 
+            log("sendArthasRequest", System.currentTimeMillis() - startTime, "OK",
                     "target=" + target + ", params=" + params + ", result=" + result);
             return result;
         } catch (TimeoutException e) {
             future.cancel(true);
-            log("sendArthasRequest", System.currentTimeMillis() - startTime, "TIMEOUT", 
+            log("sendArthasRequest", System.currentTimeMillis() - startTime, "TIMEOUT",
                     "target=" + target + ", params=" + params + ", timeout=" + timeout + "s");
             throw new RuntimeException("sendArthasRequest() timeout after " + timeout + " seconds", e);
         } catch (Exception e) {
-            log("sendArthasRequest", System.currentTimeMillis() - startTime, "ERROR", 
+            log("sendArthasRequest", System.currentTimeMillis() - startTime, "ERROR",
                     "target=" + target + ", params=" + params + ", error=" + e.getMessage());
             throw new RuntimeException("Failed to execute sendArthasRequest(): " + e.getMessage(), e);
         }
@@ -591,16 +625,16 @@ def httpPost(String url, Map data) {
 
         try {
             Object result = future.get(timeout, TimeUnit.SECONDS);
-            log("sendFileRequest", System.currentTimeMillis() - startTime, "OK", 
+            log("sendFileRequest", System.currentTimeMillis() - startTime, "OK",
                     "target=" + target + ", options=" + options + ", result=" + result);
             return result;
         } catch (TimeoutException e) {
             future.cancel(true);
-            log("sendFileRequest", System.currentTimeMillis() - startTime, "TIMEOUT", 
+            log("sendFileRequest", System.currentTimeMillis() - startTime, "TIMEOUT",
                     "target=" + target + ", options=" + options + ", timeout=" + timeout + "s");
             throw new RuntimeException("sendFileRequest() timeout after " + timeout + " seconds", e);
         } catch (Exception e) {
-            log("sendFileRequest", System.currentTimeMillis() - startTime, "ERROR", 
+            log("sendFileRequest", System.currentTimeMillis() - startTime, "ERROR",
                     "target=" + target + ", options=" + options + ", error=" + e.getMessage());
             throw new RuntimeException("Failed to execute sendFileRequest(): " + e.getMessage(), e);
         }
@@ -613,12 +647,12 @@ def httpPost(String url, Map data) {
      */
     public boolean isArthasSupported() {
         long startTime = System.currentTimeMillis();
-        
+
         Future<Boolean> future = executor.submit(() -> {
             try {
                 Script script = getScript();
                 Object result = script.invokeMethod("isArthasSupported", new Object[]{});
-                
+
                 if (result instanceof Boolean) {
                     return (Boolean) result;
                 }
@@ -654,7 +688,7 @@ def httpPost(String url, Map data) {
      * Log each call in one line
      */
     private void log(String method, long durationMs, String status, String detail) {
-        System.out.println("[RemoteScript] " + method + " " + status + " (" + durationMs + "ms)" + 
+        System.out.println("[RemoteScript] " + method + " " + status + " (" + durationMs + "ms)" +
                 (detail != null ? " - " + detail : ""));
     }
 
