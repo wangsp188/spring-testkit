@@ -1512,7 +1512,7 @@ public class TestkitToolWindow {
             File scriptFile = new File(scriptPath);
             if (!scriptFile.exists()) {
                 // 特殊处理 cci_connector.groovy - 引导用户安装 CCI Tools
-                TestkitHelper.alert(project, Messages.getErrorIcon(),
+                TestkitHelper.notify(project,NotificationType.ERROR ,
                         "Script file not found:\n" + scriptPath);
                 return;
             }

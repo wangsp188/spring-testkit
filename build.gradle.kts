@@ -27,6 +27,8 @@ dependencies {
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("com.github.jsqlparser:jsqlparser:4.6")
     implementation("dev.langchain4j:langchain4j-mcp:1.7.1-beta14")
+    // Groovy for test
+    testImplementation("org.apache.groovy:groovy-all:4.0.15")
     intellijPlatform{
         create("IC","2025.1")
 //        "Git4Idea","com.intellij.spring.boot","com.intellij.database"

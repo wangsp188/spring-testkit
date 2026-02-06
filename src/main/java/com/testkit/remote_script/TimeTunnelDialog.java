@@ -41,12 +41,13 @@ import java.util.stream.Collectors;
 
 /**
  * TimeTunnel Dialog - Multi-instance recording & replay
- * 
+ *
  * 优化版布局：左右分割，每个 instance 有独立的状态和操作按钮
  */
 public class TimeTunnelDialog extends DialogWrapper {
 
     public static final Icon CLEAR_ICON = IconLoader.getIcon("/icons/clear.svg", TimeTunnelDialog.class);
+
 
     private final Project project;
     private final String className;
@@ -56,21 +57,21 @@ public class TimeTunnelDialog extends DialogWrapper {
     // UI Components - Top
     private ComboBox<String> appBox;
     private ComboBox<String> partitionBox;
-    
+
     // UI Components - Watch Point
     private JBTextField classField;
     private JBTextField methodField;
     private JBTextField conditionField;
     private ComboBox<Integer> maxRecordsBox;
     private ComboBox<Integer> expandLevelBox;
-    
+
     // UI Components - Left Panel (Instance List)
     private JPanel instanceListPanel;
     private Map<String, InstancePanel> instancePanelMap = new LinkedHashMap<>();
-    
+
     // UI Components - Right Panel (Detail)
     private LanguageTextField jsonEditor;
-    
+
     // Current displayed instances
     private List<RuntimeHelper.VisibleApp> currentInstances = new ArrayList<>();
 
@@ -80,24 +81,24 @@ public class TimeTunnelDialog extends DialogWrapper {
         RECORDING("Recording", new Color(200, 50, 50)),
         LOADING("Loading...", new Color(0, 100, 200)),
         STOPPING("Stopping...", new Color(150, 100, 50));
-        
+
         final String label;
         final Color color;
-        
+
         InstanceState(String label, Color color) {
             this.label = label;
             this.color = color;
         }
     }
 
-    public TimeTunnelDialog(Project project, String className, String methodName, 
-                           List<RuntimeHelper.VisibleApp> arthasApps) {
+    public TimeTunnelDialog(Project project, String className, String methodName,
+                            List<RuntimeHelper.VisibleApp> arthasApps) {
         super(project);
         this.project = project;
         this.className = className;
         this.methodName = methodName;
         this.arthasApps = arthasApps;
-        
+
         setTitle("Arthas TimeTunnel");
         setModal(false);
         init();
@@ -250,23 +251,23 @@ public class TimeTunnelDialog extends DialogWrapper {
 
         // Toolbar
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
-        
+
         JButton startAllBtn = new JButton("Start All", AllIcons.Actions.Execute);
         startAllBtn.setToolTipText("Start recording on all instances");
         startAllBtn.addActionListener(e -> startAllRecording());
         toolbarPanel.add(startAllBtn);
-        
+
         JButton stopAllBtn = new JButton("Stop All", AllIcons.Actions.Suspend);
         stopAllBtn.setToolTipText("Stop recording on all instances");
         stopAllBtn.addActionListener(e -> stopAllRecording());
         toolbarPanel.add(stopAllBtn);
-        
+
         panel.add(toolbarPanel, BorderLayout.NORTH);
 
         // Instance list panel (scrollable)
         instanceListPanel = new JPanel();
         instanceListPanel.setLayout(new BoxLayout(instanceListPanel, BoxLayout.Y_AXIS));
-        
+
         JBScrollPane scrollPane = new JBScrollPane(instanceListPanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         panel.add(scrollPane, BorderLayout.CENTER);
@@ -323,7 +324,7 @@ public class TimeTunnelDialog extends DialogWrapper {
             }
         };
         jsonEditor.setOneLineMode(false);
-        
+
         panel.add(jsonEditor, BorderLayout.CENTER);
 
         return panel;
@@ -348,18 +349,18 @@ public class TimeTunnelDialog extends DialogWrapper {
     private void onPartitionChanged() {
         String selectedApp = (String) appBox.getSelectedItem();
         String selectedPartition = (String) partitionBox.getSelectedItem();
-        
+
         if (selectedApp == null || selectedPartition == null) {
             // No app/partition selected, clear instances and show hint
             currentInstances = new ArrayList<>();
         } else {
             // Update currentInstances
             currentInstances = arthasApps.stream()
-                    .filter(app -> selectedApp.equals(app.getAppName()) 
+                    .filter(app -> selectedApp.equals(app.getAppName())
                             && selectedPartition.equals(app.getRemotePartition()))
                     .collect(Collectors.toList());
         }
-        
+
         // Rebuild instance panels (will show hint if empty)
         rebuildInstancePanels();
     }
@@ -373,24 +374,24 @@ public class TimeTunnelDialog extends DialogWrapper {
      */
     private void refreshArthasApps() {
         arthasApps = ArthasLineMarkerProvider.getRemoteScriptApps(project.getName());
-        
+
         String selectedApp = (String) appBox.getSelectedItem();
         appBox.removeAllItems();
         Set<String> appNames = arthasApps.stream()
                 .map(RuntimeHelper.VisibleApp::getAppName)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         appNames.forEach(appBox::addItem);
-        
+
         if (selectedApp != null && appNames.contains(selectedApp)) {
             appBox.setSelectedItem(selectedApp);
         }
-        
+
         onAppChanged();
         onPartitionChanged();
     }
 
     // Empty state hint for instance list
-    private static final String NO_INSTANCE_HINT = 
+    private static final String NO_INSTANCE_HINT =
             "<html><center>No instances available<br><br>Click 📎 button to add</center></html>";
 
     /**
@@ -400,14 +401,14 @@ public class TimeTunnelDialog extends DialogWrapper {
         if (instanceListPanel == null) {
             return;
         }
-        
+
         // 保存旧的 panel map，用于复用
         Map<String, InstancePanel> oldPanelMap = new LinkedHashMap<>(instancePanelMap);
-        
+
         // 清空 UI 但复用已有的 panel
         instanceListPanel.removeAll();
         instancePanelMap.clear();
-        
+
         if (currentInstances.isEmpty()) {
             // Show empty state hint - use wrapper panel for centering
             JPanel hintWrapper = new JPanel(new GridBagLayout());
@@ -430,10 +431,10 @@ public class TimeTunnelDialog extends DialogWrapper {
                 instanceListPanel.add(Box.createVerticalStrut(5));
             }
         }
-        
+
         // Add glue at the end to push panels to top
         instanceListPanel.add(Box.createVerticalGlue());
-        
+
         instanceListPanel.revalidate();
         instanceListPanel.repaint();
     }
@@ -528,12 +529,12 @@ public class TimeTunnelDialog extends DialogWrapper {
      * Panel for a single instance with controls and records
      */
     private class InstancePanel extends JPanel {
-        
+
         private final RuntimeHelper.VisibleApp instance;
         private InstanceState state = InstanceState.READY;
         private List<TtRecord> records = new ArrayList<>();
         private boolean expanded = true;  // Default expanded
-        
+
         // UI Components
         private JLabel statusLabel;
         private JButton actionBtn;
@@ -555,7 +556,7 @@ public class TimeTunnelDialog extends DialogWrapper {
             }
             initUI();
         }
-        
+
         private String getMethodKey() {
             return className + "#" + methodName;
         }
@@ -615,14 +616,14 @@ public class TimeTunnelDialog extends DialogWrapper {
             recordsPanel.setLayout(new BoxLayout(recordsPanel, BoxLayout.Y_AXIS));
             recordsPanel.setOpaque(false);
             recordsPanel.setBorder(BorderFactory.createEmptyBorder(2, 20, 0, 0));
-            
+
             updateRecordsPanel();
             add(recordsPanel, BorderLayout.CENTER);
-            
+
             // 同步按钮状态（从缓存恢复时需要）
             syncButtonState();
         }
-        
+
         private void syncButtonState() {
             switch (state) {
                 case READY:
@@ -670,11 +671,11 @@ public class TimeTunnelDialog extends DialogWrapper {
             expandBtn.setIcon(expanded ? AllIcons.General.ArrowDown : AllIcons.General.ArrowRight);
             expandBtn.setToolTipText(expanded ? "Collapse records" : "Expand records");
             recordsPanel.setVisible(expanded);
-            
+
             // Trigger layout update
             revalidate();
             repaint();
-            
+
             // Update parent scroll pane
             if (getParent() != null) {
                 getParent().revalidate();
@@ -686,12 +687,12 @@ public class TimeTunnelDialog extends DialogWrapper {
             this.state = newState;
             statusLabel.setText("[" + newState.label + "]");
             statusLabel.setForeground(newState.color);
-            
+
             // 保存状态到 ConnectionMeta（只缓存 READY 和 RECORDING 状态，中间状态不缓存）
             if (newState == InstanceState.READY || newState == InstanceState.RECORDING) {
                 RuntimeHelper.setTtState(instance.toConnectionString(), getMethodKey(), newState.name());
             }
-            
+
             // Update action button
             switch (newState) {
                 case READY:
@@ -725,15 +726,22 @@ public class TimeTunnelDialog extends DialogWrapper {
             }
         }
 
+        /**
+         * tt -t 启动超时（秒）。
+         * tt -t 是阻塞命令（等待方法调用被捕获才返回），所以只需等几秒确认 instrument 成功即可。
+         * 如果在此时间内没有报错，说明录制已启动；超时视为成功。
+         */
+        private static final int TT_START_TIMEOUT = 10;
+
         void startRecording() {
             String command = buildTtCommand();
             updateState(InstanceState.LOADING);
-            
+
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Start Recording: " + instance.getRemoteIp(), false) {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
                     indicator.setText("Starting tt recording...");
-                    
+
                     String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
                     if (StringUtils.isBlank(scriptPath)) {
                         ApplicationManager.getApplication().invokeLater(() -> {
@@ -747,37 +755,54 @@ public class TimeTunnelDialog extends DialogWrapper {
                         RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                         String connStr = instance.toConnectionString();
                         Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
-                        
+
                         if (arthasPort == null) {
                             ApplicationManager.getApplication().invokeLater(() -> {
                                 updateState(InstanceState.READY);
-                                TestkitHelper.notify(project, NotificationType.ERROR, 
+                                TestkitHelper.notify(project, NotificationType.ERROR,
                                         "Arthas port not found for " + instance.getRemoteIp());
                             });
                             return;
                         }
 
+                        // tt -t 是阻塞命令：Arthas 会一直等待方法调用被捕获才返回。
+                        // 使用短 timeout：
+                        //   - Groovy 端 CLI --timeout 控制 Arthas 超时
+                        //   - Groovy 端 proc.waitFor(timeout+10s) 兜底杀子进程
+                        //   - Java 端 Future 超时再加缓冲
+                        //   - 如果 instrument 失败（如类不存在），会在超时前快速返回错误
                         Map<String, Object> params = new HashMap<>();
                         params.put("command", command);
+                        params.put("timeout", TT_START_TIMEOUT);
                         executor.sendArthasRequest(
                                 instance.getAppName(),
                                 instance.getRemotePartition(),
                                 instance.getRemoteIp(),
                                 arthasPort,
                                 params,
-                                RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
+                                TT_START_TIMEOUT + 5  // Java 侧给足够缓冲，让 Groovy 侧先超时
                         );
 
+                        // 如果在超时前返回了（罕见情况：方法调用被立即捕获），也视为成功
                         ApplicationManager.getApplication().invokeLater(() -> {
                             updateState(InstanceState.RECORDING);
                         });
 
-                    } catch (Exception e) {
-                        ApplicationManager.getApplication().invokeLater(() -> {
-                            updateState(InstanceState.READY);
-                            TestkitHelper.notify(project, NotificationType.ERROR, 
-                                    "Start recording failed on " + instance.getRemoteIp() + ": " + e.getMessage());
-                        });
+                    } catch (RuntimeException e) {
+                        String msg = e.getMessage() != null ? e.getMessage() : "";
+                        if (msg.contains("timeout")) {
+                            // 超时 = tt -t 已成功 instrument，正在等待方法调用 → 录制已启动
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                updateState(InstanceState.RECORDING);
+                            });
+                        } else {
+                            // 真正的错误（如类不存在、连接失败等）
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                updateState(InstanceState.READY);
+                                TestkitHelper.notify(project, NotificationType.ERROR,
+                                        "Start recording failed on " + instance.getRemoteIp() + ": " + msg);
+                            });
+                        }
                     }
                 }
             });
@@ -785,17 +810,17 @@ public class TimeTunnelDialog extends DialogWrapper {
 
         void stopRecording() {
             updateState(InstanceState.STOPPING);
-            
+
             // 构建 reset 命令：reset className methodName
             String cls = classField.getText().trim();
             String method = methodField.getText().trim();
             String resetCommand = "reset " + cls + " " + method;
-            
+
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Stop Recording: " + instance.getRemoteIp(), false) {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
                     indicator.setText("Stopping tt recording...");
-                    
+
                     String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
                     if (StringUtils.isBlank(scriptPath)) {
                         ApplicationManager.getApplication().invokeLater(() -> updateState(InstanceState.READY));
@@ -805,7 +830,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                     try {
                         RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                         Integer arthasPort = RuntimeHelper.getArthasPort(instance.toConnectionString());
-                        
+
                         if (arthasPort != null) {
                             Map<String, Object> params = new HashMap<>();
                             params.put("command", resetCommand);
@@ -835,12 +860,12 @@ public class TimeTunnelDialog extends DialogWrapper {
         void loadRecords() {
             loadBtn.setIcon(AllIcons.Process.Step_1);
             loadBtn.setEnabled(false);
-            
+
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Load Records: " + instance.getRemoteIp(), false) {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
                     indicator.setText("Loading tt records...");
-                    
+
                     String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
                     if (StringUtils.isBlank(scriptPath)) {
                         ApplicationManager.getApplication().invokeLater(() -> {
@@ -855,12 +880,12 @@ public class TimeTunnelDialog extends DialogWrapper {
                         RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                         String connStr = instance.toConnectionString();
                         Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
-                        
+
                         if (arthasPort == null) {
                             ApplicationManager.getApplication().invokeLater(() -> {
                                 loadBtn.setIcon(AllIcons.Actions.Refresh);
                                 loadBtn.setEnabled(true);
-                                TestkitHelper.notify(project, NotificationType.ERROR, 
+                                TestkitHelper.notify(project, NotificationType.ERROR,
                                         "Arthas port not found for " + instance.getRemoteIp());
                             });
                             return;
@@ -870,7 +895,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                         // Note: tt -l doesn't support -n, it lists all records in memory
                         // The -n param only works with tt -t (start recording)
                         params.put("command", "tt -l");
-                        
+
                         Object result = executor.sendArthasRequest(
                                 instance.getAppName(),
                                 instance.getRemotePartition(),
@@ -879,7 +904,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                                 params,
                                 RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                         );
-                        
+
                         List<TtRecord> newRecords = TtRecord.parse(result, instance.getRemoteIp());
                         newRecords.sort(Comparator.comparing(TtRecord::getTimestamp).reversed());
 
@@ -889,7 +914,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             loadBtn.setIcon(AllIcons.Actions.Checked);
                             loadBtn.setToolTipText("Loaded " + records.size() + " records");
                             loadBtn.setEnabled(true);
-                            
+
                             // Reset icon after 2 seconds
                             Timer timer = new Timer(2000, e -> {
                                 loadBtn.setIcon(AllIcons.Actions.Refresh);
@@ -904,11 +929,11 @@ public class TimeTunnelDialog extends DialogWrapper {
                             loadBtn.setIcon(AllIcons.General.Error);
                             loadBtn.setToolTipText("Load failed: " + e.getMessage());
                             loadBtn.setEnabled(true);
-                            
+
                             // Notify user
-                            TestkitHelper.notify(project, NotificationType.ERROR, 
+                            TestkitHelper.notify(project, NotificationType.ERROR,
                                     "Load records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
-                            
+
                             Timer timer = new Timer(2000, ev -> {
                                 loadBtn.setIcon(AllIcons.Actions.Refresh);
                                 loadBtn.setToolTipText("Load records (tt -l)");
@@ -933,15 +958,15 @@ public class TimeTunnelDialog extends DialogWrapper {
             if (confirm != JOptionPane.YES_OPTION) {
                 return;
             }
-            
+
             clearBtn.setEnabled(false);
             clearBtn.setToolTipText("Clearing...");
-            
+
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Clear Records: " + instance.getRemoteIp(), false) {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
                     indicator.setText("Clearing tt records...");
-                    
+
                     String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
                     if (StringUtils.isBlank(scriptPath)) {
                         ApplicationManager.getApplication().invokeLater(() -> {
@@ -959,7 +984,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             ApplicationManager.getApplication().invokeLater(() -> {
                                 clearBtn.setEnabled(true);
                                 clearBtn.setToolTipText("Clear records");
-                                TestkitHelper.notify(project, NotificationType.ERROR, 
+                                TestkitHelper.notify(project, NotificationType.ERROR,
                                         "Arthas port not found for " + instance.getRemoteIp());
                             });
                             return;
@@ -967,7 +992,7 @@ public class TimeTunnelDialog extends DialogWrapper {
 
                         Map<String, Object> params = new HashMap<>();
                         params.put("command", "tt --delete-all");
-                        
+
                         executor.sendArthasRequest(
                                 instance.getAppName(),
                                 instance.getRemotePartition(),
@@ -983,7 +1008,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                             clearBtn.setIcon(AllIcons.Actions.Checked);
                             clearBtn.setToolTipText("Cleared");
                             clearBtn.setEnabled(true);
-                            
+
                             // Reset icon after 2 seconds
                             Timer timer = new Timer(2000, e -> {
                                 clearBtn.setIcon(CLEAR_ICON);
@@ -998,10 +1023,10 @@ public class TimeTunnelDialog extends DialogWrapper {
                             clearBtn.setIcon(AllIcons.General.Error);
                             clearBtn.setToolTipText("Clear failed: " + e.getMessage());
                             clearBtn.setEnabled(true);
-                            
-                            TestkitHelper.notify(project, NotificationType.ERROR, 
+
+                            TestkitHelper.notify(project, NotificationType.ERROR,
                                     "Clear records failed on " + instance.getRemoteIp() + ": " + e.getMessage());
-                            
+
                             Timer timer = new Timer(2000, ev -> {
                                 clearBtn.setIcon(CLEAR_ICON);
                                 clearBtn.setToolTipText("Clear records");
@@ -1016,7 +1041,7 @@ public class TimeTunnelDialog extends DialogWrapper {
 
         private void updateRecordsPanel() {
             recordsPanel.removeAll();
-            
+
             if (records.isEmpty()) {
                 JLabel emptyLabel = new JLabel("└─ (no records)");
                 emptyLabel.setForeground(Color.GRAY);
@@ -1030,10 +1055,10 @@ public class TimeTunnelDialog extends DialogWrapper {
                     recordsPanel.add(recordRow);
                 }
             }
-            
+
             recordsPanel.revalidate();
             recordsPanel.repaint();
-            
+
             // Adjust panel height
             revalidate();
             repaint();
@@ -1043,17 +1068,17 @@ public class TimeTunnelDialog extends DialogWrapper {
             JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
             row.setOpaque(false);
             row.setAlignmentX(Component.LEFT_ALIGNMENT);
-            
+
             // Tree branch symbol
             String branch = isLast ? "└─" : "├─";
             JLabel branchLabel = new JLabel(branch);
             branchLabel.setForeground(Color.GRAY);
             branchLabel.setFont(new Font("Monospaced", Font.PLAIN, 11));
             row.add(branchLabel);
-            
+
             // Result icon
             String resultIcon = record.isSuccess() ? "✅" : "❌";
-            
+
             // Format time: extract HH:mm:ss.SSS from full timestamp
             String time = record.getTime();
             if (time != null && time.length() > 12) {
@@ -1063,18 +1088,18 @@ public class TimeTunnelDialog extends DialogWrapper {
                     time = time.substring(0, dotIndex + 4); // HH:mm:ss.SSS
                 }
             }
-            
+
             // Record info (compact): #index HH:mm:ss.SSS cost icon
-            String text = String.format("#%s %s %s %s", 
-                    record.getIndex(), 
-                    time, 
+            String text = String.format("#%s %s %s %s",
+                    record.getIndex(),
+                    time,
                     record.getCost(),
                     resultIcon);
-            
+
             JLabel label = new JLabel(text);
             label.setFont(label.getFont().deriveFont(11f));
             label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            
+
             // Click to view detail
             label.addMouseListener(new MouseAdapter() {
                 @Override
@@ -1083,24 +1108,24 @@ public class TimeTunnelDialog extends DialogWrapper {
                         viewRecordDetail(record);
                     }
                 }
-                
+
                 @Override
                 public void mouseEntered(MouseEvent e) {
                     label.setForeground(new Color(0, 100, 200));
                 }
-                
+
                 @Override
                 public void mouseExited(MouseEvent e) {
                     label.setForeground(UIManager.getColor("Label.foreground"));
                 }
             });
             row.add(label);
-            
+
             // Replay button (icon style)
             JButton replayBtn = createIconButton(AllIcons.Actions.Execute, "Replay this request");
             replayBtn.addActionListener(e -> replayRecord(record));
             row.add(replayBtn);
-            
+
             return row;
         }
 
@@ -1111,7 +1136,7 @@ public class TimeTunnelDialog extends DialogWrapper {
             ApplicationManager.getApplication().executeOnPooledThread(() -> {
                 String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
                 if (StringUtils.isBlank(scriptPath)) {
-                    ApplicationManager.getApplication().invokeLater(() -> 
+                    ApplicationManager.getApplication().invokeLater(() ->
                             showDetail("Error: Remote script not configured"));
                     return;
                 }
@@ -1120,7 +1145,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                     RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                     Map<String, Object> params = new HashMap<>();
                     params.put("command", "tt -i " + record.getIndex() + " -x " + expandLevel);
-                    
+
                     Object result = executor.sendArthasRequest(
                             instance.getAppName(),
                             instance.getRemotePartition(),
@@ -1130,11 +1155,11 @@ public class TimeTunnelDialog extends DialogWrapper {
                             RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
 
-                    ApplicationManager.getApplication().invokeLater(() -> 
+                    ApplicationManager.getApplication().invokeLater(() ->
                             formatAndShowDetail(record, instance.getRemoteIp(), result));
 
                 } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> 
+                    ApplicationManager.getApplication().invokeLater(() ->
                             showDetail("Error: Failed to get details - " + e.getMessage()));
                 }
             });
@@ -1152,14 +1177,14 @@ public class TimeTunnelDialog extends DialogWrapper {
             if (confirm != JOptionPane.YES_OPTION) {
                 return;
             }
-            
+
             showDetail("Replaying #" + record.getIndex() + " on " + instance.getRemoteIp() + "...");
             int expandLevel = (Integer) expandLevelBox.getSelectedItem();
 
             ApplicationManager.getApplication().executeOnPooledThread(() -> {
                 String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
                 if (StringUtils.isBlank(scriptPath)) {
-                    ApplicationManager.getApplication().invokeLater(() -> 
+                    ApplicationManager.getApplication().invokeLater(() ->
                             showDetail("Error: Remote script not configured"));
                     return;
                 }
@@ -1168,7 +1193,7 @@ public class TimeTunnelDialog extends DialogWrapper {
                     RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                     Map<String, Object> params = new HashMap<>();
                     params.put("command", "tt -i " + record.getIndex() + " -p -x " + expandLevel + " --replay-times 1 --replay-interval 0");
-                    
+
                     Object result = executor.sendArthasRequest(
                             instance.getAppName(),
                             instance.getRemotePartition(),
@@ -1178,11 +1203,11 @@ public class TimeTunnelDialog extends DialogWrapper {
                             RemoteScriptExecutor.REMOTE_ARTHAS_TIMEOUT
                     );
 
-                    ApplicationManager.getApplication().invokeLater(() -> 
+                    ApplicationManager.getApplication().invokeLater(() ->
                             formatAndShowReplayResult(record, instance.getRemoteIp(), result));
 
                 } catch (Exception e) {
-                    ApplicationManager.getApplication().invokeLater(() -> 
+                    ApplicationManager.getApplication().invokeLater(() ->
                             showDetail("Error: Replay failed - " + e.getMessage()));
                 }
             });
