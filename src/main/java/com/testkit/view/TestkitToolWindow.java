@@ -1325,7 +1325,7 @@ public class TestkitToolWindow {
         remoteTopPanel.add(selectPanel, BorderLayout.CENTER);
 
         // 实例表格
-        // Columns: IP=0, Port=1, Env=2, Arthas=3, Status=4, Action=5
+        // Columns: IP=0, Port=1, Env=2, Arthas=3, Testkit=4, Action=5
         String[] columnNames = {"IP", "Port", "Env", "Arthas", "Testkit", "Action"};
         javax.swing.table.DefaultTableModel tableModel = new javax.swing.table.DefaultTableModel(columnNames, 0) {
             @Override
