@@ -96,6 +96,10 @@ public class UpdaterUtil {
 
             // 确保 zip 已下载（下载完成后再原子移动到目标目录）
             ensureDownloaded(target);
+
+            // 清理旧版本，只保留最新的2个
+            cleanOldVersions(2);
+
             return target;
         } catch (Throwable e) {
             e.printStackTrace();
@@ -188,6 +192,41 @@ public class UpdaterUtil {
             if (conn != null){
                 conn.disconnect();
             }
+        }
+    }
+
+    /**
+     * 清理旧版本插件 zip，只保留最新的 keepCount 个版本
+     */
+    private static void cleanOldVersions(int keepCount) {
+        try {
+            File dir = new File(pluginStorageBasePackage);
+            if (!dir.exists() || !dir.isDirectory()) {
+                return;
+            }
+            File[] zips = dir.listFiles((d, name) -> name.endsWith(".zip"));
+            if (zips == null || zips.length <= keepCount) {
+                return;
+            }
+
+            // 按版本号降序排序（文件名去掉 .zip 后缀即为版本号）
+            Arrays.sort(zips, (a, b) -> {
+                String va = a.getName().replace(".zip", "");
+                String vb = b.getName().replace(".zip", "");
+                return compareVersions(vb, va);
+            });
+
+            // 删除排名 keepCount 之后的旧版本
+            for (int i = keepCount; i < zips.length; i++) {
+                if (zips[i].delete()) {
+                    System.err.println("Cleaned old plugin version: " + zips[i].getName());
+                } else {
+                    System.err.println("Failed to delete old plugin version: " + zips[i].getName());
+                }
+            }
+        } catch (Throwable e) {
+            // 清理失败不影响主流程
+            System.err.println("Failed to clean old plugin versions: " + e.getMessage());
         }
     }
 
