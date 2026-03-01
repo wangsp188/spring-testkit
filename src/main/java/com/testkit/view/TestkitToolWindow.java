@@ -95,7 +95,7 @@ public class TestkitToolWindow {
 
     private JPanel appPanel;
     private JComboBox<String> appBox;
-    private JButton arthasButton; // Arthas 按钮
+    private JButton cmdButton; // Arthas 按钮
     private JButton killButton; // kill 进程按钮
     private JPanel rightAppPanel; // RuntimeApp 面板（包含 appBox、arthasButton 和 killButton）
 
@@ -103,7 +103,7 @@ public class TestkitToolWindow {
     private CurlDialog curlDialog;
     private SqlDialog sqlDialog;
     private MCPServerDialog mcpServerDialog;
-    private ArthasDialog arthasDialog;
+    private CmdDialog cmdDialog;
     private JPanel whitePanel = new JPanel();
     private Map<PluginToolEnum, BasePluginTool> tools = new HashMap<>();
 
@@ -296,27 +296,27 @@ public class TestkitToolWindow {
         JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
         
         // 添加 Arthas 按钮（实际打开的是诊断工具面板，支持 Arthas 和 Shell）
-        arthasButton = new JButton(arthasIcon);
-        arthasButton.setToolTipText("Diagnostic Tool: Execute Arthas or Shell commands");
-        arthasButton.setPreferredSize(new Dimension(32, 32));
-        arthasButton.setFocusPainted(false);
-        arthasButton.setBorderPainted(true);
-        arthasButton.setVisible(false); // 默认隐藏
-        arthasButton.addMouseListener(new java.awt.event.MouseAdapter() {
+        cmdButton = new JButton(cmdIcon);
+        cmdButton.setToolTipText("Diagnostic Tool: Execute Arthas or Shell commands");
+        cmdButton.setPreferredSize(new Dimension(32, 32));
+        cmdButton.setFocusPainted(false);
+        cmdButton.setBorderPainted(true);
+        cmdButton.setVisible(false); // 默认隐藏
+        cmdButton.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
-                arthasButton.setBackground(new Color(100, 150, 200, 30)); // 半透明蓝色背景
+                cmdButton.setBackground(new Color(100, 150, 200, 30)); // 半透明蓝色背景
             }
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
-                arthasButton.setBackground(null);
+                cmdButton.setBackground(null);
             }
         });
-        arthasButton.addActionListener(e -> {
+        cmdButton.addActionListener(e -> {
             // 全局打开诊断工具面板，不检查当前选中的 app
-            showArthasDialog(null);
+            showCmdDialog(null);
         });
-        buttonsPanel.add(arthasButton);
+        buttonsPanel.add(cmdButton);
 
         // 添加 kill 进程按钮到 appBox 右边
         killButton = new JButton(AllIcons.Actions.GC);
@@ -793,13 +793,13 @@ public class TestkitToolWindow {
         // 检查当前工具是否需要显示 appBox
         BasePluginTool nowTool = getNowTool();
         if (nowTool == null || !nowTool.needAppBox()) {
-            arthasButton.setVisible(false);
+            cmdButton.setVisible(false);
             return;
         }
         
         // 全局判断：根据脚本的 isCmdSupported() 函数决定
         boolean showButton = RuntimeHelper.isCmdSupported();
-        arthasButton.setVisible(showButton);
+        cmdButton.setVisible(showButton);
     }
 
     /**
@@ -1190,10 +1190,10 @@ public class TestkitToolWindow {
     /**
      * 显示诊断工具对话框（Arthas & Shell）
      */
-    private void showArthasDialog(RuntimeHelper.VisibleApp visibleApp) {
+    private void showCmdDialog(RuntimeHelper.VisibleApp visibleApp) {
         // 每次都创建新的对话框实例（DialogWrapper 关闭后不能重复使用）
-        arthasDialog = new ArthasDialog(project);
-        arthasDialog.show();
+        cmdDialog = new CmdDialog(project);
+        cmdDialog.show();
     }
 
     // ==================== Connection Config Popup ====================

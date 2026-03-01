@@ -200,13 +200,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                 RuntimeHelper.setCmdSupported(arthasSupported, shellSupported);
                 System.out.println("[Testkit] Command support on init - Arthas: " + arthasSupported + ", Shell: " + shellSupported);
                 
-                // 更新按钮显示状态（如果 ToolWindow 已经创建）
-                TestkitToolWindow testkitToolWindow = getToolWindow(project);
-                if (testkitToolWindow != null) {
-                    SwingUtilities.invokeLater(() -> {
-                        testkitToolWindow.updateArthasButtonVisibility();
-                    });
-                }
+                // 按钮可见性会在 createToolWindowContent() 中统一更新
             } catch (Throwable e) {
                 // Ignore errors during init check
                 System.err.println("[Testkit] Failed to check Arthas support on init: " + e.getMessage());
@@ -316,6 +310,11 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
             contentManager.addContent(content);
             addHeaderActions(toolWindow, project, testkitToolWindow);
             McpHelper.subscribe(testkitToolWindow);
+            
+            // 更新 Arthas 按钮可见性（使用 init() 中获取的全局状态）
+            SwingUtilities.invokeLater(() -> {
+                testkitToolWindow.updateArthasButtonVisibility();
+            });
         }
 
     }

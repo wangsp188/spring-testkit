@@ -45,7 +45,7 @@ import static com.testkit.remote_script.RemoteScriptExecutor.REMOTE_ARTHAS_TIMEO
 /**
  * Arthas Command Execution Dialog
  */
-public class ArthasDialog extends DialogWrapper {
+public class CmdDialog extends DialogWrapper {
 
     private final Project project;
     private Tree instanceTree;
@@ -88,7 +88,7 @@ public class ArthasDialog extends DialogWrapper {
     // Profiler 文件目录（远程和本地使用相同路径）
     private static final String PROFILER_DIR = "/tmp/profiler";
 
-    public ArthasDialog(Project project) {
+    public CmdDialog(Project project) {
         super(project);
         this.project = project;
         setTitle("Diagnostic Tool");
@@ -410,6 +410,10 @@ public class ArthasDialog extends DialogWrapper {
         if (quickCommandPanel != null) {
             updateQuickCommandButtons(quickCommandPanel);
         }
+        
+        // 更新 Profiler 面板状态（只有 Arthas 模式且支持 Arthas 时才可用）
+        updateProfilerPanelState();
+
     }
     
     // ===== Profiler 相关方法 =====
@@ -602,7 +606,6 @@ public class ArthasDialog extends DialogWrapper {
                     profilerStatusLabel.setText("Status: ✅ Done! Click 'View' to open");
                     profilerStatusLabel.setForeground(new Color(100, 150, 100));
                     openLastButton.setEnabled(true);
-                    highlightButton(openLastButton);
                 });
                 
             } catch (Exception e) {
@@ -696,15 +699,46 @@ public class ArthasDialog extends DialogWrapper {
     }
     
     /**
-     * Highlight button temporarily
+     * 更新 Profiler 面板状态（只有 Arthas 模式且支持 Arthas 时才可用）
      */
-    private void highlightButton(JButton button) {
-        Color original = button.getBackground();
-        button.setBackground(new Color(100, 200, 100));
+    private void updateProfilerPanelState() {
+        RuntimeHelper.VisibleApp selectedApp = getSelectedInstance();
+        boolean arthasEnabled = false;
         
-        Timer timer = new Timer(2000, e -> button.setBackground(original));
-        timer.setRepeats(false);
-        timer.start();
+        if (selectedApp != null) {
+            arthasEnabled = RuntimeHelper.isArthasEnabled(selectedApp.toConnectionString());
+        }
+        
+        // Profiler 功能需要 Arthas 支持
+        boolean profilerAvailable = (currentMode == ExecutionMode.ARTHAS) && arthasEnabled;
+        
+        SwingUtilities.invokeLater(() -> {
+            // 禁用/启用所有 Profiler 控件
+            if (durationBox != null) {
+                durationBox.setEnabled(profilerAvailable && profilerState == ProfilerState.READY);
+            }
+            if (profilerButton != null) {
+                profilerButton.setEnabled(profilerAvailable);
+            }
+            if (openLastButton != null) {
+                openLastButton.setEnabled(profilerAvailable);
+            }
+            
+            // 更新状态提示
+            if (profilerStatusLabel != null) {
+                if (!profilerAvailable) {
+                    if (currentMode == ExecutionMode.SHELL) {
+                        profilerStatusLabel.setText("Status: ⚠️ Profiler requires Arthas mode");
+                    } else {
+                        profilerStatusLabel.setText("Status: ⚠️ Selected instance does not support Arthas");
+                    }
+                    profilerStatusLabel.setForeground(new Color(200, 150, 50));
+                } else if (profilerState == ProfilerState.READY) {
+                    profilerStatusLabel.setText("Status: Ready");
+                    profilerStatusLabel.setForeground(Color.GRAY);
+                }
+            }
+        });
     }
     
     /**
