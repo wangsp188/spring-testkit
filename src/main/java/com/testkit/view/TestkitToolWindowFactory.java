@@ -26,6 +26,7 @@ import com.intellij.ui.content.ContentManager;
 import com.testkit.tools.mcp_function.McpAdapter;
 import com.testkit.tools.mcp_function.McpHelper;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.util.Arrays;
@@ -41,7 +42,14 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
     public static final Icon SQL_TOOL_ICON = IconLoader.getIcon("/icons/sql-tool.svg", FunctionCallIconProvider.class);
     public static final Icon MCP_ICON = IconLoader.getIcon("/icons/mcp.svg", FunctionCallIconProvider.class);
 
-
+    /**
+     * 实例过滤类型（用于 Connection Config 弹窗）
+     */
+    public enum InstanceFilter {
+        TESTKIT,        // Testkit 连接成功的实例（主面板）
+        ARTHAS_ONLY,    // 仅支持 Arthas 的实例（TimeTunnel/ViewRemoteCode）
+        CMD_SUPPORTED   // 支持 Arthas 或 Shell 的实例（Diagnostic Tool）
+    }
 
     private static final Map<Project, TestkitToolWindow> windows = new HashMap<>();
 
@@ -75,22 +83,33 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
     }
 
     /**
-     * Show remote connection config popup
+     * Show remote connection config popup (default: all instances, show manual config)
      * @param project current project
      * @param onConnectionAdded callback when a connection is added (can be null)
      */
     public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded) {
-        showConnectionConfigPopup(project, onConnectionAdded, true);
+        showConnectionConfigPopup(project, onConnectionAdded, true, null, InstanceFilter.TESTKIT);
     }
 
     /**
-     * Show remote connection config popup
+     * Show remote connection config popup with manual config option
      * @param project current project
      * @param onConnectionAdded callback when a connection is added (can be null)
      * @param showManualConfig whether to show Manual Configure section
      */
     public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded, boolean showManualConfig) {
-        showConnectionConfigPopup(project, onConnectionAdded, showManualConfig, null);
+        showConnectionConfigPopup(project, onConnectionAdded, showManualConfig, null, InstanceFilter.TESTKIT);
+    }
+
+    /**
+     * Show remote connection config popup with filter
+     * @param project current project
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show Manual Configure section
+     * @param filter instance filter type
+     */
+    public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded, boolean showManualConfig, InstanceFilter filter) {
+        showConnectionConfigPopup(project, onConnectionAdded, showManualConfig, null, filter);
     }
 
     /**
@@ -101,8 +120,20 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
      * @param allowedAppNames if not null, only show these apps in the list
      */
     public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames) {
+        showConnectionConfigPopup(project, onConnectionAdded, showManualConfig, allowedAppNames, InstanceFilter.ARTHAS_ONLY);
+    }
+
+    /**
+     * Show remote connection config popup with full control
+     * @param project current project
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show Manual Configure section
+     * @param allowedAppNames if not null, only show these apps in the list
+     * @param filter instance filter type
+     */
+    public static void showConnectionConfigPopup(Project project, Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames, InstanceFilter filter) {
         getOrInitToolWindow(project, testkitToolWindow -> {
-            testkitToolWindow.showConnectionConfigPopup(onConnectionAdded, showManualConfig, allowedAppNames);
+            testkitToolWindow.showConnectionConfigPopup(onConnectionAdded, showManualConfig, allowedAppNames, filter);
         });
     }
 
@@ -138,7 +169,7 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
     @Override
     public void init(@org.jetbrains.annotations.NotNull ToolWindow toolWindow) {
         // Get project from toolWindow
-        Project project = ((com.intellij.openapi.wm.impl.ToolWindowImpl) toolWindow).getProject();
+        Project project = toolWindow.getProject();
         
         // Check Arthas support immediately (doesn't depend on loadInfra)
         checkArthasSupport(project);
@@ -163,10 +194,19 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                     return;
                 }
                 
-                boolean arthasSupported = executor.isArthasSupported();
-                RuntimeHelper.setArthasSupported(arthasSupported);
-                System.out.println("[Testkit] Arthas feature enabled: " + arthasSupported + 
-                        " (checked on init)");
+                Map<String, Boolean> cmdSupport = executor.isCmdSupported();
+                boolean arthasSupported = cmdSupport.getOrDefault("arthas", false);
+                boolean shellSupported = cmdSupport.getOrDefault("shell", false);
+                RuntimeHelper.setCmdSupported(arthasSupported, shellSupported);
+                System.out.println("[Testkit] Command support on init - Arthas: " + arthasSupported + ", Shell: " + shellSupported);
+                
+                // 更新按钮显示状态（如果 ToolWindow 已经创建）
+                TestkitToolWindow testkitToolWindow = getToolWindow(project);
+                if (testkitToolWindow != null) {
+                    SwingUtilities.invokeLater(() -> {
+                        testkitToolWindow.updateArthasButtonVisibility();
+                    });
+                }
             } catch (Throwable e) {
                 // Ignore errors during init check
                 System.err.println("[Testkit] Failed to check Arthas support on init: " + e.getMessage());

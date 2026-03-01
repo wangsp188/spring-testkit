@@ -114,13 +114,7 @@ public class ArthasLineMarkerProvider implements LineMarkerProvider {
             return "is_enum";
         }
 
-        // 4. Skip methods without body (abstract/interface methods)
-        if (method.getBody() == null) {
-            logSkip("method", "no_method_body", containingClass, methodName);
-            return "no_method_body";
-        }
-
-        // 5. Skip test module
+        // 4. Skip test module
         PsiFile psiFile = method.getContainingFile();
         VirtualFile virtualFile = psiFile.getVirtualFile();
         if (virtualFile != null) {

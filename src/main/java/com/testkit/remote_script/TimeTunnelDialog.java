@@ -111,11 +111,29 @@ public class TimeTunnelDialog extends DialogWrapper {
         mainPanel.setPreferredSize(new Dimension(1100, 650));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Top: Target selection + Watch point config
-        JPanel topPanel = new JPanel(new BorderLayout(5, 5));
-        topPanel.add(createTargetPanel(), BorderLayout.NORTH);
-        topPanel.add(createWatchPointPanel(), BorderLayout.CENTER);
-        mainPanel.add(topPanel, BorderLayout.NORTH);
+        // Top area: Add Connection button + Target + Watch point
+        JPanel topArea = new JPanel(new BorderLayout(5, 5));
+        
+        // Add Connection button panel (above Target)
+        JPanel connectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        JButton addConnectionBtn = new JButton("Add Connection", TestkitToolWindow.connectionIcon);
+        addConnectionBtn.setToolTipText("Add a new remote connection");
+        addConnectionBtn.addActionListener(e -> {
+            // 只显示支持 Arthas 的实例
+            TestkitToolWindowFactory.showConnectionConfigPopup(project, () -> {
+                SwingUtilities.invokeLater(this::refreshArthasApps);
+            }, false, TestkitToolWindowFactory.InstanceFilter.ARTHAS_ONLY);
+        });
+        connectionPanel.add(addConnectionBtn);
+        topArea.add(connectionPanel, BorderLayout.NORTH);
+        
+        // Target selection + Watch point config
+        JPanel configPanel = new JPanel(new BorderLayout(5, 5));
+        configPanel.add(createTargetPanel(), BorderLayout.NORTH);
+        configPanel.add(createWatchPointPanel(), BorderLayout.CENTER);
+        topArea.add(configPanel, BorderLayout.CENTER);
+        
+        mainPanel.add(topArea, BorderLayout.NORTH);
 
         // Center: Left-Right Split (Instance List | Detail)
         JBSplitter splitter = new JBSplitter(false, 0.55f);
@@ -130,7 +148,7 @@ public class TimeTunnelDialog extends DialogWrapper {
     }
 
     /**
-     * Create target selection panel (App / Partition / Add Connection)
+     * Create target selection panel (App / Partition / Refresh)
      */
     private JPanel createTargetPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
@@ -161,17 +179,6 @@ public class TimeTunnelDialog extends DialogWrapper {
         refreshBtn.setPreferredSize(new Dimension(28, 28));
         refreshBtn.addActionListener(e -> refreshArthasApps());
         panel.add(refreshBtn);
-
-        // Add connection button
-        JButton addConnectionBtn = new JButton(TestkitToolWindow.connectionIcon);
-        addConnectionBtn.setToolTipText("Add remote connection");
-        addConnectionBtn.setPreferredSize(new Dimension(28, 28));
-        addConnectionBtn.addActionListener(e -> {
-            TestkitToolWindowFactory.showConnectionConfigPopup(project, () -> {
-                SwingUtilities.invokeLater(this::refreshArthasApps);
-            }, false);
-        });
-        panel.add(addConnectionBtn);
 
         // Initialize dropdowns
         onAppChanged();

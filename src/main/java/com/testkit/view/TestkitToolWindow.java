@@ -74,7 +74,7 @@ public class TestkitToolWindow {
     public static final Icon BROWSER_ICON = IconLoader.getIcon("/icons/browser.svg", CodingGuidelinesIconProvider.class);
     private static final Icon settingsIcon = IconLoader.getIcon("/icons/settings.svg", TestkitToolWindow.class);
     private static final Icon dagreIcon = IconLoader.getIcon("/icons/trace.svg", TestkitToolWindow.class);
-    private static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
+    public static final Icon cmdIcon = IconLoader.getIcon("/icons/cmd.svg", TestkitToolWindow.class);
     public static final Icon connectionIcon = IconLoader.getIcon("/icons/connection.svg", TestkitToolWindow.class);
 //    public static final Icon connectionIcon = AllIcons.Webreferences.Server;
     public static final Icon arthasIcon = IconLoader.getIcon("/icons/arthas.svg", TestkitToolWindow.class);
@@ -281,13 +281,6 @@ public class TestkitToolWindow {
             } else {
                 appBox.setForeground(defColor);
             }
-            
-            // 控制 arthasButton 显示/隐藏
-            if (selectedItem != null && RuntimeHelper.isArthasEnabled(selectedItem)) {
-                arthasButton.setVisible(true);
-            } else {
-                arthasButton.setVisible(false);
-            }
         });
 
         // 将左侧按钮组添加到主面板西侧
@@ -302,9 +295,9 @@ public class TestkitToolWindow {
         // 创建右侧按钮面板（包含 arthasButton 和 killButton）
         JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
         
-        // 添加 Arthas 按钮
+        // 添加 Arthas 按钮（实际打开的是诊断工具面板，支持 Arthas 和 Shell）
         arthasButton = new JButton(arthasIcon);
-        arthasButton.setToolTipText("🔧 Arthas: Execute diagnostic commands (jad, tt, trace, ognl, etc.)");
+        arthasButton.setToolTipText("Diagnostic Tool: Execute Arthas or Shell commands");
         arthasButton.setPreferredSize(new Dimension(32, 32));
         arthasButton.setFocusPainted(false);
         arthasButton.setBorderPainted(true);
@@ -320,20 +313,8 @@ public class TestkitToolWindow {
             }
         });
         arthasButton.addActionListener(e -> {
-            String selectedItem = (String) appBox.getSelectedItem();
-            if (selectedItem == null) {
-                TestkitHelper.notify(project, NotificationType.WARNING, "Please select an app first");
-                return;
-            }
-
-            RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(selectedItem);
-            if (visibleApp == null || !RuntimeHelper.isArthasEnabled(selectedItem)) {
-                TestkitHelper.notify(project, NotificationType.WARNING, "Selected app does not support Arthas");
-                return;
-            }
-
-            // TODO: 打开 Arthas 命令对话框
-            showArthasDialog(visibleApp);
+            // 全局打开诊断工具面板，不检查当前选中的 app
+            showArthasDialog(null);
         });
         buttonsPanel.add(arthasButton);
 
@@ -716,7 +697,7 @@ public class TestkitToolWindow {
                 System.out.println("链接探活:"+item+",true,"+enableTrace+",env="+env);
                 newMap.put(item, enableTrace);
                 // 更新 env 到元数据（local/manual 连接不设过期时间，用 Long.MAX_VALUE）
-                RuntimeHelper.updateConnectionMeta(item, enableTrace, env, Long.MAX_VALUE, null);
+                RuntimeHelper.updateConnectionMeta(item, enableTrace, env, Long.MAX_VALUE, null,false);
             }catch (Throwable e) {
                 e.printStackTrace();
                 System.out.println("链接探活:"+item+",false,");
@@ -748,11 +729,11 @@ public class TestkitToolWindow {
 // 记录当前选中的项
                 String selectedItem = (String) appBox.getSelectedItem();
 
-                // 获取当前 visibleApps 中通过 remote script 直接添加的连接（有 arthasPort 的 remote instance）
+                // 获取当前 visibleApps 中通过 remote script 直接添加的连接（支持命令执行的 remote instance）
                 // 这些连接需要保留，不能被 newItems 覆盖
                 Set<String> newItemsSet = new HashSet<>(newItems);
                 List<RuntimeHelper.VisibleApp> remoteScriptApps = RuntimeHelper.getVisibleApps(project.getName()).stream()
-                        .filter(app -> app.isRemoteInstance() && RuntimeHelper.isArthasEnabled(app.toConnectionString()))
+                        .filter(app -> app.isRemoteInstance() && RuntimeHelper.isCmdSupported(app.toConnectionString()))
                         .filter(app -> !newItemsSet.contains(app.toConnectionString()))  // 不在 newItems 中的
                         .toList();
 
@@ -798,8 +779,27 @@ public class TestkitToolWindow {
                 TestkitHelper.refresh(project);
                 // 更新 ToolWindow 图标角标
                 updateToolWindowIcon(finalItems.size());
+                // 更新 Arthas 按钮显示状态
+                updateArthasButtonVisibility();
             }
         });
+    }
+    
+    /**
+     * 更新 Arthas 按钮的显示状态
+     * 全局判断：根据脚本的 isCmdSupported() 函数决定是否显示按钮
+     */
+    void updateArthasButtonVisibility() {
+        // 检查当前工具是否需要显示 appBox
+        BasePluginTool nowTool = getNowTool();
+        if (nowTool == null || !nowTool.needAppBox()) {
+            arthasButton.setVisible(false);
+            return;
+        }
+        
+        // 全局判断：根据脚本的 isCmdSupported() 函数决定
+        boolean showButton = RuntimeHelper.isCmdSupported();
+        arthasButton.setVisible(showButton);
     }
 
     /**
@@ -978,15 +978,10 @@ public class TestkitToolWindow {
         boolean showRuntimeApp = tool.needAppBox();
         appPanel.setVisible(showRuntimeApp);
         appBox.setVisible(showRuntimeApp);
-        killButton.setVisible(showRuntimeApp); // kill 按钮只在显示 RuntimeApp 时显示
+        killButton.setVisible(showRuntimeApp);
         
-        // arthas 按钮只在显示 RuntimeApp 且当前选中支持 Arthas 时显示
-        if (showRuntimeApp) {
-            String selectedItem = (String) appBox.getSelectedItem();
-            arthasButton.setVisible(selectedItem != null && RuntimeHelper.isArthasEnabled(selectedItem));
-        } else {
-            arthasButton.setVisible(false);
-        }
+        // arthas 按钮全局显示（只要显示 RuntimeApp 就显示）
+        updateArthasButtonVisibility();
         
         whitePanel.setVisible(false);
         // 隐藏所有工具面板，并显示选中工具面板
@@ -1193,8 +1188,7 @@ public class TestkitToolWindow {
     }
 
     /**
-     * 显示 Arthas 命令对话框
-     * @param visibleApp 目标应用（可选，用于预选实例）
+     * 显示诊断工具对话框（Arthas & Shell）
      */
     private void showArthasDialog(RuntimeHelper.VisibleApp visibleApp) {
         // 每次都创建新的对话框实例（DialogWrapper 关闭后不能重复使用）
@@ -1208,7 +1202,7 @@ public class TestkitToolWindow {
      * Show connection config popup (combined Remote Instance and Manual Configure)
      */
     private void showConnectionConfigPopup() {
-        showConnectionConfigPopup(null, true);
+        showConnectionConfigPopup(null, true, null, TestkitToolWindowFactory.InstanceFilter.TESTKIT);
     }
 
     /**
@@ -1217,7 +1211,7 @@ public class TestkitToolWindow {
      * @param showManualConfig whether to show the Manual Configure section
      */
     public void showConnectionConfigPopup(Runnable onConnectionAdded, boolean showManualConfig) {
-        showConnectionConfigPopup(onConnectionAdded, showManualConfig, null);
+        showConnectionConfigPopup(onConnectionAdded, showManualConfig, null, TestkitToolWindowFactory.InstanceFilter.TESTKIT);
     }
 
     /**
@@ -1227,11 +1221,22 @@ public class TestkitToolWindow {
      * @param allowedAppNames if not null, only show these apps in the list
      */
     public void showConnectionConfigPopup(Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames) {
+        showConnectionConfigPopup(onConnectionAdded, showManualConfig, allowedAppNames, TestkitToolWindowFactory.InstanceFilter.ARTHAS_ONLY);
+    }
+
+    /**
+     * Show connection config popup with full control
+     * @param onConnectionAdded callback when a connection is added (can be null)
+     * @param showManualConfig whether to show the Manual Configure section
+     * @param allowedAppNames if not null, only show these apps in the list
+     * @param filter instance filter type (ALL/ARTHAS_ONLY/CMD_SUPPORTED)
+     */
+    public void showConnectionConfigPopup(Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames, TestkitToolWindowFactory.InstanceFilter filter) {
         // Create popup holder
         final JBPopup[] popupHolder = new JBPopup[1];
 
         // Create combined panel
-        JPanel mainPanel = createCombinedConnectionPanel(popupHolder, onConnectionAdded, showManualConfig, allowedAppNames);
+        JPanel mainPanel = createCombinedConnectionPanel(popupHolder, onConnectionAdded, showManualConfig, allowedAppNames, filter);
         mainPanel.setPreferredSize(new Dimension(550, showManualConfig ? 420 : 320));
 
         // Create popup
@@ -1253,16 +1258,10 @@ public class TestkitToolWindow {
     }
 
     /**
-     * Create combined connection config panel (Remote Instance + Manual Configure)
-     */
-    private JPanel createCombinedConnectionPanel(JBPopup[] popupHolder) {
-        return createCombinedConnectionPanel(popupHolder, null, true, null);
-    }
-
-    /**
      * Create combined connection config panel with optional callback
+     * @param filter instance filter type: ALL/ARTHAS_ONLY/CMD_SUPPORTED
      */
-    private JPanel createCombinedConnectionPanel(JBPopup[] popupHolder, Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames) {
+    private JPanel createCombinedConnectionPanel(JBPopup[] popupHolder, Runnable onConnectionAdded, boolean showManualConfig, List<String> allowedAppNames, TestkitToolWindowFactory.InstanceFilter filter) {
         JPanel panel = new JPanel(new BorderLayout(8, 8));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -1325,12 +1324,12 @@ public class TestkitToolWindow {
         remoteTopPanel.add(selectPanel, BorderLayout.CENTER);
 
         // 实例表格
-        // Columns: IP=0, Port=1, Env=2, Arthas=3, Testkit=4, Action=5
-        String[] columnNames = {"IP", "Port", "Env", "Arthas", "Testkit", "Action"};
+        // Columns: IP=0, Port=1, Env=2, Cmd=3, Testkit=4, Action=5
+        String[] columnNames = {"IP", "Port", "Env", "Testkit", "Arthas", "Shell", "Action"};
         javax.swing.table.DefaultTableModel tableModel = new javax.swing.table.DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 5;  // Action 列
+                return column == 6;  // Action 列
             }
         };
         JTable instanceTable = new JTable(tableModel);
@@ -1340,19 +1339,21 @@ public class TestkitToolWindow {
         instanceTable.getColumnModel().getColumn(1).setMaxWidth(60);
         instanceTable.getColumnModel().getColumn(2).setPreferredWidth(60);   // Env
         instanceTable.getColumnModel().getColumn(2).setMaxWidth(80);
-        instanceTable.getColumnModel().getColumn(3).setPreferredWidth(50);   // Arthas
-        instanceTable.getColumnModel().getColumn(3).setMaxWidth(60);
-        instanceTable.getColumnModel().getColumn(4).setPreferredWidth(50);   // Status
-        instanceTable.getColumnModel().getColumn(4).setMaxWidth(80);
-        instanceTable.getColumnModel().getColumn(5).setPreferredWidth(65);   // Action
+        instanceTable.getColumnModel().getColumn(3).setPreferredWidth(60);   // Testkit
+        instanceTable.getColumnModel().getColumn(3).setMaxWidth(70);
+        instanceTable.getColumnModel().getColumn(4).setPreferredWidth(60);   // Arthas
+        instanceTable.getColumnModel().getColumn(4).setMaxWidth(70);
+        instanceTable.getColumnModel().getColumn(5).setPreferredWidth(60);   // Shell
         instanceTable.getColumnModel().getColumn(5).setMaxWidth(70);
+        instanceTable.getColumnModel().getColumn(6).setPreferredWidth(65);   // Action
+        instanceTable.getColumnModel().getColumn(6).setMaxWidth(70);
 
         List<RemoteScriptExecutor.InstanceInfo> instanceDataList = new ArrayList<>();
         
         // 用于记录最后一次 Load Instances 请求的时间戳，防止旧请求结果覆盖新请求
         final long[] lastLoadTimestamp = new long[]{0};
 
-        // Arthas 列渲染器 - 显示是否支持 Arthas
+        // Testkit 列渲染器 - 显示 Testkit 连接状态
         instanceTable.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
@@ -1360,34 +1361,15 @@ public class TestkitToolWindow {
                 label.setHorizontalAlignment(SwingConstants.CENTER);
                 if (row < instanceDataList.size()) {
                     RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
-                    if (inst.isArthasEnabled()) {
-                        label.setText("✅");
-                        label.setToolTipText("Arthas enabled (port: " + inst.getArthasPort() + ")");
-                    } else {
-                        label.setText("❌");
-                        label.setToolTipText("Arthas not available");
-                    }
-                }
-                return label;
-            }
-        });
-
-        // Status 列渲染器 - 支持 Tooltip 显示完整错误信息
-        instanceTable.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                if (row < instanceDataList.size()) {
-                    RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
                     if (inst.isSuccess()) {
                         label.setText("✅");
                         label.setToolTipText("Connection OK");
+                        label.setForeground(null);
                     } else {
-                        label.setText("❌ Error");
+                        label.setText("❌");
                         label.setForeground(new Color(200, 100, 100));
                         String errorMsg = inst.getErrorMessage();
                         if (StringUtils.isNotBlank(errorMsg)) {
-                            // 使用 HTML 格式，支持换行和更好的展示
                             String htmlTooltip = "<html><div style='width:300px;'><b>Error:</b><br>" +
                                     escapeHtml(errorMsg) + "</div></html>";
                             label.setToolTipText(htmlTooltip);
@@ -1398,7 +1380,7 @@ public class TestkitToolWindow {
                 }
                 return label;
             }
-
+            
             private String escapeHtml(String text) {
                 return text.replace("&", "&amp;")
                         .replace("<", "&lt;")
@@ -1407,8 +1389,54 @@ public class TestkitToolWindow {
             }
         });
 
-        // 操作列渲染器 - 检查是否已添加到连接列表
-        instanceTable.getColumnModel().getColumn(5).setCellRenderer((table, value, isSelected, hasFocus, row, column) -> {
+        // Arthas 列渲染器 - 显示 Arthas 支持状态
+        instanceTable.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                label.setForeground(null);
+                if (row < instanceDataList.size()) {
+                    RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
+                    boolean hasArthas = inst.isArthasEnabled();
+                    
+                    if (hasArthas) {
+                        label.setText("✅");
+                        label.setToolTipText("Arthas supported (port: " + inst.getArthasPort() + ")");
+                    } else {
+                        label.setText("❌");
+                        label.setToolTipText("Arthas not supported");
+                    }
+                }
+                return label;
+            }
+        });
+
+        // Shell 列渲染器 - 显示 Shell 支持状态
+        instanceTable.getColumnModel().getColumn(5).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                label.setForeground(null);
+                if (row < instanceDataList.size()) {
+                    RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
+                    boolean hasShell = inst.isSupportShell();
+                    
+                    if (hasShell) {
+                        label.setText("✅");
+                        label.setToolTipText("Shell supported");
+                    } else {
+                        label.setText("❌");
+                        label.setToolTipText("Shell not supported");
+                    }
+                }
+                return label;
+            }
+        });
+
+        // Action 列渲染器 - 显示 Add 按钮或已添加状态
+        instanceTable.getColumnModel().getColumn(6).setCellRenderer((table, value, isSelected, hasFocus, row, column) -> {
             if (row < instanceDataList.size() && instanceDataList.get(row).isSuccess()) {
                 RemoteScriptExecutor.InstanceInfo inst = instanceDataList.get(row);
                 // Check if already added to connections (check both visibleApps and tempApps)
@@ -1442,7 +1470,7 @@ public class TestkitToolWindow {
         });
 
         // 操作列编辑器 - 检查是否已添加到连接列表
-        instanceTable.getColumnModel().getColumn(5).setCellEditor(new javax.swing.DefaultCellEditor(new JCheckBox()) {
+        instanceTable.getColumnModel().getColumn(6).setCellEditor(new javax.swing.DefaultCellEditor(new JCheckBox()) {
             private JButton button = new JButton("Add", connectionIcon);
             private int currentRow = -1;
             {
@@ -1534,11 +1562,14 @@ public class TestkitToolWindow {
                         RemoteScriptExecutor executor = new RemoteScriptExecutor(scriptPath);
                         Map<String, List<String>> infraData = executor.loadInfra(LOAD_INFRA_TIMEOUT);
 
-                        // Check if Arthas is supported by the script (call isArthasSupported() function)
-                        boolean arthasSupported = executor.isArthasSupported();
-                        RuntimeHelper.setArthasSupported(arthasSupported);
-                        System.out.println("[Testkit] Arthas feature enabled: " + arthasSupported + 
-                                " (If false, ensure your script has 'def isArthasSupported() { return true }' and click Refresh)");
+                        // Check if command execution is supported by the script
+                        Map<String, Boolean> cmdSupport = executor.isCmdSupported();
+                        boolean arthasSupported = cmdSupport.getOrDefault("arthas", false);
+                        boolean shellSupported = cmdSupport.getOrDefault("shell", false);
+                        RuntimeHelper.setCmdSupported(arthasSupported, shellSupported);
+                        System.out.println("[Testkit] Global command support - Arthas: " + arthasSupported + ", Shell: " + shellSupported +
+                                " (Configure via 'def isCmdSupported() { return [arthas: true, shell: true] }')");
+                        System.out.println("[Testkit] Arthas features (TimeTunnel/ViewRemoteCode): " + (arthasSupported ? "Enabled" : "Disabled"));
 
                         // Get app list from current project
                         List<RuntimeHelper.AppMeta> projectApps = RuntimeHelper.getAppMetas(project.getName());
@@ -1592,6 +1623,8 @@ public class TestkitToolWindow {
                             }
                             // 重新启用刷新按钮
                             refreshBtn.setEnabled(true);
+                            // 更新 Arthas 按钮显示状态（根据 isCmdSupported 的结果）
+                            updateArthasButtonVisibility();
                         });
                     } catch (Exception ex) {
                         SwingUtilities.invokeLater(() -> {
@@ -1714,15 +1747,43 @@ public class TestkitToolWindow {
                             }
                             
                             if (instances != null && !instances.isEmpty()) {
+                                // 根据 filter 过滤实例
+                                int totalCount = instances.size();
+                                int filteredCount = 0;
                                 for (RemoteScriptExecutor.InstanceInfo inst : instances) {
-                                    instanceDataList.add(inst);
-                                    // Env 为 null 时显示 "-"，Arthas/Status/Action 由渲染器处理
-                                    String envDisplay = inst.getEnv() != null && !inst.getEnv().isEmpty() ? inst.getEnv() : "-";
-                                    // Columns: IP, Port, Env, Arthas, Status, Action
-                                    tableModel.addRow(new Object[]{inst.getIp(), inst.getPort(), envDisplay, "", "", ""});
+                                    // 应用过滤逻辑
+                                    boolean shouldInclude = false;
+                                    switch (filter) {
+                                        case TESTKIT:
+                                            // TESTKIT 模式：只显示 Testkit 连接成功的实例
+                                            shouldInclude = inst.isSuccess();
+                                            break;
+                                        case ARTHAS_ONLY:
+                                            // ARTHAS_ONLY：只看能力标记，不判断 success
+                                            shouldInclude = inst.getArthasPort() != null && inst.getArthasPort() > 0;
+                                            break;
+                                        case CMD_SUPPORTED:
+                                            // CMD_SUPPORTED：只看能力标记，不判断 success
+                                            shouldInclude = (inst.getArthasPort() != null && inst.getArthasPort() > 0) || inst.isSupportShell();
+                                            break;
+                                    }
+                                    
+                                    if (shouldInclude) {
+                                        instanceDataList.add(inst);
+                                        // Env 为 null 时显示 "-"，Testkit/Arthas/Shell/Action 由渲染器处理
+                                        String envDisplay = inst.getEnv() != null && !inst.getEnv().isEmpty() ? inst.getEnv() : "-";
+                                        // Columns: IP, Port, Env, Testkit, Arthas, Shell, Action
+                                        tableModel.addRow(new Object[]{inst.getIp(), inst.getPort(), envDisplay, "", "", "", ""});
+                                        filteredCount++;
+                                    }
                                 }
-                                long ok = instances.stream().filter(RemoteScriptExecutor.InstanceInfo::isSuccess).count();
-                                statusLabel.setText("✅ " + instances.size() + " instances, " + ok + " available");
+                                long ok = instanceDataList.stream().filter(RemoteScriptExecutor.InstanceInfo::isSuccess).count();
+                                String statusText = "✅ " + filteredCount + " instances";
+                                if (filter != TestkitToolWindowFactory.InstanceFilter.TESTKIT && filteredCount < totalCount) {
+                                    statusText += " (filtered from " + totalCount + ")";
+                                }
+                                statusText += ", " + ok + " available";
+                                statusLabel.setText(statusText);
                                 statusLabel.setForeground(new Color(100, 150, 100));
                             } else {
                                 statusLabel.setText("⚠️ No instances");
@@ -1907,7 +1968,7 @@ public class TestkitToolWindow {
                     RuntimeHelper.setTempApps(project.getName(), tempApps);
 
                     // 更新 connectionMeta（manual 连接没有 arthasPort，expireTime 用 MAX_VALUE 表示不过期）
-                    RuntimeHelper.updateConnectionMeta(connStr, false, null, Long.MAX_VALUE, null);
+                    RuntimeHelper.updateConnectionMeta(connStr, false, null, Long.MAX_VALUE, null,false);
 
                     TestkitHelper.notify(project, NotificationType.INFORMATION, "Added: " + connStr);
 
@@ -1950,13 +2011,14 @@ public class TestkitToolWindow {
         RuntimeHelper.VisibleApp visibleApp = RuntimeHelper.parseApp(connectionStr);
         RuntimeHelper.addVisibleApp(project.getName(), visibleApp);
 
-        // Update connection metadata (trace, env, expireTime, arthasPort)
+        // Update connection metadata (trace, env, expireTime, arthasPort, supportShell)
         RuntimeHelper.updateConnectionMeta(
             connectionStr,
             instance.isEnableTrace(),
             instance.getEnv(),
             instance.getExpireTime(),
-            instance.getArthasPort()
+            instance.getArthasPort(),
+            instance.isSupportShell()
         );
 
         // 更新 appBox UI

@@ -29,6 +29,7 @@ public class RemoteScriptExecutor {
     public static final int REMOTE_RESULT_TIMEOUT = 300;    // 获取结果超时 300 秒
     public static final int REMOTE_CANCEL_TIMEOUT = 60;     // 取消请求超时 60 秒
     public static final int REMOTE_ARTHAS_TIMEOUT = 300;
+    public static final int REMOTE_SHELL_TIMEOUT = 60;       // Shell 命令超时 60 秒
 
     // Remote Script API Reference
     public static final String REMOTE_SCRIPT_INFO = """
@@ -39,23 +40,34 @@ public class RemoteScriptExecutor {
 The plugin calls functions in the Groovy script. Implement these functions:
 
 ────────────────────────────────────────────────────────────────────────────────
-1. isArthasSupported()                                              [Optional]
+1. isCmdSupported()                                                 [Optional]
 ────────────────────────────────────────────────────────────────────────────────
-   Purpose: Determine whether Arthas features are available in this environment
+   Purpose: Control diagnostic tool button visibility (🔧) and global capabilities
    
-   When returns true, the IDE will show Arthas-related features:
-     - TimeTunnel: Record and replay method invocations
-     - View Remote Code: Decompile classes from running JVM
-     - Trace: Monitor method execution paths
+   Returns a Map with two keys:
+     - arthas: boolean  Whether Arthas commands are supported globally
+     - shell:  boolean  Whether Shell commands are supported globally
    
-   When returns false (or not implemented), these features are hidden.
+   When either arthas=true or shell=true, the IDE shows the diagnostic tool button.
+   When both are false (or not implemented), the button is hidden.
    
    Parameters: None
-   Returns: boolean
+   Returns: Map with keys 'arthas' and 'shell'
    
    Example:
-   def isArthasSupported() {
-       return true  // Enable Arthas features in IDE
+   def isCmdSupported() {
+       return [
+           arthas: true,   // Support Arthas commands globally
+           shell: true     // Support Shell commands globally
+       ]
+   }
+   
+   // Or selectively enable:
+   def isCmdSupported() {
+       return [
+           arthas: false,  // Disable Arthas
+           shell: true     // Only Shell enabled
+       ]
    }
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -91,12 +103,20 @@ The plugin calls functions in the Groovy script. Implement these functions:
    Optional fields:
      - enableTrace  : boolean Trace support (default: false)
      - expireTime   : long    Expiration time UTC timestamp (default: 24h later)
-     - arthasPort   : Integer Arthas HTTP port (default: null, non-null enables Arthas)
+     - arthasPort   : Integer Arthas HTTP port (default: null, enables Arthas mode in panel)
+     - supportShell : boolean Shell support (default: false, enables Shell mode in panel)
+   
+   Note: Inside diagnostic panel:
+         - arthasPort present → Arthas mode available
+         - supportShell=true  → Shell mode available
    
    Example:
    [
-       [ip: "pod-001", port: 18080, success: true, errorMessage: "", enableTrace: true, env: "prod", arthasPort: 8563],
-       [ip: "pod-002", port: 18080, success: false, errorMessage: "Connection refused"]
+       [ip: "pod-001", port: 18080, success: true, errorMessage: "", enableTrace: true, env: "prod", 
+        arthasPort: 8563, supportShell: true],  // Both Arthas and Shell
+       [ip: "pod-002", port: 18080, success: true, errorMessage: "", enableTrace: false, env: "qa",
+        arthasPort: null, supportShell: true],  // Shell only
+       [ip: "pod-003", port: 18080, success: false, errorMessage: "Connection refused"]
    ]
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -190,7 +210,7 @@ The plugin calls functions in the Groovy script. Implement these functions:
 ────────────────────────────────────────────────────────────────────────────────
    Purpose: Upload or download files to/from specified instance
    
-   When to implement: Required when Arthas is supported (isArthasSupported=true)
+   When to implement: Required when Arthas is supported (isCmdSupported.arthas=true)
    Used by:
      - Profiler: Download profiler result files (e.g., flame graph HTML)
      - Hot Deploy: Upload compiled class files for hot reloading
@@ -218,6 +238,58 @@ The plugin calls functions in the Groovy script. Implement these functions:
      Download: [action: "download", remotePath: "/app/config/app.properties"]
      Upload:   [action: "upload", remotePath: "/tmp/test.txt", content: "Hello"]
 
+────────────────────────────────────────────────────────────────────────────────
+7. sendShellRequest(String appName, String partition, String ip, Map params)
+                                                                    [Optional]
+────────────────────────────────────────────────────────────────────────────────
+   Purpose: Execute shell command on specified instance
+   
+   When to implement: Required when pod supports shell (supportShell=true in loadInstances)
+   
+   Parameters: appName   - Application name
+               partition - Partition name
+               ip        - Instance identifier
+               params    - Request parameters Map (must contain "command" key)
+   
+   Params structure:
+     - command : String (required) - Shell command string
+   
+   Common commands:
+     - "ls -la"                : List files
+     - "ps aux | grep java"    : Show Java processes
+     - "df -h"                 : Show disk usage
+     - "netstat -tunlp"        : Show network ports
+     - "cat /proc/meminfo"     : Show memory info
+     - "tail -n 100 /app/logs/app.log" : View log tail
+   
+   Response structure:
+   {
+       "success" : boolean,    // true=success, false=failure
+       "message" : String,     // error message (when success=false)
+       "data"    : String      // command output (stdout + stderr)
+   }
+   
+   Implementation example (using kubectl exec):
+   def sendShellRequest(String appName, String partition, String ip, Map params) {
+       def command = params.get("command")
+       if (!command) {
+           return [success: false, message: "Missing 'command' in params"]
+       }
+       
+       // Execute via kubectl exec
+       def podName = ip  // ip is pod name
+       def namespace = getNamespace(partition)
+       def shellCmd = ["kubectl", "exec", "-n", namespace, podName, "--", 
+                       "sh", "-c", command].execute()
+       shellCmd.waitForOrKill(60000)  // 60s timeout
+       
+       if (shellCmd.exitValue() == 0) {
+           return [success: true, data: shellCmd.text, message: null]
+       } else {
+           return [success: false, data: null, message: shellCmd.err.text]
+       }
+   }
+
 ================================================================================
                               Demo Script
 ================================================================================
@@ -225,10 +297,13 @@ The plugin calls functions in the Groovy script. Implement these functions:
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 
-// ==================== 1. isArthasSupported (Optional) ====================
-// Return true to enable Arthas features (TimeTunnel, View Remote Code) in the IDE
-def isArthasSupported() {
-    return true
+// ==================== 1. isCmdSupported (Optional) ====================
+// Return Map to control global command support and button visibility
+def isCmdSupported() {
+    return [
+        arthas: true,   // Global Arthas support
+        shell: true     // Global Shell support
+    ]
 }
 
 // ==================== 2. loadInfra ====================
@@ -258,7 +333,8 @@ def loadInstances(String appName, String partition) {
             result.success      = resp.success == true
             result.errorMessage = result.success ? "" : (resp.message ?: "Unknown error")
             result.enableTrace  = resp.data?.enableTrace ?: false
-            result.arthasPort   = 8563  // Optional: Arthas HTTP port (if Arthas is available)
+            result.arthasPort   = 8563 // Optional: Arthas HTTP port (enables Arthas mode)
+            result.supportShell = true // Optional: Shell support (enables Shell mode)
         } catch (Exception e) {
             result.success      = false
             result.errorMessage = e.message ?: "Connection failed"
@@ -388,34 +464,50 @@ def httpPost(String url, Map data) {
             lastModified = currentModified;
             System.out.println("[RemoteScriptExecutor] Script loaded/reloaded: " + scriptPath);
 
-            // Auto-refresh Arthas support flag when script is reloaded
-            refreshArthasSupportAsync();
+            // Auto-refresh support flags when script is reloaded
+            refreshSupportFlagsAsync();
         }
 
         return compiledScript;
     }
 
     /**
-     * Refresh Arthas support flag asynchronously (called when script is reloaded)
+     * Refresh support flags asynchronously (called when script is reloaded)
      */
-    private void refreshArthasSupportAsync() {
+    private void refreshSupportFlagsAsync() {
         executor.submit(() -> {
+            // Refresh Cmd support (arthas and shell)
             try {
-                Object result = compiledScript.invokeMethod("isArthasSupported", new Object[]{});
-                boolean supported = false;
-                if (result instanceof Boolean) {
-                    supported = (Boolean) result;
-                } else if (result instanceof String) {
-                    supported = Boolean.parseBoolean((String) result);
+                Object result = compiledScript.invokeMethod("isCmdSupported", new Object[]{});
+                if (result instanceof Map) {
+                    Map<?, ?> resultMap = (Map<?, ?>) result;
+                    boolean arthasSupport = getBooleanValue(resultMap, "arthas", false);
+                    boolean shellSupport = getBooleanValue(resultMap, "shell", false);
+                    RuntimeHelper.setCmdSupported(arthasSupport, shellSupport);
+                    System.out.println("[RemoteScriptExecutor] Cmd support refreshed - arthas: " + arthasSupport + ", shell: " + shellSupport);
+                } else if (result instanceof Boolean) {
+                    // 向后兼容
+                    boolean supported = (Boolean) result;
+                    RuntimeHelper.setCmdSupported(supported, supported);
+                    System.out.println("[RemoteScriptExecutor] Cmd support refreshed (legacy): " + supported);
+                } else {
+                    RuntimeHelper.setCmdSupported(false, false);
+                    System.out.println("[RemoteScriptExecutor] Cmd support disabled (invalid return type)");
                 }
-                RuntimeHelper.setArthasSupported(supported);
-                System.out.println("[RemoteScriptExecutor] Arthas support refreshed: " + supported);
             } catch (Throwable e) {
-                // Function doesn't exist or failed, disable Arthas
-                RuntimeHelper.setArthasSupported(false);
-                System.out.println("[RemoteScriptExecutor] Arthas support disabled (function not found or error)");
+                RuntimeHelper.setCmdSupported(false, false);
+                System.out.println("[RemoteScriptExecutor] Cmd support disabled (function not found or error)");
             }
         });
+    }
+    
+    private boolean parseBoolean(Object result) {
+        if (result instanceof Boolean) {
+            return (Boolean) result;
+        } else if (result instanceof String) {
+            return Boolean.parseBoolean((String) result);
+        }
+        return false;
     }
 
     /**
@@ -503,6 +595,9 @@ def httpPost(String url, Map data) {
                         // arthasPort: Arthas 端口，非空表示支持 Arthas
                         Integer arthasPort = getIntegerValue(dataMap, "arthasPort", null);
                         info.setArthasPort(arthasPort);
+                        // supportShell: Shell 支持标识
+                        boolean supportShell = getBooleanValue(dataMap, "supportShell", false);
+                        info.setSupportShell(supportShell);
                         instances.add(info);
                     }
                 }
@@ -601,6 +696,41 @@ def httpPost(String url, Map data) {
     }
 
     /**
+     * 向指定实例发送 Shell 命令（带超时）
+     * @param appName 应用名
+     * @param partition 分区
+     * @param ip 实例 IP
+     * @param params 请求参数（Map），至少包含 "command" key
+     * @param timeout 超时时间（秒）
+     * @return 命令执行结果
+     */
+    public Object sendShellRequest(String appName, String partition, String ip, Map<String, Object> params, int timeout) {
+        long startTime = System.currentTimeMillis();
+        String target = appName + ":[" + partition + "]" + ip;
+
+        Future<Object> future = executor.submit(() -> {
+            Script script = getScript();
+            return script.invokeMethod("sendShellRequest", new Object[]{appName, partition, ip, params});
+        });
+
+        try {
+            Object result = future.get(timeout, TimeUnit.SECONDS);
+            log("sendShellRequest", System.currentTimeMillis() - startTime, "OK",
+                    "target=" + target + ", params=" + params + ", result=" + result);
+            return result;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            log("sendShellRequest", System.currentTimeMillis() - startTime, "TIMEOUT",
+                    "target=" + target + ", params=" + params + ", timeout=" + timeout + "s");
+            throw new RuntimeException("sendShellRequest() timeout after " + timeout + " seconds", e);
+        } catch (Exception e) {
+            log("sendShellRequest", System.currentTimeMillis() - startTime, "ERROR",
+                    "target=" + target + ", params=" + params + ", error=" + e.getMessage());
+            throw new RuntimeException("Failed to execute sendShellRequest(): " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * 向指定实例发送文件操作请求（上传或下载）
      * @param appName 应用名
      * @param partition 分区
@@ -641,46 +771,67 @@ def httpPost(String url, Map data) {
     }
 
     /**
-     * Check if Arthas is supported by the remote script
-     * Calls the script's isArthasSupported() function
-     * @return true if supported, false otherwise
+     * Check if command execution is supported by the remote script
+     * Calls the script's isCmdSupported() function
+     * @return Map with keys: arthas (boolean), shell (boolean)
      */
-    public boolean isArthasSupported() {
+    public Map<String, Boolean> isCmdSupported() {
         long startTime = System.currentTimeMillis();
 
-        Future<Boolean> future = executor.submit(() -> {
+        Future<Map<String, Boolean>> future = executor.submit(() -> {
             try {
                 Script script = getScript();
-                Object result = script.invokeMethod("isArthasSupported", new Object[]{});
+                Object result = script.invokeMethod("isCmdSupported", new Object[]{});
 
+                if (result instanceof Map) {
+                    Map<?, ?> resultMap = (Map<?, ?>) result;
+                    Map<String, Boolean> cmdSupport = new HashMap<>();
+                    cmdSupport.put("arthas", getBooleanValue(resultMap, "arthas", false));
+                    cmdSupport.put("shell", getBooleanValue(resultMap, "shell", false));
+                    return cmdSupport;
+                }
+                // 向后兼容：如果返回 boolean，则视为同时支持两者
                 if (result instanceof Boolean) {
-                    return (Boolean) result;
+                    boolean supported = (Boolean) result;
+                    Map<String, Boolean> cmdSupport = new HashMap<>();
+                    cmdSupport.put("arthas", supported);
+                    cmdSupport.put("shell", supported);
+                    return cmdSupport;
                 }
-                if (result instanceof String) {
-                    return Boolean.parseBoolean((String) result);
-                }
-                // If function doesn't exist or returns null, assume not supported
-                return false;
+                // 默认不支持
+                Map<String, Boolean> cmdSupport = new HashMap<>();
+                cmdSupport.put("arthas", false);
+                cmdSupport.put("shell", false);
+                return cmdSupport;
             } catch (Exception e) {
-                // Function doesn't exist or failed, assume not supported
-                System.err.println("[RemoteScriptExecutor] isArthasSupported check failed: " + e.getMessage());
-                return false;
+                System.err.println("[RemoteScriptExecutor] isCmdSupported check failed: " + e.getMessage());
+                Map<String, Boolean> cmdSupport = new HashMap<>();
+                cmdSupport.put("arthas", false);
+                cmdSupport.put("shell", false);
+                return cmdSupport;
             }
         });
 
         try {
-            Boolean result = future.get(5, TimeUnit.SECONDS);
-            log("isArthasSupported", System.currentTimeMillis() - startTime, "OK", "result=" + result);
-            return result != null && result;
+            Map<String, Boolean> result = future.get(5, TimeUnit.SECONDS);
+            log("isCmdSupported", System.currentTimeMillis() - startTime, "OK", "result=" + result);
+            return result;
         } catch (TimeoutException e) {
             future.cancel(true);
-            log("isArthasSupported", System.currentTimeMillis() - startTime, "TIMEOUT", "timeout=" + 5 + "s");
-            return false;
+            log("isCmdSupported", System.currentTimeMillis() - startTime, "TIMEOUT", "timeout=5s");
+            Map<String, Boolean> cmdSupport = new HashMap<>();
+            cmdSupport.put("arthas", false);
+            cmdSupport.put("shell", false);
+            return cmdSupport;
         } catch (Exception e) {
-            log("isArthasSupported", System.currentTimeMillis() - startTime, "ERROR", "error=" + e.getMessage());
-            return false;
+            log("isCmdSupported", System.currentTimeMillis() - startTime, "ERROR", "error=" + e.getMessage());
+            Map<String, Boolean> cmdSupport = new HashMap<>();
+            cmdSupport.put("arthas", false);
+            cmdSupport.put("shell", false);
+            return cmdSupport;
         }
     }
+
 
     // ==================== Helper Methods ====================
 
@@ -769,6 +920,7 @@ def httpPost(String url, Map data) {
         private String env;  // 环境标识
         private long expireTime;  // 过期时间（UTC 时间戳），过期后会从列表中剔除
         private Integer arthasPort;  // Arthas 端口，非空表示支持 Arthas
+        private boolean supportShell;  // 是否支持 Shell
 
         public String getAppName() {
             return appName;
@@ -857,6 +1009,14 @@ def httpPost(String url, Map data) {
             return System.currentTimeMillis() > expireTime;
         }
 
+        public boolean isSupportShell() {
+            return supportShell;
+        }
+
+        public void setSupportShell(boolean supportShell) {
+            this.supportShell = supportShell;
+        }
+
         /**
          * 检查是否支持 Arthas
          */
@@ -884,6 +1044,7 @@ def httpPost(String url, Map data) {
                     ", env='" + env + '\'' +
                     ", expireTime=" + expireTime +
                     ", arthasPort=" + arthasPort +
+                    ", supportShell=" + supportShell +
                     '}';
         }
     }

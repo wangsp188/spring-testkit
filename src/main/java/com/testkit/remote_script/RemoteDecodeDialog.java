@@ -15,6 +15,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.ui.components.JBScrollPane;
 import com.testkit.RuntimeHelper;
@@ -76,6 +77,155 @@ public class RemoteDecodeDialog extends DialogWrapper {
         if (className == null) return "";
         int lastDot = className.lastIndexOf('.');
         return lastDot >= 0 ? className.substring(lastDot + 1) : className;
+    }
+
+    /**
+     * Convert Java class name to JVM class name format
+     * For inner classes: com.example.Outer.Inner -> com.example.Outer$Inner
+     */
+    private String convertToJvmClassName(String javaClassName) {
+        if (javaClassName == null) {
+            return null;
+        }
+        
+        try {
+            // PSI access must be in read-action
+            return ApplicationManager.getApplication().runReadAction((com.intellij.openapi.util.Computable<String>) () -> {
+                try {
+                    // Try to find PsiClass to check if it's an inner class
+                    PsiClass psiClass = JavaPsiFacade.getInstance(project)
+                            .findClass(javaClassName, GlobalSearchScope.allScope(project));
+                    
+                    if (psiClass == null) {
+                        // If not found, return as-is
+                        return javaClassName;
+                    }
+                    
+                    // Build JVM class name by traversing containing classes
+                    StringBuilder jvmName = new StringBuilder();
+                    PsiClass current = psiClass;
+                    
+                    // Collect all class names from inner to outer
+                    while (current != null) {
+                        if (jvmName.length() > 0) {
+                            jvmName.insert(0, "$");
+                        }
+                        jvmName.insert(0, current.getName());
+                        current = current.getContainingClass();
+                    }
+                    
+                    // Add package name
+                    PsiFile psiFile = psiClass.getContainingFile();
+                    if (psiFile instanceof com.intellij.psi.PsiJavaFile) {
+                        String packageName = ((com.intellij.psi.PsiJavaFile) psiFile).getPackageName();
+                        if (StringUtils.isNotBlank(packageName)) {
+                            jvmName.insert(0, packageName + ".");
+                        }
+                    }
+                    
+                    String result = jvmName.toString();
+                    System.out.println("[JVM Class Name] " + javaClassName + " -> " + result);
+                    return result;
+                    
+                } catch (Exception e) {
+                    System.out.println("[JVM Class Name] Error converting: " + e.getMessage() + ", using original: " + javaClassName);
+                    return javaClassName;
+                }
+            });
+            
+        } catch (Exception e) {
+            System.out.println("[JVM Class Name] Error in read action: " + e.getMessage() + ", using original: " + javaClassName);
+            return javaClassName;
+        }
+    }
+
+    /**
+     * 检查是否为项目源码（而非 jar 包或库），且支持 hot deploy
+     */
+    private boolean checkIsProjectSource() {
+        if (className == null) {
+            return false;
+        }
+        
+        try {
+            // PSI access must be in read-action
+            return ApplicationManager.getApplication().runReadAction((com.intellij.openapi.util.Computable<Boolean>) () -> {
+                try {
+                    // 只在项目源码范围内查找
+                    PsiClass psiClass = JavaPsiFacade.getInstance(project)
+                            .findClass(className, GlobalSearchScope.projectScope(project));
+                    
+                    if (psiClass == null) {
+                        System.out.println("[HotDeploy] Class not in project scope: " + className);
+                        return false;
+                    }
+                    
+                    // 跳过接口
+                    if (psiClass.isInterface()) {
+                        System.out.println("[HotDeploy] Skip interface: " + className);
+                        return false;
+                    }
+                    
+                    // 跳过枚举
+                    if (psiClass.isEnum()) {
+                        System.out.println("[HotDeploy] Skip enum: " + className);
+                        return false;
+                    }
+                    
+                    // 跳过注解
+                    if (psiClass.isAnnotationType()) {
+                        System.out.println("[HotDeploy] Skip annotation: " + className);
+                        return false;
+                    }
+                    
+                    // 跳过匿名类
+                    if (psiClass.getName() == null) {
+                        System.out.println("[HotDeploy] Skip anonymous class");
+                        return false;
+                    }
+                    
+                    // 内部类（静态/成员）：允许 hot deploy
+                    // convertToJvmClassName() 已经正确处理了 Outer.Inner -> Outer$Inner 的转换
+                    
+                    // 跳过测试代码（src/test/java）
+                    PsiFile psiFile = psiClass.getContainingFile();
+                    if (psiFile != null) {
+                        VirtualFile virtualFile = psiFile.getVirtualFile();
+                        if (virtualFile != null) {
+                            String filePath = virtualFile.getPath();
+                            if (filePath.contains("/src/test/java/")) {
+                                System.out.println("[HotDeploy] Skip test code: " + className);
+                                return false;
+                            }
+                        }
+                    }
+                    
+                    // 额外检查：确保类文件来自项目模块（而非库）
+                    Module module = ModuleUtilCore.findModuleForPsiElement(psiClass);
+                    if (module == null) {
+                        System.out.println("[HotDeploy] No module found for class: " + className);
+                        return false;
+                    }
+                    
+                    // 检查是否能找到编译输出目录
+                    CompilerModuleExtension compilerExtension = CompilerModuleExtension.getInstance(module);
+                    if (compilerExtension == null || compilerExtension.getCompilerOutputPath() == null) {
+                        System.out.println("[HotDeploy] No compiler output path for module: " + module.getName());
+                        return false;
+                    }
+                    
+                    System.out.println("[HotDeploy] ✓ Class is project source: " + className + " in module: " + module.getName());
+                    return true;
+                    
+                } catch (Exception e) {
+                    System.out.println("[HotDeploy] Error checking project source: " + e.getMessage());
+                    return false;
+                }
+            });
+        } catch (Exception e) {
+            System.out.println("[HotDeploy] Error in read action: " + e.getMessage());
+            return false;
+        }
     }
 
     @Nullable
@@ -146,13 +296,16 @@ public class RemoteDecodeDialog extends DialogWrapper {
         refreshButton.addActionListener(e -> loadRemoteCode());
         toolbarPanel.add(refreshButton);
         
-        // 分隔符
-        toolbarPanel.add(Box.createHorizontalStrut(20));
-        
-        hotDeployButton = new JButton("🔥 Hot Deploy");
-        hotDeployButton.setToolTipText("Upload local .class file and retransform on remote instance");
-        hotDeployButton.addActionListener(e -> confirmAndHotDeploy());
-        toolbarPanel.add(hotDeployButton);
+        // Hot Deploy 按钮：只在项目源码的具体类上显示
+        if (checkIsProjectSource()) {
+            // 分隔符
+            toolbarPanel.add(Box.createHorizontalStrut(20));
+            
+            hotDeployButton = new JButton("🔥 Hot Deploy");
+            hotDeployButton.setToolTipText("Upload local .class file and retransform on remote instance");
+            hotDeployButton.addActionListener(e -> confirmAndHotDeploy());
+            toolbarPanel.add(hotDeployButton);
+        }
 
         panel.add(toolbarPanel, BorderLayout.NORTH);
 
@@ -190,6 +343,10 @@ public class RemoteDecodeDialog extends DialogWrapper {
                     return;
                 }
                 
+                // Convert class name to JVM format (for inner classes: Outer.Inner -> Outer$Inner)
+                String jvmClassName = convertToJvmClassName(className);
+                System.out.println("[RemoteCodeDialog] JVM className = '" + jvmClassName + "'");
+                
                 // Build jad command
                 // jad syntax: jad [--source-only] className [methodName]
                 String command;
@@ -201,10 +358,10 @@ public class RemoteDecodeDialog extends DialogWrapper {
                         // Constructor: use <init>
                         actualMethodName = "<init>";
                     }
-                    command = "jad " + className.trim() + " " + actualMethodName;
+                    command = "jad " + jvmClassName.trim() + " " + actualMethodName;
                 } else {
                     // Decompile entire class
-                    command = "jad " + className.trim();
+                    command = "jad " + jvmClassName.trim();
                 }
                 System.out.println("[RemoteCodeDialog] Executing command: " + command);
 
@@ -325,7 +482,9 @@ public class RemoteDecodeDialog extends DialogWrapper {
      */
     private void hotDeploy(File classFile) {
         isDeploying = true;
-        hotDeployButton.setEnabled(false);
+        if (hotDeployButton != null) {
+            hotDeployButton.setEnabled(false);
+        }
         
         ProgressManager.getInstance().run(new Task.Backgroundable(project, "Hot Deploy: " + getSimpleClassName(), false) {
             @Override
@@ -435,7 +594,9 @@ public class RemoteDecodeDialog extends DialogWrapper {
     private void showDeployResult(boolean success, String message) {
         ApplicationManager.getApplication().invokeLater(() -> {
             isDeploying = false;
-            hotDeployButton.setEnabled(true);
+            if (hotDeployButton != null) {
+                hotDeployButton.setEnabled(true);
+            }
             
             if (success) {
                 TestkitHelper.notify(project, NotificationType.INFORMATION, "🔥 " + message);
@@ -453,44 +614,56 @@ public class RemoteDecodeDialog extends DialogWrapper {
             return null;
         }
         
-        // 将类名转换为路径：com.example.MyClass -> com/example/MyClass.class
-        String classPath = className.replace('.', '/') + ".class";
-        
-        // 通过类名找到 PsiClass，然后获取其所属的 Module
-        PsiClass psiClass = JavaPsiFacade.getInstance(project)
-                .findClass(className, GlobalSearchScope.projectScope(project));
-        
-        if (psiClass == null) {
-            System.out.println("[HotDeploy] PsiClass not found for: " + className);
-            return null;
-        }
-        
-        Module module = ModuleUtilCore.findModuleForPsiElement(psiClass);
-        if (module == null) {
-            System.out.println("[HotDeploy] Module not found for class: " + className);
-            return null;
-        }
-        
-        System.out.println("[HotDeploy] Found module: " + module.getName() + " for class: " + className);
-        
-        CompilerModuleExtension compilerExtension = CompilerModuleExtension.getInstance(module);
-        if (compilerExtension == null) {
-            System.out.println("[HotDeploy] CompilerModuleExtension not found for module: " + module.getName());
-            return null;
-        }
-        
-        // 检查主输出目录
-        VirtualFile outputPath = compilerExtension.getCompilerOutputPath();
-        if (outputPath != null) {
-            File classFile = new File(outputPath.getPath(), classPath);
-            if (classFile.exists()) {
-                System.out.println("[HotDeploy] Found class file: " + classFile.getAbsolutePath());
-                return classFile;
+        // PSI access must be in read-action
+        return ApplicationManager.getApplication().runReadAction((com.intellij.openapi.util.Computable<File>) () -> {
+            try {
+                // 将类名转换为 JVM 格式，然后转换为路径
+                // com.example.Outer.Inner -> com.example.Outer$Inner -> com/example/Outer$Inner.class
+                String jvmClassName = convertToJvmClassName(className);
+                String classPath = jvmClassName.replace('.', '/') + ".class";
+                System.out.println("[HotDeploy] Class path: " + classPath);
+                
+                // 通过类名找到 PsiClass，然后获取其所属的 Module
+                PsiClass psiClass = JavaPsiFacade.getInstance(project)
+                        .findClass(className, GlobalSearchScope.projectScope(project));
+                
+                if (psiClass == null) {
+                    System.out.println("[HotDeploy] PsiClass not found for: " + className);
+                    return null;
+                }
+                
+                Module module = ModuleUtilCore.findModuleForPsiElement(psiClass);
+                if (module == null) {
+                    System.out.println("[HotDeploy] Module not found for class: " + className);
+                    return null;
+                }
+                
+                System.out.println("[HotDeploy] Found module: " + module.getName() + " for class: " + className);
+                
+                CompilerModuleExtension compilerExtension = CompilerModuleExtension.getInstance(module);
+                if (compilerExtension == null) {
+                    System.out.println("[HotDeploy] CompilerModuleExtension not found for module: " + module.getName());
+                    return null;
+                }
+                
+                // 检查主输出目录
+                VirtualFile outputPath = compilerExtension.getCompilerOutputPath();
+                if (outputPath != null) {
+                    File classFile = new File(outputPath.getPath(), classPath);
+                    if (classFile.exists()) {
+                        System.out.println("[HotDeploy] Found class file: " + classFile.getAbsolutePath());
+                        return classFile;
+                    }
+                }
+                
+                System.out.println("[HotDeploy] Class file not found in output directory for: " + className);
+                return null;
+                
+            } catch (Exception e) {
+                System.out.println("[HotDeploy] Error finding class file: " + e.getMessage());
+                return null;
             }
-        }
-        
-        System.out.println("[HotDeploy] Class file not found in output directory for: " + className);
-        return null;
+        });
     }
 
     @Override

@@ -38,8 +38,9 @@ public class RuntimeHelper {
 
     private static boolean enableMapperSql = false;
     
-    // Global Arthas support flag (determined by remote script's isArthasSupported function)
-    private static volatile boolean arthasSupported = false;
+    // Global support flags (determined by remote script isCmdSupported() function)
+    private static volatile boolean arthasSupported = false;  // isCmdSupported().arthas - Arthas commands and features
+    private static volatile boolean shellSupported = false;   // isCmdSupported().shell - Shell commands
 
 
     public static boolean isEnableMapperSql() {
@@ -51,18 +52,36 @@ public class RuntimeHelper {
     }
 
     /**
+     * Check if command execution is supported globally (determined by remote script)
+     * Returns true if either Arthas or Shell is supported globally
+     */
+    public static boolean isCmdSupported() {
+        return arthasSupported || shellSupported;
+    }
+
+    /**
+     * Check if Shell commands are supported globally
+     */
+    public static boolean isShellSupported() {
+        return shellSupported;
+    }
+
+    /**
+     * Set command support flags (from isCmdSupported() function)
+     */
+    public static void setCmdSupported(boolean arthasSupported, boolean shellSupported) {
+        RuntimeHelper.arthasSupported = arthasSupported;
+        RuntimeHelper.shellSupported = shellSupported;
+    }
+
+    /**
      * Check if Arthas is supported (determined by remote script)
+     * This controls both Arthas commands and IDE features (TimeTunnel, View Remote Code)
      */
     public static boolean isArthasSupported() {
         return arthasSupported;
     }
 
-    /**
-     * Set Arthas support flag
-     */
-    public static void setArthasSupported(boolean supported) {
-        RuntimeHelper.arthasSupported = supported;
-    }
 
     public static VisibleApp getSelectedApp(String project) {
         if (project == null) {
@@ -86,9 +105,9 @@ public class RuntimeHelper {
     // ==================== Connection Meta 相关方法 ====================
 
     /**
-     * 更新连接的元数据
+     * 更新连接的元数据（包含 Shell 支持）
      */
-    public static void updateConnectionMeta(String connectionStr, boolean enableTrace, String env, long expireTime, Integer arthasPort) {
+    public static void updateConnectionMeta(String connectionStr, boolean enableTrace, String env, long expireTime, Integer arthasPort, boolean supportShell) {
         if (connectionStr == null) {
             return;
         }
@@ -97,6 +116,7 @@ public class RuntimeHelper {
         meta.setEnv(env);
         meta.setExpireTime(expireTime);
         meta.setArthasPort(arthasPort);
+        meta.setSupportShell(supportShell);
     }
 
     /**
@@ -170,6 +190,28 @@ public class RuntimeHelper {
         }
         ConnectionMeta meta = connectionMetaMap.get(connectionStr);
         return meta != null && meta.isArthasEnabled();
+    }
+
+    public static boolean isShellEnabled(String connectionStr) {
+        if (connectionStr == null) {
+            return false;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        return meta != null && meta.isSupportShell();
+    }
+
+    /**
+     * 检查连接是否支持命令执行（面板内判断是否显示该实例）
+     */
+    public static boolean isCmdSupported(String connectionStr) {
+        if (connectionStr == null) {
+            return false;
+        }
+        ConnectionMeta meta = connectionMetaMap.get(connectionStr);
+        if (meta == null) {
+            return false;
+        }
+        return meta.isArthasEnabled() || meta.isSupportShell();
     }
 
     /**
@@ -593,6 +635,7 @@ public class RuntimeHelper {
         private String env;
         private long expireTime;  // 过期时间（UTC 时间戳）
         private Integer arthasPort;  // Arthas 端口，非空表示支持 Arthas
+        private boolean supportShell;  // 是否支持 Shell
         // TimeTunnel 状态缓存，key: className#methodName, value: 状态名称 (READY/RECORDING)
         private Map<String, String> ttStates = new HashMap<>();
 
@@ -636,6 +679,14 @@ public class RuntimeHelper {
             return arthasPort != null && arthasPort > 0;
         }
 
+        public boolean isSupportShell() {
+            return supportShell;
+        }
+
+        public void setSupportShell(boolean supportShell) {
+            this.supportShell = supportShell;
+        }
+
         public String getTtState(String methodKey) {
             return ttStates.get(methodKey);
         }
@@ -655,6 +706,7 @@ public class RuntimeHelper {
                     ", env='" + env + '\'' +
                     ", expireTime=" + expireTime +
                     ", arthasPort=" + arthasPort +
+                    ", supportShell=" + supportShell +
                     ", ttStates=" + ttStates +
                     '}';
         }

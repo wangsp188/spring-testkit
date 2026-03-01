@@ -64,6 +64,13 @@ public class ArthasDialog extends DialogWrapper {
     private boolean isExecuting = false;
     private volatile boolean isCancelled = false;
     
+    // ===== Shell 模式切换 =====
+    private enum ExecutionMode { ARTHAS, SHELL }
+    private ExecutionMode currentMode = ExecutionMode.ARTHAS;
+    private JRadioButton arthasRadioButton;
+    private JRadioButton shellRadioButton;
+    private JPanel quickCommandPanel;  // 保存快捷命令面板引用
+    
     // ===== Profiler 相关字段 =====
     private ComboBox<String> durationBox;           // 时长选择: 10s, 30s, 60s, 120s
     private JButton profilerButton;                  // Start/Cancel 按钮
@@ -84,9 +91,11 @@ public class ArthasDialog extends DialogWrapper {
     public ArthasDialog(Project project) {
         super(project);
         this.project = project;
-        setTitle("Arthas Diagnostic Tool");
+        setTitle("Diagnostic Tool");
         setModal(false);
         init();
+        // init() 后所有组件都已创建，可以安全调用 updateUIForMode()
+        ApplicationManager.getApplication().invokeLater(() -> updateUIForMode());
     }
 
     @Nullable
@@ -118,6 +127,25 @@ public class ArthasDialog extends DialogWrapper {
                 TitledBorder.LEFT,
                 TitledBorder.TOP
         ));
+        
+        // 顶部按钮面板
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
+        
+        // 添加连接按钮
+        JButton addConnectionButton = new JButton("Add Connection", TestkitToolWindow.connectionIcon);
+        addConnectionButton.setToolTipText("Add a new remote connection");
+        addConnectionButton.addActionListener(e -> {
+            // 弹出连接配置对话框（不显示 Manual Config，只显示支持 Arthas 或 Shell 的实例）
+            TestkitToolWindowFactory.showConnectionConfigPopup(project, () -> {
+                // 连接添加成功后，刷新实例列表
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    refreshInstanceList();
+                });
+            }, false, TestkitToolWindowFactory.InstanceFilter.CMD_SUPPORTED);
+        });
+        topPanel.add(addConnectionButton);
+        
+        panel.add(topPanel, BorderLayout.NORTH);
 
         // Create tree with root node
         DefaultMutableTreeNode root = new DefaultMutableTreeNode("Root");
@@ -129,6 +157,14 @@ public class ArthasDialog extends DialogWrapper {
         
         // Custom cell renderer for formatted display
         instanceTree.setCellRenderer(new InstanceTreeCellRenderer());
+        
+        // Add selection listener to update mode when instance changes
+        instanceTree.addTreeSelectionListener(e -> {
+            RuntimeHelper.VisibleApp selectedApp = getSelectedInstance();
+            if (selectedApp != null) {
+                updateUIForMode();
+            }
+        });
 
         JBScrollPane scrollPane = new JBScrollPane(instanceTree);
         panel.add(scrollPane, BorderLayout.CENTER);
@@ -159,6 +195,31 @@ public class ArthasDialog extends DialogWrapper {
         JPanel inputPanel = new JPanel(new BorderLayout(5, 5));
         inputPanel.setBorder(BorderFactory.createTitledBorder(">_ Command"));
 
+        // Mode selection panel (Arthas / Shell) - 使用单选按钮
+        JPanel modePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 2));
+        modePanel.add(new JLabel("Mode:"));
+        
+        arthasRadioButton = new JRadioButton("Arthas", TestkitToolWindow.arthasIcon, true);
+        arthasRadioButton.setToolTipText("Execute Arthas diagnostic commands");
+        shellRadioButton = new JRadioButton("Shell", TestkitToolWindow.cmdIcon, false);
+        shellRadioButton.setToolTipText("Execute shell commands");
+        
+        ButtonGroup modeGroup = new ButtonGroup();
+        modeGroup.add(arthasRadioButton);
+        modeGroup.add(shellRadioButton);
+        
+        arthasRadioButton.addActionListener(e -> {
+            currentMode = ExecutionMode.ARTHAS;
+            updateUIForMode();
+        });
+        shellRadioButton.addActionListener(e -> {
+            currentMode = ExecutionMode.SHELL;
+            updateUIForMode();
+        });
+        
+        modePanel.add(arthasRadioButton);
+        modePanel.add(shellRadioButton);
+
         commandField = new JBTextField();
         commandField.setToolTipText("Enter Arthas command, e.g.: jad com.example.MyClass");
         commandField.addActionListener(e -> executeCommand()); // Support Enter key
@@ -172,9 +233,13 @@ public class ArthasDialog extends DialogWrapper {
         executeButton.setPreferredSize(new Dimension(32, 32));
         executeButton.addActionListener(e -> handleExecuteOrCancel());
 
-        inputPanel.add(new JLabel("Command:"), BorderLayout.WEST);
-        inputPanel.add(commandField, BorderLayout.CENTER);
-        inputPanel.add(executeButton, BorderLayout.EAST);
+        JPanel commandInputPanel = new JPanel(new BorderLayout(5, 5));
+        commandInputPanel.add(new JLabel("Command:"), BorderLayout.WEST);
+        commandInputPanel.add(commandField, BorderLayout.CENTER);
+        commandInputPanel.add(executeButton, BorderLayout.EAST);
+
+        inputPanel.add(modePanel, BorderLayout.NORTH);
+        inputPanel.add(commandInputPanel, BorderLayout.CENTER);
 
         topPanel.add(inputPanel, BorderLayout.CENTER);
         
@@ -189,8 +254,8 @@ public class ArthasDialog extends DialogWrapper {
                 TitledBorder.TOP
         ));
 
-        String defaultText = "Select an instance and enter command...\n\n" +
-                "Common command examples:\n" +
+        String arthasDefaultText = "Select an instance and enter command...\n\n" +
+                "Common Arthas command examples:\n" +
                 "  jad com.example.MyClass                - Decompile class\n" +
                 "  sc -d com.example.MyClass              - Show class details\n" +
                 "  sm com.example.MyClass                 - Show methods of class\n" +
@@ -199,7 +264,17 @@ public class ArthasDialog extends DialogWrapper {
                 "  logger --name ROOT --level debug       - Change logger level\n" +
                 "  classloader -t                         - Show classloader tree\n";
         
-        String initialText = StringUtils.isNotBlank(lastResult) ? lastResult : defaultText;
+        String shellDefaultText = "Select an instance and enter shell command...\n\n" +
+                "Common shell command examples:\n" +
+                "  ls -la                                 - List files in detail\n" +
+                "  ps aux | grep java                     - Show Java processes\n" +
+                "  df -h                                  - Show disk usage\n" +
+                "  free -m                                - Show memory usage\n" +
+                "  netstat -tunlp                         - Show network ports\n" +
+                "  tail -n 100 /app/logs/app.log          - View log tail\n" +
+                "  cat /proc/meminfo                      - Show memory info\n";
+        
+        String initialText = StringUtils.isNotBlank(lastResult) ? lastResult : arthasDefaultText;
         
         resultEditor = new LanguageTextField(JsonLanguage.INSTANCE, project, initialText, false) {
             @Override
@@ -220,7 +295,7 @@ public class ArthasDialog extends DialogWrapper {
         panel.add(resultPanel, BorderLayout.CENTER);
 
         // Bottom: Quick command buttons
-        JPanel quickCommandPanel = createQuickCommandPanel();
+        quickCommandPanel = createQuickCommandPanel();
         panel.add(quickCommandPanel, BorderLayout.SOUTH);
 
         return panel;
@@ -232,8 +307,20 @@ public class ArthasDialog extends DialogWrapper {
     private JPanel createQuickCommandPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         panel.setBorder(BorderFactory.createTitledBorder("⌨ Quick Commands"));
-
-        String[] quickCommands = {
+        
+        updateQuickCommandButtons(panel);
+        
+        return panel;
+    }
+    
+    /**
+     * Update quick command buttons based on current mode
+     */
+    private void updateQuickCommandButtons(JPanel panel) {
+        panel.removeAll();
+        
+        // Arthas 快捷命令
+        String[] arthasCommands = {
                 "jad *",
                 "thread -n 5",
                 "thread -b",
@@ -242,7 +329,20 @@ public class ArthasDialog extends DialogWrapper {
                 "sysenv"
         };
 
-        for (String cmd : quickCommands) {
+        // Shell 快捷命令
+        String[] shellCommands = {
+                "ls -la",
+                "ps aux | grep java",
+                "df -h",
+                "free -m",
+                "netstat -tunlp",
+                "pwd"
+        };
+
+        // 根据当前模式显示不同的快捷命令
+        String[] commands = currentMode == ExecutionMode.ARTHAS ? arthasCommands : shellCommands;
+        
+        for (String cmd : commands) {
             JButton btn = new JButton(cmd);
             btn.addActionListener(e -> {
                 commandField.setText(cmd);
@@ -250,8 +350,66 @@ public class ArthasDialog extends DialogWrapper {
             });
             panel.add(btn);
         }
-
-        return panel;
+        
+        panel.revalidate();
+        panel.repaint();
+    }
+    
+    /**
+     * Update UI based on current mode (Arthas / Shell)
+     */
+    private void updateUIForMode() {
+        // 防止初始化时单选按钮还未创建导致 NPE
+        if (arthasRadioButton == null || shellRadioButton == null) {
+            return;
+        }
+        
+        RuntimeHelper.VisibleApp selectedApp = getSelectedInstance();
+        
+        // 检查选中的实例是否支持当前模式
+        if (selectedApp != null) {
+            boolean arthasEnabled = RuntimeHelper.isArthasEnabled(selectedApp.toConnectionString());
+            boolean shellEnabled = RuntimeHelper.isShellEnabled(selectedApp.toConnectionString());
+            
+            // 如果切换到的模式不支持，自动切换到支持的模式
+            if (currentMode == ExecutionMode.ARTHAS && !arthasEnabled) {
+                if (shellEnabled) {
+                    currentMode = ExecutionMode.SHELL;
+                    shellRadioButton.setSelected(true);
+                } else {
+                    if (resultEditor != null) {
+                        resultEditor.setText("❌ Selected instance does not support Arthas or Shell");
+                    }
+                }
+            } else if (currentMode == ExecutionMode.SHELL && !shellEnabled) {
+                if (arthasEnabled) {
+                    currentMode = ExecutionMode.ARTHAS;
+                    arthasRadioButton.setSelected(true);
+                } else {
+                    if (resultEditor != null) {
+                        resultEditor.setText("❌ Selected instance does not support Shell or Arthas");
+                    }
+                }
+            }
+            
+            // 控制单选按钮是否可用
+            arthasRadioButton.setEnabled(arthasEnabled);
+            shellRadioButton.setEnabled(shellEnabled);
+        }
+        
+        // 更新命令输入框提示
+        if (commandField != null) {
+            if (currentMode == ExecutionMode.ARTHAS) {
+                commandField.setToolTipText("Enter Arthas command, e.g.: jad com.example.MyClass");
+            } else {
+                commandField.setToolTipText("Enter shell command, e.g.: ls -la");
+            }
+        }
+        
+        // 更新快捷命令面板
+        if (quickCommandPanel != null) {
+            updateQuickCommandButtons(quickCommandPanel);
+        }
     }
     
     // ===== Profiler 相关方法 =====
@@ -632,31 +790,35 @@ public class ArthasDialog extends DialogWrapper {
 
     /**
      * Refresh instance list (build two-level tree)
+     * 显示所有支持 Arthas 或 Shell 的实例
      */
     private void refreshInstanceList() {
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
         root.removeAllChildren();
 
-        // Get all Arthas-enabled instances
+        // Get all command-supported instances
         List<RuntimeHelper.VisibleApp> visibleApps = RuntimeHelper.getVisibleApps(project.getName());
-        List<RuntimeHelper.VisibleApp> arthasEnabledApps = visibleApps.stream()
-                .filter(app -> app.isRemoteInstance() && RuntimeHelper.isArthasEnabled(app.toConnectionString()))
+        List<RuntimeHelper.VisibleApp> supportedApps = visibleApps.stream()
+                .filter(app -> app.isRemoteInstance() && RuntimeHelper.isCmdSupported(app.toConnectionString()))
                 .collect(Collectors.toList());
 
-        if (arthasEnabledApps.isEmpty()) {
+        if (supportedApps.isEmpty()) {
             if (resultEditor != null) {
-                resultEditor.setText("⚠️ No Arthas-enabled instances found\n\n" +
-                        "Please ensure:\n" +
-                        "1. Remote Script is configured\n" +
-                        "2. loadInstances returns arthasPort field\n" +
-                        "3. At least one instance has non-empty arthasPort");
+                resultEditor.setText("⚠️ No command-supported instances found\n\n" +
+                        "To get started:\n" +
+                        "1. Click 'Add Connection' button at the top of left panel\n" +
+                        "2. Or ensure your Remote Script is configured correctly:\n" +
+                        "   - Remote Script path is set in Settings\n" +
+                        "   - isCmdSupported() returns [arthas: true, shell: true]\n" +
+                        "   - loadInstances() returns instances with arthasPort or supportShell\n\n" +
+                        "Quick Action: Click the 'Add Connection' button!");
             }
             treeModel.reload();
             return;
         }
 
         // Group by appName
-        Map<String, List<RuntimeHelper.VisibleApp>> groupedApps = arthasEnabledApps.stream()
+        Map<String, List<RuntimeHelper.VisibleApp>> groupedApps = supportedApps.stream()
                 .collect(Collectors.groupingBy(RuntimeHelper.VisibleApp::getAppName));
 
         // Build tree structure
@@ -751,7 +913,7 @@ public class ArthasDialog extends DialogWrapper {
     }
     
     /**
-     * Execute command
+     * Execute command (根据当前模式执行 Arthas 或 Shell 命令)
      */
     private void executeCommand() {
         RuntimeHelper.VisibleApp selectedApp = getSelectedInstance();
@@ -772,6 +934,17 @@ public class ArthasDialog extends DialogWrapper {
             return;
         }
         
+        // 检查当前模式是否支持
+        String connStr = selectedApp.toConnectionString();
+        if (currentMode == ExecutionMode.ARTHAS && !RuntimeHelper.isArthasEnabled(connStr)) {
+            resultEditor.setText("❌ Error: Selected instance does not support Arthas");
+            return;
+        }
+        if (currentMode == ExecutionMode.SHELL && !RuntimeHelper.isShellEnabled(connStr)) {
+            resultEditor.setText("❌ Error: Selected instance does not support Shell");
+            return;
+        }
+        
         // Save state
         lastCommand = command;
         lastSelectedInstance = selectedApp.toConnectionString();
@@ -781,7 +954,8 @@ public class ArthasDialog extends DialogWrapper {
         isCancelled = false;
         executeButton.setIcon(AllIcons.Actions.Suspend);
         executeButton.setToolTipText("Cancel command");
-        resultEditor.setText("⏳ Executing command: " + command + "\n\nPlease wait...");
+        String modeText = currentMode == ExecutionMode.ARTHAS ? "Arthas" : "Shell";
+        resultEditor.setText("⏳ Executing " + modeText + " command: " + command + "\n\nPlease wait...");
 
         // Execute in background
         currentTask = ApplicationManager.getApplication().executeOnPooledThread(() -> {
@@ -795,15 +969,23 @@ public class ArthasDialog extends DialogWrapper {
                 String appName = selectedApp.getAppName();
                 String partition = selectedApp.getRemotePartition();
                 String ip = selectedApp.getRemoteIp();
-                Integer arthasPort = RuntimeHelper.getArthasPort(selectedApp.toConnectionString());
 
                 // Build request parameters
                 Map<String, Object> params = new HashMap<>();
                 params.put("command", command);
 
-                Object result = executor.sendArthasRequest(
-                        appName, partition, ip, arthasPort, params, REMOTE_ARTHAS_TIMEOUT
-                );
+                Object result;
+                if (currentMode == ExecutionMode.ARTHAS) {
+                    Integer arthasPort = RuntimeHelper.getArthasPort(connStr);
+                    result = executor.sendArthasRequest(
+                            appName, partition, ip, arthasPort, params, REMOTE_ARTHAS_TIMEOUT
+                    );
+                } else {
+                    // Shell mode
+                    result = executor.sendShellRequest(
+                            appName, partition, ip, params, RemoteScriptExecutor.REMOTE_SHELL_TIMEOUT
+                    );
+                }
 
                 // Display result
                 ApplicationManager.getApplication().invokeLater(() -> {
@@ -936,10 +1118,24 @@ public class ArthasDialog extends DialogWrapper {
                 Object userObject = node.getUserObject();
                 
                 if (userObject instanceof RuntimeHelper.VisibleApp app) {
-                    // Instance node: show [partition] ip with server icon
-                    String displayText = String.format("[%s] %s",
+                    // Instance node: show [partition] ip with capability icons
+                    String connStr = app.toConnectionString();
+                    boolean hasArthas = RuntimeHelper.isArthasEnabled(connStr);
+                    boolean hasShell = RuntimeHelper.isShellEnabled(connStr);
+                    
+                    String capabilities = "";
+                    if (hasArthas && hasShell) {
+                        capabilities = " 🔧🐚";  // Both Arthas and Shell
+                    } else if (hasArthas) {
+                        capabilities = " 🔧";  // Arthas only
+                    } else if (hasShell) {
+                        capabilities = " 🐚";  // Shell only
+                    }
+                    
+                    String displayText = String.format("[%s] %s%s",
                             app.getRemotePartition(),
-                            app.getRemoteIp());
+                            app.getRemoteIp(),
+                            capabilities);
                     setText(displayText);
                     setIcon(AllIcons.Webreferences.Server);  // Server/machine icon for instance nodes
                 } else if (userObject instanceof String appName) {
