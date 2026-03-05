@@ -649,7 +649,7 @@ public class TestkitToolWindow {
                 // 2. 未过期，通过脚本探活
                 try {
                     String scriptPath = SettingsStorageHelper.getRemoteScriptPath(project);
-                    if (StringUtils.isBlank(scriptPath)) {
+                    if (StringUtils.isNotBlank(scriptPath)) {
                         JSONObject hiReq = new JSONObject();
                         hiReq.put("method", "hi");
                         JSONObject resp = RemoteScriptCallUtils.sendRequest(project, visibleApp, hiReq, 5);
