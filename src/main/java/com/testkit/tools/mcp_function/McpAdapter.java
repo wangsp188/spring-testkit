@@ -315,6 +315,15 @@ public class McpAdapter {
             for (Map.Entry<String, JsonSchemaElement> stringObjectEntry : properties.entrySet()) {
                 String argName = stringObjectEntry.getKey();
                 JsonSchemaElement value = stringObjectEntry.getValue();
+                String originalDescription = value.description();
+                // anyOf(e.g. Python Optional[str] → anyOf[string, null]) → 提取实际类型
+                if (value instanceof JsonAnyOfSchema) {
+                    JsonSchemaElement resolved = resolveAnyOf((JsonAnyOfSchema) value);
+                    if (resolved != null) {
+                        value = resolved;
+                    }
+                }
+                String description = value.description() != null ? value.description() : originalDescription;
                 String type = value.getClass().getSimpleName();
                 Object typeExtension = null;
                 if (value instanceof JsonAnyOfSchema) {
@@ -346,13 +355,31 @@ public class McpAdapter {
                 }else if (value instanceof JsonReferenceSchema){
                     type = McpServerDefinition.ArgType.REFERENCE.getCode();
                 }
-                McpServerDefinition.ArgSchema argSchema = new McpServerDefinition.ArgSchema(argName, type, typeExtension,value.description(), required != null && required.contains(argName));
+                McpServerDefinition.ArgSchema argSchema = new McpServerDefinition.ArgSchema(argName, type, typeExtension, description, required != null && required.contains(argName));
                 argSchemas.add(argSchema);
             }
             exposureDefinition.setArgSchemas(argSchemas);
             objects.add(exposureDefinition);
         }
         return objects;
+    }
+
+    /**
+     * anyOf: [string, null] → string; anyOf: [integer, null] → integer
+     * 多个非 null 类型时保留 AnyOf 不做解析
+     */
+    private static JsonSchemaElement resolveAnyOf(JsonAnyOfSchema anyOfSchema) {
+        List<JsonSchemaElement> elements = anyOfSchema.anyOf();
+        if (elements == null || elements.isEmpty()) {
+            return null;
+        }
+        List<JsonSchemaElement> nonNull = elements.stream()
+                .filter(e -> !(e instanceof JsonNullSchema))
+                .collect(Collectors.toList());
+        if (nonNull.size() == 1) {
+            return nonNull.get(0);
+        }
+        return null;
     }
 
 }

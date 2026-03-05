@@ -139,7 +139,7 @@ public class McpHelper {
             Constructor<?> constructor = ToolExecutionRequest.Builder.class.getDeclaredConstructor();
             constructor.setAccessible(true);
             ToolExecutionRequest.Builder reqBuilder = (ToolExecutionRequest.Builder) constructor.newInstance();
-            ToolExecutionRequest request = reqBuilder.name(toolName).arguments(args.toJSONString()).build();
+            ToolExecutionRequest request = reqBuilder.name(toolName).arguments(JSON.toJSONString(args, SerializerFeature.WriteMapNullValue)).build();
             return mcpClient.executeTool(request);
         } catch (Throwable e) {
             e.printStackTrace();

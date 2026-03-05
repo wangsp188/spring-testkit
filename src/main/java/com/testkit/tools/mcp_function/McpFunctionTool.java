@@ -411,8 +411,23 @@ public class McpFunctionTool extends BasePluginTool {
                     }
                 } else if (comp instanceof JScrollPane) {
                     Component view = ((JScrollPane) comp).getViewport().getView();
-                    if (view instanceof JPanel) {
-                        // ARRAY 类型多选 CheckBox 面板
+                    // LanguageTextField extends EditorTextField extends JPanel，必须先检查
+                    if (view instanceof LanguageTextField) {
+                        String txt = ((LanguageTextField) view).getText();
+                        if (txt == null || txt.isBlank()) {
+                            val = null;
+                        } else {
+                            if (Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())) {
+                                val = txt;
+                            } else {
+                                try {
+                                    val = com.alibaba.fastjson.JSON.parse(txt);
+                                } catch (Throwable e) {
+                                    errors.add("'" + name + "' must be valid JSON.");
+                                }
+                            }
+                        }
+                    } else if (view instanceof JPanel) {
                         JPanel checkBoxPanel = (JPanel) view;
                         ArrayList<String> selectedValues = new ArrayList<>();
                         for (Component c : checkBoxPanel.getComponents()) {
@@ -421,29 +436,13 @@ public class McpFunctionTool extends BasePluginTool {
                             }
                         }
                         val = selectedValues;
-                    } else if (view instanceof LanguageTextField) {
-                        String txt = ((LanguageTextField) view).getText();
-                        if (txt == null || txt.isBlank()) {
-                            val = null;
-                        } else {
-                            // STRING 类型的 SQL 输入框：直接取文本
-                            if (Objects.equals(type, McpServerDefinition.ArgType.STRING.getCode())) {
-                                val = txt;
-                            } else {
-                                // 复杂类型：需要解析 JSON
-                                try {
-                                    val = com.alibaba.fastjson.JSON.parse(txt);
-                                } catch (Throwable e) {
-                                    errors.add("'" + name + "' must be valid JSON.");
-                                }
-                            }
-                        }
                     }
                 }
             } catch (Throwable ignore) {
             }
 
-            if (required && (val == null || (val instanceof String && ((String) val).isBlank()))) {
+            if (required && (val == null || (val instanceof String && ((String) val).isBlank())
+                    || (val instanceof Collection && ((Collection<?>) val).isEmpty()))) {
                 errors.add("Required argument '" + name + "' is missing.");
             }
             out.put(name, val);
