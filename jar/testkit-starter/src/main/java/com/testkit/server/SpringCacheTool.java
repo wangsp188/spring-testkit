@@ -86,7 +86,8 @@ public class SpringCacheTool implements TestkitTool {
         if (!cacheOperationSource.isCandidateClass(typeClass)) {
             throw new TestkitException("typeClass is not Cache");
         }
-        ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
+        String source = params.get("__source__");
+        ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr, source);
         Object bean = ReflexUtils.getBean(app, beanName, typeClass);
         Class<?> finalTypeClass = typeClass;
         Object finalBean = bean;

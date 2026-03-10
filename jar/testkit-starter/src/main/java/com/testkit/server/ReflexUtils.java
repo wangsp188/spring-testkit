@@ -43,6 +43,9 @@ import java.util.regex.Pattern;
 public class ReflexUtils {
     private static final Logger logger = LoggerFactory.getLogger(ReflexUtils.class);
     public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    static {
+        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
 
     public static final ObjectMapper PARSER_MAPPER = new ObjectMapper();
 
@@ -181,7 +184,7 @@ public class ReflexUtils {
     }
 
 
-    public static ReflexBox parse(Class typeClass, String methodName, String methodArgTypesStr, String methodArgsStr) throws JsonProcessingException, NoSuchMethodException, ClassNotFoundException {
+    public static ReflexBox parse(Class typeClass, String methodName, String methodArgTypesStr, String methodArgsStr, String source) throws JsonProcessingException, NoSuchMethodException, ClassNotFoundException {
         TypeFactory typeFactory = PARSER_MAPPER.getTypeFactory();
 
         List<String> methodArgTypesList = PARSER_MAPPER.readValue(methodArgTypesStr, new TypeReference<List<String>>() {
@@ -190,6 +193,9 @@ public class ReflexUtils {
         JavaType[] methodArgTypes = new JavaType[methodArgTypesList.size()];
         for (int i = 0; i < methodArgTypesList.size(); i++) {
             String canonical = methodArgTypesList.get(i);
+            if (canonical.startsWith("java.time.")) {
+                throw new TestkitException("不支持 java.time.* 类型（" + canonical + "），请使用 java.util.Date 替代，或使用 flexible-test 功能");
+            }
             String resolvedType = convertFullTypeString(canonical);
             methodArgTypes[i] = typeFactory.constructFromCanonical(resolvedType);
         }
@@ -299,8 +305,11 @@ public class ReflexUtils {
                             throw new TestkitException("Failed to convert JSON to MockHttpServletRequest: " + e.getMessage());
                         }
                     }
+                } else if (argType.toCanonical().startsWith("java.time.")) {
+                    throw new TestkitException("不支持 java.time.* 类型（" + argType.toCanonical() + "），请使用 java.util.Date 替代，或使用 flexible-test 功能");
                 } else {
                     // 其他类型
+                    checkJsonAnnotations(argType.getRawClass(), source);
                     methodArgs[i] = PARSER_MAPPER.readValue(PARSER_MAPPER.writeValueAsString(argJson), argType);
                 }
             } catch (Throwable e) {
@@ -308,6 +317,46 @@ public class ReflexUtils {
             }
         }
         return new ReflexBox(method, methodArgs);
+    }
+
+    private static final Set<String> JACKSON_ANNOTATION_NAMES = new HashSet<>(Arrays.asList(
+            "com.fasterxml.jackson.annotation.JsonProperty",
+            "com.fasterxml.jackson.annotation.JsonAlias",
+            "com.fasterxml.jackson.annotation.JsonSetter",
+            "com.fasterxml.jackson.annotation.JsonGetter",
+            "com.fasterxml.jackson.annotation.JsonCreator",
+            "com.fasterxml.jackson.annotation.JsonValue",
+            "com.fasterxml.jackson.annotation.JsonSerialize",
+            "com.fasterxml.jackson.annotation.JsonDeserialize",
+            "com.fasterxml.jackson.annotation.JsonNaming",
+            "com.fasterxml.jackson.annotation.JsonTypeInfo",
+            "com.fasterxml.jackson.annotation.JsonSubTypes"
+    ));
+
+    private static void checkJsonAnnotations(Class<?> clazz, String source) {
+        if ("plugin".equals(source)) {
+            return;
+        }
+        if (clazz == null || clazz.isPrimitive() || clazz.getName().startsWith("java.")) {
+            return;
+        }
+        Class<?> current = clazz;
+        while (current != null && current != Object.class) {
+            for (Field field : current.getDeclaredFields()) {
+                for (Annotation ann : field.getAnnotations()) {
+                    if (JACKSON_ANNOTATION_NAMES.contains(ann.annotationType().getName())) {
+                        throw new TestkitException(
+                                "POJO " + clazz.getSimpleName() + " 的字段 " + field.getName()
+                                        + (current != clazz ? "（继承自 " + current.getSimpleName() + "）" : "")
+                                        + " 存在 " + ann.annotationType().getSimpleName() + " 注解，"
+                                        + "Testkit 使用字段名直接反序列化（已禁用 Jackson 注解），可能导致字段映射不一致。"
+                                        + "请使用 flexible-test 功能替代，或确认字段名与 JSON key 一致"
+                        );
+                    }
+                }
+            }
+            current = current.getSuperclass();
+        }
     }
 
     public static boolean isPrimitiveOrWrapper(Object obj) {

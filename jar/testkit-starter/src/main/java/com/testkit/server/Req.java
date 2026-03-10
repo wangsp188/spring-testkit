@@ -14,6 +14,9 @@ class Req {
 
     private Map<String, String> params;
 
+    private String operator = "testkit";
+
+    private String source = "plugin";
 
     public String getMethod() {
         return method;
@@ -53,5 +56,21 @@ class Req {
 
     public void setPrepare(boolean prepare) {
         this.prepare = prepare;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 }

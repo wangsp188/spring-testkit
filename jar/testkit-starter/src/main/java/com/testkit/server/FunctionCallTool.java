@@ -36,7 +36,8 @@ public class FunctionCallTool implements TestkitTool {
         } catch (ClassNotFoundException e) {
             throw new TestkitException("can not find class: " + typeClassStr + ", please check");
         }
-        ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
+        String source = params.get("__source__");
+        ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr, source);
         Object bean = ReflexUtils.getBean(app, beanName, typeClass);
         if (original && ReflexUtils.isAopProxy(bean)) {
             try {

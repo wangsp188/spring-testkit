@@ -265,7 +265,7 @@ public class TestkitServer {
             Map<String, String> params = req.getParams();
             String reqId = params.get("reqId");
             Ret ret = Ret.success(TaskManager.stopTask(reqId), (int) (System.currentTimeMillis() - begin));
-            log("Testkit stopReq reqId:" + reqId + " cancel:" + ret.getData(),null);
+            log("[operator:" + req.getOperator() + "] " + "[reqId:" + reqId + "] Testkit stopReq cancel:" + ret.getData(), null);
             return ret;
         }
         TestkitTool testkitTool = tools.get(req.getMethod());
@@ -284,7 +284,7 @@ public class TestkitServer {
             }
         });
         Ret ret = Ret.success(reqId, (int) (System.currentTimeMillis() - begin));
-        log("Testkit submitReq  method:" + req.getMethod() + " reqId:" + reqId,null);
+        log("[operator:" + req.getOperator() + "] " + "[reqId:" + reqId + "] Testkit submitReq method:" + req.getMethod(), null);
         return ret;
     }
 
@@ -374,6 +374,7 @@ public class TestkitServer {
 
         Map<String, String> params = req.getParams();
         params.put("req_id", reqId);
+        params.put("__source__", req.getSource());
         Object ret = null;
         Throwable error = null;
         Long begin = System.currentTimeMillis();
@@ -410,7 +411,7 @@ public class TestkitServer {
                 }
             }
         } catch (Throwable e) {
-            log("TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage(),e);
+            log("[operator:" + req.getOperator() + "] " + "[reqId:" + reqId + "] " + "TESTKIT tool execute error, errorType:" + e.getClass().getName() + ", " + e.getMessage(), e);
             error = e;
             return Ret.fail(getNoneTestkitStackTrace(e), (int) (System.currentTimeMillis() - begin), profile);
         } finally {
@@ -418,7 +419,7 @@ public class TestkitServer {
             while (error instanceof InvocationTargetException) {
                 error = ((InvocationTargetException) error).getTargetException();
             }
-            log("TESTKIT_DETAIL tool:" + req.getMethod() + " cost:" + cost + " params:" + params + " ret:" + ret + " e:" + error,null);
+            log("[operator:" + req.getOperator() + "] " + "[reqId:" + reqId + "] " + "TESTKIT_DETAIL tool:" + req.getMethod() + " cost:" + cost + " params:" + params + " ret:" + ret + " e:" + error, null);
             if (afterMethod != null) {
                 try {
                     afterMethod.invoke(interceptorObj, env, req.getMethod(), params, cost, ret, error);

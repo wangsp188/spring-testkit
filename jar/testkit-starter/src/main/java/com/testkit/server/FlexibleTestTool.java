@@ -51,7 +51,8 @@ public class FlexibleTestTool implements TestkitTool {
             throw new TestkitException("autowireBean error, " + e);
         }
 
-        ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr);
+        String source = params.get("__source__");
+        ReflexBox reflexBox = ReflexUtils.parse(typeClass, methodName, methodArgTypesStr, methodArgsStr, source);
         Object finalInstance = instance;
         return new PrepareRet() {
             @Override
