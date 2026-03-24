@@ -384,15 +384,28 @@ public class RuntimeHelper {
         return appMetas1 == null ? new ArrayList<>() : appMetas1;
     }
 
+    /**
+     * 强制清空 appMetas 缓存（用于手动刷新）
+     */
+    public static void clearAppMetas(String project) {
+        if (project == null) {
+            return;
+        }
+        appMetas.remove(project);
+        System.out.println("[RuntimeHelper] Cleared appMetas cache for " + project);
+    }
+
     public static void updateAppMetas(String project, List<AppMeta> metas) {
         if (project == null) {
             return;
         }
         if (CollectionUtils.isEmpty(metas)) {
             appMetas.remove(project);
+            System.out.println("[RuntimeHelper] Updated appMetas for " + project + ": 0 apps (cleared)");
             return;
         }
         appMetas.put(project, metas);
+        System.out.println("[RuntimeHelper] Updated appMetas for " + project + ": " + metas.size() + " apps");
     }
 
     public static List<String> getTempApps(String project) {

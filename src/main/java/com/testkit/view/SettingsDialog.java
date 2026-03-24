@@ -151,6 +151,13 @@ public class SettingsDialog {
         if (apps == null) {
             return;
         }
+        // ✅ 先清空旧数据，防止重复累加
+        interceptorAppBox.removeAllItems();
+        controllerScriptAppBox.removeAllItems();
+        feignScriptAppBox.removeAllItems();
+        propertiesAppBox.removeAllItems();
+        
+        // 再添加新数据
         apps.stream().forEach(new Consumer<String>() {
             @Override
             public void accept(String app) {

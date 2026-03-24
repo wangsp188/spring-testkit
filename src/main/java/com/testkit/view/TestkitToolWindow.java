@@ -1015,12 +1015,37 @@ public class TestkitToolWindow {
     }
 
 
+    /**
+     * 扫描 Spring Boot 应用类并更新缓存
+     * ✅ 方案 1 + 4：强制重新扫描，确保更新缓存，支持手动刷新
+     */
     public void findSpringBootApplicationClasses() {
+        findSpringBootApplicationClasses(false);
+    }
+
+    /**
+     * 扫描 Spring Boot 应用类并更新缓存
+     * @param forceClearCache 是否强制清空缓存（用于手动刷新）
+     */
+    public void findSpringBootApplicationClasses(boolean forceClearCache) {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            // 在后台线程中执行索引查询操作（慢操作）
-            List<RuntimeHelper.AppMeta> apps = RuntimeHelper.getAppMetas(project.getName());
-            if (apps == null || apps.isEmpty()) {
-                apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
+            // ✅ 方案 4：手动刷新时强制清空缓存
+            if (forceClearCache) {
+                RuntimeHelper.clearAppMetas(project.getName());
+            }
+            
+            // 强制重新扫描，不依赖可能为空的缓存
+            Map<String, RuntimeHelper.AppMeta> scannedApps = TestkitHelper.findSpringBootClass(project);
+            List<RuntimeHelper.AppMeta> apps = new ArrayList<>(scannedApps.values());
+            
+            // ✅ 关键修复：无论结果如何都更新缓存
+            RuntimeHelper.updateAppMetas(project.getName(), apps);
+            
+            // 如果扫描结果为空，记录日志便于排查
+            if (apps.isEmpty()) {
+                System.err.println("[Testkit] Warning: No @SpringBootApplication found in " + project.getName());
+            } else {
+                System.out.println("[Testkit] Found " + apps.size() + " Spring Boot applications in " + project.getName());
             }
             
             // 将查询结果保存为 final 变量，传递到 EDT 线程

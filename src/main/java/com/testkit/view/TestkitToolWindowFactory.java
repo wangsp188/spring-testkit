@@ -363,6 +363,8 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
 
 
         // 添加第三个个按钮
+        // 添加 Refresh 按钮（刷新所有内容，包括 RuntimeApp 列表）
+        // ✅ 方案 4：手动刷新时强制清空 appMetas 缓存，确保重新扫描
         AnAction refresh = new AnAction("Refresh", "Refresh", AllIcons.Actions.Refresh) {
             @Override
             public void actionPerformed(AnActionEvent e) {
@@ -373,7 +375,8 @@ public class TestkitToolWindowFactory implements ToolWindowFactory {
                         testkitToolWindow.refreshVisibleApp();
 
                         // 1. 查找 Spring Boot 应用类（已经在后台线程中执行）
-                        testkitToolWindow.findSpringBootApplicationClasses();
+                        // ✅ 传入 true 强制清空缓存后重新扫描
+                        testkitToolWindow.findSpringBootApplicationClasses(true);
                         
                         // 2. 刷新文档（文件 I/O 操作，在后台线程执行）
                         CodingGuidelinesHelper.refreshDoc(project);

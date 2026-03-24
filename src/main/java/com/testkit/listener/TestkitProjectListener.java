@@ -40,7 +40,9 @@ public class TestkitProjectListener implements ProjectActivity {
 
     @Override
     public @Nullable Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
-        DumbService.getInstance(project).smartInvokeLater(() -> {
+        // ✅ 方案 2：使用 runWhenSmart 替代 smartInvokeLater
+        // runWhenSmart 会在所有索引任务完成后才执行，更可靠
+        DumbService.getInstance(project).runWhenSmart(() -> {
             try {
 //                new Thread(() -> {
 //                    while (true) {
@@ -57,8 +59,18 @@ public class TestkitProjectListener implements ProjectActivity {
                 ProgressManager.getInstance().run(new Task.Backgroundable(project, "Init project apps", false){
                     @Override
                     public void run(@NotNull ProgressIndicator progressIndicator) {
-                        List<RuntimeHelper.AppMeta> apps = new ArrayList<>(TestkitHelper.findSpringBootClass(project).values());
+                        // ✅ 方案 1：强制重新扫描，并确保更新缓存
+                        Map<String, RuntimeHelper.AppMeta> scannedApps = TestkitHelper.findSpringBootClass(project);
+                        List<RuntimeHelper.AppMeta> apps = new ArrayList<>(scannedApps.values());
+                        
+                        // 关键修复：无论结果如何都更新缓存
                         RuntimeHelper.updateAppMetas(project.getName(), apps);
+                        
+                        // 如果扫描结果为空，记录日志便于排查
+                        if (apps.isEmpty()) {
+                            System.err.println("[Testkit] Warning: No @SpringBootApplication found in " + project.getName());
+                        }
+                        
                         RuntimeHelper.setEnableMapperSql(SettingsStorageHelper.getSqlConfig(project).isEnableMapperSql());
                         System.out.println("Init project line marker,"+project.getName());
                         TestkitHelper.refresh(project);
